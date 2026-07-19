@@ -1,0 +1,6 @@
+{
+  "name": "Pi Business Market",
+  "description": "A complete Pi Browser Super App exclusively for verified Pi Pioneers. Create professional profiles, publish stores, offer local services (electrician, plumber, tutor), post jobs, and coordinate peer-to-peer Pi crypto payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
