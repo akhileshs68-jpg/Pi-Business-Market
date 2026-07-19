@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Enterprise user profile synced from Pi Network",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Authentication UID" },
+        "piUid": { "type": "string", "description": "Pi Network Unique ID" },
+        "username": { "type": "string", "description": "Pi Network Username" },
+        "displayName": { "type": "string" },
+        "walletAddress": { "type": "string" },
+        "role": { 
+          "type": "string", 
+          "enum": ["Buyer", "Seller", "Business Owner", "Service Provider", "Employer", "Job Seeker", "Admin", "Super Admin"] 
+        },
+        "accountType": { 
+          "type": "string", 
+          "enum": ["individual", "business", "enterprise"] 
+        },
+        "verified": { "type": "boolean" },
+        "kycVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "status": { 
+          "type": "string", 
+          "enum": ["active", "suspended", "pending_verification"] 
+        }
+      },
+      "required": ["uid", "piUid", "username", "role", "accountType", "status"]
+    },
+    "BusinessProfile": {
+      "title": "Business Profile",
+      "description": "Enterprise business identity",
+      "type": "object",
+      "properties": {
+        "businessId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "businessName": { "type": "string" },
+        "businessSlug": { "type": "string" },
+        "businessType": { "type": "string" },
+        "businessCategory": { "type": "string" },
+        "description": { "type": "string" },
+        "country": { "type": "string" },
+        "state": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "website": { "type": "string" },
+        "logo": { "type": "string" },
+        "banner": { "type": "string" },
+        "verified": { "type": "boolean" },
+        "featured": { "type": "boolean" },
+        "status": { "type": "string" },
+        "rating": { "type": "number" },
+        "followers": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["businessId", "ownerUid", "businessName", "businessSlug", "businessType", "businessCategory", "status"]
+    },
+    "Store": {
+      "title": "Enterprise Store",
+      "description": "Retail or service outlet",
+      "type": "object",
+      "properties": {
+        "storeId": { "type": "string" },
+        "businessId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "storeName": { "type": "string" },
+        "storeSlug": { "type": "string" },
+        "storeType": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["storeId", "businessId", "ownerUid", "storeName", "storeSlug", "storeType", "status"]
+    },
+    "Product": {
+      "title": "Enterprise Product",
+      "description": "Commercial product or service listing",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "businessId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "productName": { "type": "string" },
+        "productSlug": { "type": "string" },
+        "sku": { "type": "string" },
+        "price": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["productId", "storeId", "businessId", "ownerUid", "productName", "productSlug", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profile document indexed by Firebase UID"
+    },
+    "/businessProfiles/{businessId}": {
+      "schema": "BusinessProfile",
+      "description": "Business profile document"
+    },
+    "/stores/{storeId}": {
+      "schema": "Store",
+      "description": "Store outlet document"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Enterprise product document"
+    }
+  }
+}

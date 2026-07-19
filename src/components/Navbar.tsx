@@ -21,11 +21,24 @@ import {
   MessageSquare,
   Shield,
   Menu,
-  X
+  X,
+  Briefcase,
+  LayoutDashboard,
+  Search,
+  ClipboardList,
+  Truck,
+  Users,
+  Award,
+  BarChart3,
+  ShieldAlert,
+  Terminal
 } from 'lucide-react';
 import { User as UserType, Notification } from '../types';
 import { PiSdkSim } from '../services/piSdk';
 import { PiBusinessMarketDB } from '../services/storage';
+import { CartDrawer } from './cart/CartDrawer';
+
+import { NotificationCenter } from './NotificationCenter';
 
 interface NavbarProps {
   currentUser: UserType;
@@ -47,21 +60,9 @@ export default function Navbar({
   onToggleCart
 }: NavbarProps) {
   const [isWalletOpen, setIsWalletOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [faucetLoading, setFaucetLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchNotifs = () => {
-      const list = PiBusinessMarketDB.getNotifications(currentUser.uid);
-      setNotifications(list);
-    };
-    fetchNotifs();
-    // Poll every 5 seconds for new background notifications
-    const interval = setInterval(fetchNotifs, 5000);
-    return () => clearInterval(interval);
-  }, [currentUser.uid]);
 
   const handleFaucet = () => {
     setFaucetLoading(true);
@@ -69,25 +70,8 @@ export default function Navbar({
       const updated = PiSdkSim.requestFaucet();
       onWalletUpdate(updated);
       setFaucetLoading(false);
-      
-      // Seed a notification
-      PiBusinessMarketDB.createNotification(
-        currentUser.uid,
-        'Sandbox Faucet Success! 🪙',
-        'You successfully claimed +50.00 Pi Test coins from the Pi Network Sandbox Mining Pool.',
-        'ads_milestone'
-      );
-      // Trigger instant list refresh
-      setNotifications(PiBusinessMarketDB.getNotifications(currentUser.uid));
     }, 800);
   };
-
-  const handleMarkAllRead = () => {
-    PiBusinessMarketDB.markAllNotificationsAsRead(currentUser.uid);
-    setNotifications(PiBusinessMarketDB.getNotifications(currentUser.uid));
-  };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <header className="sticky top-0 z-50 w-full bg-slate-950/80 backdrop-blur-md border-b border-slate-900 shadow-lg shadow-violet-950/5">
@@ -117,116 +101,155 @@ export default function Navbar({
           
           {/* DESKTOP-ONLY LINKS CONTAINER */}
           <div className="hidden xl:flex items-center gap-3" id="nav_desktop_links">
-            {/* PROFILE ENGINE NAV TRIGGER */}
+            {/* DASHBOARD NAV TRIGGER */}
             <button
-              onClick={() => onNavigate('profile_engine')}
+              onClick={() => onNavigate('dashboard')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                currentView === 'profile_engine'
+                currentView === 'dashboard'
+                  ? 'bg-slate-800 text-white border-slate-700 shadow-md shadow-slate-950/20'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Dashboard</span>
+            </button>
+
+            {/* MESSAGING HUB TRIGGER */}
+            <button
+              onClick={() => onNavigate('inbox')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'inbox'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Inbox</span>
+            </button>
+
+            {/* UNIVERSAL SEARCH NAV TRIGGER */}
+            <button
+              onClick={() => onNavigate('discovery')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'discovery'
                   ? 'bg-violet-600 text-white border-violet-500/30 shadow-md shadow-violet-500/10'
                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
               }`}
-              id="btn_nav_profile_engine"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Profile Engine</span>
+              <Search className="w-3.5 h-3.5 text-violet-400" />
+              <span>Market Search</span>
             </button>
 
-            {/* AI DISCOVERY ENGINE NAV TRIGGER */}
+            {/* BUSINESS DASHBOARD NAV TRIGGER */}
             <button
-              onClick={() => onNavigate('discovery_engine')}
+              onClick={() => onNavigate('business-dashboard')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'discovery_engine'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-500/30 shadow-md shadow-indigo-500/10'
+                currentView === 'business-dashboard'
+                  ? 'bg-violet-600 text-white border-violet-500/30 shadow-md shadow-violet-500/10'
                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
               }`}
-              id="btn_nav_discovery_engine"
             >
-              <Compass className="w-3.5 h-3.5 text-violet-400" />
-              <span>AI Discovery Hub</span>
+              <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+              <span>Businesses</span>
             </button>
 
-            {/* PI COMMERCE ENGINE NAV TRIGGER */}
             <button
-              onClick={() => onNavigate('commerce_engine')}
+              onClick={() => onNavigate('merchant-analytics')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'commerce_engine'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-500/30 shadow-md shadow-indigo-500/10'
+                currentView === 'merchant-analytics'
+                  ? 'bg-amber-600 text-white border-amber-500/30 shadow-md shadow-amber-500/10'
                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
               }`}
-              id="btn_nav_commerce_engine"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+              <span>BI</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('admin-analytics')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'admin-analytics'
+                  ? 'bg-rose-600 text-white border-rose-500/30 shadow-md shadow-rose-500/10'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+              <span>System</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('admin-console')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'admin-console'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Ops</span>
+            </button>
+
+            {/* STORE DASHBOARD NAV TRIGGER */}
+            <button
+              onClick={() => onNavigate('store-dashboard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'store-dashboard'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Stores</span>
+            </button>
+
+            {/* MERCHANT ORDERS NAV TRIGGER */}
+            <button
+              onClick={() => onNavigate('business-orders')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'business-orders'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Order Hub</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('business-payments')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'business-payments'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+              }`}
             >
               <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Commerce Hub</span>
+              <span>Finance Hub</span>
             </button>
 
-            {/* PI ENGAGEMENT & ENGAGEMENT NAV TRIGGER */}
             <button
-              onClick={() => onNavigate('engagement_platform')}
+              onClick={() => onNavigate('logistics')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'engagement_platform'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-500/30 shadow-md shadow-indigo-500/10'
+                currentView === 'logistics'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
               }`}
-              id="btn_nav_engagement_platform"
             >
-              <MessageSquare className="w-3.5 h-3.5 text-violet-400 animate-pulse" />
-              <span>Communication Hub</span>
+              <Truck className="w-3.5 h-3.5 text-violet-400" />
+              <span>Logistics Hub</span>
             </button>
 
-            {/* ENTERPRISE AI PLATFORM TRIGGER */}
             <button
-              onClick={() => onNavigate('ai_platform')}
+              onClick={() => onNavigate('crm')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'ai_platform'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-violet-500/30 shadow-md shadow-indigo-500/10'
+                currentView === 'crm'
+                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
               }`}
-              id="btn_nav_ai_platform"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span>Enterprise AI</span>
+              <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Customer 360</span>
             </button>
-
-            {/* GLOBAL COMMAND CENTER TRIGGER */}
-            <button
-              onClick={() => onNavigate('global_ops')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'global_ops'
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 border-amber-400/30 shadow-md shadow-amber-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-              id="btn_nav_global_ops"
-            >
-              <Shield className={`w-3.5 h-3.5 ${currentView === 'global_ops' ? 'text-slate-950' : 'text-amber-400'}`} />
-              <span>Global Ops</span>
-            </button>
-
-            {/* USER PORTFOLIO CONTROL */}
-            {currentUser.isMerchant ? (
-              <button
-                onClick={() => onNavigate(currentView.startsWith('merchant') ? 'marketplace' : 'merchant_dashboard')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  currentView.startsWith('merchant')
-                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
-                    : 'bg-violet-600 text-white shadow-md hover:bg-violet-500 hover:shadow-violet-600/10 border border-violet-500/30'
-                }`}
-                id="btn_toggle_merchant"
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline font-sans">
-                  {currentView.startsWith('merchant') ? 'Switch to Marketplace' : 'Merchant Suite'}
-                </span>
-              </button>
-            ) : (
-              <button
-                onClick={() => onNavigate('store_wizard')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md hover:from-violet-500 hover:to-indigo-500 transition-all group border border-violet-500/30 cursor-pointer"
-                id="btn_launch_store"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 group-hover:rotate-12 transition-transform" />
-                <span className="font-sans">Sell on Pi</span>
-              </button>
-            )}
           </div>
 
           {/* MOBILE TOGGLE (COMPACT CLASS FOR VIEWPORTS < XL) */}
@@ -234,7 +257,6 @@ export default function Navbar({
             onClick={() => {
               setIsMobileMenuOpen(!isMobileMenuOpen);
               setIsWalletOpen(false);
-              setIsNotifOpen(false);
             }}
             className="xl:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer select-none"
             id="btn_nav_mobile_toggle"
@@ -244,15 +266,23 @@ export default function Navbar({
           </button>
 
           {/* SIMULATED PI WALLET STATUS */}
-          <div className="relative">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                setIsWalletOpen(!isWalletOpen);
-                setIsNotifOpen(false);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-850 hover:border-slate-750 transition-all cursor-pointer"
-              id="nav_wallet_button"
+              onClick={() => onNavigate('rewards')}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-500/20 bg-indigo-600/10 hover:bg-indigo-600/20 transition-all cursor-pointer"
             >
+              <Award className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Rewards</span>
+            </button>
+
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsWalletOpen(!isWalletOpen);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-850 hover:border-slate-750 transition-all cursor-pointer"
+                id="nav_wallet_button"
+              >
               <Wallet className="w-3.5 h-3.5 text-violet-450" />
               <div className="text-left font-mono text-xs font-bold text-slate-200">
                 {walletBalance.toFixed(2)} <span className="text-violet-400 font-bold">π</span>
@@ -301,75 +331,23 @@ export default function Navbar({
               </div>
             )}
           </div>
+        </div>
 
           {/* ACTIVE NOTIFICATIONS BUTTON */}
-          <div className="relative">
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={() => {
-                setIsNotifOpen(!isNotifOpen);
-                setIsWalletOpen(false);
-              }}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all relative"
-              id="nav_notif_button"
+              onClick={() => onNavigate('inbox')}
+              className={`p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all ${
+                currentView === 'inbox' ? 'text-indigo-400 bg-slate-900 border-slate-800' : ''
+              }`}
+              title="Messages"
             >
-              <Bell className="w-4.5 h-4.5" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-rose-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold font-mono">
-                  {unreadCount}
-                </span>
-              )}
+              <MessageSquare className="w-4.5 h-4.5" />
             </button>
-
-            {/* NOTIFICATION OVERLAY */}
-            {isNotifOpen && (
-              <div className="absolute right-0 mt-2.5 w-80 bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl z-50 overflow-hidden">
-                <div className="px-4 py-3 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">Transactional Alerts</span>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllRead}
-                      className="text-[10px] text-violet-400 hover:text-violet-300 font-bold"
-                    >
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-
-                <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/40">
-                  {notifications.length === 0 ? (
-                    <div className="py-8 text-center text-slate-500 flex flex-col items-center justify-center gap-1.5">
-                      <Clock className="w-4 h-4 text-slate-600" />
-                      <p className="text-xs">No notifications yet</p>
-                    </div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div 
-                        key={n.id} 
-                        onClick={() => {
-                          PiBusinessMarketDB.markNotificationAsRead(n.id);
-                          setNotifications(PiBusinessMarketDB.getNotifications(currentUser.uid));
-                          if (n.linkTo) {
-                            onNavigate(n.linkTo === '/orders' ? 'orders' : 'merchant_orders');
-                          }
-                          setIsNotifOpen(false);
-                        }}
-                        className={`p-3.5 text-left cursor-pointer transition-all hover:bg-slate-850 ${!n.read ? 'bg-violet-950/20' : ''}`}
-                      >
-                        <div className="flex justify-between items-start gap-1">
-                          <span className="text-xs font-bold text-slate-200 leading-tight block">{n.title}</span>
-                          {!n.read && <span className="w-1.5 h-1.5 bg-violet-500 rounded-full mt-1.5 flex-shrink-0"></span>}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-1 leading-normal">{n.message}</p>
-                        <span className="text-[9px] text-slate-550 font-mono block mt-1.5">
-                          {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+            <NotificationCenter />
           </div>
+
+          {/* ACTIVE CUSTOMER ORDERS / PURCHASES HUB */}
 
           {/* ACTIVE CUSTOMER ORDERS / PURCHASES HUB */}
           <button
@@ -384,7 +362,7 @@ export default function Navbar({
 
           {/* VISUAL CART TOGGLE */}
           <button
-            onClick={onToggleCart}
+            onClick={() => setIsCartOpen(true)}
             className="p-2 rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition-all relative flex items-center gap-1.5 cursor-pointer shadow-md border border-violet-500/30"
             id="nav_cart_button"
           >
@@ -406,6 +384,22 @@ export default function Navbar({
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono mb-2 px-1">Network Hub Navigation</h3>
             <div className="grid grid-cols-2 gap-2">
               
+              {/* DISCOVERY SEARCH TRIGGER */}
+              <button
+                onClick={() => {
+                  onNavigate('discovery');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2 p-3 rounded-xl text-xs font-bold border transition-all h-12 cursor-pointer ${
+                  currentView === 'discovery'
+                    ? 'bg-violet-600/15 border-violet-500 text-white shadow-sm'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-300'
+                }`}
+              >
+                <Search className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                <span className="truncate">Search Market</span>
+              </button>
+
               {/* PROFILE ENGINE */}
               <button
                 onClick={() => {
@@ -506,37 +500,86 @@ export default function Navbar({
           </div>
 
           <div className="border-t border-slate-900 pt-3.5 space-y-2">
-            <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono px-1">Merchant Suite Control</h4>
-            {currentUser.isMerchant ? (
-              <button
-                onClick={() => {
-                  onNavigate(currentView.startsWith('merchant') ? 'marketplace' : 'merchant_dashboard');
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold border transition-all cursor-pointer h-12 ${
-                  currentView.startsWith('merchant')
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    : 'bg-violet-600 text-white border-violet-500/30 shadow-md shadow-violet-500/10'
-                }`}
-              >
-                <Store className="w-4 h-4" />
-                <span>{currentView.startsWith('merchant') ? 'Switch to Marketplace' : 'Open Merchant Suite'}</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  onNavigate('store_wizard');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white border border-violet-500/30 cursor-pointer h-12"
-              >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>Sell on Pi (Create Store)</span>
-              </button>
-            )}
+            <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono px-1">Enterprise Suite</h4>
+            <button
+              onClick={() => {
+                onNavigate('business-dashboard');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-violet-600 text-white border border-violet-500/30 cursor-pointer h-12"
+            >
+              <Briefcase className="w-4 h-4" />
+              <span>Business Management</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavigate('store-dashboard');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-indigo-600 text-white border border-indigo-500/30 cursor-pointer h-12"
+            >
+              <Store className="w-4 h-4" />
+              <span>Store Management</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavigate('business-orders');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-slate-800 text-white border border-slate-700 cursor-pointer h-12"
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span>Order Management</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavigate('business-payments');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-slate-800 text-white border border-slate-700 cursor-pointer h-12"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Finance Management</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavigate('logistics');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-slate-800 text-white border border-slate-700 cursor-pointer h-12"
+            >
+              <Truck className="w-4 h-4" />
+              <span>Logistics Management</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavigate('crm');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-slate-800 text-white border border-slate-700 cursor-pointer h-12"
+            >
+              <Users className="w-4 h-4" />
+              <span>Customer Management</span>
+            </button>
+            <button
+              onClick={() => {
+                onNavigate('rewards');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold bg-indigo-600 text-white border border-indigo-500 cursor-pointer h-12"
+            >
+              <Award className="w-4 h-4" />
+              <span>My Rewards</span>
+            </button>
           </div>
         </div>
       )}
+      <CartDrawer 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        userUid={currentUser.uid}
+        businessId="PI-CORP-001"
+      />
     </header>
   );
 }

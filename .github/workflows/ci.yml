@@ -1,0 +1,45 @@
+name: Enterprise CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate:
+    name: Build & Test Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: TypeScript Validation
+        run: npm run lint
+        
+      - name: Unit & Integration Tests
+        run: npm test -- --run
+        
+      - name: Production Build Verification
+        run: npm run build
+        
+      - name: Bundle Size Audit
+        run: |
+          ls -lh dist/assets/
+          
+  security-audit:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: NPM Audit
+        run: npm audit --audit-level=high

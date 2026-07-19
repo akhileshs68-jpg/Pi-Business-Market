@@ -7,18 +7,38 @@
 // USER & WALLET DOMAIN
 // ==========================================
 
+export type UserRole =
+  | 'Buyer'
+  | 'Seller'
+  | 'Business Owner'
+  | 'Service Provider'
+  | 'Employer'
+  | 'Job Seeker'
+  | 'Admin'
+  | 'Super Admin';
+
+export type AccountStatus = 'active' | 'suspended' | 'pending_verification';
+
 export interface User {
-  uid: string;
-  username: string; // Pi Network username (e.g., 'pi_pioneer')
+  uid: string;           // Firebase UID
+  piUid: string;         // Pi Network unique ID
+  username: string;      // Pi Network username (e.g., 'pi_pioneer')
   displayName: string;
   walletAddress: string; // Pi wallet public key
-  createdAt: string;
-  isMerchant: boolean;
-  storeId?: string; // Associated store ID if merchant
-  profileId?: string; // Associated PioneerProfile ID (services/professional/business)
-  roles: ('user' | 'merchant' | 'admin' | 'pioneer_provider')[];
-  ratingCount: number;
-  averageRating: number;
+  role: UserRole;
+  accountType: 'individual' | 'business' | 'enterprise';
+  verified: boolean;     // Pi verification checkmark
+  kycVerified: boolean;
+  createdAt: string;     // ISO string
+  updatedAt: string;     // ISO string
+  lastLogin: string;     // ISO string
+  status: AccountStatus;
+  photoUrl?: string;
+  
+  // Backward compatibility fields
+  email?: string;
+  ratingCount?: number;
+  averageRating?: number;
 }
 
 export interface PiSession {
@@ -28,44 +48,102 @@ export interface PiSession {
 }
 
 // ==========================================
-// STORE DOMAIN (SaaS Storefront Builder)
+// PRODUCT DOMAIN (Enterprise Management)
 // ==========================================
 
-export interface StoreAnalytics {
-  totalRevenuePi: number;
-  views: number;
-  ordersCount: number;
-  conversionRate: number; // percentage
-  salesHistory: { date: string; amount: number; orders: number }[];
+export type ProductType = 
+  | 'physical' 
+  | 'digital' 
+  | 'service' 
+  | 'subscription' 
+  | 'rental' 
+  | 'downloadable';
+
+export type ProductStatus = 'draft' | 'pending' | 'published' | 'archived' | 'deleted';
+export type VisibilityStatus = 'public' | 'hidden' | 'password_protected';
+export type StockStatus = 'in_stock' | 'out_of_stock' | 'on_backorder' | 'discontinued';
+
+export interface ProductInventory {
+  quantity: number;
+  reserved: number;
+  available: number;
+  lowStockThreshold: number;
+  unlimited: boolean;
+  sku: string;
+  barcode?: string;
 }
 
-export interface Store {
-  id: string;
-  ownerUid: string;
-  name: string;
-  slug: string; // URL-friendly slug
+export interface ProductPricing {
+  regularPrice: number;
+  salePrice?: number;
+  comparePrice?: number;
+  currency: string;
+  taxClass: string;
+}
+
+export interface ProductSEO {
+  title: string;
   description: string;
-  logoUrl: string;
-  bannerUrl: string;
+  slug: string;
+}
+
+export interface Product {
+  productId: string;
+  storeId: string;
+  businessId: string;
+  ownerUid: string;
+  
+  // Basic Information
+  sku: string;
+  barcode?: string;
+  productName: string;
+  productSlug: string;
+  shortDescription: string;
+  description: string;
+  brand: string;
+  type: ProductType;
+  
+  // Categorization
   category: string;
-  createdAt: string;
-  verified: boolean; // Pi verification checkmark
-  rating: number;
-  reviewCount: number;
-  piWalletAddress: string; // Destination wallet for sales
-  phone?: string;
-  email?: string;
-  socials?: {
-    telegram?: string;
-    whatsapp?: string;
-    twitter?: string;
+  subCategory: string;
+  tags: string[];
+  
+  // Pricing
+  price: number;
+  comparePrice?: number;
+  currency: string;
+  taxClass: string;
+  
+  // Inventory
+  stock: number;
+  stockStatus: StockStatus;
+  minOrderQty: number;
+  maxOrderQty: number;
+  
+  // Logistics
+  weight?: number;
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
   };
+  
+  // Flags & Status
   featured: boolean;
-  analytics: StoreAnalytics;
-  customTheme?: {
-    primaryColor: string;
-    bannerText: string;
-  };
+  status: ProductStatus;
+  visibility: VisibilityStatus;
+  
+  // SEO
+  seoTitle: string;
+  seoDescription: string;
+  
+  // Media
+  mainImage?: string;
+  imageUrls: string[];
+  
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ==========================================
@@ -82,124 +160,324 @@ export type ProductCategory =
   | 'books_education'
   | 'others';
 
-export interface ProductAttribute {
+export interface LegacyProductAttribute {
   name: string; // e.g., 'Size', 'Color'
   options: string[]; // e.g., ['M', 'L', 'XL']
 }
 
-export interface Product {
-  id: string;
-  storeId: string;
-  storeName: string;
-  title: string;
-  description: string;
-  pricePi: number; // Pricing in Pi cryptocurrency
-  category: ProductCategory;
-  imageUrls: string[];
-  stock: number;
-  createdAt: string;
-  updatedAt: string;
-  tags: string[];
-  attributes: ProductAttribute[];
-  isDigital: boolean; // Virtual assets vs physical delivery
-  downloadUrl?: string; // For digital products
-  status: 'active' | 'draft' | 'archived';
-  views: number;
-  salesCount: number;
-  averageRating: number;
-  reviewCount: number;
-  aiOptimized?: boolean; // Tracking if merchant used AI optimizer
-  boostedWithAds?: boolean; // Multi-tiered ad campaign tag
-}
+// Old Product interface removed to avoid conflict with Enterprise Product Engine.
+// Use 'Product' from the Enterprise Management section.
 
 // ==========================================
-// CART & ORDERING DOMAIN
+// CART & ORDERING DOMAIN (OMS)
 // ==========================================
-
-export interface CartItem {
-  product: Product;
-  quantity: number;
-  selectedAttributes: Record<string, string>; // e.g., { 'Size': 'M' }
-}
 
 export enum OrderStatus {
+  DRAFT = 'draft',
   PENDING_PAYMENT = 'pending_payment',
-  PAID_VERIFYING = 'paid_verifying',
-  PREPARING = 'preparing',
-  SHIPPED = 'shipped',
-  DELIVERED = 'delivered',
+  CONFIRMED = 'confirmed',
+  PROCESSING = 'processing',
+  READY_FOR_DISPATCH = 'ready_for_dispatch',
   COMPLETED = 'completed',
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
+  RETURNED = 'returned',
+  REFUND_PENDING = 'refund_pending',
+  REFUNDED = 'refunded'
 }
 
-export interface ShippingAddress {
-  fullName: string;
-  streetAddress: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  phoneNumber: string;
+export enum PaymentStatus {
+  PENDING = 'pending',
+  AUTHORIZED = 'authorized',
+  PAID = 'paid',
+  PARTIALLY_PAID = 'partially_paid',
+  FAILED = 'failed',
+  REFUNDED = 'refunded'
+}
+
+export enum FulfillmentStatus {
+  PENDING = 'pending',
+  PACKED = 'packed',
+  READY = 'ready',
+  DISPATCHED = 'dispatched',
+  DELIVERED = 'delivered',
+  RETURNED = 'returned'
+}
+
+export interface OrderTimelineEvent {
+  eventId: string;
+  orderId: string;
+  status: string; // Can be OrderStatus, PaymentStatus, or FulfillmentStatus
+  type: 'status_change' | 'payment' | 'fulfillment' | 'note' | 'system';
+  message: string;
+  actorUid: string;
+  actorName: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface OrderItem {
+  itemId: string;
+  orderId: string;
+  productId: string;
+  variantId?: string;
+  sku?: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  status: string;
 }
 
 export interface Order {
-  id: string;
-  storeId: string;
-  storeName: string;
-  buyerUid: string;
-  buyerUsername: string;
-  items: {
-    productId: string;
-    title: string;
-    pricePi: number;
-    quantity: number;
-    imageUrl: string;
-    selectedAttributes: Record<string, string>;
-  }[];
-  totalPi: number;
-  status: OrderStatus;
-  shippingAddress?: ShippingAddress; // optional for digital assets
+  orderId: string;
+  orderNumber: string;
+  checkoutSessionId?: string;
+  draftId?: string;
+  userUid: string;
+  businessId: string;
+  storeId?: string;
+  currency: string;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  shipping: number;
+  grandTotal: number;
+  paymentStatus: PaymentStatus;
+  orderStatus: OrderStatus;
+  fulfillmentStatus: FulfillmentStatus;
+  billingAddress?: Address;
+  shippingAddress?: Address;
+  customerNotes?: string;
   createdAt: string;
   updatedAt: string;
-  blockchainTxId?: string; // Real or simulated Pi Tx Hash
-  notes?: string;
-  isDigital: boolean;
+  blockchainTxId?: string;
 }
 
 // ==========================================
-// REVIEWS & NOTIFICATIONS DOMAIN
+// MESSAGING & NOTIFICATION DOMAIN
 // ==========================================
 
-export interface Review {
-  id: string;
-  productId: string;
-  productTitle: string;
-  storeId: string;
-  buyerUid: string;
-  buyerUsername: string;
-  rating: number; // 1-5 scale
-  comment: string;
+export type ConversationType = 'direct' | 'group' | 'business_customer' | 'system' | 'support';
+export type ConversationStatus = 'active' | 'archived' | 'deleted' | 'blocked';
+export type MessageType = 'text' | 'image' | 'document' | 'system' | 'voice_placeholder';
+export type MessageStatus = 'sent' | 'delivered' | 'read' | 'failed' | 'deleted';
+
+export interface Conversation {
+  conversationId: string;
+  type: ConversationType;
+  participants: string[]; // Array of user UIDs
+  businessId?: string;
+  storeId?: string;
+  relatedEntityType?: SearchEntityType | 'order' | 'job_application';
+  relatedEntityId?: string;
+  lastMessage?: {
+    content: string;
+    senderUid: string;
+    createdAt: string;
+  };
+  lastActivity: string;
+  status: ConversationStatus;
+  unreadCounts: Record<string, number>; // UID -> count
   createdAt: string;
-  merchantResponse?: string;
+  updatedAt: string;
 }
 
-export type NotificationType =
-  | 'order_placed'
-  | 'payment_received'
-  | 'order_shipped'
-  | 'new_review'
-  | 'system_announcement'
-  | 'ads_milestone';
+export interface Message {
+  messageId: string;
+  conversationId: string;
+  senderUid: string;
+  messageType: MessageType;
+  content: string;
+  attachments?: string[]; // Array of mediaAsset IDs
+  status: MessageStatus;
+  edited: boolean;
+  deleted: boolean;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type EnterpriseNotificationType =
+  | 'order_update'
+  | 'payment_update'
+  | 'shipment_update'
+  | 'review_reply'
+  | 'loyalty_reward'
+  | 'system_alert'
+  | 'business_announcement'
+  | 'job_update'
+  | 'message_new';
+
+export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export interface Notification {
-  id: string;
+  notificationId: string;
   recipientUid: string;
+  type: EnterpriseNotificationType;
   title: string;
-  message: string;
-  type: NotificationType;
-  read: boolean;
+  body: string;
+  entityType?: string;
+  entityId?: string;
+  priority: NotificationPriority;
+  status: 'unread' | 'read' | 'dismissed';
+  readAt?: string;
   createdAt: string;
-  linkTo?: string; // Actionable route inside app
+  linkTo?: string; // App route
+}
+
+export interface NotificationPreference {
+  preferenceId: string;
+  userUid: string;
+  channels: {
+    inApp: boolean;
+    email: boolean;
+    push: boolean;
+  };
+  mutedTypes: EnterpriseNotificationType[];
+  updatedAt: string;
+}
+
+export interface DeliveryReceipt {
+  receiptId: string;
+  messageId: string;
+  recipientUid: string;
+  status: 'delivered' | 'read';
+  timestamp: string;
+}
+
+// ==========================================
+// ANALYTICS, BI & OBSERVABILITY DOMAIN
+// ==========================================
+
+export type AnalyticsEventType = 
+  | 'page_view' 
+  | 'product_view' 
+  | 'search_performed' 
+  | 'cart_add' 
+  | 'order_placed' 
+  | 'payment_success' 
+  | 'payment_failure'
+  | 'shipment_dispatched'
+  | 'inventory_low'
+  | 'user_signup'
+  | 'business_created'
+  | 'api_error';
+
+export interface AnalyticsEvent {
+  eventId: string;
+  eventType: AnalyticsEventType;
+  entityType?: string;
+  entityId?: string;
+  businessId?: string;
+  storeId?: string;
+  userUid?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface BusinessMetrics {
+  metricId: string; // businessId_YYYY-MM-DD
+  businessId: string;
+  date: string;
+  revenue: number;
+  orderCount: number;
+  productViews: number;
+  customerCount: number;
+  avgOrderValue: number;
+  conversionRate: number;
+  lowStockItems: number;
+  inventoryValue: number;
+  topProducts: Array<{ id: string; name: string; sales: number }>;
+  updatedAt: string;
+}
+
+export interface SystemMetrics {
+  metricId: string; // YYYY-MM-DD
+  date: string;
+  dau: number;
+  mau: number;
+  totalRevenue: number;
+  totalOrders: number;
+  paymentSuccessRate: number;
+  activeBusinesses: number;
+  searchVolume: number;
+  apiErrorCount: number;
+  avgFulfillmentTime: number; // in hours
+  updatedAt: string;
+}
+
+export interface AuditLog {
+  logId: string;
+  actorUid: string;
+  actorName: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  description: string;
+  before?: any;
+  after?: any;
+  severity: 'info' | 'warning' | 'critical';
+  timestamp: string;
+}
+
+// ==========================================
+// ADMINISTRATION & GOVERNANCE DOMAIN
+// ==========================================
+
+export interface PlatformSettings {
+  settingId: string;
+  currency: string;
+  defaultLanguage: string;
+  marketplaceFeePercentage: number;
+  minWithdrawalLimit: number;
+  registrationPolicy: 'open' | 'invite_only' | 'restricted';
+  businessVerificationRequired: boolean;
+  maxStoragePerBusinessMb: number;
+  updatedAt: string;
+}
+
+export interface FeatureFlag {
+  flagId: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  rolloutPercentage: number;
+  targetRoles: string[];
+  targetBusinesses: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaintenanceWindow {
+  windowId: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  affectedServices: string[];
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  description: string;
+}
+
+export interface SystemAnnouncement {
+  announcementId: string;
+  title: string;
+  body: string;
+  severity: 'info' | 'warning' | 'critical';
+  audience: 'all' | 'merchants' | 'customers';
+  publishAt: string;
+  expireAt: string;
+  createdAt: string;
+}
+
+export interface SecurityPolicy {
+  policyId: string;
+  name: string;
+  description: string;
+  rules: Record<string, any>;
+  lastUpdated: string;
+  updatedBy: string;
 }
 
 // ==========================================
@@ -217,6 +495,108 @@ export interface AdCampaign {
   startDate: string;
   endDate: string;
   status: 'active' | 'completed' | 'paused';
+}
+
+// ==========================================
+// BUSINESS PROFILE ENGINE (PHASE 2)
+// ==========================================
+
+export type BusinessProfileType =
+  | 'Store'
+  | 'Company'
+  | 'Service'
+  | 'Professional'
+  | 'Organization'
+  | 'Creator'
+  | 'Manufacturer'
+  | 'Supplier'
+  | 'Startup'
+  | 'Freelancer';
+
+export type BusinessProfileStatus = 'active' | 'inactive' | 'suspended' | 'deleted';
+
+export interface BusinessProfile {
+  businessId: string;
+  ownerUid: string;
+  businessName: string;
+  businessSlug: string; // Unique URL-friendly slug
+  businessType: BusinessProfileType;
+  businessCategory: string;
+  description: string;
+  country: string;
+  state: string;
+  city: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  email: string;
+  phone: string;
+  website?: string;
+  logo?: string;
+  banner?: string;
+  verified: boolean;
+  featured: boolean;
+  status: BusinessProfileStatus;
+  rating: number;
+  followers: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// STORE MANAGEMENT ENGINE (PHASE 3)
+// ==========================================
+
+export type StoreType = 
+  | 'Physical Store' 
+  | 'Online Store' 
+  | 'Hybrid Store' 
+  | 'Service Center' 
+  | 'Restaurant' 
+  | 'Hotel' 
+  | 'Wholesale' 
+  | 'Retail';
+
+export type StoreStatus = 'active' | 'archived' | 'deleted' | 'pending';
+
+export interface OpeningHours {
+  day: string;
+  open: string;
+  close: string;
+  closed: boolean;
+}
+
+export interface Store {
+  storeId: string;
+  businessId: string;
+  ownerUid: string;
+  storeName: string;
+  storeSlug: string;
+  storeType: StoreType;
+  storeCategory: string;
+  description: string;
+  logo?: string;
+  banner?: string;
+  email: string;
+  phone: string;
+  website?: string;
+  country: string;
+  state: string;
+  city: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  openingHours: OpeningHours[];
+  deliveryAvailable: boolean;
+  pickupAvailable: boolean;
+  verified: boolean;
+  featured: boolean;
+  status: StoreStatus;
+  followers: number;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ==========================================
@@ -467,37 +847,832 @@ export interface UnifiedListing {
 }
 
 // ==========================================
-// PI SUPER APP: JOB MARKETPLACE DOMAIN
+// ENTERPRISE MEDIA & ASSET DOMAIN
 // ==========================================
 
-export interface Job {
-  id: string;
-  providerUid: string;
-  providerProfileId: string;
-  providerName: string;
+export type MediaModule = 
+  | 'users' 
+  | 'businesses' 
+  | 'stores' 
+  | 'products' 
+  | 'services' 
+  | 'jobs' 
+  | 'documents' 
+  | 'temporary';
+
+export type MediaStatus = 'active' | 'archived' | 'deleted';
+export type MediaVisibility = 'public' | 'private';
+
+export interface MediaAsset {
+  mediaId: string;
+  ownerUid: string;
+  businessId?: string;
+  storeId?: string;
+  module: MediaModule;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  extension: string;
+  size: number;
+  width?: number;
+  height?: number;
+  storagePath: string;
+  downloadUrl: string;
+  thumbnailUrl?: string;
+  status: MediaStatus;
+  visibility: MediaVisibility;
+  uploadedAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// ENTERPRISE CATALOG & CATEGORY ENGINE
+// ==========================================
+
+export type CategoryStatus = 'active' | 'archived' | 'hidden';
+export type AttributeDataType = 
+  | 'text' 
+  | 'number' 
+  | 'boolean' 
+  | 'date' 
+  | 'color' 
+  | 'size' 
+  | 'weight' 
+  | 'dimension' 
+  | 'dropdown' 
+  | 'multi-select';
+
+export interface Category {
+  categoryId: string;
+  name: string;
+  slug: string;
+  description: string;
+  icon?: string;
+  banner?: string;
+  parentId?: string; // For nested subcategories
+  level: number;     // 0 for root, 1 for sub, etc.
+  sortOrder: number;
+  status: CategoryStatus;
+  visibility: 'public' | 'private';
+  featured: boolean;
+  seoTitle?: string;
+  seoDescription?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttributeGroup {
+  groupId: string;
+  name: string;      // e.g., "Technical", "Physical", "Warranty"
+  slug: string;
+  displayOrder: number;
+  status: 'active' | 'inactive';
+}
+
+export interface ProductAttribute {
+  attributeId: string;
+  groupId: string;   // Reference to AttributeGroup
+  name: string;      // e.g., "Screen Size", "Material", "Battery Life"
+  slug: string;
+  dataType: AttributeDataType;
+  unit?: string;     // e.g., "inches", "kg", "hours"
+  options?: string[]; // For dropdown/multi-select
+  required: boolean;
+  filterable: boolean;
+  searchable: boolean;
+  comparable: boolean;
+  variantAttribute: boolean; // Can this be used to create product variants?
+  displayOrder: number;
+  status: 'active' | 'inactive';
+}
+
+export interface CategoryAttributeMapping {
+  mappingId: string;
+  categoryId: string;
+  attributeId: string;
+  required: boolean;
+  displayOrder: number;
+}
+
+// ==========================================
+// ENTERPRISE PRODUCT VARIANTS & SKU ENGINE
+// ==========================================
+
+export interface ProductVariant {
+  variantId: string;
+  productId: string;
+  storeId: string;
+  businessId: string;
+  ownerUid: string;
+  sku: string;
+  barcode?: string;
+  variantName: string;
+  attributes: Record<string, string>; // { attributeSlug: value }
+  price: number;
+  comparePrice?: number;
+  currency: string;
+  stock: number;
+  reservedStock: number;
+  weight?: number;
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
+  };
+  status: ProductStatus;
+  visibility: VisibilityStatus;
+  mainImage?: string;
+  imageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VariantGroup {
+  groupId: string;
+  productId: string;
+  name: string;      // e.g., "Color", "Size", "Storage"
+  displayOrder: number;
+}
+
+export interface VariantOption {
+  optionId: string;
+  groupId: string;
+  productId: string;
+  value: string;     // e.g., "Black", "Medium", "256 GB"
+  displayOrder: number;
+}
+
+// ==========================================
+// ENTERPRISE INVENTORY & WAREHOUSE MANAGEMENT
+// ==========================================
+
+export type WarehouseType = 'main' | 'fulfillment' | 'returns' | 'retail' | 'virtual';
+export type WarehouseStatus = 'active' | 'inactive' | 'maintenance' | 'closed';
+
+export interface Warehouse {
+  warehouseId: string;
+  businessId: string;
+  name: string;
+  code: string; // e.g., WH-NY-001
+  type: WarehouseType;
+  country: string;
+  state: string;
+  city: string;
+  address: string;
+  managerUid: string;
+  status: WarehouseStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WarehouseLocation {
+  locationId: string;
+  warehouseId: string;
+  zone: string;   // e.g., "A", "B", "C"
+  aisle: string;  // e.g., "01", "02"
+  rack: string;   // e.g., "R1"
+  bin: string;    // e.g., "B12"
+  barcode?: string;
+  status: 'available' | 'full' | 'restricted' | 'damaged';
+}
+
+export interface Inventory {
+  inventoryId: string;
+  productId: string;
+  variantId: string;
+  warehouseId: string;
+  locationId: string;
+  sku: string;
+  availableStock: number;
+  reservedStock: number;
+  incomingStock: number;
+  damagedStock: number;
+  returnedStock: number;
+  minimumStock: number;
+  maximumStock: number;
+  reorderPoint: number;
+  reorderQuantity: number;
+  status: 'in-stock' | 'low-stock' | 'out-of-stock' | 'discontinued';
+  updatedAt: string;
+}
+
+export type InventoryTransactionType = 
+  | 'stock-in' 
+  | 'stock-out' 
+  | 'transfer' 
+  | 'adjustment' 
+  | 'damage' 
+  | 'return' 
+  | 'correction' 
+  | 'reservation' 
+  | 'release-reservation'
+  | 'fulfill-reservation';
+
+export interface InventoryTransaction {
+  transactionId: string;
+  inventoryId: string;
+  transactionType: InventoryTransactionType;
+  quantity: number;
+  beforeQuantity: number;
+  afterQuantity: number;
+  referenceType?: 'order' | 'transfer' | 'adjustment' | 'return';
+  referenceId?: string;
+  performedBy: string; // userUid
+  reason: string;
+  timestamp: string;
+}
+
+// ==========================================
+// ENTERPRISE SERVICES MARKETPLACE ENGINE
+// ==========================================
+
+export type ServicePricingType = 'fixed' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quote';
+export type ServiceLocationType = 'on-site' | 'customer-location' | 'online' | 'hybrid';
+export type ServiceStatus = 'draft' | 'pending' | 'published' | 'archived' | 'deleted';
+
+export interface Service {
+  serviceId: string;
+  businessId: string;
+  storeId: string;
+  ownerUid: string;
   title: string;
+  slug: string; // Unique URL-friendly slug
+  description: string;
+  category: string;
+  subCategory: string;
+  pricingType: ServicePricingType;
+  basePrice: number;
+  currency: string;
+  duration?: number; // Estimated duration in minutes
+  locationType: ServiceLocationType;
+  serviceArea?: string; // e.g., "New York City", "Global"
+  status: ServiceStatus;
+  visibility: VisibilityStatus;
+  featured: boolean;
+  rating: number;
+  mainImage?: string;
+  imageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServicePackage {
+  packageId: string;
+  serviceId: string;
+  name: string;
+  description: string;
+  price: number;
+  duration?: number; // Minutes
+  features: string[];
+  status: 'active' | 'inactive';
+}
+
+export interface ServiceAvailability {
+  availabilityId: string;
+  serviceId?: string; // If null, applies to all services of the business
+  businessId: string;
+  workingDays: number[]; // 0-6 (Sun-Sat)
+  workingHours: {
+    start: string; // HH:mm
+    end: string;   // HH:mm
+  }[];
+  holidayRules: {
+    date: string; // YYYY-MM-DD
+    name: string;
+  }[];
+  blackoutDates: string[]; // YYYY-MM-DD
+  timezone: string;
+}
+
+// ==========================================
+// ENTERPRISE RECRUITMENT & JOBS ENGINE
+// ==========================================
+
+export type EmploymentType = 'full-time' | 'part-time' | 'contract' | 'internship' | 'temporary' | 'freelance' | 'volunteer';
+export type WorkMode = 'on-site' | 'remote' | 'hybrid';
+export type JobStatus = 'draft' | 'published' | 'closed' | 'archived' | 'deleted';
+export type HiringStatus = 'applied' | 'under-review' | 'shortlisted' | 'interview' | 'offer' | 'hired' | 'rejected' | 'withdrawn';
+
+export interface Job {
+  jobId: string;
+  businessId: string;
+  storeId?: string;
+  ownerUid: string;
+  title: string;
+  slug: string;
+  department: string;
+  employmentType: EmploymentType;
+  workMode: WorkMode;
+  experienceLevel: string;
+  salaryType: 'fixed' | 'range' | 'commission' | 'negotiable';
+  salaryMin?: number;
+  salaryMax?: number;
+  currency: string;
+  vacancies: number;
+  skills: string[];
   description: string;
   requirements: string[];
-  salaryPi: number;
-  salaryType: 'hourly' | 'fixed' | 'monthly';
-  locationType: 'remote' | 'on_site' | 'hybrid';
+  benefits: string[];
   location: string;
-  category: string;
+  status: JobStatus;
+  visibility: VisibilityStatus;
+  applicationDeadline: string;
   createdAt: string;
-  status: 'open' | 'closed';
-  applicantCount: number;
+  updatedAt: string;
+}
+
+export interface CandidateProfile {
+  candidateId: string;
+  userUid: string;
+  headline: string;
+  summary: string;
+  skills: string[];
+  experience: {
+    title: string;
+    company: string;
+    location: string;
+    startDate: string;
+    endDate?: string;
+    current: boolean;
+    description: string;
+  }[];
+  education: {
+    school: string;
+    degree: string;
+    field: string;
+    startDate: string;
+    endDate: string;
+  }[];
+  certifications: string[];
+  languages: string[];
+  portfolioLinks: string[];
+  resumeMediaId?: string;
+  availability: 'immediate' | '15-days' | '30-days' | '90-days';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface JobApplication {
-  id: string;
+  applicationId: string;
   jobId: string;
-  jobTitle: string;
-  providerUid: string;
-  applicantUid: string;
-  applicantUsername: string;
-  applicantName: string;
-  coverLetter: string;
-  piWalletAddress: string;
+  candidateId: string;
+  businessId: string;
+  status: HiringStatus;
+  appliedAt: string;
+  updatedAt: string;
+  notes?: string;
+}
+
+export interface SavedJob {
+  savedJobId: string;
+  userUid: string;
+  jobId: string;
+  savedAt: string;
+}
+
+// ==========================================
+// ENTERPRISE UNIVERSAL SEARCH & DISCOVERY
+// ==========================================
+
+export type SearchEntityType = 'product' | 'service' | 'job' | 'business' | 'store' | 'category';
+
+export interface SearchIndexEntry {
+  documentId: string;
+  entityType: SearchEntityType;
+  entityId: string;
+  businessId: string;
+  storeId?: string;
+  title: string;
+  description: string;
+  keywords: string[];
+  categoryIds: string[];
+  location?: string;
+  visibility: VisibilityStatus;
+  status: string;
+  price?: number;
+  currency?: string;
+  featured: boolean;
+  metadata: Record<string, any>; // Entity-specific data for snippets
   createdAt: string;
-  status: 'pending' | 'reviewed' | 'accepted' | 'declined';
+  updatedAt: string;
+}
+
+export interface SearchFilters {
+  entityType?: SearchEntityType;
+  businessId?: string;
+  storeId?: string;
+  categoryId?: string;
+  location?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  featured?: boolean;
+}
+
+export interface RecentSearch {
+  searchId: string;
+  userUid: string;
+  query: string;
+  timestamp: string;
+}
+
+// ==========================================
+// ENTERPRISE CART, WISHLIST & CHECKOUT
+// ==========================================
+
+export interface WishlistItem {
+  wishlistId: string;
+  userUid: string;
+  entityType: SearchEntityType;
+  entityId: string;
+  createdAt: string;
+}
+
+export interface CartItem {
+  itemId: string;
+  cartId: string;
+  productId: string;
+  variantId?: string;
+  sku?: string;
+  name: string;
+  image?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  status: 'active' | 'out-of-stock' | 'price-changed';
+}
+
+export interface Cart {
+  cartId: string;
+  userUid: string;
+  businessId: string; // One cart per business per user for multi-vendor prep
+  storeId?: string;
+  currency: string;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  shipping: number;
+  grandTotal: number;
+  status: 'active' | 'converted' | 'abandoned';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Address {
+  fullName: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+}
+
+export interface CheckoutSession {
+  sessionId: string;
+  cartId: string;
+  userUid: string;
+  billingAddress?: Address;
+  shippingAddress?: Address;
+  deliveryMethod?: 'shipping' | 'pickup';
+  couponCodes: string[];
+  notes?: string;
+  currency: string;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  shipping: number;
+  grandTotal: number;
+  status: 'pending' | 'completed' | 'expired';
+  expiresAt: string;
+}
+
+export interface OrderDraft {
+  draftId: string;
+  checkoutSessionId: string;
+  userUid: string;
+  businessId: string;
+  storeId?: string;
+  lineItems: CartItem[];
+  pricingSummary: {
+    subtotal: number;
+    discount: number;
+    tax: number;
+    shipping: number;
+    grandTotal: number;
+  };
+  status: 'draft' | 'converted-to-order';
+  createdAt: string;
+}
+
+// ==========================================
+// PAYMENT & FINANCIAL LEDGER DOMAIN
+// ==========================================
+
+export enum PaymentIntentStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  EXPIRED = 'expired',
+  CANCELLED = 'cancelled'
+}
+
+export interface PaymentIntent {
+  paymentIntentId: string;
+  orderId: string;
+  customerUid: string;
+  businessId: string;
+  storeId?: string;
+  currency: string;
+  amount: number;
+  status: PaymentIntentStatus;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface Payment {
+  paymentId: string;
+  paymentIntentId: string;
+  piTransactionId: string;
+  orderId: string;
+  payerUid: string;
+  payeeBusinessId: string;
+  amount: number;
+  currency: string;
+  provider: 'pi_network' | 'manual' | 'stripe' | 'upi';
+  providerReference?: string;
+  verificationStatus: 'unverified' | 'verified' | 'failed';
+  paymentStatus: PaymentStatus;
+  paidAt: string;
+  createdAt: string;
+}
+
+export type LedgerEntryType = 'sale' | 'refund' | 'payout' | 'fee' | 'adjustment';
+
+export interface LedgerEntry {
+  ledgerId: string;
+  paymentId?: string;
+  businessId: string;
+  entryType: LedgerEntryType;
+  debit: number;
+  credit: number;
+  currency: string;
+  balanceImpact: number; // e.g., +amount for sale, -amount for refund
+  referenceType: 'order' | 'payout' | 'adjustment' | 'refund';
+  referenceId: string;
+  createdAt: string;
+}
+
+export interface PaymentReceipt {
+  receiptId: string;
+  paymentId: string;
+  orderId: string;
+  receiptNumber: string;
+  issuedAt: string;
+  downloadableUrl?: string;
+}
+
+export interface Refund {
+  refundId: string;
+  paymentId: string;
+  orderId: string;
+  refundAmount: number;
+  reason: string;
+  status: 'pending' | 'processed' | 'failed';
+  requestedAt: string;
+  processedAt?: string;
+}
+
+// ==========================================
+// SHIPPING & LOGISTICS DOMAIN
+// ==========================================
+
+export enum ShipmentStatus {
+  PENDING = 'pending',
+  PACKED = 'packed',
+  READY_FOR_PICKUP = 'ready_for_pickup',
+  PICKED_UP = 'picked_up',
+  IN_TRANSIT = 'in_transit',
+  OUT_FOR_DELIVERY = 'out_for_delivery',
+  DELIVERED = 'delivered',
+  DELIVERY_FAILED = 'delivery_failed',
+  RETURNED = 'returned',
+  CANCELLED = 'cancelled'
+}
+
+export enum ShippingMethod {
+  STANDARD = 'standard',
+  EXPRESS = 'express',
+  SAME_DAY = 'same_day',
+  PICKUP = 'pickup',
+  DIGITAL = 'digital'
+}
+
+export interface Carrier {
+  carrierId: string;
+  name: string;
+  contactNumber?: string;
+  website?: string;
+  trackingUrlTemplate?: string; // e.g. https://carrier.com/track/{trackingNumber}
+  isActive: boolean;
+}
+
+export interface Shipment {
+  shipmentId: string;
+  orderId: string;
+  businessId: string;
+  storeId?: string;
+  warehouseId?: string;
+  carrierId?: string;
+  trackingNumber?: string;
+  shippingMethod: ShippingMethod;
+  estimatedDelivery?: string;
+  actualDelivery?: string;
+  status: ShipmentStatus;
+  shippingAddress: Address;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShipmentPackage {
+  packageId: string;
+  shipmentId: string;
+  weight: number; // in kg
+  dimensions: {
+    length: number;
+    width: number;
+    height: number;
+    unit: 'cm' | 'in';
+  };
+  declaredValue: number;
+  packageType: string; // 'box', 'envelope', 'pallet'
+  status: string;
+}
+
+export interface TrackingEvent {
+  eventId: string;
+  shipmentId: string;
+  status: ShipmentStatus;
+  location: string;
+  description: string;
+  eventTime: string;
+  createdBy: string; // UID of person who recorded it
+}
+
+export interface ShippingZone {
+  zoneId: string;
+  name: string;
+  type: 'local' | 'state' | 'national' | 'international';
+  regions: string[]; // List of states or country codes
+}
+
+export interface ShippingRate {
+  rateId: string;
+  zoneId: string;
+  method: ShippingMethod;
+  baseRate: number;
+  perKgRate: number;
+  minWeight: number;
+  maxWeight: number;
+  estimatedDays: number;
+}
+
+// ==========================================
+// CRM, CUSTOMER 360 & LOYALTY DOMAIN
+// ==========================================
+
+export type CustomerStatus = 'active' | 'inactive' | 'blocked';
+export type LoyaltyTier = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
+export type TimelineEventType = 
+  | 'order_placed' 
+  | 'payment_completed' 
+  | 'shipment_delivered' 
+  | 'review_submitted' 
+  | 'loyalty_earned' 
+  | 'loyalty_redeemed';
+
+export interface CustomerProfile {
+  customerId: string;
+  userUid: string;
+  businessId: string;
+  displayName: string;
+  email: string;
+  phone?: string;
+  preferredLanguage?: string;
+  preferredCurrency?: string;
+  status: CustomerStatus;
+  totalOrders: number;
+  totalSpent: number;
+  averageOrderValue: number;
+  lastOrderAt?: string;
+  lastVisitAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerTimelineEvent {
+  eventId: string;
+  customerId: string;
+  businessId: string;
+  type: TimelineEventType;
+  title: string;
+  description: string;
+  referenceId?: string; // Order ID, Review ID, etc.
+  points?: number;
+  amount?: number;
+  createdAt: string;
+}
+
+export interface LoyaltyAccount {
+  accountId: string;
+  customerId: string;
+  businessId: string;
+  pointsBalance: number;
+  tier: LoyaltyTier;
+  lifetimePoints: number;
+  lastEarnedAt?: string;
+  lastRedeemedAt?: string;
+}
+
+export interface LoyaltyTransaction {
+  transactionId: string;
+  accountId: string;
+  type: 'earn' | 'redeem' | 'adjust';
+  points: number;
+  referenceType: string;
+  referenceId: string;
+  createdAt: string;
+}
+
+export interface CustomerTag {
+  tagId: string;
+  businessId: string;
+  customerId: string;
+  label: string;
+  color: string;
+}
+
+export interface CustomerNote {
+  noteId: string;
+  businessId: string;
+  customerId: string;
+  authorUid: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export type ReviewEntityType = 'product' | 'service' | 'business' | 'store' | 'employer';
+export type ReviewStatus = 'pending' | 'published' | 'hidden' | 'rejected' | 'archived';
+
+export interface Review {
+  reviewId: string;
+  entityType: ReviewEntityType;
+  entityId: string;
+  businessId: string;
+  orderId?: string; // For verified purchase
+  reviewerUid: string;
+  reviewerName: string;
+  rating: number; // 1-5
+  title: string;
+  comment: string;
+  mediaIds?: string[];
+  verifiedPurchase: boolean;
+  helpfulCount: number;
+  status: ReviewStatus;
+  reply?: {
+    comment: string;
+    repliedAt: string;
+    replierName: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReputationScore {
+  entityId: string;
+  entityType: ReviewEntityType;
+  overallRating: number;
+  reviewCount: number;
+  verifiedReviewCount: number;
+  responseRate?: number; // For businesses
+  trustScore: number; // 0-100 normalized
+  lastUpdated: string;
+}
+
+export interface ReviewVote {
+  voteId: string;
+  reviewId: string;
+  userUid: string;
+  type: 'helpful' | 'report';
+  createdAt: string;
+}
+
+export interface ReviewReport {
+  reportId: string;
+  reviewId: string;
+  reporterUid: string;
+  reason: string;
+  status: 'pending' | 'resolved' | 'dismissed';
+  createdAt: string;
 }

@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Master Gate: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Primitives
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    /**
+     * Validation Blueprint for Enterprise Users
+     * Enforces schema integrity, type safety, and immutable identity.
+     */
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'piUid', 'username', 'role', 'accountType', 'status']) &&
+             data.uid is string && data.uid.size() <= 128 &&
+             data.piUid is string && data.piUid.size() <= 128 &&
+             data.username is string && data.username.size() <= 128 &&
+             data.role in ['Buyer', 'Seller', 'Business Owner', 'Service Provider', 'Employer', 'Job Seeker', 'Admin', 'Super Admin'] &&
+             data.accountType in ['individual', 'business', 'enterprise'] &&
+             data.status in ['active', 'suspended', 'pending_verification'];
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin'];
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super Admin';
+    }
+
+    function isBusinessOwner(businessId) {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/businessProfiles/$(businessId)).data.ownerUid == request.auth.uid;
+    }
+
+    // 3. Collection Rules
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(uid) && isValidUser(incoming()) && incoming().uid == uid;
+      allow update: if isOwner(uid) && 
+                    isValidUser(incoming()) && 
+                    incoming().uid == existing().uid &&
+                    incoming().piUid == existing().piUid &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'walletAddress', 'updatedAt', 'lastLogin', 'role', 'accountType']);
+    }
+
+    match /businessProfiles/{businessId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.auth.uid == incoming().ownerUid && incoming().businessId == businessId;
+      allow update, delete: if isSignedIn() && (request.auth.uid == existing().ownerUid || isAdmin());
+    }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isBusinessOwner(incoming().businessId) && incoming().storeId == storeId;
+      allow update, delete: if isSignedIn() && (request.auth.uid == existing().ownerUid || isAdmin());
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isBusinessOwner(incoming().businessId);
+      allow update, delete: if isSignedIn() && (request.auth.uid == existing().ownerUid || isAdmin());
+    }
+
+    // 4. Analytics & BI
+    match /analyticsEvents/{eventId} {
+      allow create: if isSignedIn(); // Events are append-only
+      allow read: if isAdmin();
+    }
+
+    match /businessMetrics/{metricId} {
+      allow read: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow write: if false; // Only system-triggered via functions or batch (simulated)
+    }
+
+    match /systemMetrics/{metricId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // 5. Audit & Governance
+    match /auditLogs/{logId} {
+      allow create: if isSignedIn(); // Log entry creation
+      allow read: if isAdmin();
+      allow update, delete: if false; // Audit logs are immutable
+    }
+
+    match /platformSettings/{settingId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /featureFlags/{flagId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /maintenanceWindows/{windowId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 6. Commerce & OMS
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.customerUid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.customerUid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if false; // Payments are immutable after creation
+    }
+  }
+}
