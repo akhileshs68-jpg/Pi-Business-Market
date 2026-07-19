@@ -31,6 +31,7 @@ import InboxPage from './pages/InboxPage';
 import MerchantAnalytics from './pages/MerchantAnalytics';
 import AdminAnalytics from './pages/AdminAnalytics';
 import AdminConsole from './pages/AdminConsole';
+import { BusinessProfile } from './pages/BusinessProfile';
 
 /**
  * Pi Business Market - Enterprise Entry Point
@@ -66,6 +67,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <BusinessDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/business/:id" 
+            element={
+              <ProtectedRoute>
+                <BusinessProfile />
               </ProtectedRoute>
             } 
           />

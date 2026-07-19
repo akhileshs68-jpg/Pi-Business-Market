@@ -1,408 +1,377 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
   MapPin, 
-  Contact, 
+  Mail, 
+  Phone, 
+  Globe, 
+  ShieldCheck, 
+  Image as ImageIcon, 
   CheckCircle2, 
   ChevronRight, 
   ChevronLeft,
+  Upload,
   Briefcase,
-  Store,
-  Globe,
-  Settings2,
-  ShieldCheck,
-  Image as ImageIcon,
-  Camera
+  User,
+  Zap,
+  Info,
+  X,
+  Plus,
+  ArrowRight,
+  FileText
 } from 'lucide-react';
-import { BusinessProfileType, MediaAsset } from '../../types';
-import { businessService } from '../../services/businessService';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../auth/useAuth';
-import { MediaPickerModal } from '../product/MediaPickerModal';
+import { businessService } from '../../services/businessService';
+import { businessCategoryService } from '../../services/businessCategoryService';
+import { businessVerificationService } from '../../services/businessVerificationService';
+import { Business, BusinessType, BusinessCategory } from '../../types';
 
-const BUSINESS_TYPES: BusinessProfileType[] = [
-  'Store', 'Company', 'Service', 'Professional', 'Organization', 
-  'Creator', 'Manufacturer', 'Supplier', 'Startup', 'Freelancer'
-];
-
-const CATEGORIES = [
-  'Electronics', 'Fashion', 'Food & Beverage', 'Health & Beauty',
-  'Automotive', 'Real Estate', 'Education', 'Technology',
-  'Legal', 'Medical', 'Home Services', 'Consulting', 'Entertainment'
-];
-
-interface BusinessWizardProps {
-  onComplete: () => void;
+interface WizardProps {
+  onComplete: (businessId: string) => void;
   onCancel: () => void;
 }
 
-export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete, onCancel }) => {
+export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) => {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const totalSteps = 9;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<BusinessCategory[]>([]);
 
-  const [formData, setFormData] = useState({
-    businessType: 'Store' as BusinessProfileType,
-    businessCategory: 'Electronics',
+  // Wizard State
+  const [formData, setFormData] = useState<Partial<Business>>({
+    businessType: 'Individual',
     businessName: '',
+    legalName: '',
+    displayName: '',
+    industry: '',
+    category: '',
+    subcategory: '',
     description: '',
-    country: 'USA',
+    email: user?.email || '',
+    phone: '',
+    alternatePhone: '',
+    website: '',
+    country: 'India', // Default for Pi Network prevalence
     state: '',
     city: '',
-    address: '',
-    email: '',
-    phone: '',
-    website: '',
-    logo: '',
-    banner: ''
+    postalCode: '',
+    fullAddress: '',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    currency: 'Pi',
+    language: 'English',
+    verificationStatus: 'Pending',
+    businessStatus: 'active',
   });
 
-  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
-  const [activeMediaTarget, setActiveMediaTarget] = useState<'logo' | 'banner' | null>(null);
+  const [docs, setDocs] = useState<{ type: string; file: File | null; name: string }[]>([]);
 
-  const nextStep = () => setStep(s => Math.min(s + 1, 7));
-  const prevStep = () => setStep(s => Math.max(s - 1, 1));
+  useEffect(() => {
+    const loadCategories = async () => {
+      const cats = await businessCategoryService.getAllCategories();
+      setCategories(cats);
+    };
+    loadCategories();
+  }, []);
 
-  const handleCreate = async () => {
+  const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
+  const handleBack = () => setStep(s => Math.max(s - 1, 1));
+
+  const handleSubmit = async () => {
     if (!user) return;
-    setLoading(true);
-    setError(null);
+    setIsSubmitting(true);
     try {
-      const slug = await businessService.generateUniqueSlug(formData.businessName);
-      
-      await businessService.createBusiness({
-        ownerUid: user.uid,
-        ...formData,
-        businessSlug: slug,
-        latitude: 0, // Simplified for now
-        longitude: 0,
-        status: 'active'
-      });
+      const businessId = await businessService.createBusiness(
+        user.uid,
+        user.displayName || 'Owner',
+        formData as any
+      );
 
-      onComplete();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create business profile');
+      // Upload docs (Simulated for this implementation as we don't have a real storage bucket setup yet)
+      // In a real app, we'd loop through `docs` and call businessVerificationService.uploadDocument
+
+      onComplete(businessId);
+    } catch (err) {
+      console.error('Failed to create business:', err);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const isStepValid = () => {
-    switch (step) {
-      case 1: return !!formData.businessType;
-      case 2: return !!formData.businessCategory;
-      case 3: return formData.businessName.length >= 3 && !!formData.description;
-      case 4: return true; // Media is optional
-      case 5: return !!formData.country && !!formData.city && !!formData.address;
-      case 6: return !!formData.email && !!formData.phone;
-      default: return true;
-    }
-  };
+  const progress = (step / totalSteps) * 100;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-xl">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden overflow-y-auto max-h-[90vh]"
+        className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl shadow-indigo-500/10 overflow-hidden flex flex-col max-h-[90vh]"
       >
-        {/* Header */}
-        <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between sticky top-0 z-10 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-600/20 flex items-center justify-center border border-violet-500/20">
-              <Building2 className="w-5 h-5 text-violet-400" />
+        {/* Progress Header */}
+        <div className="px-8 pt-8 pb-6 border-b border-slate-800">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600 rounded-xl">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white tracking-tight">Business Onboarding</h2>
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Step {step} of {totalSteps}: {getStepTitle(step)}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-white leading-none mb-1">Create Business Profile</h2>
-              <p className="text-xs text-slate-500 font-medium tracking-wide uppercase">Step {step} of 7</p>
-            </div>
+            <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-all">
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
           </div>
-          <button 
-            onClick={onCancel}
-            className="text-slate-500 hover:text-white transition-colors"
-          >
-            Cancel
-          </button>
+          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-gradient-to-r from-indigo-600 to-violet-600"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.4 }}
+            />
+          </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="h-1 bg-slate-800 w-full">
-          <motion.div 
-            className="h-full bg-violet-500" 
-            animate={{ width: `${(step / 7) * 100}%` }} 
-          />
-        </div>
-
-        <div className="p-8">
+        {/* Wizard Steps */}
+        <div className="flex-1 overflow-y-auto px-8 py-10 scrollbar-hide">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
+              className="space-y-8"
             >
-              {/* Step 1: Type */}
               {step === 1 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white mb-4">Select Business Type</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {BUSINESS_TYPES.map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setFormData({ ...formData, businessType: type })}
-                        className={`p-4 rounded-2xl border text-left transition-all ${
-                          formData.businessType === type 
-                            ? 'bg-violet-600/10 border-violet-500 text-white shadow-lg shadow-violet-500/5' 
-                            : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
-                        }`}
-                      >
-                        <Store className={`w-5 h-5 mb-2 ${formData.businessType === type ? 'text-violet-400' : 'text-slate-600'}`} />
-                        <span className="font-bold text-sm">{type}</span>
-                      </button>
-                    ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {BUSINESS_TYPES.map(type => (
+                    <button
+                      key={type.id}
+                      onClick={() => setFormData({ ...formData, businessType: type.id as BusinessType })}
+                      className={`p-6 rounded-2xl border text-left transition-all group ${
+                        formData.businessType === type.id 
+                          ? 'bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-500/20' 
+                          : 'bg-slate-950/50 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <type.icon className={`w-8 h-8 mb-4 ${formData.businessType === type.id ? 'text-white' : 'text-slate-500'}`} />
+                      <h4 className={`text-sm font-bold ${formData.businessType === type.id ? 'text-white' : 'text-slate-300'}`}>{type.label}</h4>
+                      <p className={`text-[10px] mt-1 leading-relaxed ${formData.businessType === type.id ? 'text-indigo-100' : 'text-slate-500'}`}>{type.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-6 max-w-2xl mx-auto">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Business Public Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Acme Tech Solutions"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.businessName}
+                      onChange={e => setFormData({ ...formData, businessName: e.target.value, displayName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Legal Entity Name (As per Documents)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Acme Technologies Pvt Ltd"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.legalName}
+                      onChange={e => setFormData({ ...formData, legalName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Business Description</label>
+                    <textarea 
+                      rows={4}
+                      placeholder="Tell us what your business does..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all resize-none"
+                      value={formData.description}
+                      onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    />
                   </div>
                 </div>
               )}
 
-              {/* Step 2: Category */}
-              {step === 2 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white mb-4">Select Category</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {CATEGORIES.map(cat => (
+              {step === 3 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+                   <div className="col-span-full">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Full Registered Address</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.fullAddress}
+                      onChange={e => setFormData({ ...formData, fullAddress: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">City</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.city}
+                      onChange={e => setFormData({ ...formData, city: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Postal Code</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.postalCode}
+                      onChange={e => setFormData({ ...formData, postalCode: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="space-y-6 max-w-2xl mx-auto">
+                  <div className="flex items-center gap-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl mb-4">
+                    <Mail className="w-5 h-5 text-indigo-400" />
+                    <p className="text-xs text-slate-400 font-medium">Verify your contact details for official communications.</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Business Email Address</label>
+                    <input 
+                      type="email" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.email}
+                      onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Primary Phone Number</label>
+                    <input 
+                      type="tel" 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.phone}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {step === 5 && (
+                <div className="space-y-8 max-w-3xl mx-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {['Retail', 'IT', 'Manufacturing', 'Finance', 'Education', 'Healthcare', 'Agriculture', 'Logistics'].map(cat => (
                       <button
                         key={cat}
-                        onClick={() => setFormData({ ...formData, businessCategory: cat })}
-                        className={`p-3 rounded-xl border text-center text-sm font-medium transition-all ${
-                          formData.businessCategory === cat 
-                            ? 'bg-violet-600/10 border-violet-500 text-white' 
-                            : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
+                        onClick={() => setFormData({ ...formData, category: cat })}
+                        className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all ${
+                          formData.category === cat 
+                            ? 'bg-indigo-600 border-indigo-500 text-white' 
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
                         }`}
                       >
                         {cat}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Step 3: Identity */}
-              {step === 3 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Business Details</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Business Name</label>
-                      <input 
-                        type="text"
-                        value={formData.businessName}
-                        onChange={e => setFormData({ ...formData, businessName: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all"
-                        placeholder="e.g. NextGen Electronics"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Description</label>
-                      <textarea 
-                        rows={4}
-                        value={formData.description}
-                        onChange={e => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all resize-none"
-                        placeholder="Describe your business and services..."
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Industry Focus</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Artificial Intelligence, Real Estate Tech"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
+                      value={formData.industry}
+                      onChange={e => setFormData({ ...formData, industry: e.target.value })}
+                    />
                   </div>
                 </div>
               )}
 
-              {/* Step 4: Media & Branding */}
-              {step === 4 && (
-                <div className="space-y-6">
-                  <h3 className="text-lg font-semibold text-white">Media & Branding</h3>
-                  
-                  <div className="space-y-4">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Business Banner</label>
-                    <div 
-                      onClick={() => { setActiveMediaTarget('banner'); setIsMediaPickerOpen(true); }}
-                      className="relative h-40 w-full rounded-2xl bg-slate-950 border-2 border-dashed border-slate-800 overflow-hidden cursor-pointer hover:border-violet-500 transition-all group"
-                    >
-                      {formData.banner ? (
-                        <>
-                          <img src={formData.banner} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Camera className="w-8 h-8 text-white" />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-600">
-                          <ImageIcon className="w-10 h-10 mb-2" />
-                          <span className="text-xs font-bold">Upload Business Banner</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-8 items-end">
-                    <div className="space-y-4">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
-                      <div 
-                        onClick={() => { setActiveMediaTarget('logo'); setIsMediaPickerOpen(true); }}
-                        className="relative w-32 h-32 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-800 overflow-hidden cursor-pointer hover:border-violet-500 transition-all group"
-                      >
-                        {formData.logo ? (
-                          <>
-                            <img src={formData.logo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Camera className="w-6 h-6 text-white" />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-600">
-                            <ImageIcon className="w-8 h-8 mb-2" />
-                            <span className="text-[10px] font-bold">Upload Logo</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex-1 bg-slate-950/50 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-sm text-slate-400 italic">
-                        Enterprise profiles with high-quality media receive 5x more engagement on the Pi Business Market.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5: Location */}
-              {step === 5 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Location Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Country</label>
-                      <input 
-                        type="text"
-                        value={formData.country}
-                        onChange={e => setFormData({ ...formData, country: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">City</label>
-                      <input 
-                        type="text"
-                        value={formData.city}
-                        onChange={e => setFormData({ ...formData, city: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">State / Region</label>
-                      <input 
-                        type="text"
-                        value={formData.state}
-                        onChange={e => setFormData({ ...formData, state: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Full Address</label>
-                      <input 
-                        type="text"
-                        value={formData.address}
-                        onChange={e => setFormData({ ...formData, address: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 6: Contact */}
               {step === 6 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Contact Information</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Business Email</label>
-                      <input 
-                        type="email"
-                        value={formData.email}
-                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                        placeholder="contact@business.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Phone Number</label>
-                      <input 
-                        type="tel"
-                        value={formData.phone}
-                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                        placeholder="+1 234 567 890"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Website (Optional)</label>
-                      <input 
-                        type="url"
-                        value={formData.website}
-                        onChange={e => setFormData({ ...formData, website: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:border-violet-500 outline-none"
-                        placeholder="https://www.business.com"
-                      />
+                <div className="space-y-6 max-w-2xl mx-auto">
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
+                    <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      Verification Documents
+                    </h4>
+                    <div className="space-y-4">
+                      {['GST Certificate', 'Company PAN', 'Trade License'].map(docType => (
+                        <div key={docType} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-slate-500" />
+                            <span className="text-xs font-bold text-slate-300">{docType}</span>
+                          </div>
+                          <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] font-bold text-white transition-all">
+                            <Upload className="w-3 h-3" /> Upload
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Step 7: Review */}
               {step === 7 && (
-                <div className="space-y-6">
-                  <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
-                    <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
-                      {formData.logo ? (
-                        <img src={formData.logo} alt="" className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center">
-                          <Building2 className="w-6 h-6 text-white" />
-                        </div>
-                      )}
-                      <div>
-                        <h4 className="font-bold text-white text-lg">{formData.businessName}</h4>
-                        <p className="text-slate-400 text-sm">{formData.businessType} • {formData.businessCategory}</p>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+                  <div className="space-y-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
+                    <div className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group">
+                      <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
+                      <span className="text-[10px] font-bold text-slate-600">Square SVG</span>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                      <div className="space-y-1">
-                        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Location</p>
-                        <p className="text-slate-300">{formData.city}, {formData.country}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Contact</p>
-                        <p className="text-slate-300">{formData.phone}</p>
-                      </div>
+                  </div>
+                  <div className="space-y-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cover Image</label>
+                    <div className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group">
+                      <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
+                      <span className="text-[10px] font-bold text-slate-600">Landscape 16:9</span>
                     </div>
+                  </div>
+                </div>
+              )}
 
-                    <div className="pt-4 border-t border-slate-800">
-                      <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest mb-2">Profile Status</p>
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Ready to Launch
+              {step === 8 && (
+                <div className="space-y-6 max-w-2xl mx-auto">
+                  <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">
+                    <div className="h-24 bg-gradient-to-r from-indigo-900 to-violet-900" />
+                    <div className="px-8 pb-8 -mt-10">
+                      <div className="w-20 h-20 bg-slate-900 border-4 border-slate-950 rounded-2xl flex items-center justify-center mb-4">
+                        <Building2 className="w-8 h-8 text-indigo-400" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">{formData.businessName || 'Business Name'}</h3>
+                      <p className="text-sm text-slate-500">{formData.businessType} • {formData.category}</p>
+                      <div className="mt-6 grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                          <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Legal Entity</p>
+                          <p className="text-xs text-slate-300 font-medium">{formData.legalName || 'N/A'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                          <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Location</p>
+                          <p className="text-xs text-slate-300 font-medium">{formData.city || 'N/A'}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {error && (
-                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm font-medium">
-                      {error}
-                    </div>
-                  )}
+              {step === 9 && (
+                <div className="flex flex-col items-center justify-center text-center py-10 space-y-6">
+                  <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] flex items-center justify-center">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-white tracking-tight">Ready for Deployment</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto mt-2 leading-relaxed">
+                      Your business profile and verification documents are prepared. Click below to launch your identity on the Pi Business Market.
+                    </p>
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -410,55 +379,66 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete, onCa
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+        <div className="px-8 py-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
           <button
-            onClick={prevStep}
-            disabled={step === 1 || loading}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+            onClick={handleBack}
+            disabled={step === 1 || isSubmitting}
+            className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-slate-400 hover:text-white transition-all disabled:opacity-0"
           >
-            <ChevronLeft className="w-4 h-4" />
-            Back
+            <ChevronLeft className="w-4 h-4" /> Back
           </button>
-
-          {step < 7 ? (
+          
+          {step < totalSteps ? (
             <button
-              onClick={nextStep}
-              disabled={!isStepValid()}
-              className="flex items-center gap-2 px-8 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed font-bold shadow-lg shadow-violet-600/20"
+              onClick={handleNext}
+              className="flex items-center gap-2 px-8 py-3 bg-white text-slate-950 rounded-xl font-bold hover:bg-slate-200 transition-all shadow-xl shadow-white/5"
             >
-              Next Step
-              <ChevronRight className="w-4 h-4" />
+              Continue <ChevronRight className="w-4 h-4" />
             </button>
           ) : (
             <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white transition-all disabled:opacity-50 font-bold shadow-xl shadow-violet-600/20"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-10 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50"
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              {isSubmitting ? (
+                <>Deploying Identity...</>
               ) : (
                 <>
-                  <ShieldCheck className="w-5 h-5" />
-                  Launch Business
+                  <Zap className="w-4 h-4" />
+                  Finalize & Launch
                 </>
               )}
             </button>
           )}
         </div>
       </motion.div>
-
-      <MediaPickerModal 
-        isOpen={isMediaPickerOpen}
-        onClose={() => { setIsMediaPickerOpen(false); setActiveMediaTarget(null); }}
-        ownerUid={user?.uid || ''}
-        module="businesses"
-        onSelect={(asset) => {
-          if (activeMediaTarget === 'logo') setFormData({ ...formData, logo: asset.downloadUrl });
-          if (activeMediaTarget === 'banner') setFormData({ ...formData, banner: asset.downloadUrl });
-        }}
-        title={`Select Business ${activeMediaTarget === 'logo' ? 'Logo' : 'Banner'}`}
-      />
     </div>
   );
 };
+
+const getStepTitle = (step: number) => {
+  switch(step) {
+    case 1: return 'Business Entity Type';
+    case 2: return 'Basic Profile';
+    case 3: return 'Operational Address';
+    case 4: return 'Governance Contacts';
+    case 5: return 'Industry Classification';
+    case 6: return 'Regulatory Compliance';
+    case 7: return 'Brand Identity';
+    case 8: return 'Visual Review';
+    case 9: return 'Submission';
+    default: return '';
+  }
+};
+
+const BUSINESS_TYPES = [
+  { id: 'Individual', label: 'Individual', icon: User, desc: 'Single owner, no legal registration.' },
+  { id: 'Sole Proprietorship', label: 'Proprietorship', icon: Building2, desc: 'Regulated single-owner business.' },
+  { id: 'Partnership', label: 'Partnership', icon: Briefcase, desc: 'Multiple partners sharing liability.' },
+  { id: 'Private Limited', label: 'Pvt Ltd', icon: Zap, desc: 'Private corporation with limited liability.' },
+  { id: 'Public Limited', label: 'Public Ltd', icon: Building2, desc: 'Corporation with publicly traded shares.' },
+  { id: 'NGO', label: 'NGO / Trust', icon: ShieldCheck, desc: 'Non-profit or social enterprise.' },
+];
+
+export default BusinessWizard;

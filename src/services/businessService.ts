@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { 
   collection, 
   doc, 
@@ -6,146 +11,149 @@ import {
   getDocs, 
   query, 
   where, 
-  updateDoc, 
-  deleteDoc,
+  orderBy, 
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  runTransaction,
+  writeBatch,
+  limit
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
-import { BusinessProfile, BusinessProfileStatus } from '../types';
+import { Business, BusinessStatus, VerificationStatus } from '../types';
+import { withRetry } from '../lib/retry';
 
 export const businessService = {
   /**
-   * Generates a unique, URL-friendly slug from a business name
+   * Create a new business with a transaction to ensure member record is also created
    */
-  async generateUniqueSlug(name: string): Promise<string> {
-    const db = getFirebaseDb();
-    const baseSlug = name
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '') // Remove non-word chars
-      .replace(/\s+/g, '-')     // Replace spaces with -
-      .replace(/--+/g, '-')      // Replace multiple - with single -
-      .trim();
-
-    let slug = baseSlug;
-    let counter = 1;
-    let isUnique = false;
-
-    while (!isUnique) {
-      const q = query(collection(db, 'businessProfiles'), where('businessSlug', '==', slug));
-      const snapshot = await getDocs(q);
+  async createBusiness(ownerUid: string, actorName: string, businessData: Omit<Business, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'rating' | 'reviewCount' | 'followers' | 'employeeCount' | 'storeCount'>): Promise<string> {
+    return withRetry(async () => {
+      const db = getFirebaseDb();
+      const businessId = `BIZ_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+      const businessRef = doc(db, 'businesses', businessId);
+      const memberRef = doc(db, 'businessMembers', `${businessId}_${ownerUid}`);
       
-      if (snapshot.empty) {
-        isUnique = true;
-      } else {
-        slug = `${baseSlug}-${counter}`;
-        counter++;
-      }
-    }
+      await runTransaction(db, async (transaction) => {
+        // 1. Create Business
+        transaction.set(businessRef, {
+          ...businessData,
+          id: businessId,
+          ownerUid,
+          rating: 0,
+          reviewCount: 0,
+          followers: 0,
+          employeeCount: 1,
+          storeCount: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: actorName,
+          updatedBy: actorName
+        });
 
-    return slug;
-  },
+        // 2. Create Owner Member Record
+        transaction.set(memberRef, {
+          memberId: `${businessId}_${ownerUid}`,
+          businessId,
+          userUid: ownerUid,
+          role: 'Owner',
+          permissions: ['*'], // Root permissions
+          status: 'active',
+          joinedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
 
-  /**
-   * Creates a new business profile
-   */
-  async createBusiness(profile: Omit<BusinessProfile, 'businessId' | 'createdAt' | 'updatedAt' | 'verified' | 'featured' | 'rating' | 'followers'>): Promise<string> {
-    const db = getFirebaseDb();
-    const businessId = doc(collection(db, 'businessProfiles')).id;
-    
-    const newProfile: BusinessProfile = {
-      ...profile,
-      businessId,
-      verified: false,
-      featured: false,
-      rating: 0,
-      followers: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+        // 3. Create Audit Log (System collection for business context)
+        const logRef = doc(collection(db, 'businessAuditLogs'));
+        transaction.set(logRef, {
+          logId: logRef.id,
+          businessId,
+          actorUid: ownerUid,
+          actorName,
+          action: 'BUSINESS_CREATED',
+          entityType: 'business',
+          entityId: businessId,
+          description: `Business ${businessData.businessName} initialized by ${actorName}`,
+          timestamp: serverTimestamp()
+        });
+      });
 
-    await setDoc(doc(db, 'businessProfiles', businessId), {
-      ...newProfile,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    return businessId;
-  },
-
-  /**
-   * Fetches all businesses owned by a specific user
-   */
-  async getOwnedBusinesses(ownerUid: string): Promise<BusinessProfile[]> {
-    const db = getFirebaseDb();
-    const q = query(
-      collection(db, 'businessProfiles'), 
-      where('ownerUid', '==', ownerUid),
-      where('status', '!=', 'deleted')
-    );
-    
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
-      } as BusinessProfile;
+      return businessId;
     });
   },
 
-  /**
-   * Fetches a single business profile by ID
-   */
-  async getBusiness(businessId: string): Promise<BusinessProfile | null> {
+  async getBusiness(businessId: string): Promise<Business | null> {
     const db = getFirebaseDb();
-    const docRef = doc(db, 'businessProfiles', businessId);
-    const snap = await getDoc(docRef);
-    
+    const snap = await getDoc(doc(db, 'businesses', businessId));
     if (!snap.exists()) return null;
-    
     const data = snap.data();
     return {
       ...data,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
-    } as BusinessProfile;
+    } as Business;
   },
 
-  /**
-   * Updates an existing business profile
-   */
-  async updateBusiness(businessId: string, updates: Partial<BusinessProfile>): Promise<void> {
+  async getMyBusinesses(userUid: string): Promise<Business[]> {
     const db = getFirebaseDb();
-    const businessRef = doc(db, 'businessProfiles', businessId);
+    // Query members first to find all businesses the user is part of
+    const memberQuery = query(collection(db, 'businessMembers'), where('userUid', '==', userUid), where('status', '==', 'active'));
+    const memberSnap = await getDocs(memberQuery);
     
-    await updateDoc(businessRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
+    const businessIds = memberSnap.docs.map(d => d.data().businessId);
+    if (businessIds.length === 0) return [];
+
+    // Batch get businesses
+    const businesses: Business[] = [];
+    for (const id of businessIds) {
+      const b = await this.getBusiness(id);
+      if (b) businesses.push(b);
+    }
+    return businesses;
+  },
+
+  async updateBusiness(businessId: string, actorUid: string, actorName: string, updates: Partial<Business>): Promise<void> {
+    return withRetry(async () => {
+      const db = getFirebaseDb();
+      const businessRef = doc(db, 'businesses', businessId);
+      
+      await setDoc(businessRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
+        updatedBy: actorName
+      }, { merge: true });
+
+      // Log update
+      const logRef = doc(collection(db, 'businessAuditLogs'));
+      await setDoc(logRef, {
+        logId: logRef.id,
+        businessId,
+        actorUid,
+        actorName,
+        action: 'BUSINESS_UPDATED',
+        entityType: 'business',
+        entityId: businessId,
+        description: `Business profile updated by ${actorName}`,
+        metadata: { updatedFields: Object.keys(updates) },
+        timestamp: serverTimestamp()
+      });
     });
   },
 
-  /**
-   * Soft deletes a business profile
-   */
-  async deleteBusiness(businessId: string): Promise<void> {
+  async searchBusinesses(searchTerm: string, limitCount: number = 20): Promise<Business[]> {
     const db = getFirebaseDb();
-    const businessRef = doc(db, 'businessProfiles', businessId);
-    
-    await updateDoc(businessRef, {
-      status: 'deleted',
-      updatedAt: serverTimestamp(),
-    });
-  },
-
-  /**
-   * Validates if a business name is available (optional check before submission)
-   */
-  async isBusinessNameAvailable(name: string): Promise<boolean> {
-    const db = getFirebaseDb();
-    const q = query(collection(db, 'businessProfiles'), where('businessName', '==', name));
-    const snapshot = await getDocs(q);
-    return snapshot.empty;
+    const q = query(
+      collection(db, 'businesses'),
+      where('businessStatus', '==', 'active'),
+      where('displayName', '>=', searchTerm),
+      where('displayName', '<=', searchTerm + '\uf8ff'),
+      orderBy('displayName'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({
+      ...d.data(),
+      createdAt: d.data().createdAt instanceof Timestamp ? d.data().createdAt.toDate().toISOString() : d.data().createdAt,
+      updatedAt: d.data().updatedAt instanceof Timestamp ? d.data().updatedAt.toDate().toISOString() : d.data().updatedAt,
+    })) as Business[];
   }
 };

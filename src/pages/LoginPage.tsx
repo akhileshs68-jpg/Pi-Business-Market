@@ -1,32 +1,20 @@
 import React, { useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { Shield, Sparkles, AlertCircle } from 'lucide-react';
-import { Navigate, useNavigate } from "react-router-dom";
 
 export const LoginPage: React.FC = () => {
- const navigate = useNavigate();
-
-const { user, login, loading, error } = useAuth();
+  const { login, loading, error } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
 
   const handlePiLogin = async () => {
-  try {
-    setAuthError(null);
+    try {
+      setAuthError(null);
+      await login();
+    } catch (err: any) {
+      setAuthError(err.message || 'Pi Authentication failed. Please try again.');
+    }
+  };
 
-    await login();
-
-    console.log("LOGIN SUCCESS");
-
-    navigate("/dashboard", { replace: true });
-
-  } catch (err: any) {
-    setAuthError(err.message || "Pi Authentication failed. Please try again.");
-  }
-};
-
-  if (user) {
-  return <Navigate to="/dashboard" replace />;
-}
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       {/* Background Glow */}

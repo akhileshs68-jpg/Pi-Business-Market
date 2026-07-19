@@ -39,7 +39,17 @@ service cloud.firestore {
 
     function isBusinessOwner(businessId) {
       return isSignedIn() && 
-             get(/databases/$(database)/documents/businessProfiles/$(businessId)).data.ownerUid == request.auth.uid;
+             get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid;
+    }
+
+    function isBusinessMember(businessId) {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid));
+    }
+
+    function hasBusinessRole(businessId, roles) {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid)).data.role in roles;
     }
 
     // 3. Collection Rules
@@ -54,6 +64,50 @@ service cloud.firestore {
                     incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'walletAddress', 'updatedAt', 'lastLogin', 'role', 'accountType']);
     }
 
+    // New Business Identity Rules
+    match /businesses/{businessId} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().ownerUid == request.auth.uid;
+      allow update: if isSignedIn() && (isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']));
+      allow delete: if isSignedIn() && (isBusinessOwner(businessId) || isSuperAdmin());
+    }
+
+    match /businessMembers/{memberId} {
+      allow read: if isSignedIn() && (isBusinessMember(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn(); // Usually via transaction or invite
+      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR']));
+    }
+
+    match /businessInvitations/{invitationId} {
+      allow read: if isSignedIn() && (isBusinessMember(resource.data.businessId) || incoming().email == request.auth.token.email);
+      allow create: if isSignedIn() && hasBusinessRole(incoming().businessId, ['Owner', 'Super Admin', 'Business Admin', 'HR']);
+      allow update: if isSignedIn(); // Accept/Reject
+      allow delete: if isSignedIn() && hasBusinessRole(resource.data.businessId, ['Owner', 'Super Admin', 'Business Admin', 'HR']);
+    }
+
+    match /businessDocuments/{docId} {
+      allow read: if isSignedIn() && (isBusinessMember(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn() && isBusinessMember(incoming().businessId);
+      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin']));
+    }
+
+    match /businessAuditLogs/{logId} {
+      allow read: if isSignedIn() && (isBusinessMember(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Append-only
+    }
+
+    match /businessCategories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /businessSettings/{businessId} {
+      allow read: if isSignedIn() && isBusinessMember(businessId);
+      allow write: if isSignedIn() && (isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']));
+    }
+
+    // Legacy/Compatibility support for existing modules
     match /businessProfiles/{businessId} {
       allow read: if true;
       allow create: if isSignedIn() && request.auth.uid == incoming().ownerUid && incoming().businessId == businessId;

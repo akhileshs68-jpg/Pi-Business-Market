@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { storeService } from '../services/storeService';
 import { businessService } from '../services/businessService';
-import { Store, BusinessProfile } from '../types';
+import { Store, Business } from '../types';
 import { StoreWizard } from '../components/store/StoreWizard';
 import { StoreCard } from '../components/store/StoreCard';
 import { ReviewManagement } from '../components/ReviewManagement';
@@ -22,7 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export const StoreDashboard: React.FC = () => {
   const { user } = useAuth();
   const [stores, setStores] = useState<Store[]>([]);
-  const [businesses, setBusinesses] = useState<BusinessProfile[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [filterBusiness, setFilterBusiness] = useState<string>('all');
@@ -33,7 +33,7 @@ export const StoreDashboard: React.FC = () => {
     try {
       const [storeData, businessData] = await Promise.all([
         storeService.getOwnedStores(user.uid),
-        businessService.getOwnedBusinesses(user.uid)
+        businessService.getMyBusinesses(user.uid)
       ]);
       setStores(storeData);
       setBusinesses(businessData);
@@ -134,10 +134,10 @@ export const StoreDashboard: React.FC = () => {
             </button>
             {businesses.map(biz => (
               <button
-                key={biz.businessId}
-                onClick={() => setFilterBusiness(biz.businessId)}
+                key={biz.id}
+                onClick={() => setFilterBusiness(biz.id)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  filterBusiness === biz.businessId ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-500 hover:text-slate-300'
+                  filterBusiness === biz.id ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-500 hover:text-slate-300'
                 }`}
               >
                 {biz.businessName}
@@ -177,7 +177,7 @@ export const StoreDashboard: React.FC = () => {
 
         {/* Content */}
         {activeView === 'reviews' ? (
-          <ReviewManagement businessId={filterBusiness === 'all' ? businesses[0]?.businessId : filterBusiness} />
+          <ReviewManagement businessId={filterBusiness === 'all' ? businesses[0]?.id : filterBusiness} />
         ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => <div key={i} className="h-72 bg-slate-900/50 rounded-3xl border border-slate-800 animate-pulse" />)}

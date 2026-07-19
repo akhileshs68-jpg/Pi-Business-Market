@@ -18,7 +18,7 @@ import {
   Camera,
   Trash2
 } from 'lucide-react';
-import { StoreType, BusinessProfile, OpeningHours, MediaAsset } from '../../types';
+import { StoreType, Business, OpeningHours, MediaAsset } from '../../types';
 import { storeService } from '../../services/storeService';
 import { businessService } from '../../services/businessService';
 import { useAuth } from '../../auth/useAuth';
@@ -41,7 +41,7 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [businesses, setBusinesses] = useState<BusinessProfile[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
 
   const [formData, setFormData] = useState({
     businessId: '',
@@ -69,9 +69,9 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
   useEffect(() => {
     const fetchBusinesses = async () => {
       if (!user) return;
-      const data = await businessService.getOwnedBusinesses(user.uid);
+      const data = await businessService.getMyBusinesses(user.uid);
       setBusinesses(data);
-      if (data.length > 0) setFormData(prev => ({ ...prev, businessId: data[0].businessId }));
+      if (data.length > 0) setFormData(prev => ({ ...prev, businessId: data[0].id }));
     };
     fetchBusinesses();
   }, [user]);
@@ -163,20 +163,20 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
                     ) : (
                       businesses.map(biz => (
                         <button
-                          key={biz.businessId}
-                          onClick={() => setFormData({ ...formData, businessId: biz.businessId })}
+                          key={biz.id}
+                          onClick={() => setFormData({ ...formData, businessId: biz.id })}
                           className={`w-full p-4 rounded-2xl border text-left flex items-center gap-4 transition-all ${
-                            formData.businessId === biz.businessId 
+                            formData.businessId === biz.id 
                               ? 'bg-indigo-600/10 border-indigo-500 text-white' 
                               : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
                           }`}
                         >
-                          <Building2 className={`w-6 h-6 ${formData.businessId === biz.businessId ? 'text-indigo-400' : 'text-slate-600'}`} />
+                          <Building2 className={`w-6 h-6 ${formData.businessId === biz.id ? 'text-indigo-400' : 'text-slate-600'}`} />
                           <div className="flex-1">
                             <p className="font-bold">{biz.businessName}</p>
                             <p className="text-xs opacity-60">{biz.businessType} • {biz.city}</p>
                           </div>
-                          {formData.businessId === biz.businessId && <CheckCircle2 className="w-5 h-5 text-indigo-400" />}
+                          {formData.businessId === biz.id && <CheckCircle2 className="w-5 h-5 text-indigo-400" />}
                         </button>
                       ))
                     )}
@@ -445,7 +445,7 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
                       <div className="space-y-1">
                         <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Business Partner</p>
                         <p className="text-slate-300 truncate">
-                          {businesses.find(b => b.businessId === formData.businessId)?.businessName || 'N/A'}
+                          {businesses.find(b => b.id === formData.businessId)?.businessName || 'N/A'}
                         </p>
                       </div>
                       <div className="space-y-1">

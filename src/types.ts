@@ -423,6 +423,156 @@ export interface AuditLog {
 }
 
 // ==========================================
+// BUSINESS IDENTITY & ONBOARDING DOMAIN
+// ==========================================
+
+export type BusinessType = 
+  | 'Individual' | 'Freelancer' | 'Startup' | 'Sole Proprietorship' | 'Partnership' 
+  | 'LLP' | 'Private Limited' | 'Public Limited' | 'NGO' | 'Trust' | 'Society' 
+  | 'Government' | 'Educational Institute' | 'School' | 'College' | 'University' 
+  | 'Hospital' | 'Clinic' | 'Pharmacy' | 'Restaurant' | 'Hotel' | 'Manufacturer' 
+  | 'Wholesaler' | 'Distributor' | 'Retailer' | 'Service Provider' | 'Digital Agency' 
+  | 'IT Company' | 'Finance Company' | 'Agriculture' | 'Construction' | 'Transport' 
+  | 'Logistics' | 'Real Estate' | 'Tourism' | 'Entertainment' | 'Other';
+
+export type BusinessRole = 
+  | 'Owner' | 'Super Admin' | 'Business Admin' | 'Manager' | 'Finance' | 'Sales' 
+  | 'Inventory' | 'Warehouse' | 'Support' | 'HR' | 'Marketing' | 'Employee' | 'Viewer';
+
+export type VerificationStatus = 'Pending' | 'Submitted' | 'Under Review' | 'Approved' | 'Rejected' | 'Suspended' | 'Verified';
+export type BusinessStatus = 'active' | 'inactive' | 'suspended' | 'archived' | 'deleted';
+
+export interface Business {
+  id: string;
+  ownerUid: string;
+  businessName: string;
+  legalName: string;
+  displayName: string;
+  businessType: BusinessType;
+  industry: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  logo?: string;
+  coverImage?: string;
+  email: string;
+  phone: string;
+  alternatePhone?: string;
+  website?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  registrationNumber?: string;
+  taxNumber?: string;
+  walletAddress?: string;
+  country: string;
+  state: string;
+  district?: string;
+  city: string;
+  postalCode: string;
+  fullAddress: string;
+  latitude?: number;
+  longitude?: number;
+  timezone: string;
+  currency: string;
+  language: string;
+  verificationStatus: VerificationStatus;
+  kycStatus: string;
+  businessStatus: BusinessStatus;
+  rating: number;
+  reviewCount: number;
+  followers: number;
+  employeeCount: number;
+  storeCount: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface BusinessMember {
+  memberId: string;
+  businessId: string;
+  userUid: string;
+  role: BusinessRole;
+  permissions: string[];
+  title?: string;
+  department?: string;
+  status: 'active' | 'suspended' | 'invited';
+  joinedAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessInvitation {
+  invitationId: string;
+  businessId: string;
+  email?: string;
+  phone?: string;
+  piUsername?: string;
+  role: BusinessRole;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+  invitedBy: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface BusinessDocument {
+  documentId: string;
+  businessId: string;
+  type: 'GST' | 'PAN' | 'TradeLicense' | 'Registration' | 'IdentityProof' | 'AddressProof' | 'Tax' | 'Other';
+  name: string;
+  url: string;
+  version: number;
+  status: 'valid' | 'expired' | 'under_review' | 'rejected';
+  uploadedBy: string;
+  uploadedAt: string;
+  expiryDate?: string;
+}
+
+export interface BusinessCategory {
+  categoryId: string;
+  parentId?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  isActive: boolean;
+}
+
+export interface BusinessAuditLog {
+  logId: string;
+  businessId: string;
+  actorUid: string;
+  actorName: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  description: string;
+  metadata?: Record<string, any>;
+  timestamp: string;
+}
+
+export interface BusinessSettings {
+  businessId: string;
+  notifications: {
+    email: boolean;
+    sms: boolean;
+    push: boolean;
+    orderUpdates: boolean;
+    marketing: boolean;
+  };
+  privacy: {
+    showPhone: boolean;
+    showEmail: boolean;
+    publicProfile: boolean;
+  };
+  branding: {
+    primaryColor: string;
+    accentColor: string;
+    fontFamily: string;
+  };
+}
+
+// ==========================================
 // ADMINISTRATION & GOVERNANCE DOMAIN
 // ==========================================
 

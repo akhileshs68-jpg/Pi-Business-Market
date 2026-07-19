@@ -3,7 +3,6 @@ import { User } from '../types';
 import { authService } from './authService';
 import { AuthContext } from './AuthContext';
 import { isFirebaseConfigured } from '../firebase/config';
-import { useNavigate } from "react-router-dom";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -22,18 +21,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for Firebase Auth state changes
     const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
       if (!isMounted) return;
-
-      
       
       try {
         if (firebaseUser) {
           const profile = await authService.getUserProfile(firebaseUser.uid);
-
-          
-
           setUser(profile);
         } else {
-          
           setUser(null);
         }
       } catch (err) {
