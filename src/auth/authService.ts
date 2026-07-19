@@ -15,6 +15,12 @@ import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { PiSdkSim } from '../services/piSdk';
 import { User, UserRole } from '../types';
 
+declare global {
+  interface Window {
+    Pi: any;
+  }
+}
+
 export const authService = {
   /**
    * Orchestrates the Pi Network Authentication flow
@@ -24,14 +30,41 @@ export const authService = {
       const auth = getFirebaseAuth();
       const db = getFirebaseDb();
 
-      // 1. Pi SDK Authentication
-      const piAuth = await PiSdkSim.authenticate();
+      // 1. Initialize Pi SDK
+      // The user wants to await Pi.init() fully
+      await window.Pi.init({ version: "2.0", sandbox: true });
+
+      // 2. Pi SDK Authentication
+      const scopes = ['username'];
+      const onIncompletePaymentFound = (payment: any) => {
+        console.log('Incomplete payment found:', payment);
+      };
+
+      const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+      const accessToken = piAuth.accessToken;
+
+      // 3. Validate Token on Backend
+      const response = await fetch('/api/auth/pi', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accessToken }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Backend validation failed');
+      }
+
+      const backendResult = await response.json();
+      const validatedPiUser = backendResult.user;
       
-      // 2. Firebase Anonymous Auth (to get a session)
+      // 4. Firebase Anonymous Auth (to get a session)
       const userCredential = await signInAnonymously(auth);
       const firebaseUid = userCredential.user.uid;
 
-      // 3. Check/Create Firestore User
+      // 5. Check/Create Firestore User
       const userRef = doc(db, 'users', firebaseUid);
       const userSnap = await getDoc(userRef);
 
@@ -40,11 +73,11 @@ export const authService = {
       if (!userSnap.exists()) {
         const newUser: User = {
           uid: firebaseUid,
-          piUid: piAuth.uid,
-          username: piAuth.username,
-          displayName: piAuth.username, // Default to username
-          walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7), // Simulated
-          role: 'Buyer', // Default role
+          piUid: validatedPiUser.uid,
+          username: validatedPiUser.username,
+          displayName: validatedPiUser.username, 
+          walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+          role: 'Buyer', 
           accountType: 'individual',
           verified: true,
           kycVerified: false,
@@ -66,7 +99,9 @@ export const authService = {
         // Update last login
         await updateDoc(userRef, {
           lastLogin: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
+          piUid: validatedPiUser.uid,
+          username: validatedPiUser.username
         });
         
         const data = userSnap.data();

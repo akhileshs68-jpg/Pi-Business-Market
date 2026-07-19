@@ -26,13 +26,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (firebaseUser) {
           const profile = await authService.getUserProfile(firebaseUser.uid);
           setUser(profile);
+          setLoading(false);
         } else {
-          setUser(null);
+          // If no user is logged in, attempt automatic Pi login
+          try {
+            if (window.Pi) {
+              const piUser = await authService.loginWithPi();
+              setUser(piUser);
+            }
+          } catch (piErr) {
+            console.warn('[AuthProvider] Auto Pi login skipped or failed:', piErr);
+          } finally {
+            setLoading(false);
+          }
         }
       } catch (err) {
         console.error('[AuthProvider] State change error:', err);
         setError('Failed to load user profile');
-      } finally {
         setLoading(false);
       }
     });
