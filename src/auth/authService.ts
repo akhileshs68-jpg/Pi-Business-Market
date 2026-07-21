@@ -32,7 +32,8 @@ export const authService = {
 
       // 1. Initialize Pi SDK
       // The user wants to await Pi.init() fully
-      await window.Pi.init({ version: "2.0", sandbox: true });
+      await window.Pi.init({ version: "2.0", sandbox: false });
+      console.log("STEP 1: Pi.init Success");
 
       // 2. Pi SDK Authentication
       const scopes = ['username'];
@@ -41,9 +42,11 @@ export const authService = {
       };
 
       const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+      console.log("STEP 2: Pi.authenticate Success", piAuth);
       const accessToken = piAuth.accessToken;
 
       // 3. Validate Token on Backend
+      console.log("STEP 3: Calling Backend");
       const response = await fetch('/api/auth/pi', {
         method: 'POST',
         headers: {
@@ -58,15 +61,21 @@ export const authService = {
       }
 
       const backendResult = await response.json();
+      console.log("STEP 4: Backend Validation Success", backendResult);
       const validatedPiUser = backendResult.user;
       
       // 4. Firebase Anonymous Auth (to get a session)
+      console.log("STEP 5: Before Firebase Auth");
       const userCredential = await signInAnonymously(auth);
+      console.log("STEP 6: Firebase Auth Success", userCredential.user.uid);
       const firebaseUid = userCredential.user.uid;
 
       // 5. Check/Create Firestore User
       const userRef = doc(db, 'users', firebaseUid);
+      
+      console.log("STEP 7: Before getDoc");
       const userSnap = await getDoc(userRef);
+      console.log("STEP 8: getDoc Success", userSnap.exists());
 
       const now = new Date().toISOString();
 
@@ -87,12 +96,14 @@ export const authService = {
           status: 'active'
         };
 
+        console.log("STEP 9: Before setDoc");
         await setDoc(userRef, {
           ...newUser,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastLogin: serverTimestamp()
         });
+        console.log("STEP 10: setDoc Success");
 
         return newUser;
       } else {
@@ -113,10 +124,12 @@ export const authService = {
           lastLogin: now,
         } as User;
       }
-    } catch (error) {
-      console.error('[AuthService] Login failed:', error);
-      throw error;
-    }
+   } catch (error: any) {
+  console.error("LOGIN FAILED:", error);
+  console.error("Error Code:", error?.code);
+  console.error("Error Message:", error?.message);
+  throw error;
+}
   },
 
   /**
