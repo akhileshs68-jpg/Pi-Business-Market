@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 let app: FirebaseApp | null = null;
@@ -41,7 +41,10 @@ export const getFirebaseAuth = () => {
 
 export const getFirebaseDb = () => {
   if (!db) {
-    db = getFirestore(getFirebaseApp());
+    // Force Long Polling to handle Pi Browser's restricted webview
+    db = initializeFirestore(getFirebaseApp(), {
+      experimentalAutoDetectLongPolling: true,
+    });
   }
   return db;
 };
