@@ -68,14 +68,27 @@ export const authService = {
       console.log("STEP 5: Before Firebase Auth");
       const userCredential = await signInAnonymously(auth);
       console.log("STEP 6: Firebase Auth Success", userCredential.user.uid);
+      console.log("Firebase User:", userCredential.user);
+console.log("Firebase UID:", userCredential.user.uid);
       const firebaseUid = userCredential.user.uid;
 
       // 5. Check/Create Firestore User
       const userRef = doc(db, 'users', firebaseUid);
       
       console.log("STEP 7: Before getDoc");
-      const userSnap = await getDoc(userRef);
-      console.log("STEP 8: getDoc Success", userSnap.exists());
+
+let userSnap;
+
+try {
+  userSnap = await getDoc(userRef);
+  console.log("STEP 8: getDoc Success", userSnap.exists());
+} catch (e: any) {
+  console.error("❌ getDoc FAILED");
+  console.error("Code:", e?.code);
+  console.error("Message:", e?.message);
+  console.error(e);
+  throw e;
+}
 
       const now = new Date().toISOString();
 
