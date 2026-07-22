@@ -21,128 +21,139 @@ declare global {
   }
 }
 
+let piInitPromise: Promise<void> | null = null;
+let loginInProgressPromise: Promise<User> | null = null;
+
 export const authService = {
   /**
-   * Orchestrates the Pi Network Authentication flow
+   * Initializes the Pi SDK exactly once
+   */
+  async initPi(): Promise<void> {
+    if (piInitPromise) return piInitPromise;
+
+    piInitPromise = (async () => {
+      try {
+        if (!window.Pi) {
+          console.warn('[PiSDK] window.Pi not found. Is the SDK script loaded?');
+          return;
+        }
+        await window.Pi.init({ version: "2.0", sandbox: true });
+        console.log('[PiSDK] Initialization successful');
+      } catch (err) {
+        piInitPromise = null; // Allow retry on failure
+        console.error('[PiSDK] Initialization failed:', err);
+        throw err;
+      }
+    })();
+
+    return piInitPromise;
+  },
+
+  /**
+   * Orchestrates the Pi Network Authentication flow with concurrency protection
    */
   async loginWithPi(): Promise<User> {
-    try {
-      const auth = getFirebaseAuth();
-      const db = getFirebaseDb();
+    if (loginInProgressPromise) {
+      console.log('[AuthService] Authentication already in progress, reusing promise');
+      return loginInProgressPromise;
+    }
 
-      // 1. Initialize Pi SDK
-      // The user wants to await Pi.init() fully
-      await window.Pi.init({ version: "2.0", sandbox: false });
-      console.log("STEP 1: Pi.init Success");
+    loginInProgressPromise = (async () => {
+      try {
+        const auth = getFirebaseAuth();
+        const db = getFirebaseDb();
 
-      // 2. Pi SDK Authentication
-      const scopes = ['username'];
-      const onIncompletePaymentFound = (payment: any) => {
-        console.log('Incomplete payment found:', payment);
-      };
+        // 1. Initialize Pi SDK
+        await this.initPi();
 
-      const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
-      console.log("STEP 2: Pi.authenticate Success", piAuth);
-      const accessToken = piAuth.accessToken;
-
-      // 3. Validate Token on Backend
-      console.log("STEP 3: Calling Backend");
-      const response = await fetch('/api/auth/pi', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ accessToken }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Backend validation failed');
-      }
-
-      const backendResult = await response.json();
-      console.log("STEP 4: Backend Validation Success", backendResult);
-      const validatedPiUser = backendResult.user;
-      
-      // 4. Firebase Anonymous Auth (to get a session)
-      console.log("STEP 5: Before Firebase Auth");
-      const userCredential = await signInAnonymously(auth);
-      console.log("STEP 6: Firebase Auth Success", userCredential.user.uid);
-      console.log("Firebase User:", userCredential.user);
-console.log("Firebase UID:", userCredential.user.uid);
-      const firebaseUid = userCredential.user.uid;
-
-      // 5. Check/Create Firestore User
-      const userRef = doc(db, 'users', firebaseUid);
-      
-      console.log("STEP 7: Before getDoc");
-
-let userSnap;
-
-try {
-  userSnap = await getDoc(userRef);
-  console.log("STEP 8: getDoc Success", userSnap.exists());
-} catch (e: any) {
-  console.error("❌ getDoc FAILED");
-  console.error("Code:", e?.code);
-  console.error("Message:", e?.message);
-  console.error(e);
-  throw e;
-}
-
-      const now = new Date().toISOString();
-
-      if (!userSnap.exists()) {
-        const newUser: User = {
-          uid: firebaseUid,
-          piUid: validatedPiUser.uid,
-          username: validatedPiUser.username,
-          displayName: validatedPiUser.username, 
-          walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
-          role: 'Buyer', 
-          accountType: 'individual',
-          verified: true,
-          kycVerified: false,
-          createdAt: now,
-          updatedAt: now,
-          lastLogin: now,
-          status: 'active'
+        // 2. Pi SDK Authentication
+        const scopes = ['username'];
+        const onIncompletePaymentFound = (payment: any) => {
+          console.log('Incomplete payment found:', payment);
         };
 
-        console.log("STEP 9: Before setDoc");
-        await setDoc(userRef, {
-          ...newUser,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastLogin: serverTimestamp()
-        });
-        console.log("STEP 10: setDoc Success");
+        const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+        const accessToken = piAuth.accessToken;
 
-        return newUser;
-      } else {
-        // Update last login
-        await updateDoc(userRef, {
-          lastLogin: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          piUid: validatedPiUser.uid,
-          username: validatedPiUser.username
+        // 3. Validate Token on Backend
+        const response = await fetch('/api/auth/pi', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ accessToken }),
         });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Backend validation failed');
+        }
+
+        const backendResult = await response.json();
+        const validatedPiUser = backendResult.user;
         
-        const data = userSnap.data();
-        return {
-          ...data,
-          uid: firebaseUid,
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || now,
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString() || now,
-          lastLogin: now,
-        } as User;
+        // 4. Firebase Anonymous Auth (to get a session)
+        const userCredential = await signInAnonymously(auth);
+        const firebaseUid = userCredential.user.uid;
+
+        // 5. Check/Create Firestore User
+        const userRef = doc(db, 'users', firebaseUid);
+        const userSnap = await getDoc(userRef);
+
+        const now = new Date().toISOString();
+
+        if (!userSnap.exists()) {
+          const newUser: User = {
+            uid: firebaseUid,
+            piUid: validatedPiUser.uid,
+            username: validatedPiUser.username,
+            displayName: validatedPiUser.username, 
+            walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+            role: 'Buyer', 
+            accountType: 'individual',
+            verified: true,
+            kycVerified: false,
+            createdAt: now,
+            updatedAt: now,
+            lastLogin: now,
+            status: 'active'
+          };
+
+          await setDoc(userRef, {
+            ...newUser,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            lastLogin: serverTimestamp()
+          });
+
+          return newUser;
+        } else {
+          // Update last login
+          await updateDoc(userRef, {
+            lastLogin: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            piUid: validatedPiUser.uid,
+            username: validatedPiUser.username
+          });
+          
+          const data = userSnap.data();
+          return {
+            ...data,
+            uid: firebaseUid,
+            createdAt: data.createdAt?.toDate?.()?.toISOString() || now,
+            updatedAt: data.updatedAt?.toDate?.()?.toISOString() || now,
+            lastLogin: now,
+          } as User;
+        }
+      } catch (error) {
+        console.error('[AuthService] Login failed:', error);
+        throw error;
+      } finally {
+        loginInProgressPromise = null;
       }
-   } catch (error: any) {
-  console.error("LOGIN FAILED:", error);
-  console.error("Error Code:", error?.code);
-  console.error("Error Message:", error?.message);
-  throw error;
-}
+    })();
+
+    return loginInProgressPromise;
   },
 
   /**

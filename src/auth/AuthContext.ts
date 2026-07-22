@@ -5,7 +5,7 @@ export interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: () => Promise<void>;
+  login: () => Promise<User>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
 }
