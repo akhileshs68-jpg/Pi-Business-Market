@@ -32,6 +32,7 @@ import MerchantAnalytics from './pages/MerchantAnalytics';
 import AdminAnalytics from './pages/AdminAnalytics';
 import AdminConsole from './pages/AdminConsole';
 import { BusinessProfile } from './pages/BusinessProfile';
+import DocumentationPortal from './pages/DocumentationPortal';
 
 /**
  * Pi Business Market - Enterprise Entry Point
@@ -44,6 +45,7 @@ function App() {
         <Routes>
           {/* PUBLIC ROUTES */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/docs" element={<DocumentationPortal />} />
 
           {/* PROTECTED ROUTES */}
           <Route 

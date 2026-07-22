@@ -31,7 +31,8 @@ import {
   Award,
   BarChart3,
   ShieldAlert,
-  Terminal
+  Terminal,
+  BookOpen
 } from 'lucide-react';
 import { User as UserType, Notification } from '../types';
 import { PiSdkSim } from '../services/piSdk';
@@ -112,6 +113,19 @@ export default function Navbar({
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
               <span>Dashboard</span>
+            </button>
+
+            {/* DOCS PORTAL TRIGGER */}
+            <button
+              onClick={() => window.location.href = '/docs'}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                currentView === 'docs'
+                  ? 'bg-emerald-600 text-white border-emerald-500/30 shadow-md shadow-emerald-500/10'
+                  : 'bg-emerald-950/50 border-emerald-800/60 text-emerald-300 hover:text-white hover:bg-emerald-900/80'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Docs</span>
             </button>
 
             {/* MESSAGING HUB TRIGGER */}
