@@ -1,15 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { Shield, Sparkles, AlertCircle } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { login, loading, error } = useAuth();
+  const { user, login, loading, error } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !loading) {
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, location]);
 
   const handlePiLogin = async () => {
     try {
       setAuthError(null);
-      await login();
+      const loggedInUser = await login();
+      if (loggedInUser && loggedInUser.uid) {
+        const from = (location.state as any)?.from?.pathname || '/dashboard';
+        navigate(from, { replace: true });
+      }
     } catch (err: any) {
       setAuthError(err.message || 'Pi Authentication failed. Please try again.');
     }

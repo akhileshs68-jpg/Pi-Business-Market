@@ -8,9 +8,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isInitialLoad = React.useRef(true);
+  const isProcessing = React.useRef(false);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Pre-initialize Pi SDK on mount
+    authService.initPi().catch(err => console.warn('[AuthProvider] SDK Pre-init failed:', err));
     
     if (!isFirebaseConfigured()) {
       setError('Firebase configuration is missing. Authentication services are currently offline.');
@@ -22,58 +27,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
       if (!isMounted) return;
       
+      // If we are already processing a login (auto or manual), ignore state changes
+      if (isProcessing.current) {
+        console.log('[AuthProvider] Ignoring state change while processing');
+        return;
+      }
+
       try {
         if (firebaseUser) {
+          console.log('[AuthProvider] Firebase user detected, fetching profile');
+          isProcessing.current = true;
           const profile = await authService.getUserProfile(firebaseUser.uid);
-          setUser(profile);
-          setLoading(false);
+          if (isMounted) {
+            setUser(profile);
+            setLoading(false);
+            isInitialLoad.current = false;
+          }
+          isProcessing.current = false;
         } else {
-          // If no user is logged in, attempt automatic Pi login
-          try {
-            if (window.Pi) {
-              const piUser = await authService.loginWithPi();
-              setUser(piUser);
+          // If no user is logged in, we stay on the login screen
+          // We do NOT attempt automatic Pi login here because Pi.authenticate requires a user gesture
+          if (isInitialLoad.current) {
+            console.log('[AuthProvider] No Firebase user on initial load');
+            if (isMounted) {
+              setLoading(false);
+              isInitialLoad.current = false;
             }
-          } catch (piErr) {
-            console.warn('[AuthProvider] Auto Pi login skipped or failed:', piErr);
-          } finally {
+          } else {
+            console.log('[AuthProvider] User logged out');
+            setUser(null);
             setLoading(false);
           }
         }
       } catch (err) {
         console.error('[AuthProvider] State change error:', err);
-        setError('Failed to load user profile');
-        setLoading(false);
+        if (isMounted) {
+          setError('Failed to load user profile');
+          setLoading(false);
+          isInitialLoad.current = false;
+        }
+        isProcessing.current = false;
       }
     });
-
-    // If the auth provider is not yet configured, we should still allow 
-    // the app to load (e.g. to show the login screen which explains the missing config)
-    // We check if loading is still true after a short delay or if we can detect failure
-    const timer = setTimeout(() => {
-      if (isMounted && loading) {
-        setLoading(false);
-      }
-    }, 2000);
 
     return () => {
       isMounted = false;
       unsubscribe();
-      clearTimeout(timer);
     };
   }, []);
 
-  const login = async () => {
+  const login = async (): Promise<User> => {
+    if (isProcessing.current && user) return user;
+    if (isProcessing.current) throw new Error('Authentication already in progress');
+    
+    isProcessing.current = true;
     setLoading(true);
     setError(null);
     try {
       const loggedInUser = await authService.loginWithPi();
       setUser(loggedInUser);
+      return loggedInUser;
     } catch (err: any) {
       setError(err.message || 'Pi Authentication failed');
       throw err;
     } finally {
       setLoading(false);
+      isProcessing.current = false;
+      isInitialLoad.current = false;
     }
   };
 
