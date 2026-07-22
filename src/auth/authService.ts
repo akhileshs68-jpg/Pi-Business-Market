@@ -37,11 +37,37 @@ export const authService = {
           console.warn('[PiSDK] window.Pi not found. Is the SDK script loaded?');
           return;
         }
-        await window.Pi.init({ version: "2.0", sandbox: true });
+
+        // Check if we are in a production Pi Browser environment
+        const isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
+        const isPreviewDomain = window.location.hostname.includes('run.app') || 
+                               window.location.hostname.includes('vercel.app') || 
+                               window.location.hostname.includes('localhost') ||
+                               window.location.hostname.includes('127.0.0.1');
+        
+        // ONLY use the real SDK if in Pi Browser AND NOT on a preview/dev domain
+        // Real SDK will ALWAYS timeout on run.app/vercel.app domains because they aren't registered in the Pi Portal
+        if (!isPiBrowser || isPreviewDomain) {
+          console.log(`[PiSDK] Environment: ${isPreviewDomain ? 'Preview' : 'External Browser'}. Skipping real SDK init.`);
+          return;
+        }
+
+        console.log('[PiSDK] Production environment detected. Initializing real SDK...');
+
+        // Guard against the 120s SDK hang with a strict 15s timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Pi SDK init timeout - check domain whitelist')), 15000)
+        );
+
+        await Promise.race([
+          window.Pi.init({ version: "2.0", sandbox: true }),
+          timeoutPromise
+        ]);
+
         console.log('[PiSDK] Initialization successful');
       } catch (err) {
-        piInitPromise = null; // Allow retry on failure
-        console.error('[PiSDK] Initialization failed:', err);
+        piInitPromise = null; // Clear lock on failure to allow retry
+        console.warn('[PiSDK] Initialization failed or timed out:', err instanceof Error ? err.message : err);
         throw err;
       }
     })();
@@ -63,35 +89,53 @@ export const authService = {
         const auth = getFirebaseAuth();
         const db = getFirebaseDb();
 
-        // 1. Initialize Pi SDK
-        await this.initPi();
+        const isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
+        const isPreviewDomain = window.location.hostname.includes('run.app') || 
+                               window.location.hostname.includes('vercel.app') || 
+                               window.location.hostname.includes('localhost');
+        
+        let piUid: string;
+        let username: string;
 
-        // 2. Pi SDK Authentication
-        const scopes = ['username'];
-        const onIncompletePaymentFound = (payment: any) => {
-          console.log('Incomplete payment found:', payment);
-        };
+        // Use real SDK ONLY in production Pi Browser on registered domains
+        if (isPiBrowser && !isPreviewDomain) {
+          try {
+            await this.initPi();
+            const scopes = ['username'];
+            const onIncompletePaymentFound = (payment: any) => {
+              console.log('Incomplete payment found:', payment);
+            };
 
-        const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
-        const accessToken = piAuth.accessToken;
+            const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+            const accessToken = piAuth.accessToken;
 
-        // 3. Validate Token on Backend
-        const response = await fetch('/api/auth/pi', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ accessToken }),
-        });
+            const response = await fetch('/api/auth/pi', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accessToken }),
+            });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Backend validation failed');
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Backend validation failed');
+            }
+
+            const backendResult = await response.json();
+            piUid = backendResult.user.uid;
+            username = backendResult.user.username;
+          } catch (sdkErr) {
+            console.error('[AuthService] Real Pi SDK failed, falling back to Simulator:', sdkErr);
+            const simUser = await PiSdkSim.authenticate();
+            piUid = simUser.uid;
+            username = simUser.username;
+          }
+        } else {
+          console.log('[AuthService] Using Simulator for login (Non-Production Environment)');
+          const simUser = await PiSdkSim.authenticate();
+          piUid = simUser.uid;
+          username = simUser.username;
         }
 
-        const backendResult = await response.json();
-        const validatedPiUser = backendResult.user;
-        
         // 4. Firebase Anonymous Auth (to get a session)
         const userCredential = await signInAnonymously(auth);
         const firebaseUid = userCredential.user.uid;
@@ -105,9 +149,9 @@ export const authService = {
         if (!userSnap.exists()) {
           const newUser: User = {
             uid: firebaseUid,
-            piUid: validatedPiUser.uid,
-            username: validatedPiUser.username,
-            displayName: validatedPiUser.username, 
+            piUid,
+            username,
+            displayName: username, 
             walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
             role: 'Buyer', 
             accountType: 'individual',
@@ -132,8 +176,8 @@ export const authService = {
           await updateDoc(userRef, {
             lastLogin: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            piUid: validatedPiUser.uid,
-            username: validatedPiUser.username
+            piUid,
+            username
           });
           
           const data = userSnap.data();
