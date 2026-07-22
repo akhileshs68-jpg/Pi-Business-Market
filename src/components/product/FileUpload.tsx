@@ -40,6 +40,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,13 +49,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     setError(null);
     setSuccess(false);
     setIsUploading(true);
+    setUploadProgress(0);
 
     try {
       const asset = await mediaService.uploadMedia(file, ownerUid, {
         module,
         businessId,
         storeId,
-        visibility
+        visibility,
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+        }
       });
       setSuccess(true);
       onUploadSuccess(asset);
@@ -63,6 +68,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
       setError(err.message || 'Upload failed');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -138,11 +144,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
         {isUploading && (
           <div className="absolute inset-x-8 bottom-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-violet-400">{uploadProgress}%</span>
+            </div>
             <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: '100%' }}
-                transition={{ duration: 2, repeat: Infinity }}
+                animate={{ width: `${uploadProgress}%` }}
+                transition={{ duration: 0.1 }}
                 className="h-full bg-violet-500"
               />
             </div>

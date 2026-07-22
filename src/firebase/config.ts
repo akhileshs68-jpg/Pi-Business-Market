@@ -1,12 +1,10 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore, initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFirestore, Firestore, initializeFirestore } from 'firebase/firestore';
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
 
 export const isFirebaseConfigured = () => {
   return !!(import.meta as any).env.VITE_FIREBASE_API_KEY;
@@ -18,7 +16,6 @@ export const getFirebaseApp = () => {
       apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY,
       authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET,
       messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID,
       appId: (import.meta as any).env.VITE_FIREBASE_APP_ID,
     };
@@ -47,12 +44,5 @@ export const getFirebaseDb = () => {
     });
   }
   return db;
-};
-
-export const getFirebaseStorage = () => {
-  if (!storage) {
-    storage = getStorage(getFirebaseApp());
-  }
-  return storage;
 };
 

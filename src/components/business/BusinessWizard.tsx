@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building2, 
   MapPin, 
@@ -30,6 +30,7 @@ import { useAuth } from '../../auth/useAuth';
 import { businessService } from '../../services/businessService';
 import { businessCategoryService } from '../../services/businessCategoryService';
 import { businessVerificationService } from '../../services/businessVerificationService';
+import { mediaService } from '../../services/mediaService';
 import { Business, BusinessType, BusinessCategory } from '../../types';
 
 interface WizardProps {
@@ -71,6 +72,67 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
   });
 
   const [docs, setDocs] = useState<{ type: string; file: File | null; name: string }[]>([]);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const [activeDocType, setActiveDocType] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover' | 'document') => {
+    const file = e.target.files?.[0];
+    console.log(`[BusinessWizard] File selected for ${type}:`, file?.name);
+    
+    if (!file) {
+      console.warn(`[BusinessWizard] No file selected for ${type}`);
+      return;
+    }
+    
+    // Validate file
+    if (file.size > 10 * 1024 * 1024) {
+      console.error(`[BusinessWizard] File too large: ${file.size} bytes`);
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    if (!user) {
+      console.error('[BusinessWizard] User not authenticated for upload');
+      return;
+    }
+
+    try {
+      console.log(`[BusinessWizard] Starting upload for ${type}...`);
+      
+      // For images, show local preview immediately
+      if (type === 'logo') {
+        setFormData(prev => ({ ...prev, logo: URL.createObjectURL(file) }));
+      } else if (type === 'cover') {
+        setFormData(prev => ({ ...prev, coverImage: URL.createObjectURL(file) }));
+      }
+
+      const asset = await mediaService.uploadMedia(file, user.uid, {
+        module: 'businesses',
+        onProgress: (progress: number) => {
+          console.log(`[BusinessWizard] ${type} upload progress: ${progress}%`);
+        }
+      });
+      
+      console.log(`[BusinessWizard] ${type} upload success:`, asset.downloadUrl);
+      
+      if (type === 'logo') {
+        setFormData(prev => ({ ...prev, logo: asset.downloadUrl }));
+      } else if (type === 'cover') {
+        setFormData(prev => ({ ...prev, coverImage: asset.downloadUrl }));
+      } else if (type === 'document' && activeDocType) {
+        setDocs(prev => {
+          const filtered = prev.filter(d => d.type !== activeDocType);
+          return [...filtered, { type: activeDocType, file: null, name: asset.originalName, url: asset.downloadUrl } as any];
+        });
+      }
+    } catch (err) {
+      console.error(`[BusinessWizard] ${type} upload failed:`, err);
+      setError(`Failed to upload ${type}. Please try again.`);
+    }
+  };
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -307,13 +369,27 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                             <FileText className="w-5 h-5 text-slate-500" />
                             <span className="text-xs font-bold text-slate-300">{docType}</span>
                           </div>
-                          <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] font-bold text-white transition-all">
-                            <Upload className="w-3 h-3" /> Upload
+                          <button 
+                            onClick={() => {
+                              console.log(`[Upload] Selecting document for: ${docType}`);
+                              setActiveDocType(docType);
+                              docInputRef.current?.click();
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] font-bold text-white transition-all"
+                          >
+                            <Upload className="w-3 h-3" /> 
+                            {docs.find(d => d.type === docType) ? 'Replace' : 'Upload'}
                           </button>
                         </div>
                       ))}
                     </div>
                   </div>
+                  <input 
+                    type="file"
+                    ref={docInputRef}
+                    className="hidden"
+                    onChange={(e) => handleFileSelect(e, 'document')}
+                  />
                 </div>
               )}
 
@@ -321,16 +397,54 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
-                    <div className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group">
-                      <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
-                      <span className="text-[10px] font-bold text-slate-600">Square SVG</span>
+                    <input 
+                      type="file"
+                      ref={logoInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={(e) => handleFileSelect(e, 'logo')}
+                    />
+                    <div 
+                      onClick={() => {
+                        console.log('[Upload] Opening logo file picker');
+                        logoInputRef.current?.click();
+                      }}
+                      className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
+                    >
+                      {formData.logo ? (
+                        <img src={formData.logo} alt="Logo Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
+                          <span className="text-[10px] font-bold text-slate-600">Square SVG</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cover Image</label>
-                    <div className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group">
-                      <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
-                      <span className="text-[10px] font-bold text-slate-600">Landscape 16:9</span>
+                    <input 
+                      type="file"
+                      ref={coverInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={(e) => handleFileSelect(e, 'cover')}
+                    />
+                    <div 
+                      onClick={() => {
+                        console.log('[Upload] Opening cover file picker');
+                        coverInputRef.current?.click();
+                      }}
+                      className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
+                    >
+                      {formData.coverImage ? (
+                        <img src={formData.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
+                          <span className="text-[10px] font-bold text-slate-600">Landscape 16:9</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

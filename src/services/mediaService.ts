@@ -3,13 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL, 
-  deleteObject,
-  uploadBytesResumable
-} from 'firebase/storage';
+import axios from 'axios';
 import { 
   collection, 
   doc, 
@@ -20,11 +14,9 @@ import {
   getDocs, 
   serverTimestamp, 
   Timestamp,
-  updateDoc,
   deleteDoc,
-  orderBy
 } from 'firebase/firestore';
-import { getFirebaseStorage, getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb } from '../firebase/config';
 import { MediaAsset, MediaModule, MediaVisibility } from '../types';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -39,7 +31,7 @@ const ALLOWED_MIME_TYPES = [
 
 export const mediaService = {
   /**
-   * Sanitizes a filename to prevent path traversal and other issues
+   * Sanitizes a filename
    */
   sanitizeFileName(fileName: string): string {
     return fileName
@@ -69,7 +61,7 @@ export const mediaService = {
   },
 
   /**
-   * Uploads a file and saves metadata
+   * Uploads a file to backend and saves metadata to Firestore
    */
   async uploadMedia(
     file: File,
@@ -80,56 +72,59 @@ export const mediaService = {
       storeId?: string;
       visibility?: MediaVisibility;
       customMetadata?: Record<string, string>;
+      onProgress?: (progress: number) => void;
     }
   ): Promise<MediaAsset> {
     const { valid, error } = this.validateFile(file);
     if (!valid) throw new Error(error);
 
-    const storage = getFirebaseStorage();
     const db = getFirebaseDb();
-    
     const mediaId = this.generateId();
-    const sanitizedName = this.sanitizeFileName(file.name);
-    const extension = sanitizedName.split('.').pop() || '';
-    const storagePath = `${options.module}/${ownerUid}/${mediaId}_${sanitizedName}`;
-    const storageRef = ref(storage, storagePath);
+    
+    // 1. Prepare Form Data for Backend
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', options.module);
+    
+    // 2. Upload to Backend API
+    const response = await axios.post('/api/upload', formData, {
+      onUploadProgress: (progressEvent) => {
+        if (options.onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          options.onProgress(percentCompleted);
+        }
+      }
+    });
 
-    // Upload to Firebase Storage
-    await uploadBytes(storageRef, file);
-    const downloadUrl = await getDownloadURL(storageRef);
+    const cloudinaryData = response.data;
+    if (!cloudinaryData.success) {
+      throw new Error(cloudinaryData.error || 'Upload failed');
+    }
 
-    // Prepare Metadata
+    // 3. Prepare Metadata
     const asset: MediaAsset = {
       mediaId,
       ownerUid,
       businessId: options.businessId,
       storeId: options.storeId,
       module: options.module,
-      fileName: sanitizedName,
+      fileName: this.sanitizeFileName(file.name),
       originalName: file.name,
       mimeType: file.type,
-      extension,
-      size: file.size,
-      storagePath,
-      downloadUrl,
+      extension: cloudinaryData.format || file.name.split('.').pop() || '',
+      size: cloudinaryData.bytes || file.size,
+      width: cloudinaryData.width,
+      height: cloudinaryData.height,
+      storagePath: cloudinaryData.publicId, // Store Cloudinary public_id here
+      downloadUrl: cloudinaryData.secureUrl,
+      thumbnailUrl: cloudinaryData.secureUrl.replace('/upload/', '/upload/c_thumb,w_200,h_200,g_face,q_auto,f_auto/'),
       status: 'active',
       visibility: options.visibility || 'public',
       uploadedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // Extract image dimensions if possible
-    if (file.type.startsWith('image/')) {
-      try {
-        const dimensions = await this.getImageDimensions(file);
-        asset.width = dimensions.width;
-        asset.height = dimensions.height;
-      } catch (e) {
-        console.warn('Failed to extract image dimensions', e);
-      }
-    }
-
-    // Save metadata to Firestore
+    // 4. Save metadata to Firestore
     await setDoc(doc(db, 'media', mediaId), {
       ...asset,
       uploadedAt: serverTimestamp(),
@@ -137,20 +132,6 @@ export const mediaService = {
     });
 
     return asset;
-  },
-
-  /**
-   * Helper to get image dimensions
-   */
-  getImageDimensions(file: File): Promise<{ width: number; height: number }> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        resolve({ width: img.width, height: img.height });
-      };
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
   },
 
   /**
@@ -185,8 +166,6 @@ export const mediaService = {
    */
   async deleteMedia(mediaId: string): Promise<void> {
     const db = getFirebaseDb();
-    const storage = getFirebaseStorage();
-    
     const docRef = doc(db, 'media', mediaId);
     const docSnap = await getDoc(docRef);
     
@@ -194,15 +173,16 @@ export const mediaService = {
     
     const asset = docSnap.data() as MediaAsset;
     
-    // Delete from Storage
-    try {
-      const storageRef = ref(storage, asset.storagePath);
-      await deleteObject(storageRef);
-    } catch (e) {
-      console.warn('Failed to delete from storage, might already be gone', e);
+    // 1. Delete from Cloudinary via Backend
+    if (asset.storagePath) {
+      try {
+        await axios.delete(`/api/upload/${encodeURIComponent(asset.storagePath)}`);
+      } catch (e) {
+        console.warn('Failed to delete from Cloudinary via backend', e);
+      }
     }
     
-    // Delete from Firestore (or soft delete)
+    // 2. Delete from Firestore
     await deleteDoc(docRef);
   },
 
