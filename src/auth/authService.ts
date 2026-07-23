@@ -1,5 +1,7 @@
 import { 
   signInAnonymously, 
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut, 
   onAuthStateChanged,
   User as FirebaseUser 
@@ -34,7 +36,6 @@ export const authService = {
     piInitPromise = (async () => {
       try {
         if (!window.Pi) {
-          console.warn('[PiSDK] window.Pi not found. Is the SDK script loaded?');
           return;
         }
 
@@ -48,11 +49,9 @@ export const authService = {
         // ONLY use the real SDK if in Pi Browser AND NOT on a preview/dev domain
         // Real SDK will ALWAYS timeout on run.app/vercel.app domains because they aren't registered in the Pi Portal
         if (!isPiBrowser || isPreviewDomain) {
-          console.log(`[PiSDK] Environment: ${isPreviewDomain ? 'Preview' : 'External Browser'}. Skipping real SDK init.`);
           return;
         }
 
-        console.log('[PiSDK] Production environment detected. Initializing real SDK...');
 
         // Guard against the 120s SDK hang with a strict 15s timeout
         const timeoutPromise = new Promise((_, reject) => 
@@ -64,10 +63,8 @@ export const authService = {
           timeoutPromise
         ]);
 
-        console.log('[PiSDK] Initialization successful');
       } catch (err) {
         piInitPromise = null; // Clear lock on failure to allow retry
-        console.warn('[PiSDK] Initialization failed or timed out:', err instanceof Error ? err.message : err);
         throw err;
       }
     })();
@@ -80,7 +77,6 @@ export const authService = {
    */
   async loginWithPi(): Promise<User> {
     if (loginInProgressPromise) {
-      console.log('[AuthService] Authentication already in progress, reusing promise');
       return loginInProgressPromise;
     }
 
@@ -103,7 +99,6 @@ export const authService = {
             await this.initPi();
             const scopes = ['username'];
             const onIncompletePaymentFound = (payment: any) => {
-              console.log('Incomplete payment found:', payment);
             };
 
             const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
@@ -130,15 +125,23 @@ export const authService = {
             username = simUser.username;
           }
         } else {
-          console.log('[AuthService] Using Simulator for login (Non-Production Environment)');
           const simUser = await PiSdkSim.authenticate();
           piUid = simUser.uid;
           username = simUser.username;
         }
 
-        // 4. Firebase Anonymous Auth (to get a session)
-        const userCredential = await signInAnonymously(auth);
-        const firebaseUid = userCredential.user.uid;
+        // 4. Firebase Auth (to get a session)
+        let firebaseUid: string;
+        try {
+          const userCredential = await signInAnonymously(auth);
+          firebaseUid = userCredential.user.uid;
+        } catch (authErr: any) {
+          console.error('[AuthService] Anonymous Auth failed:', authErr);
+          if (authErr.code === 'auth/admin-restricted-operation' || authErr.code === 'auth/operation-not-allowed') {
+            throw new Error('Firebase Anonymous Authentication is disabled. Please enable it in the Firebase Console (Authentication > Sign-in method) or try an alternative login method.');
+          }
+          throw authErr;
+        }
 
         // 5. Check/Create Firestore User
         const userRef = doc(db, 'users', firebaseUid);
@@ -220,9 +223,74 @@ export const authService = {
         } as User;
       }
       return null;
-    } catch (error) {
-      console.error('[AuthService] Get user profile failed:', error);
+    } catch (error: any) {
+      if (error.code === 'unavailable' || error.message?.includes('offline')) {
+      } else {
+        console.error('[AuthService] Get user profile failed:', error);
+      }
       return null;
+    }
+  },
+
+  /**
+   * Signs in with Google as a fallback or alternative
+   */
+  async loginWithGoogle(): Promise<User> {
+    try {
+      const auth = getFirebaseAuth();
+      const db = getFirebaseDb();
+      const provider = new GoogleAuthProvider();
+      
+      const userCredential = await signInWithPopup(auth, provider);
+      const firebaseUid = userCredential.user.uid;
+      const firebaseUser = userCredential.user;
+
+      const userRef = doc(db, 'users', firebaseUid);
+      const userSnap = await getDoc(userRef);
+      const now = new Date().toISOString();
+
+      if (!userSnap.exists()) {
+        const newUser: User = {
+          uid: firebaseUid,
+          piUid: 'google_' + firebaseUid,
+          username: firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUid.slice(0, 5),
+          displayName: firebaseUser.displayName || 'Enterprise User',
+          walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+          role: 'Buyer',
+          accountType: 'individual',
+          verified: true,
+          kycVerified: false,
+          createdAt: now,
+          updatedAt: now,
+          lastLogin: now,
+          status: 'active'
+        };
+
+        await setDoc(userRef, {
+          ...newUser,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastLogin: serverTimestamp()
+        });
+
+        return newUser;
+      } else {
+        await updateDoc(userRef, {
+          lastLogin: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        const data = userSnap.data();
+        return {
+          ...data,
+          uid: firebaseUid,
+          createdAt: data.createdAt?.toDate?.()?.toISOString() || now,
+          updatedAt: data.updatedAt?.toDate?.()?.toISOString() || now,
+          lastLogin: now,
+        } as User;
+      }
+    } catch (error) {
+      console.error('[AuthService] Google Login failed:', error);
+      throw error;
     }
   },
 

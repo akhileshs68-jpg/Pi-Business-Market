@@ -45,14 +45,19 @@ export const MerchantAnalytics: React.FC = () => {
   }, [user]);
 
   const latest = metrics[metrics.length - 1] || {
+    metricId: '',
+    businessId: businessId,
+    date: new Date().toISOString().split('T')[0],
     revenue: 0,
     orderCount: 0,
+    productViews: 0,
     customerCount: 0,
-    conversionRate: 0,
     avgOrderValue: 0,
+    conversionRate: 0,
     lowStockItems: 0,
     inventoryValue: 0,
-    topProducts: []
+    topProducts: [],
+    updatedAt: new Date().toISOString()
   } as BusinessMetrics;
 
   const previous = metrics[metrics.length - 2] || latest;
@@ -62,7 +67,16 @@ export const MerchantAnalytics: React.FC = () => {
     return ((current - prev) / prev) * 100;
   };
 
-  const StatCard = ({ title, value, unit = '', trend = 0, icon: Icon, color }: any) => (
+  interface StatCardProps {
+    title: string;
+    value: number;
+    unit?: string;
+    trend?: number;
+    icon: React.ElementType;
+    color: string;
+  }
+
+  const StatCard = ({ title, value, unit = '', trend = 0, icon: Icon, color }: StatCardProps) => (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}

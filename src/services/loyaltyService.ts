@@ -163,11 +163,11 @@ export const loyaltyService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'loyaltyTransactions'),
-      where('accountId', '==', accountId),
-      orderBy('createdAt', 'desc')
+      where('accountId', '==', accountId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToTransaction(doc));
+    const transactions = snapshot.docs.map(doc => this.mapDocToTransaction(doc));
+    return transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   /**

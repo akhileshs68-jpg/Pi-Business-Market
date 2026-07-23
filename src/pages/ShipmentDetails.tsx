@@ -164,7 +164,6 @@ export const ShipmentDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Carrier Details Placeholder (Digital Delivery / Merchant Delivery) */}
             <div className="p-8 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] flex items-center gap-6">
               <div className="p-4 bg-indigo-600/10 rounded-3xl text-indigo-400">
                 <ShieldCheck className="w-8 h-8" />

@@ -88,18 +88,18 @@ export const OrderDetails: React.FC = () => {
   if (!order) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 py-12">
+    <div className="min-h-screen bg-slate-950 text-slate-200 py-8 sm:py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 sm:mb-12">
           <div className="space-y-2">
             <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 hover:text-white mb-4 transition-colors">
               <ArrowLeft className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-widest">Back to History</span>
             </button>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Order {order.orderNumber}</h1>
-              <span className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-widest">
+              <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter truncate">Order {order.orderNumber}</h1>
+              <span className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
                 {order.orderStatus.replace('_', ' ')}
               </span>
             </div>
@@ -128,25 +128,25 @@ export const OrderDetails: React.FC = () => {
           {/* Left Column: Details */}
           <div className="lg:col-span-2 space-y-8">
             {/* Order Items */}
-            <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
+            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 sm:mb-8 flex items-center gap-3">
                 <ClipboardList className="w-6 h-6 text-indigo-400" /> Line Items
               </h2>
               <div className="space-y-6">
                 {items.map((item) => (
                   <div key={item.itemId} className="space-y-4">
-                    <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center">
-                        <ShoppingBag className="w-6 h-6 text-slate-700" />
+                    <div className="flex items-center gap-4 sm:gap-6">
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center shrink-0">
+                        <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700" />
                       </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-bold text-white uppercase">{item.productName}</h4>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">SKU: {item.sku || 'N/A'}</p>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs sm:text-sm font-bold text-white uppercase truncate">{item.productName}</h4>
+                        <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">SKU: {item.sku || 'N/A'}</p>
                       </div>
-                      <div className="text-right flex flex-col items-end gap-2">
+                      <div className="text-right flex flex-col items-end gap-1 sm:gap-2 shrink-0">
                         <div>
-                          <p className="text-sm font-black text-white">{item.subtotal} Pi</p>
-                          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{item.quantity} × {item.unitPrice} Pi</p>
+                          <p className="text-xs sm:text-sm font-black text-white">{item.subtotal} Pi</p>
+                          <p className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-widest">{item.quantity} × {item.unitPrice}</p>
                         </div>
                         {order.orderStatus === OrderStatus.COMPLETED && !isMerchant && reviewingItemId !== item.itemId && (
                           <button 
@@ -192,16 +192,16 @@ export const OrderDetails: React.FC = () => {
                   <span className="text-white">{order.tax.toFixed(2)} Pi</span>
                 </div>
                 <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
-                  <span className="text-xs font-black text-white uppercase tracking-widest">Grand Total</span>
-                  <span className="text-3xl font-black text-indigo-500">{order.grandTotal.toFixed(2)} Pi</span>
+                  <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest">Grand Total</span>
+                  <span className="text-2xl sm:text-3xl font-black text-indigo-500">{order.grandTotal.toFixed(2)} Pi</span>
                 </div>
               </div>
             </section>
 
             {/* Logistics & Delivery */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-6 flex items-center gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-emerald-400" /> Delivery Address
                 </h3>
                 {order.shippingAddress ? (
@@ -209,31 +209,31 @@ export const OrderDetails: React.FC = () => {
                     <p className="text-sm font-bold text-slate-200">{order.shippingAddress.fullName}</p>
                     <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.street}</p>
                     <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-4 flex items-center gap-2">
+                    <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-4 flex items-center gap-2">
                       <Truck className="w-3 h-3" /> Standard Shipping
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-600 italic">No shipping address provided (Digital/Service)</p>
+                  <p className="text-[10px] sm:text-xs text-slate-600 italic">No address (Digital/Service)</p>
                 )}
               </section>
 
-              <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-6 flex items-center gap-2">
+              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-amber-400" /> Payment Info
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black text-slate-500 uppercase">Method</span>
-                    <span className="text-xs font-bold text-white uppercase">Pi Network Wallet</span>
+                    <span className="text-xs font-bold text-white uppercase">Pi Wallet</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black text-slate-500 uppercase">Status</span>
                     <span className="text-xs font-bold text-amber-400 uppercase">{order.paymentStatus}</span>
                   </div>
                   <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Transaction secured on Pi Mainnet</span>
+                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-tight">Secured on Pi Mainnet</span>
                   </div>
                 </div>
               </section>
@@ -242,11 +242,11 @@ export const OrderDetails: React.FC = () => {
 
           {/* Right Column: Timeline */}
           <div className="lg:col-span-1">
-            <section className="sticky top-12 bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
+            <section className="sticky top-12 bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 sm:mb-8 flex items-center gap-3">
                 <Clock className="w-6 h-6 text-violet-400" /> Activity Log
               </h2>
-              <div className="relative space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
+              <div className="relative space-y-6 sm:space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
                 {timeline.map((event, i) => (
                   <div key={event.eventId} className="relative pl-10">
                     <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-slate-900 flex items-center justify-center z-10 ${
@@ -255,10 +255,10 @@ export const OrderDetails: React.FC = () => {
                       {i === timeline.length - 1 && <CheckCircle2 className="w-3 h-3 text-white" />}
                     </div>
                     <div className="space-y-1">
-                      <p className={`text-xs font-bold uppercase tracking-tight ${i === timeline.length - 1 ? 'text-white' : 'text-slate-400'}`}>
+                      <p className={`text-[11px] sm:text-xs font-bold uppercase tracking-tight ${i === timeline.length - 1 ? 'text-white' : 'text-slate-400'}`}>
                         {event.message}
                       </p>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                         <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">{new Date(event.createdAt).toLocaleString()}</span>
                         <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">by {event.actorName}</span>
                       </div>

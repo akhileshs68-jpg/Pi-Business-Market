@@ -83,108 +83,108 @@ export const BusinessDashboard: React.FC = () => {
         onToggleCart={() => {}} 
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pb-24 sm:pb-10">
         
         {/* Enterprise Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 mb-8 sm:mb-12">
           <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 shadow-inner">
-                <Briefcase className="w-5 h-5 text-indigo-400" />
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <div className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-indigo-600/10 border border-indigo-500/20 shadow-inner">
+                <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
               </div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">Corporate Registry</p>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em]">Corporate Registry</p>
             </div>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight">Enterprise Identities</h1>
-            <p className="text-slate-500 mt-2 font-medium">Root control for all your marketplace operations.</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">Enterprise Identities</h1>
+            <p className="text-slate-500 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base font-medium">Root control for all your marketplace operations.</p>
           </div>
           
           <button 
             onClick={() => setShowWizard(true)}
-            className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-indigo-600 text-white font-bold transition-all hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95"
+            className="group flex items-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-indigo-600 text-white font-bold transition-all hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95"
           >
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-            Establish New Identity
+            <span className="text-sm sm:text-base">Establish New Identity</span>
           </button>
         </div>
 
         {/* Global Context Rail */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
            {[
             { label: 'Total Identities', val: businesses.length, icon: Building2, color: 'text-indigo-400' },
             { label: 'Verified Status', val: businesses.filter(b => b.verificationStatus === 'Verified').length, icon: ShieldCheck, color: 'text-emerald-400' },
             { label: 'Active Personnel', val: businesses.reduce((acc, b) => acc + b.employeeCount, 0), icon: Zap, color: 'text-amber-400' },
             { label: 'System Health', val: 'Operational', icon: Globe, color: 'text-sky-400' },
           ].map((stat, i) => (
-            <div key={i} className="bg-slate-900/40 border border-slate-800 p-5 rounded-3xl backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-2">
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</span>
+            <div key={i} className="bg-slate-900/40 border border-slate-800 p-4 sm:p-5 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <stat.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${stat.color}`} />
+                <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stat.val}</p>
+              <p className="text-xl sm:text-2xl font-bold text-white">{stat.val}</p>
             </div>
           ))}
         </div>
 
         {/* Quick Hub Navigation */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2.5rem] p-10 flex flex-col items-start justify-between gap-8 shadow-2xl shadow-indigo-600/20 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform">
-              <ShoppingBag className="w-40 h-40" />
+          <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 flex flex-col items-start justify-between gap-6 sm:gap-8 shadow-2xl shadow-indigo-600/20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-10 group-hover:scale-110 transition-transform hidden sm:block">
+              <ShoppingBag className="w-32 h-32 sm:w-40 sm:h-40" />
             </div>
             <div className="relative z-10">
-              <h2 className="text-3xl font-bold text-white mb-3">Global Store Management</h2>
-              <p className="text-indigo-100/70 font-medium max-w-sm">Synchronize inventory, pricing, and fulfillment across all your registered storefronts.</p>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-2 sm:mb-3">Global Store Management</h2>
+              <p className="text-indigo-100/70 text-xs sm:text-sm md:text-base font-medium max-w-sm">Synchronize inventory, pricing, and fulfillment across all your registered storefronts.</p>
             </div>
             <button 
               onClick={() => navigate('/store-dashboard')}
-              className="relative z-10 px-8 py-4 rounded-2xl bg-white text-indigo-700 font-bold hover:bg-slate-50 transition-all shadow-xl flex items-center gap-2"
+              className="relative z-10 w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-white text-indigo-700 font-bold hover:bg-slate-50 transition-all shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
-              <Store className="w-5 h-5" />
+              <Store className="w-4 h-4 sm:w-5 sm:h-5" />
               Manage Fleet
             </button>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 flex flex-col items-start justify-between gap-8 shadow-xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:scale-110 transition-transform">
-              <MessageSquare className="w-40 h-40" />
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 flex flex-col items-start justify-between gap-6 sm:gap-8 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 sm:p-12 opacity-5 group-hover:scale-110 transition-transform hidden sm:block">
+              <MessageSquare className="w-32 h-32 sm:w-40 sm:h-40" />
             </div>
             <div className="relative z-10">
-              <h2 className="text-3xl font-bold text-white mb-3">Omnichannel Communications</h2>
-              <p className="text-slate-400 font-medium max-w-sm">Centralized support desk and automated CRM for every business identity in your registry.</p>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-2 sm:mb-3">Omnichannel Communications</h2>
+              <p className="text-slate-400 text-xs sm:text-sm md:text-base font-medium max-w-sm">Centralized support desk and automated CRM for every business identity in your registry.</p>
             </div>
             <button 
               onClick={() => navigate('/inbox')}
-              className="relative z-10 px-8 py-4 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-all shadow-xl flex items-center gap-2"
+              className="relative z-10 w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition-all shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base"
             >
-              <MessageSquare className="w-5 h-5" />
+              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
               Open Unified Inbox
             </button>
           </div>
         </div>
 
         {/* List Section Header */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 border-b border-slate-800 pb-6">
-          <div className="flex items-center gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-slate-800 pb-6">
+          <div className="flex items-center gap-6 overflow-x-auto w-full md:w-auto pb-4 md:pb-0 scrollbar-hide">
             <button 
               onClick={() => setActiveTab('owned')}
-              className={`text-sm font-bold transition-all relative ${
+              className={`text-sm font-bold transition-all relative whitespace-nowrap ${
                 activeTab === 'owned' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               Managed Identities
               {activeTab === 'owned' && (
-                <motion.div layoutId="activeTab" className="absolute -bottom-6 left-0 right-0 h-1 bg-indigo-600 rounded-full" />
+                <motion.div layoutId="activeTab" className="absolute -bottom-[25px] md:-bottom-[25px] left-0 right-0 h-1 bg-indigo-600 rounded-full" />
               )}
             </button>
             <button 
               onClick={() => setActiveTab('collaborations')}
-              className={`text-sm font-bold transition-all relative ${
+              className={`text-sm font-bold transition-all relative whitespace-nowrap ${
                 activeTab === 'collaborations' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               Collaborations
               {activeTab === 'collaborations' && (
-                <motion.div layoutId="activeTab" className="absolute -bottom-6 left-0 right-0 h-1 bg-indigo-600 rounded-full" />
+                <motion.div layoutId="activeTab" className="absolute -bottom-[25px] md:-bottom-[25px] left-0 right-0 h-1 bg-indigo-600 rounded-full" />
               )}
             </button>
           </div>
@@ -194,13 +194,13 @@ export const BusinessDashboard: React.FC = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input 
                 type="text" 
-                placeholder="Filter by name or category..." 
+                placeholder="Filter identity..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full md:w-72 bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:border-indigo-500 outline-none transition-all shadow-inner"
+                className="w-full md:w-64 bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:border-indigo-500 outline-none transition-all shadow-inner"
               />
             </div>
-            <button className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-slate-500 hover:text-white transition-all">
+            <button className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-slate-500 hover:text-white transition-all shrink-0">
               <BarChart3 className="w-5 h-5" />
             </button>
           </div>

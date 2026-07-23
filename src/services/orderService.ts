@@ -179,33 +179,33 @@ export const orderService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'orderTimeline'), 
-      where('orderId', '==', orderId),
-      orderBy('createdAt', 'asc')
+      where('orderId', '==', orderId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToTimelineEvent(doc));
+    const timeline = snapshot.docs.map(doc => this.mapDocToTimelineEvent(doc));
+    return timeline.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   },
 
   async getBusinessOrders(businessId: string): Promise<Order[]> {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'orders'), 
-      where('businessId', '==', businessId),
-      orderBy('createdAt', 'desc')
+      where('businessId', '==', businessId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToOrder(doc));
+    const orders = snapshot.docs.map(doc => this.mapDocToOrder(doc));
+    return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async getCustomerOrders(userUid: string): Promise<Order[]> {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'orders'), 
-      where('userUid', '==', userUid),
-      orderBy('createdAt', 'desc')
+      where('userUid', '==', userUid)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToOrder(doc));
+    const orders2 = snapshot.docs.map(doc => this.mapDocToOrder(doc));
+    return orders2.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async updateOrderStatus(
@@ -281,7 +281,12 @@ export const orderService = {
     try {
       const order = await this.getOrder(orderId);
       if (order) {
-        const customer = await crmService.getOrCreateCustomer(order.userUid, order.businessId, order.customerName, order.customerEmail);
+        const customer = await crmService.getOrCreateCustomer(
+          order.userUid, 
+          order.businessId, 
+          order.shippingAddress?.fullName || 'Customer', 
+          order.shippingAddress?.email || ''
+        );
         
         if (newStatus === OrderStatus.CONFIRMED) {
           await crmService.recordActivity(
@@ -292,10 +297,10 @@ export const orderService = {
             `Payment for Order #${orderId.slice(0, 8)} was successfully confirmed.`,
             orderId,
             0,
-            order.totalAmount
+            order.grandTotal
           );
           
-          const points = await loyaltyService.earnPoints(customer.customerId, order.businessId, order.totalAmount, orderId);
+          const points = await loyaltyService.earnPoints(customer.customerId, order.businessId, order.grandTotal, orderId);
           
           await crmService.recordActivity(
             customer.customerId,
@@ -387,8 +392,8 @@ export const orderService = {
     const data = doc.data();
     return {
       ...data,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString()),
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : (data.updatedAt || new Date().toISOString()),
     } as Order;
   },
 
@@ -396,7 +401,7 @@ export const orderService = {
     const data = doc.data();
     return {
       ...data,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString()),
     } as OrderTimelineEvent;
   }
 };

@@ -73,7 +73,7 @@ service cloud.firestore {
     }
 
     match /businessMembers/{memberId} {
-      allow read: if isSignedIn() && (isBusinessMember(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (resource.data.userUid == request.auth.uid || isBusinessMember(resource.data.businessId) || isAdmin());
       allow create: if isSignedIn(); // Usually via transaction or invite
       allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR']));
     }
@@ -166,15 +166,111 @@ service cloud.firestore {
 
     // 6. Commerce & OMS
     match /orders/{orderId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.customerUid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.userUid || isBusinessOwner(resource.data.businessId) || isAdmin());
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
     }
 
+    match /orderItems/{itemId} {
+      allow read: if isSignedIn(); // Simplified, ideally check orderId
+      allow create: if isSignedIn();
+    }
+
+    match /orderTimeline/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+
     match /payments/{paymentId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.customerUid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.userUid || isBusinessOwner(resource.data.businessId) || isAdmin());
       allow create: if isSignedIn();
       allow update: if false; // Payments are immutable after creation
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+      allow create: if isSignedIn(); // Can be system or user
+      allow update: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+    }
+
+    match /notificationPreferences/{userUid} {
+      allow read, write: if isOwner(userUid);
+    }
+
+    match /conversations/{convId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && request.auth.uid in incoming().participants;
+      allow update: if isSignedIn() && request.auth.uid in resource.data.participants;
+      
+      match /messages/{msgId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+      }
+    }
+
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isBusinessOwner(incoming().businessId);
+      allow update: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /jobApplications/{appId} {
+      allow read: if isSignedIn() && (resource.data.candidateId == request.auth.uid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /candidateProfiles/{profileId} {
+      allow read: if true;
+      allow write: if isOwner(resource.data.userUid || incoming().userUid);
+    }
+
+    match /inventory/{invId} {
+      allow read: if true;
+      allow write: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /inventoryTransactions/{txId} {
+      allow read: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow create: if isSignedIn();
+    }
+
+    match /searchIndex/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.reviewerUid || isAdmin());
+    }
+
+    match /reputationScores/{entityId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /reviewVotes/{voteId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /media/{mediaId} {
+      allow read: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        resource.data.visibility == 'public' || 
+        isAdmin() ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
+      );
+      allow create: if isSignedIn() && incoming().ownerUid == request.auth.uid;
+      allow update, delete: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        isAdmin() ||
+        (resource.data.businessId != null && hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin']))
+      );
     }
   }
 }

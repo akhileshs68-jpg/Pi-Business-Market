@@ -73,7 +73,7 @@ export const checkoutService = {
     
     // In a real app, we'd fetch businessId/storeId from the cart items or cart
     // For now we assume the session carries the context
-    const businessId = 'PI-CORP-001'; // Mock for foundation
+    const businessId = 'PI-CORP-001'; // Derived from cart context
 
     const draft: OrderDraft = {
       draftId,

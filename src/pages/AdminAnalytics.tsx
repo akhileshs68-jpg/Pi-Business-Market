@@ -81,48 +81,48 @@ export const AdminAnalytics: React.FC = () => {
         onToggleCart={() => {}} 
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pb-24 sm:pb-10">
         {/* System Status Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-indigo-600 rounded-xl">
                 <Shield className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">System Control</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">System Control</h1>
             </div>
-            <p className="text-slate-500 font-medium ml-12">Global infrastructure & observability</p>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium md:ml-12">Global infrastructure & observability</p>
           </div>
-
-          <div className="flex flex-wrap gap-3">
-            <StatusPill label="API Cluster" status="healthy" />
-            <StatusPill label="Firestore" status="healthy" />
-            <StatusPill label="Pi Gateway" status="healthy" />
+ 
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <StatusPill label="API" status="healthy" />
+            <StatusPill label="DB" status="healthy" />
+            <StatusPill label="Pi" status="healthy" />
             <button 
               onClick={() => navigate('/admin-console')}
-              className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-full text-[10px] font-bold text-white uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-full text-[10px] font-bold text-white uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20"
             >
               <Terminal className="w-3 h-3" />
-              Ops Console
+              Ops
             </button>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-800 mb-10">
+        <div className="flex border-b border-slate-800 mb-8 overflow-x-auto scrollbar-hide">
           {[
-            { id: 'overview', label: 'Platform Overview', icon: Globe },
-            { id: 'observability', label: 'Observability', icon: Activity },
-            { id: 'audit', label: 'Audit Engine', icon: Lock },
+            { id: 'overview', label: 'Overview', icon: Globe },
+            { id: 'observability', label: 'Nodes', icon: Activity },
+            { id: 'audit', label: 'Audit', icon: Lock },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all relative ${
+              className={`flex items-center gap-2 px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative whitespace-nowrap ${
                 activeTab === tab.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               {tab.label}
               {activeTab === tab.id && (
                 <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
@@ -134,39 +134,39 @@ export const AdminAnalytics: React.FC = () => {
         {activeTab === 'overview' && (
           <div className="space-y-10">
             {/* High Level Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {[
-                { title: 'Daily Active Users', value: latest.dau, icon: Users, color: 'text-indigo-400' },
-                { title: 'Monthly Active Users', value: latest.mau, icon: Activity, color: 'text-violet-400' },
-                { title: 'Total Revenue (π)', value: latest.totalRevenue, icon: Zap, color: 'text-amber-400' },
-                { title: 'Total Transactions', value: latest.totalOrders, icon: ShoppingBag, color: 'text-emerald-400' },
+                { title: 'DAU', value: latest.dau, icon: Users, color: 'text-indigo-400' },
+                { title: 'MAU', value: latest.mau, icon: Activity, color: 'text-violet-400' },
+                { title: 'Revenue (π)', value: latest.totalRevenue, icon: Zap, color: 'text-amber-400' },
+                { title: 'Trans.', value: latest.totalOrders, icon: ShoppingBag, color: 'text-emerald-400' },
               ].map((stat, i) => (
                 <motion.div 
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl"
+                  className="bg-slate-900/50 border border-slate-800 p-4 sm:p-6 rounded-2xl sm:rounded-3xl"
                 >
-                  <div className="flex justify-between items-center mb-4">
-                    <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global</span>
+                  <div className="flex justify-between items-center mb-2 sm:mb-4">
+                    <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
+                    <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden xs:inline">Global</span>
                   </div>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">{stat.title}</p>
-                  <h3 className="text-2xl font-bold text-white mt-1">{stat.value.toLocaleString()}</h3>
+                  <p className="text-slate-500 text-[9px] sm:text-xs font-bold uppercase tracking-wider">{stat.title}</p>
+                  <h3 className="text-lg sm:text-2xl font-bold text-white mt-0.5 sm:mt-1 truncate">{stat.value.toLocaleString()}</h3>
                 </motion.div>
               ))}
             </div>
 
             {/* Growth Chart */}
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl">
-              <h3 className="text-lg font-bold text-white mb-8">Platform Traffic Growth</h3>
-              <div className="h-80">
+            <div className="bg-slate-900/50 border border-slate-800 p-4 sm:p-8 rounded-3xl">
+              <h3 className="text-base sm:text-lg font-bold text-white mb-6 sm:mb-8">Traffic Velocity</h3>
+              <div className="h-64 sm:h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={metrics}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#64748b'}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#64748b'}} />
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
                     />
@@ -179,45 +179,45 @@ export const AdminAnalytics: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'observability' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-lg font-bold text-white">System Error Volume</h3>
+        {activeTab === 'observability' && (          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <div className="bg-slate-900/50 border border-slate-800 p-6 md:p-8 rounded-3xl">
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h3 className="text-base md:text-lg font-bold text-white">System Error Volume</h3>
                 <AlertCircle className="w-5 h-5 text-rose-500" />
               </div>
-              <div className="h-64">
+              <div className="h-48 md:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={metrics}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#64748b'}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#64748b'}} />
                     <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} />
                     <Bar dataKey="apiErrorCount" fill="#f43f5e" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
-
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-lg font-bold text-white">Payment Health</h3>
+ 
+            <div className="bg-slate-900/50 border border-slate-800 p-6 md:p-8 rounded-3xl">
+              <div className="flex justify-between items-center mb-6 md:mb-8">
+                <h3 className="text-base md:text-lg font-bold text-white">Payment Health</h3>
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
-              <div className="flex items-center justify-center h-64">
-                <div className="relative w-48 h-48 flex items-center justify-center">
+              <div className="flex items-center justify-center h-48 md:h-64">
+                <div className="relative w-36 h-36 md:w-48 md:h-48 flex items-center justify-center">
                   <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-800" />
-                    <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={502.4} strokeDashoffset={502.4 * (1 - latest.paymentSuccessRate / 100)} className="text-emerald-500 transition-all duration-1000" />
+                    <circle cx="50%" cy="50%" r="40%" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-800" />
+                    <circle cx="50%" cy="50%" r="40%" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - latest.paymentSuccessRate / 100)} className="text-emerald-500 transition-all duration-1000" />
                   </svg>
                   <div className="absolute flex flex-col items-center">
-                    <span className="text-4xl font-bold">{latest.paymentSuccessRate}%</span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Success Rate</span>
+                    <span className="text-2xl md:text-4xl font-bold">{latest.paymentSuccessRate}%</span>
+                    <span className="text-[8px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest">Success</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
         )}
 
         {activeTab === 'audit' && (
@@ -232,51 +232,51 @@ export const AdminAnalytics: React.FC = () => {
               </button>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto scrollbar-hide -mx-4 sm:mx-0">
+              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="bg-slate-800/30 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800">
-                    <th className="px-8 py-4">Timestamp</th>
-                    <th className="px-8 py-4">Actor</th>
-                    <th className="px-8 py-4">Action</th>
-                    <th className="px-8 py-4">Target</th>
-                    <th className="px-8 py-4">Severity</th>
+                  <tr className="bg-slate-800/30 text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800">
+                    <th className="px-6 sm:px-8 py-4">Timestamp</th>
+                    <th className="px-6 sm:px-8 py-4">Actor</th>
+                    <th className="px-6 sm:px-8 py-4">Action</th>
+                    <th className="px-6 sm:px-8 py-4">Target</th>
+                    <th className="px-6 sm:px-8 py-4">Severity</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
                   {auditLogs.map((log) => (
                     <tr key={log.logId} className="hover:bg-slate-800/20 transition-colors group">
-                      <td className="px-8 py-4">
+                      <td className="px-6 sm:px-8 py-4">
                         <div className="flex flex-col">
-                          <span className="text-xs font-medium text-slate-300">
+                          <span className="text-[11px] sm:text-xs font-medium text-slate-300">
                             {new Date(log.timestamp).toLocaleDateString()}
                           </span>
-                          <span className="text-[10px] text-slate-600 font-mono">
+                          <span className="text-[9px] sm:text-[10px] text-slate-600 font-mono">
                             {new Date(log.timestamp).toLocaleTimeString()}
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-4">
+                      <td className="px-6 sm:px-8 py-4">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">
                             {log.actorName.charAt(0)}
                           </div>
-                          <span className="text-xs text-slate-400">{log.actorName}</span>
+                          <span className="text-[11px] sm:text-xs text-slate-400">{log.actorName}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-4">
-                        <span className="px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded-md text-[10px] font-bold border border-indigo-500/20">
+                      <td className="px-6 sm:px-8 py-4">
+                        <span className="px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded-md text-[9px] sm:text-[10px] font-bold border border-indigo-500/20">
                           {log.action}
                         </span>
                       </td>
-                      <td className="px-8 py-4">
+                      <td className="px-6 sm:px-8 py-4">
                         <div className="flex flex-col">
-                          <span className="text-xs text-slate-300 capitalize">{log.targetType}</span>
-                          <span className="text-[10px] text-slate-600 font-mono truncate max-w-[100px]">{log.targetId}</span>
+                          <span className="text-[11px] sm:text-xs text-slate-300 capitalize">{log.targetType}</span>
+                          <span className="text-[9px] sm:text-[10px] text-slate-600 font-mono truncate max-w-[100px]">{log.targetId}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-4">
-                        <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tighter ${
+                      <td className="px-6 sm:px-8 py-4">
+                        <div className={`flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter ${
                           log.severity === 'critical' ? 'text-rose-500' : 
                           log.severity === 'warning' ? 'text-amber-500' : 
                           'text-emerald-500'

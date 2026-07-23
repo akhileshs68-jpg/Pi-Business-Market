@@ -164,22 +164,22 @@ export const shippingService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'trackingEvents'), 
-      where('shipmentId', '==', shipmentId),
-      orderBy('eventTime', 'desc')
+      where('shipmentId', '==', shipmentId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToTrackingEvent(doc));
+    const events = snapshot.docs.map(doc => this.mapDocToTrackingEvent(doc));
+    return events.sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime());
   },
 
   async getBusinessShipments(businessId: string): Promise<Shipment[]> {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'shipments'), 
-      where('businessId', '==', businessId),
-      orderBy('createdAt', 'desc')
+      where('businessId', '==', businessId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToShipment(doc));
+    const shipments = snapshot.docs.map(doc => this.mapDocToShipment(doc));
+    return shipments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   /**

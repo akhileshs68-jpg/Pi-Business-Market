@@ -31,7 +31,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -48,15 +48,15 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           >
             <button 
               onClick={onClose}
-              className="absolute -top-12 right-0 p-2 text-slate-400 hover:text-white transition-colors"
+              className="absolute -top-10 sm:-top-12 right-0 p-2 text-slate-400 hover:text-white transition-colors"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5 sm:w-6 h-6" />
             </button>
 
             <MediaLibrary 
               ownerUid={ownerUid}
               module={module}
-              onSelect={(asset) => {
+              onSelect={(asset: MediaAsset) => {
                 onSelect(asset);
                 onClose();
               }}

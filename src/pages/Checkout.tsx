@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { CheckoutInput } from '../components/checkout/CheckoutInput';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -13,8 +14,6 @@ import {
   CheckCircle2, 
   Loader2,
   ShieldCheck,
-  ChevronRight,
-  Plus
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/useAuth';
@@ -112,7 +111,6 @@ export const Checkout: React.FC = () => {
         }
       }, {
         onReadyForServerApproval: (paymentId) => {
-          console.log('[Checkout] Payment approved by user, processing on node...');
         },
         onReadyForServerCompletion: async (paymentId, txid) => {
           try {
@@ -131,7 +129,6 @@ export const Checkout: React.FC = () => {
           }
         },
         onCancel: (paymentId) => {
-          console.log('[Checkout] Payment cancelled by user');
           setIsProcessing(false);
         },
         onError: (error, paymentId) => {
@@ -168,51 +165,53 @@ export const Checkout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 py-12">
+    <div className="min-h-screen bg-slate-950 text-slate-200 py-8 sm:py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-12">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 sm:mb-12">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group w-fit">
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-widest">Back to Bag</span>
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">Back to Bag</span>
           </button>
-          <div className="flex items-center gap-8">
+          
+          <div className="flex items-center justify-between md:justify-start gap-4 sm:gap-8 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
             <StepIndicator current={step === 'shipping'} done={step !== 'shipping'} label="Shipping" />
-            <div className="w-8 h-px bg-slate-800" />
+            <div className="hidden sm:block w-8 h-px bg-slate-800 shrink-0" />
             <StepIndicator current={step === 'payment'} done={step === 'review'} label="Payment" />
-            <div className="w-8 h-px bg-slate-800" />
+            <div className="hidden sm:block w-8 h-px bg-slate-800 shrink-0" />
             <StepIndicator current={step === 'review'} done={false} label="Review" />
           </div>
-          <div className="flex items-center gap-2 text-emerald-400">
+          
+          <div className="hidden md:flex items-center gap-2 text-emerald-400">
             <ShieldCheck className="w-5 h-5" />
             <span className="text-[10px] font-black uppercase tracking-widest">Secure Checkout</span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6 md:space-y-8 order-2 lg:order-1">
             {step === 'shipping' && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-                  <h2 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
-                    <MapPin className="w-6 h-6 text-indigo-400" /> Shipping Information
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 md:space-y-8">
+                <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+                  <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-tight mb-6 md:mb-8 flex items-center gap-3">
+                    <MapPin className="w-6 h-6 text-indigo-400" /> Shipping
                   </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <CheckoutInput label="Full Name" value={address.fullName} onChange={(v) => setAddress({...address, fullName: v})} />
-                    <CheckoutInput label="Email" value={address.email} onChange={(v) => setAddress({...address, email: v})} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <CheckoutInput label="Full Name" value={address.fullName} onChange={(v: string) => setAddress({...address, fullName: v})} />
+                    <CheckoutInput label="Email" value={address.email} onChange={(v: string) => setAddress({...address, email: v})} />
                     <div className="md:col-span-2">
-                      <CheckoutInput label="Street Address" value={address.street} onChange={(v) => setAddress({...address, street: v})} />
+                      <CheckoutInput label="Street Address" value={address.street} onChange={(v: string) => setAddress({...address, street: v})} />
                     </div>
-                    <CheckoutInput label="City" value={address.city} onChange={(v) => setAddress({...address, city: v})} />
-                    <CheckoutInput label="State" value={address.state} onChange={(v) => setAddress({...address, state: v})} />
-                    <CheckoutInput label="Postal Code" value={address.postalCode} onChange={(v) => setAddress({...address, postalCode: v})} />
-                    <CheckoutInput label="Country" value={address.country} onChange={(v) => setAddress({...address, country: v})} />
+                    <CheckoutInput label="City" value={address.city} onChange={(v: string) => setAddress({...address, city: v})} />
+                    <CheckoutInput label="State" value={address.state} onChange={(v: string) => setAddress({...address, state: v})} />
+                    <CheckoutInput label="Postal Code" value={address.postalCode} onChange={(v: string) => setAddress({...address, postalCode: v})} />
+                    <CheckoutInput label="Country" value={address.country} onChange={(v: string) => setAddress({...address, country: v})} />
                   </div>
                 </section>
 
-                <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-                  <h2 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
+                <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+                  <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-tight mb-6 md:mb-8 flex items-center gap-3">
                     <Truck className="w-6 h-6 text-amber-400" /> Delivery Method
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -233,7 +232,7 @@ export const Checkout: React.FC = () => {
 
                 <button 
                   onClick={() => setStep('payment')}
-                  className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20"
+                  className="w-full py-4 sm:py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl md:rounded-[1.8rem] text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20"
                 >
                   Continue to Payment
                 </button>
@@ -241,30 +240,30 @@ export const Checkout: React.FC = () => {
             )}
 
             {step === 'payment' && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-                  <h2 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
-                    <CreditCard className="w-6 h-6 text-violet-400" /> Payment Method
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 md:space-y-8">
+                <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+                  <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-tight mb-6 md:mb-8 flex items-center gap-3">
+                    <CreditCard className="w-6 h-6 text-violet-400" /> Payment
                   </h2>
-                  <div className="p-8 bg-slate-950 border border-slate-800 rounded-3xl text-center">
-                    <div className="w-16 h-16 bg-indigo-600/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <CreditCard className="w-8 h-8 text-indigo-400" />
+                  <div className="p-6 md:p-8 bg-slate-950 border border-slate-800 rounded-2xl sm:rounded-3xl text-center">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-600/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                      <CreditCard className="w-7 h-7 sm:w-8 sm:h-8 text-indigo-400" />
                     </div>
-                    <h3 className="text-lg font-black text-white uppercase mb-2">Pi Network Wallet</h3>
-                    <p className="text-xs text-slate-500 font-medium mb-8">Securely authorize this transaction via your Pi Browser or Wallet app.</p>
-                    <div className="px-6 py-4 bg-slate-900 rounded-2xl flex items-center justify-between border border-slate-800">
+                    <h3 className="text-base sm:text-lg font-black text-white uppercase mb-2">Pi Wallet</h3>
+                    <p className="text-[10px] sm:text-xs text-slate-500 font-medium mb-6 sm:mb-8 max-w-xs mx-auto leading-relaxed">Securely authorize transaction via Pi Browser or Wallet app.</p>
+                    <div className="px-4 md:px-6 py-4 bg-slate-900 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-black text-white">PI</div>
-                        <span className="text-sm font-bold text-slate-300">Wallet balance available</span>
+                        <span className="text-[11px] sm:text-sm font-bold text-slate-300">Balance available</span>
                       </div>
-                      <span className="text-lg font-black text-white">1,240.50 Pi</span>
+                      <span className="text-base sm:text-lg font-black text-white">1,240.50 Pi</span>
                     </div>
                   </div>
                 </section>
 
                 <button 
                   onClick={() => setStep('review')}
-                  className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20"
+                  className="w-full py-4 sm:py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl md:rounded-[1.8rem] text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20"
                 >
                   Review Order
                 </button>
@@ -272,23 +271,27 @@ export const Checkout: React.FC = () => {
             )}
 
             {step === 'review' && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-                <section className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-                  <h2 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 md:space-y-8">
+                <section className="bg-slate-900/50 border border-slate-800 rounded-3xl md:rounded-[2.5rem] p-6 md:p-8">
+                  <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-tight mb-6 md:mb-8 flex items-center gap-3">
                     <CheckCircle2 className="w-6 h-6 text-emerald-400" /> Final Review
                   </h2>
                   <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Shipping To</h4>
-                        <p className="text-sm font-bold text-white">{address.fullName}</p>
-                        <p className="text-xs text-slate-400">{address.street}</p>
-                        <p className="text-xs text-slate-400">{address.city}, {address.state} {address.postalCode}</p>
+                        <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                          <p className="text-sm font-bold text-white">{address.fullName}</p>
+                          <p className="text-xs text-slate-400">{address.street}</p>
+                          <p className="text-xs text-slate-400">{address.city}, {address.state} {address.postalCode}</p>
+                        </div>
                       </div>
                       <div>
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Payment</h4>
-                        <p className="text-sm font-bold text-white">Pi Network Wallet</p>
-                        <p className="text-xs text-slate-400">Transaction ID: TBD on confirm</p>
+                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Payment Method</h4>
+                        <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                          <p className="text-sm font-bold text-white">Pi Network Wallet</p>
+                          <p className="text-xs text-slate-400">Secure Consensus Authorization</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -297,7 +300,7 @@ export const Checkout: React.FC = () => {
                 <button 
                   onClick={handlePlaceOrder}
                   disabled={isProcessing}
-                  className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white rounded-[2rem] text-sm font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3"
+                  className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white rounded-2xl md:rounded-[2rem] text-sm font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3"
                 >
                   {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : "Confirm and Pay Now"}
                 </button>
@@ -306,22 +309,22 @@ export const Checkout: React.FC = () => {
           </div>
 
           {/* Sidebar Summary */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-12 bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
-              <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Order Summary</h3>
-              <div className="space-y-6 mb-8 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="lg:col-span-1 order-1 lg:order-2">
+            <div className="lg:sticky lg:top-28 bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight mb-6 sm:mb-8">Order Summary</h3>
+              <div className="space-y-6 mb-6 sm:mb-8 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                 {items.map((item) => (
                   <div key={item.itemId} className="flex gap-4">
-                    <div className="w-12 h-12 bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                    <div className="w-12 h-12 bg-slate-800 rounded-xl overflow-hidden border border-slate-700 flex-shrink-0">
                       {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-[10px] font-bold text-white truncate uppercase">{item.name}</h4>
                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                        Qty: {item.quantity} × {item.unitPrice} Pi
+                        Qty: {item.quantity} × {item.unitPrice}
                       </p>
                     </div>
-                    <p className="text-[10px] font-black text-white">{item.subtotal} Pi</p>
+                    <p className="text-[10px] font-black text-white flex-shrink-0">{item.subtotal} Pi</p>
                   </div>
                 ))}
               </div>
@@ -336,12 +339,12 @@ export const Checkout: React.FC = () => {
                   <span className="text-white">{session.shipping} Pi</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>Tax</span>
+                  <span>Tax (5%)</span>
                   <span className="text-white">{session.tax} Pi</span>
                 </div>
                 <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
-                  <span className="text-xs font-black text-white uppercase tracking-widest">Total</span>
-                  <span className="text-2xl font-black text-white">{session.grandTotal} Pi</span>
+                  <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest">Total</span>
+                  <span className="text-xl sm:text-2xl font-black text-white">{session.grandTotal} Pi</span>
                 </div>
               </div>
             </div>
@@ -368,26 +371,21 @@ const StepIndicator = ({ current, done, label }: { current: boolean; done: boole
   </div>
 );
 
-const CheckoutInput = ({ label, value, onChange, placeholder }: any) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
-    <input 
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-sm font-bold text-white focus:border-indigo-500 outline-none transition-all placeholder:text-slate-700"
-    />
-  </div>
-);
+interface DeliveryOptionProps {
+  title: string;
+  desc: string;
+  price: string;
+  active: boolean;
+}
 
-const DeliveryOption = ({ title, desc, price, active }: any) => (
-  <div className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all ${
+const DeliveryOption: React.FC<DeliveryOptionProps> = ({ title, desc, price, active }) => (
+  <div className={`p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border-2 cursor-pointer transition-all ${
     active ? 'bg-indigo-600/5 border-indigo-600 shadow-lg shadow-indigo-600/10' : 'bg-slate-950 border-slate-800 hover:border-slate-700'
   }`}>
-    <div className="flex justify-between items-start mb-2">
-      <h4 className="text-sm font-black text-white uppercase tracking-tight">{title}</h4>
-      <span className="text-xs font-black text-white">{price}</span>
+    <div className="flex justify-between items-start mb-1 sm:mb-2 gap-2">
+      <h4 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight leading-tight">{title}</h4>
+      <span className="text-[10px] sm:text-xs font-black text-white shrink-0">{price}</span>
     </div>
-    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{desc}</p>
+    <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{desc}</p>
   </div>
 );

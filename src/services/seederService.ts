@@ -97,7 +97,6 @@ export const seederService = {
         });
       }
 
-      console.log('Catalog seeded successfully!');
     } catch (err) {
       console.error('Seeding failed:', err);
     }

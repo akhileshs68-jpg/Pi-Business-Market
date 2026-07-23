@@ -89,12 +89,12 @@ export const ledgerService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'paymentLedger'),
-      where('businessId', '==', businessId),
-      orderBy('createdAt', 'desc')
+      where('businessId', '==', businessId)
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToLedger(doc));
+    const entries = snapshot.docs.map(doc => this.mapDocToLedger(doc));
+    return entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async getCustomerLedger(customerUid: string): Promise<LedgerEntry[]> {

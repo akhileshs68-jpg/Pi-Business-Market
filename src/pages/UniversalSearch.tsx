@@ -101,41 +101,41 @@ export const UniversalSearch: React.FC = () => {
         onToggleCart={() => {}}
       />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-24 sm:pb-12">
         {/* Search Header */}
-        <div className="relative mb-12">
+        <div className="relative mb-8 sm:mb-12">
           <div className="absolute inset-0 bg-violet-600/5 blur-[120px] rounded-full" />
           <div className="relative">
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase mb-8 text-center">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter uppercase mb-6 sm:mb-8 text-center">
               Discover the <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-500">Pi Economy</span>
             </h1>
 
             <div className="max-w-3xl mx-auto">
               <div className="relative group">
-                <div className="absolute inset-0 bg-violet-600/20 blur-xl group-focus-within:bg-violet-600/40 transition-all rounded-[2.5rem]" />
-                <div className="relative flex items-center bg-slate-900 border border-slate-800 focus-within:border-violet-500 rounded-[2.5rem] p-2 shadow-2xl transition-all">
-                  <Search className="w-6 h-6 text-slate-500 ml-6" />
+                <div className="absolute inset-0 bg-violet-600/20 blur-xl group-focus-within:bg-violet-600/40 transition-all rounded-[1.5rem] sm:rounded-[2.5rem]" />
+                <div className="relative flex items-center bg-slate-900 border border-slate-800 focus-within:border-violet-500 rounded-2xl sm:rounded-[2.5rem] p-1.5 sm:p-2 shadow-2xl transition-all">
+                  <Search className="w-5 h-5 sm:w-6 h-6 text-slate-500 ml-3 sm:ml-6 shrink-0" />
                   <input 
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search Products, Services, Jobs, or Businesses..." 
-                    className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-lg font-bold text-white placeholder:text-slate-600"
+                    placeholder="Search market..." 
+                    className="flex-1 min-w-0 bg-transparent border-none outline-none px-3 sm:px-6 py-3 sm:py-4 text-sm sm:text-lg font-bold text-white placeholder:text-slate-600"
                   />
                   {query && (
-                    <button onClick={() => setQuery('')} className="p-2 text-slate-500 hover:text-white mr-2">
-                      <X className="w-5 h-5" />
+                    <button onClick={() => setQuery('')} className="p-2 text-slate-500 hover:text-white mr-1 sm:mr-2 shrink-0">
+                      <X className="w-4 h-4 sm:w-5 h-5" />
                     </button>
                   )}
-                  <button className="px-8 py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-[1.8rem] font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-violet-600/20 active:scale-95">
+                  <button className="px-4 sm:px-8 py-3 sm:py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-xl sm:rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all shadow-xl shadow-violet-600/20 active:scale-95 shrink-0">
                     Search
                   </button>
                 </div>
               </div>
 
               {/* Entity Type Filters */}
-              <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-6 sm:mt-8">
                 {[
-                  { id: 'all', label: 'All Results', icon: LayoutGrid },
+                  { id: 'all', label: 'All', icon: LayoutGrid },
                   { id: 'product', label: 'Products', icon: ShoppingBag },
                   { id: 'service', label: 'Services', icon: Zap },
                   { id: 'job', label: 'Jobs', icon: Briefcase },
@@ -144,13 +144,13 @@ export const UniversalSearch: React.FC = () => {
                   <button
                     key={type.id}
                     onClick={() => setActiveType(type.id as any)}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-[8px] sm:text-[10px] font-black uppercase tracking-widest transition-all border ${
                       activeType === type.id 
                         ? 'bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/20' 
                         : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    <type.icon className="w-3.5 h-3.5" />
+                    <type.icon className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
                     {type.label}
                   </button>
                 ))}
@@ -299,15 +299,15 @@ export const UniversalSearch: React.FC = () => {
 const DiscoveryCard = ({ title, desc, icon, color, onClick }: any) => (
   <div 
     onClick={onClick}
-    className="group p-8 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-[2.5rem] transition-all cursor-pointer relative overflow-hidden"
+    className="group p-6 sm:p-8 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl sm:rounded-[2.5rem] transition-all cursor-pointer relative overflow-hidden"
   >
     <div className={`absolute top-0 right-0 w-32 h-32 bg-${color}-600/10 blur-3xl -mr-16 -mt-16 group-hover:scale-150 transition-transform`} />
-    <div className={`p-4 bg-${color}-600/10 rounded-2xl w-fit mb-6 text-${color}-400 group-hover:scale-110 transition-transform`}>
+    <div className={`p-3 sm:p-4 bg-${color}-600/10 rounded-xl sm:rounded-2xl w-fit mb-4 sm:mb-6 text-${color}-400 group-hover:scale-110 transition-transform`}>
       {icon}
     </div>
-    <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{title}</h3>
-    <p className="text-slate-500 text-xs font-medium mb-8 leading-relaxed">{desc}</p>
-    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-white transition-colors">
+    <h3 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-2">{title}</h3>
+    <p className="text-slate-500 text-[10px] sm:text-xs font-medium mb-6 sm:mb-8 leading-relaxed">{desc}</p>
+    <div className="flex items-center gap-2 text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-white transition-colors">
       Explore Ecosystem <ChevronRight className="w-4 h-4" />
     </div>
   </div>

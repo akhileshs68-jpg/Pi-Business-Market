@@ -121,23 +121,22 @@ export const crmService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'customers'), 
-      where('businessId', '==', businessId),
-      orderBy('totalSpent', 'desc')
+      where('businessId', '==', businessId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToCustomer(doc));
+    const customers = snapshot.docs.map(doc => this.mapDocToCustomer(doc));
+    return customers.sort((a, b) => b.totalSpent - a.totalSpent);
   },
 
   async getCustomerTimeline(customerId: string): Promise<CustomerTimelineEvent[]> {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'customerTimeline'),
-      where('customerId', '==', customerId),
-      orderBy('createdAt', 'desc'),
-      limit(50)
+      where('customerId', '==', customerId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToEvent(doc));
+    const timeline = snapshot.docs.map(doc => this.mapDocToEvent(doc));
+    return timeline.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 50);
   },
 
   /**
@@ -161,11 +160,11 @@ export const crmService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'customerNotes'),
-      where('customerId', '==', customerId),
-      orderBy('createdAt', 'desc')
+      where('customerId', '==', customerId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToNote(doc));
+    const notes = snapshot.docs.map(doc => this.mapDocToNote(doc));
+    return notes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   /**

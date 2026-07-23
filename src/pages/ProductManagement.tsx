@@ -33,6 +33,8 @@ import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { useAuth } from '../auth/useAuth';
 import { Product, Store } from '../types';
+import { CardSkeleton } from '../components/ui/Skeleton';
+import { EmptyState } from '../components/ui/EmptyState';
 
 export const ProductManagement: React.FC = () => {
   const { storeId } = useParams<{ storeId: string }>();
@@ -93,7 +95,7 @@ export const ProductManagement: React.FC = () => {
       await productService.softDeleteProduct(productId);
       setProducts(prev => prev.filter(p => p.productId !== productId));
     } catch (err: any) {
-      alert('Failed to delete product: ' + err.message);
+      setError('Failed to delete product: ' + err.message);
     }
   };
 
@@ -113,7 +115,7 @@ export const ProductManagement: React.FC = () => {
       
       await loadData();
     } catch (err: any) {
-      alert('Failed to duplicate product: ' + err.message);
+      setError('Failed to duplicate product: ' + err.message);
     }
   };
 
@@ -135,9 +137,17 @@ export const ProductManagement: React.FC = () => {
           onWalletUpdate={() => {}}
           onToggleCart={() => {}}
         />
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          <Loader2 className="w-12 h-12 text-violet-500 animate-spin mb-4" />
-          <p className="text-slate-400 font-bold animate-pulse">Initializing Product Engine...</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full space-y-12">
+          <div className="flex justify-between items-center">
+            <div className="flex gap-4">
+              <div className="w-16 h-16 bg-slate-800 rounded-2xl animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-8 w-64 bg-slate-800 rounded-lg animate-pulse" />
+                <div className="h-4 w-48 bg-slate-800 rounded-lg animate-pulse" />
+              </div>
+            </div>
+          </div>
+          <CardSkeleton count={4} />
         </div>
       </div>
     );
@@ -188,76 +198,76 @@ export const ProductManagement: React.FC = () => {
       {/* Hero Header */}
       <div className="relative overflow-hidden bg-slate-900 border-b border-slate-800">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-600/10 via-transparent to-indigo-600/10 pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-600/20">
-                <Package className="w-8 h-8 text-white" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <div className="flex items-center gap-4 sm:gap-5">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-600/20 shrink-0">
+                <Package className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <button 
                     onClick={() => navigate('/store-dashboard')}
-                    className="text-xs font-bold text-slate-500 hover:text-violet-400 flex items-center gap-1 transition-colors"
+                    className="text-[10px] sm:text-xs font-bold text-slate-500 hover:text-violet-400 flex items-center gap-1 transition-colors"
                   >
                     <StoreIcon className="w-3 h-3" />
-                    {store.storeName}
+                    <span className="truncate max-w-[100px] sm:max-w-none">{store.storeName}</span>
                   </button>
                   <span className="text-slate-700">/</span>
-                  <span className="text-xs font-bold text-slate-400">Products</span>
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-400">Products</span>
                 </div>
-                <h1 className="text-3xl font-black text-white tracking-tight">Product Management</h1>
-                <p className="text-slate-400 text-sm font-medium mt-1">Manage inventory, pricing, and catalog details.</p>
+                <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight">Product Management</h1>
+                <p className="text-slate-400 text-[10px] sm:text-sm font-medium mt-0.5 sm:mt-1">Manage inventory, pricing, and catalog details.</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button 
                 onClick={() => { setEditingProduct(undefined); setIsWizardOpen(true); }}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 text-white font-bold shadow-lg shadow-violet-600/20 hover:bg-violet-500 transition-all"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-3 rounded-xl bg-violet-600 text-white font-bold shadow-lg shadow-violet-600/20 hover:bg-violet-500 transition-all text-xs sm:text-base"
               >
-                <Plus className="w-5 h-5" />
-                Add Product
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Add Product</span>
               </button>
               <button className="p-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition-all">
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1 w-full">
         {/* Controls Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="relative flex-1 max-w-md">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+          <div className="relative flex-1 lg:max-w-md">
             <input 
               type="text"
               placeholder="Search by name, SKU, or category..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:border-violet-500 transition-all"
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500 transition-all"
             />
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-1 flex items-center">
               <button 
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
               >
                 <LayoutGrid className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
               >
                 <List className="w-5 h-5" />
               </button>
             </div>
             
-            <button className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all font-bold text-sm">
+            <button className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">
               <Filter className="w-4 h-4" />
               Filters
             </button>
@@ -266,26 +276,13 @@ export const ProductManagement: React.FC = () => {
 
         {/* Product List */}
         {filteredProducts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-3xl">
-            <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6">
-              <Package className="w-10 h-10 text-slate-600" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              {searchQuery ? 'No matching products' : 'No products found'}
-            </h3>
-            <p className="text-slate-500 max-w-xs text-center mb-8">
-              {searchQuery ? 'Try adjusting your search filters.' : 'Start building your inventory catalog by adding your first product.'}
-            </p>
-            {!searchQuery && (
-              <button 
-                onClick={() => setIsWizardOpen(true)}
-                className="flex items-center gap-2 px-8 py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                Add First Product
-              </button>
-            )}
-          </div>
+          <EmptyState 
+            icon={Package}
+            title={searchQuery ? 'No matching products' : 'Inventory Catalog Empty'}
+            description={searchQuery ? 'We couldn\'t find any products matching your current filters. Try adjusting your search query.' : 'Start building your digital inventory by adding your first product to this store.'}
+            actionLabel={!searchQuery ? 'Add First Product' : undefined}
+            onAction={!searchQuery ? () => setIsWizardOpen(true) : undefined}
+          />
         ) : (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'space-y-4'}>
             {filteredProducts.map(product => (

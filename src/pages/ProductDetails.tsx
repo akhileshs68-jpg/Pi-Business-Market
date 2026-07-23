@@ -53,7 +53,7 @@ export const ProductDetails: React.FC = () => {
     setLoading(true);
     try {
       // In a real app, we'd fetch the full product object
-      // For foundation, we fetch from the search index or a mock
+      // For foundation, we fetch from the search index or cache
       const { results } = await searchService.search('', { entityType: 'product' });
       const found = results.find(p => p.entityId === id);
       if (found) {
@@ -147,31 +147,31 @@ export const ProductDetails: React.FC = () => {
         onToggleCart={() => {}}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-12 group">
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="text-xs font-black uppercase tracking-widest">Back to Results</span>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-24 sm:pb-12">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 sm:mb-12 group">
+          <ArrowLeft className="w-4 h-4 sm:w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">Back to Results</span>
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-16">
           {/* Image Gallery */}
           <div className="space-y-6">
-            <div className="aspect-square bg-slate-900 border border-slate-800 rounded-[3rem] overflow-hidden relative group">
+            <div className="aspect-square bg-slate-900 border border-slate-800 rounded-3xl sm:rounded-[3rem] overflow-hidden relative group">
               {product.metadata.image ? (
                 <img src={product.metadata.image} alt={product.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <ShoppingBag className="w-20 h-20 text-slate-800" />
+                  <ShoppingBag className="w-16 h-16 sm:w-20 sm:h-20 text-slate-800" />
                 </div>
               )}
-              <div className="absolute top-6 right-6">
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
                 <button 
                   onClick={handleToggleWishlist}
-                  className={`p-4 rounded-2xl backdrop-blur-md transition-all shadow-xl ${
+                  className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-md transition-all shadow-xl ${
                     isWishlisted ? 'bg-rose-500 text-white' : 'bg-slate-950/40 text-white hover:bg-slate-950/60'
                   }`}
                 >
-                  <Heart className={`w-6 h-6 ${isWishlisted ? 'fill-current' : ''}`} />
+                  <Heart className={`w-5 h-5 sm:w-6 h-6 ${isWishlisted ? 'fill-current' : ''}`} />
                 </button>
               </div>
             </div>
@@ -190,10 +190,10 @@ export const ProductDetails: React.FC = () => {
                   <span className="text-xs font-bold text-slate-500">(120 Reviews)</span>
                 </div>
               </div>
-              <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-4 leading-none">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-3 sm:mb-4 leading-none">
                 {product.title}
               </h1>
-              <p className="text-slate-400 font-medium leading-relaxed max-w-lg mb-8">
+              <p className="text-slate-400 text-sm sm:text-base font-medium leading-relaxed max-w-lg mb-6 sm:mb-8">
                 {product.description}
               </p>
               
@@ -201,21 +201,21 @@ export const ProductDetails: React.FC = () => {
               <ReputationWidget entityId={product.entityId} entityType="product" />
             </div>
 
-            <div className="mb-12">
-              <div className="flex items-baseline gap-4 mb-2">
-                <span className="text-4xl font-black text-white">{product.price} Pi</span>
-                <span className="text-lg text-slate-600 line-through font-bold">{(product.price || 0) * 1.2} Pi</span>
-                <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-black rounded-lg uppercase">Save 20%</span>
+            <div className="mb-8 sm:mb-12">
+              <div className="flex items-baseline gap-3 sm:gap-4 mb-2">
+                <span className="text-3xl sm:text-4xl font-black text-white">{product.price} Pi</span>
+                <span className="text-base sm:text-lg text-slate-600 line-through font-bold">{(product.price || 0) * 1.2} Pi</span>
+                <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[9px] sm:text-[10px] font-black rounded-lg uppercase">Save 20%</span>
               </div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-500" /> In Stock & Ready to Ship
+              <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 sm:w-4 h-4 text-emerald-500" /> In Stock & Ready to Ship
               </p>
             </div>
 
             {/* Actions */}
-            <div className="space-y-6 mb-12">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2">
+            <div className="space-y-4 sm:space-y-6 mb-12">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6">
+                <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2">
                   <button 
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="p-3 hover:bg-slate-800 rounded-xl transition-colors text-slate-400"
@@ -233,7 +233,7 @@ export const ProductDetails: React.FC = () => {
                 <button 
                   onClick={handleAddToCart}
                   disabled={isAdding}
-                  className={`flex-1 py-5 rounded-[2rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${
+                  className={`flex-1 py-4 sm:py-5 rounded-2xl sm:rounded-[2rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${
                     added 
                       ? 'bg-emerald-600 text-white shadow-emerald-600/20' 
                       : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
@@ -243,7 +243,7 @@ export const ProductDetails: React.FC = () => {
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : added ? (
                     <>
-                      <Check className="w-5 h-5" /> Added to Bag
+                      <Check className="w-5 h-5" /> Added
                     </>
                   ) : (
                     <>
@@ -252,44 +252,44 @@ export const ProductDetails: React.FC = () => {
                   )}
                 </button>
               </div>
-
+ 
               <button 
                 onClick={handleMessageMerchant}
-                className="w-full py-4 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                className="w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-bold text-[10px] sm:text-xs uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <MessageSquare className="w-4 h-4" />
                 Message Merchant
               </button>
             </div>
-
+ 
             {/* Trust Badges */}
-            <div className="grid grid-cols-2 gap-4 pt-12 border-t border-slate-900">
-              <TrustBadge icon={<Truck className="w-5 h-5" />} label="Express Shipping" sub="Global Delivery" />
-              <TrustBadge icon={<ShieldCheck className="w-5 h-5" />} label="Pi Secured" sub="Protected Payment" />
-              <TrustBadge icon={<RefreshCcw className="w-5 h-5" />} label="Free Returns" sub="Within 30 days" />
-              <TrustBadge icon={<Check className="w-5 h-5" />} label="Verified Asset" sub="Authored by Pi Entity" />
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6 pt-12 border-t border-slate-900">
+              <TrustBadge icon={<Truck className="w-5 h-5" />} label="Shipping" sub="Global" />
+              <TrustBadge icon={<ShieldCheck className="w-5 h-5" />} label="Secured" sub="Protected" />
+              <TrustBadge icon={<RefreshCcw className="w-5 h-5" />} label="Returns" sub="30 Days" />
+              <TrustBadge icon={<Check className="w-5 h-5" />} label="Verified" sub="Enterprise" />
             </div>
           </div>
         </div>
 
         {/* Reviews Section */}
-        <div className="mt-32 space-y-16">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-slate-900 pb-12">
+        <div className="mt-20 sm:mt-32 space-y-12 sm:space-y-16">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 border-b border-slate-900 pb-8 sm:pb-12">
             <div>
-              <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-4">Customer Experience</h2>
-              <p className="text-slate-500 font-medium">Real feedback from the Pi Business Market community.</p>
+              <h2 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-tighter mb-3 sm:mb-4">Customer Experience</h2>
+              <p className="text-sm sm:text-base text-slate-500 font-medium">Real feedback from the Pi Business Market community.</p>
             </div>
             {!showReviewForm && (
               <button 
                 onClick={() => setShowReviewForm(true)}
-                className="px-10 py-5 bg-white text-black rounded-[2rem] text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+                className="w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-white text-black rounded-2xl sm:rounded-[2rem] text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl active:scale-95"
               >
                 Write a Review
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 sm:gap-16">
             <div className="lg:col-span-2">
               {showReviewForm ? (
                 <ReviewForm 
@@ -310,10 +310,10 @@ export const ProductDetails: React.FC = () => {
               )}
             </div>
 
-            <div className="lg:col-span-1 space-y-8">
-              <div className="p-8 bg-slate-900/50 border border-slate-800 rounded-[2.5rem]">
-                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-6">Review Guidelines</h3>
-                <ul className="space-y-4">
+            <div className="lg:col-span-1 space-y-6 sm:space-y-8">
+              <div className="p-6 sm:p-8 bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem]">
+                <h3 className="text-[10px] sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6">Review Guidelines</h3>
+                <ul className="space-y-3 sm:space-y-4">
                   <GuidelineItem text="Be respectful and honest" />
                   <GuidelineItem text="Focus on quality and service" />
                   <GuidelineItem text="Do not include personal info" />
@@ -321,10 +321,10 @@ export const ProductDetails: React.FC = () => {
                 </ul>
               </div>
               
-              <div className="p-8 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem]">
-                <ShieldCheck className="w-8 h-8 text-indigo-400 mb-4" />
-                <h4 className="text-sm font-black text-white uppercase mb-2">Verified Reviews</h4>
-                <p className="text-xs text-slate-500 font-medium">Look for the badge to identify reviews from customers with confirmed Pi Network transactions.</p>
+              <div className="p-6 sm:p-8 bg-indigo-600/5 border border-indigo-500/20 rounded-3xl sm:rounded-[2.5rem]">
+                <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-400 mb-3 sm:mb-4" />
+                <h4 className="text-[10px] sm:text-sm font-black text-white uppercase mb-1 sm:mb-2">Verified Reviews</h4>
+                <p className="text-[10px] sm:text-xs text-slate-500 font-medium">Look for the badge to identify reviews from customers with confirmed Pi Network transactions.</p>
               </div>
             </div>
           </div>

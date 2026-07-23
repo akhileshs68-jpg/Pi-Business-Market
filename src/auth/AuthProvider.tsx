@@ -15,7 +15,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     // Pre-initialize Pi SDK on mount
-    authService.initPi().catch(err => console.warn('[AuthProvider] SDK Pre-init failed:', err));
     
     if (!isFirebaseConfigured()) {
       setError('Firebase configuration is missing. Authentication services are currently offline.');
@@ -29,13 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // If we are already processing a login (auto or manual), ignore state changes
       if (isProcessing.current) {
-        console.log('[AuthProvider] Ignoring state change while processing');
         return;
       }
 
       try {
         if (firebaseUser) {
-          console.log('[AuthProvider] Firebase user detected, fetching profile');
           isProcessing.current = true;
           const profile = await authService.getUserProfile(firebaseUser.uid);
           if (isMounted) {
@@ -48,13 +45,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If no user is logged in, we stay on the login screen
           // We do NOT attempt automatic Pi login here because Pi.authenticate requires a user gesture
           if (isInitialLoad.current) {
-            console.log('[AuthProvider] No Firebase user on initial load');
             if (isMounted) {
               setLoading(false);
               isInitialLoad.current = false;
             }
           } else {
-            console.log('[AuthProvider] User logged out');
             setUser(null);
             setLoading(false);
           }
@@ -97,6 +92,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async (): Promise<User> => {
+    if (isProcessing.current && user) return user;
+    isProcessing.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const loggedInUser = await authService.loginWithGoogle();
+      setUser(loggedInUser);
+      return loggedInUser;
+    } catch (err: any) {
+      setError(err.message || 'Google Authentication failed');
+      throw err;
+    } finally {
+      setLoading(false);
+      isProcessing.current = false;
+      isInitialLoad.current = false;
+    }
+  };
+
   const logout = async () => {
     setLoading(true);
     try {
@@ -121,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, error, login, loginWithGoogle, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

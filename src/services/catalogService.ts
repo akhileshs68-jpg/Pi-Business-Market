@@ -102,11 +102,11 @@ export const catalogService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'attributes'), 
-      where('groupId', '==', groupId),
-      orderBy('displayOrder', 'asc')
+      where('groupId', '==', groupId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as ProductAttribute);
+    const attributes = snapshot.docs.map(doc => doc.data() as ProductAttribute);
+    return attributes.sort((a, b) => a.displayOrder - b.displayOrder);
   },
 
   async getAllAttributes(): Promise<ProductAttribute[]> {
@@ -128,11 +128,11 @@ export const catalogService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'categoryAttributes'), 
-      where('categoryId', '==', categoryId),
-      orderBy('displayOrder', 'asc')
+      where('categoryId', '==', categoryId)
     );
     const mappingSnapshot = await getDocs(q);
     const mappings = mappingSnapshot.docs.map(doc => doc.data() as CategoryAttributeMapping);
+    mappings.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
     
     if (mappings.length === 0) return [];
 

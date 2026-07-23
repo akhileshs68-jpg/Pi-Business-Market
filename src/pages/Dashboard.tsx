@@ -11,35 +11,66 @@ import {
   Image as ImageIcon,
   Camera,
   FolderOpen,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2
 } from 'lucide-react';
 import { MediaPickerModal } from '../components/product/MediaPickerModal';
+import { Skeleton } from '../components/ui/Skeleton';
 
 export const Dashboard: React.FC = () => {
-  const { user, logout, updateUser } = useAuth();
+  const { user, loading, logout, updateUser } = useAuth();
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [isAssetsModalOpen, setIsAssetsModalOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-200 p-4 sm:p-8 md:p-12 pb-24 md:pb-12">
+        <div className="max-w-6xl mx-auto space-y-8 sm:space-y-12">
+          <div className="flex justify-between items-center">
+            <div className="flex gap-4">
+              <Skeleton className="w-16 h-16 rounded-2xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <Skeleton className="w-32 h-12 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Skeleton className="lg:col-span-2 h-64 rounded-3xl" />
+            <Skeleton className="h-64 rounded-3xl" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-24 rounded-2xl" />
+            <Skeleton className="h-24 rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 md:p-12">
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 sm:p-8 md:p-12 pb-24 md:pb-12">
       <div className="max-w-6xl mx-auto">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 sm:mb-12">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
-              <Shield className="w-8 h-8 text-white" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0">
+              <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">Enterprise Dashboard</h1>
-              <p className="text-slate-400 font-medium">Welcome back, {user.displayName}</p>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">Enterprise Dashboard</h1>
+              <p className="text-slate-400 font-medium text-xs sm:text-sm md:text-base">Welcome back, {user.displayName}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-semibold text-sm"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all font-semibold text-sm h-12 md:h-auto"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -47,33 +78,33 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* User Card */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 sm:mb-12">
           
-          <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-3xl p-8 backdrop-blur-sm">
-            <div className="flex items-start justify-between mb-8">
+          <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-8">
               <div className="flex items-center gap-5">
                 <div 
                   onClick={() => setIsMediaPickerOpen(true)}
-                  className="relative group w-20 h-20 rounded-full bg-slate-800 border-2 border-violet-500/30 flex items-center justify-center overflow-hidden cursor-pointer"
+                  className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-800 border-2 border-violet-500/30 flex items-center justify-center overflow-hidden cursor-pointer shrink-0"
                 >
                   {user.photoUrl ? (
                     <img src={user.photoUrl} alt={user.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <UserIcon className="w-10 h-10 text-slate-400" />
+                    <UserIcon className="w-8 h-8 sm:w-10 sm:h-10 text-slate-400" />
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-white" />
+                    <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-2xl font-bold text-white">{user.displayName}</h2>
-                    {user.verified && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
+                    <h2 className="text-xl sm:text-2xl font-bold text-white">{user.displayName}</h2>
+                    {user.verified && <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />}
                   </div>
-                  <p className="text-slate-500 font-mono text-sm tracking-wider">@{user.username}</p>
+                  <p className="text-slate-500 font-mono text-xs sm:text-sm tracking-wider">@{user.username}</p>
                 </div>
               </div>
-              <span className="px-4 py-1.5 rounded-full bg-violet-600/10 border border-violet-500/20 text-violet-400 text-xs font-bold uppercase tracking-widest">
+              <span className="self-start px-4 py-1.5 rounded-full bg-violet-600/10 border border-violet-500/20 text-violet-400 text-[10px] font-bold uppercase tracking-widest">
                 {user.role}
               </span>
             </div>
@@ -129,7 +160,6 @@ export const Dashboard: React.FC = () => {
 
         </div>
 
-        {/* Stats Placeholder */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
           {[
             { label: 'Network Status', value: 'Operational', color: 'text-emerald-400' },

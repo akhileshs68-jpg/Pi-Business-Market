@@ -27,15 +27,17 @@ export const businessCategoryService = {
       constraints.push(where('parentId', '==', null));
     }
 
-    const q = query(collection(db, 'businessCategories'), ...constraints, orderBy('name'));
+    const q = query(collection(db, 'businessCategories'), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => d.data() as BusinessCategory);
+    const categories = snap.docs.map(d => d.data() as BusinessCategory);
+    return categories.sort((a, b) => a.name.localeCompare(b.name));
   },
 
   async getAllCategories(): Promise<BusinessCategory[]> {
     const db = getFirebaseDb();
-    const q = query(collection(db, 'businessCategories'), where('isActive', '==', true), orderBy('name'));
+    const q = query(collection(db, 'businessCategories'), where('isActive', '==', true));
     const snap = await getDocs(q);
-    return snap.docs.map(d => d.data() as BusinessCategory);
+    const categories = snap.docs.map(d => d.data() as BusinessCategory);
+    return categories.sort((a, b) => a.name.localeCompare(b.name));
   }
 };

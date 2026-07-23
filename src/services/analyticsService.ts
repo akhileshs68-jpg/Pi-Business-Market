@@ -61,13 +61,12 @@ export const analyticsService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'businessMetrics'),
-      where('businessId', '==', businessId),
-      orderBy('date', 'desc'),
-      limit(limitCount)
+      where('businessId', '==', businessId)
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToBusinessMetrics(doc));
+    const metrics = snapshot.docs.map(doc => this.mapDocToBusinessMetrics(doc));
+    return metrics.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, limitCount);
   },
 
   /**

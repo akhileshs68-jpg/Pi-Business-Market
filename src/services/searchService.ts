@@ -63,7 +63,6 @@ export const searchService = {
     const constraints: QueryConstraint[] = [
       where('status', '==', 'published'),
       where('visibility', '==', 'public'),
-      orderBy('createdAt', 'desc'),
       limit(pageSize)
     ];
 
@@ -76,6 +75,8 @@ export const searchService = {
     const snapshot = await getDocs(q);
     
     let results = snapshot.docs.map(doc => this.mapDocToEntry(doc));
+    
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Simple client-side text filtering if keyword is provided
     // In production, this would use a dedicated search engine like Algolia or ElasticSearch

@@ -43,6 +43,7 @@ export const InventoryDashboard: React.FC = () => {
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<Inventory | null>(null);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
@@ -55,6 +56,7 @@ export const InventoryDashboard: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+      setError(null);
     try {
       const [invData] = await Promise.all([
         inventoryService.getInventoryForWarehouse(warehouseId!)
@@ -303,6 +305,7 @@ interface StockAdjustmentModalProps {
 const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({ inventory, onClose, onSuccess }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     type: 'adjustment' as any,
     quantity: 0,
@@ -322,7 +325,7 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({ inventory, 
       });
       onSuccess();
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message || 'Failed to adjust stock');
     } finally {
       setLoading(false);
     }

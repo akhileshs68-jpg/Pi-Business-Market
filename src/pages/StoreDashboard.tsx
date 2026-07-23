@@ -78,20 +78,20 @@ export const StoreDashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-8 mb-8 md:mb-12">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-indigo-600/10 border border-indigo-500/20">
                 <ShoppingBag className="w-5 h-5 text-indigo-400" />
               </div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Enterprise Retail Engine</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enterprise Retail Engine</p>
             </div>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight">Store Management</h1>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">Store Management</h1>
           </div>
           
           <button 
             onClick={() => setShowWizard(true)}
-            className="group flex items-center gap-2 px-8 py-4 rounded-2xl bg-indigo-600 text-white font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-600/20"
+            className="group flex items-center justify-center gap-2 px-8 py-4 rounded-xl md:rounded-2xl bg-indigo-600 text-white font-bold transition-all hover:scale-105 shadow-xl shadow-indigo-600/20 w-full md:w-auto"
           >
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
             Open New Store
@@ -99,11 +99,11 @@ export const StoreDashboard: React.FC = () => {
         </div>
 
         {/* Filters & Search */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 mb-8">
+          <div className="flex bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 self-start w-full sm:w-auto">
             <button
               onClick={() => setActiveView('stores')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
                 activeView === 'stores' 
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
                   : 'text-slate-500 hover:text-white'
@@ -113,7 +113,7 @@ export const StoreDashboard: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveView('reviews')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
                 activeView === 'reviews' 
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
                   : 'text-slate-500 hover:text-white'
@@ -123,11 +123,11 @@ export const StoreDashboard: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
             <button 
               onClick={() => setFilterBusiness('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                filterBusiness === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-500 hover:text-slate-300'
+              className={`px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-widest border ${
+                filterBusiness === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
               }`}
             >
               All Stores
@@ -136,8 +136,8 @@ export const StoreDashboard: React.FC = () => {
               <button
                 key={biz.id}
                 onClick={() => setFilterBusiness(biz.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  filterBusiness === biz.id ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-500 hover:text-slate-300'
+                className={`px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-widest border ${
+                  filterBusiness === biz.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
                 }`}
               >
                 {biz.businessName}
@@ -146,31 +146,31 @@ export const StoreDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <div className="relative flex-1 lg:w-64">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input 
                 type="text" 
                 placeholder="Find a store..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-white focus:border-indigo-500 outline-none"
               />
             </div>
           </div>
         </div>
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
           {[
             { label: 'Active Stores', value: stores.filter(s => s.status === 'active').length, icon: StoreIcon, color: 'text-emerald-400' },
             { label: 'Business Units', value: businesses.length, icon: Building2, color: 'text-violet-400' },
             { label: 'Total Fans', value: stores.reduce((acc, s) => acc + s.followers, 0), icon: Users, color: 'text-indigo-400' },
             { label: 'Avg Rating', value: (stores.reduce((acc, s) => acc + s.rating, 0) / (stores.length || 1)).toFixed(1), icon: BarChart3, color: 'text-amber-400' }
           ].map((stat, i) => (
-            <div key={i} className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+            <div key={i} className="bg-slate-900/50 border border-slate-800 p-4 sm:p-6 rounded-2xl sm:rounded-3xl">
               <div className="flex items-center justify-between mb-2">
-                <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</span>
+                <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
+                <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</span>
               </div>
-              <p className="text-2xl font-bold text-white">{stat.value}</p>
+              <p className="text-xl sm:text-2xl font-bold text-white">{stat.value}</p>
             </div>
           ))}
         </div>

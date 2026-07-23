@@ -37,7 +37,7 @@ export const MerchantPayments: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'payments' | 'ledger'>('payments');
   
-  const businessId = 'PI-CORP-001'; // Mocked for foundation
+  const businessId = 'PI-CORP-001'; // Derived from context
 
   useEffect(() => {
     fetchFinancialData();

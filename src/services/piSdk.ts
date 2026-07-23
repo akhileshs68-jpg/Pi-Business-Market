@@ -89,7 +89,6 @@ export class PiSdkSim {
     }
 
     // Step 1: SDK Payment Request Created
-    console.log(`[Pi SDK] Payment requested: ${paymentData.amount} Pi for memo: "${paymentData.memo}"`);
 
     // We will trigger onReadyForServerApproval which simulates merchant server interaction
     setTimeout(() => {

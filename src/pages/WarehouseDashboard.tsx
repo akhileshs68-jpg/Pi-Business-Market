@@ -74,58 +74,58 @@ export const WarehouseDashboard: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-indigo-600/20 rounded-xl">
                 <Building2 className="w-6 h-6 text-indigo-400" />
               </div>
-              <h1 className="text-3xl font-black text-white tracking-tight uppercase">Logistics Command</h1>
+              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight uppercase">Logistics Command</h1>
             </div>
-            <p className="text-slate-500 font-medium">Manage enterprise warehouse networks and storage zones.</p>
+            <p className="text-sm text-slate-500 font-medium">Manage enterprise warehouse networks and storage zones.</p>
           </div>
           <button 
-            className="group flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest text-sm transition-all shadow-xl shadow-indigo-600/20 active:scale-95"
+            className="group flex items-center justify-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl md:rounded-2xl font-black uppercase tracking-widest text-xs sm:text-sm transition-all shadow-xl shadow-indigo-600/20 active:scale-95 w-full md:w-auto"
           >
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-            Provision Warehouse
+            Provision Node
           </button>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
           {[
-            { label: 'Active Warehouses', value: warehouses.length, icon: WarehouseIcon, color: 'text-indigo-400' },
-            { label: 'Total Capacity', value: '85%', icon: Activity, color: 'text-emerald-400' },
-            { label: 'Pending Shipments', value: '12', icon: Truck, color: 'text-amber-400' },
-            { label: 'SKU Coverage', value: '1,240', icon: Box, color: 'text-blue-400' },
+            { label: 'Nodes', value: warehouses.length, icon: WarehouseIcon, color: 'text-indigo-400' },
+            { label: 'Capacity', value: '85%', icon: Activity, color: 'text-emerald-400' },
+            { label: 'Shipments', value: '12', icon: Truck, color: 'text-amber-400' },
+            { label: 'Coverage', value: '1,240', icon: Box, color: 'text-blue-400' },
           ].map((stat, i) => (
-            <div key={i} className="p-6 bg-slate-900/50 border border-slate-800 rounded-3xl">
-              <div className="flex items-center gap-3 mb-4">
-                <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+            <div key={i} className="p-4 sm:p-6 bg-slate-900/50 border border-slate-800 rounded-2xl sm:rounded-3xl">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
+                <p className="text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{stat.label}</p>
               </div>
-              <p className="text-3xl font-black text-white">{stat.value}</p>
+              <p className="text-xl sm:text-3xl font-black text-white">{stat.value}</p>
             </div>
           ))}
         </div>
 
         {/* Warehouse List */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <h2 className="text-xl font-bold text-white flex items-center gap-3">
               <MapPin className="w-5 h-5 text-indigo-400" />
               Global Nodes
             </h2>
-            <div className="flex items-center gap-3">
-              <div className="relative">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
                 <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input 
                   placeholder="Search Node..." 
-                  className="bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm focus:border-indigo-500 outline-none w-64"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm focus:border-indigo-500 outline-none"
                 />
               </div>
-              <button className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-500 hover:text-white">
+              <button className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-500 hover:text-white shrink-0">
                 <Filter className="w-4 h-4" />
               </button>
             </div>

@@ -67,13 +67,18 @@ export const jobService = {
     // In a real app, we would build dynamic queries based on filters
     const q = query(
       collection(db, 'jobs'), 
-      where('status', '==', 'published'),
-      where('visibility', '==', 'public'),
-      orderBy('createdAt', 'desc'),
-      limit(50)
+      where('status', '==', 'published')
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToJob(doc));
+    let jobs = snapshot.docs.map(doc => this.mapDocToJob(doc));
+    
+    // Filter and sort locally
+    jobs = jobs
+      .filter(job => job.visibility === 'public')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 50);
+      
+    return jobs;
   },
 
   /**

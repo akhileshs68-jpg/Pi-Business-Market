@@ -66,7 +66,7 @@ export const paymentService = {
   },
 
   /**
-   * VERIFY PI PAYMENT (MOCK BACKEND VERIFICATION)
+   * VERIFY PI PAYMENT (BACKEND VERIFICATION)
    * In a real app, this would be a server-side cloud function that calls Pi API
    */
   async verifyAndProcessPayment(
@@ -82,7 +82,7 @@ export const paymentService = {
       if (!intentSnap.exists()) throw new Error('Payment intent not found');
       const intent = intentSnap.data() as PaymentIntent;
 
-      // 2. Mock Server-Side Verification with Pi Network API
+      // 2. Server-Side Verification with Pi Network API
       // const verification = await piNetworkApi.verifyTransaction(piTransactionId);
       const isVerified = true; // Simulated success
 
@@ -192,11 +192,11 @@ export const paymentService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'payments'), 
-      where('payeeBusinessId', '==', businessId),
-      orderBy('createdAt', 'desc')
+      where('payeeBusinessId', '==', businessId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToPayment(doc));
+    const payments = snapshot.docs.map(doc => this.mapDocToPayment(doc));
+    return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   /**

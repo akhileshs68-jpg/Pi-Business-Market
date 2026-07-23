@@ -54,9 +54,11 @@ export const mediaService = {
     if (file.size > MAX_FILE_SIZE) {
       return { valid: false, error: 'File size exceeds 10MB limit.' };
     }
+
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       return { valid: false, error: 'File type not supported. Allowed: PNG, JPG, WEBP, SVG, PDF.' };
     }
+
     return { valid: true };
   },
 
@@ -87,14 +89,20 @@ export const mediaService = {
     formData.append('folder', options.module);
     
     // 2. Upload to Backend API
-    const response = await axios.post('/api/upload', formData, {
-      onUploadProgress: (progressEvent) => {
-        if (options.onProgress && progressEvent.total) {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          options.onProgress(percentCompleted);
+    let response;
+    try {
+      response = await axios.post('/api/upload', formData, {
+        onUploadProgress: (progressEvent) => {
+          if (options.onProgress && progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            options.onProgress(percentCompleted);
+          }
         }
-      }
-    });
+      });
+    } catch (error: any) {
+      const backendError = error.response?.data?.error || error.response?.data?.details || error.message;
+      throw new Error(backendError || 'Upload failed');
+    }
 
     const cloudinaryData = response.data;
     if (!cloudinaryData.success) {
@@ -115,9 +123,9 @@ export const mediaService = {
       size: cloudinaryData.bytes || file.size,
       width: cloudinaryData.width,
       height: cloudinaryData.height,
-      storagePath: cloudinaryData.publicId, // Store Cloudinary public_id here
-      downloadUrl: cloudinaryData.secureUrl,
-      thumbnailUrl: cloudinaryData.secureUrl.replace('/upload/', '/upload/c_thumb,w_200,h_200,g_face,q_auto,f_auto/'),
+      storagePath: cloudinaryData.public_id || cloudinaryData.publicId, // Store Cloudinary public_id here
+      downloadUrl: cloudinaryData.secure_url || cloudinaryData.secureUrl,
+      thumbnailUrl: (cloudinaryData.secure_url || cloudinaryData.secureUrl).replace('/upload/', '/upload/c_thumb,w_200,h_200,g_face,q_auto,f_auto/'),
       status: 'active',
       visibility: options.visibility || 'public',
       uploadedAt: new Date().toISOString(),
@@ -145,56 +153,53 @@ export const mediaService = {
       where('status', '==', 'active')
     );
 
-    if (module) {
-      q = query(q, where('module', '==', module));
-    }
-
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => {
+    const snapshot = await getDocs(q);
+    let assets = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         ...data,
-        mediaId: doc.id,
         uploadedAt: data.uploadedAt instanceof Timestamp ? data.uploadedAt.toDate().toISOString() : data.uploadedAt,
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
       } as MediaAsset;
     });
+
+    if (module) {
+      assets = assets.filter(a => a.module === module);
+    }
+
+    return assets.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
   },
 
   /**
-   * Deletes a media asset
+   * Deletes a media asset (Soft delete or full delete based on requirement, here doing full)
    */
   async deleteMedia(mediaId: string): Promise<void> {
     const db = getFirebaseDb();
-    const docRef = doc(db, 'media', mediaId);
-    const docSnap = await getDoc(docRef);
     
-    if (!docSnap.exists()) throw new Error('Media asset not found');
-    
-    const asset = docSnap.data() as MediaAsset;
-    
-    // 1. Delete from Cloudinary via Backend
-    if (asset.storagePath) {
-      try {
-        await axios.delete(`/api/upload/${encodeURIComponent(asset.storagePath)}`);
-      } catch (e) {
-        console.warn('Failed to delete from Cloudinary via backend', e);
+    try {
+      const mediaRef = doc(db, 'media', mediaId);
+      const mediaDoc = await getDoc(mediaRef);
+      
+      if (!mediaDoc.exists()) {
+        throw new Error('Media not found');
       }
-    }
-    
-    // 2. Delete from Firestore
-    await deleteDoc(docRef);
-  },
 
-  /**
-   * Formats file size
-   */
-  formatBytes(bytes: number, decimals = 2): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+      const asset = mediaDoc.data() as MediaAsset;
+
+      // Delete from Cloudinary backend
+      if (asset.storagePath) {
+        try {
+          await axios.delete(`/api/upload/${encodeURIComponent(asset.storagePath)}`);
+        } catch (e) {
+          console.warn('Failed to delete from Cloudinary via backend', e);
+        }
+      }
+      
+      // Delete from Firestore
+      await deleteDoc(mediaRef);
+    } catch (err) {
+      console.error('Delete media failed', err);
+      throw err;
+    }
   }
 };

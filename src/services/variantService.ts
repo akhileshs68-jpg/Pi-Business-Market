@@ -36,11 +36,11 @@ export const variantService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'variantGroups'), 
-      where('productId', '==', productId),
-      orderBy('displayOrder', 'asc')
+      where('productId', '==', productId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as VariantGroup);
+    const groups = snapshot.docs.map(doc => doc.data() as VariantGroup);
+    return groups.sort((a, b) => a.displayOrder - b.displayOrder);
   },
 
   /**
@@ -57,11 +57,11 @@ export const variantService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'variantOptions'), 
-      where('productId', '==', productId),
-      orderBy('displayOrder', 'asc')
+      where('productId', '==', productId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as VariantOption);
+    const options = snapshot.docs.map(doc => doc.data() as VariantOption);
+    return options.sort((a, b) => a.displayOrder - b.displayOrder);
   },
 
   /**

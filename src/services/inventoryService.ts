@@ -157,17 +157,16 @@ export const inventoryService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'inventoryTransactions'),
-      where('inventoryId', '==', inventoryId),
-      orderBy('timestamp', 'desc'),
-      limit(max)
+      where('inventoryId', '==', inventoryId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const tx = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         ...data,
         timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate().toISOString() : data.timestamp
       } as InventoryTransaction;
     });
+    return tx.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, max);
   }
 };

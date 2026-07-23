@@ -75,7 +75,7 @@ export const auditService = {
     severity?: string;
   }, limitCount: number = 50): Promise<AuditLog[]> {
     const db = getFirebaseDb();
-    let q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(limitCount));
+    let q = query(collection(db, 'auditLogs'));
 
     if (filters?.actorUid) {
       q = query(q, where('actorUid', '==', filters.actorUid));
@@ -85,12 +85,14 @@ export const auditService = {
     }
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const logs = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         ...data,
         timestamp: data.timestamp instanceof Timestamp ? data.timestamp.toDate().toISOString() : data.timestamp
       } as AuditLog;
     });
+    
+    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limitCount);
   }
 };

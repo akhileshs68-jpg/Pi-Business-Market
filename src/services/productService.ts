@@ -72,14 +72,11 @@ export const productService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'products'), 
-      where('storeId', '==', storeId),
-      where('status', '!=', 'deleted'),
-      orderBy('status'),
-      orderBy('createdAt', 'desc')
+      where('storeId', '==', storeId)
     );
     
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const products = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         ...data,
@@ -88,6 +85,15 @@ export const productService = {
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
       } as Product;
     });
+    
+    return products
+      .filter(p => p.status !== 'deleted')
+      .sort((a, b) => {
+        if (a.status !== b.status) {
+          return a.status.localeCompare(b.status);
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
   },
 
   /**

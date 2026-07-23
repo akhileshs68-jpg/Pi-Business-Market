@@ -14,6 +14,7 @@ import {
   HelpCircle, 
   ChevronDown, 
   ChevronUp, 
+  ChevronRight,
   ArrowLeft, 
   ArrowRight, 
   ThumbsUp, 
@@ -53,7 +54,7 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
     <article className="flex-1 max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 font-sans text-slate-200">
       
       {/* CATEGORY & TITLE HEADER */}
-      <div className="mb-8 border-b border-slate-800 pb-6">
+      <div className="mb-8 border-b border-slate-800 pb-6" id="article-top">
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20">
             {language === 'hi' ? section.categoryHi : section.categoryEn}
@@ -79,12 +80,39 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
         <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-normal bg-slate-900/80 p-4 rounded-xl border border-slate-800/80 shadow-inner">
           {language === 'hi' || language === 'dual' ? section.summaryHi : section.summaryEn}
         </p>
+
+        {/* TABLE OF CONTENTS (In-Article Navigation) */}
+        <div className="mt-6 p-4 bg-slate-900/40 border border-slate-800/60 rounded-xl">
+          <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            {language === 'hi' ? 'लेख की सूची' : 'In this Article'}
+          </h3>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {[
+              { id: 'overview', labelEn: 'Overview', labelHi: 'अवलोकन' },
+              { id: 'purpose', labelEn: 'Purpose', labelHi: 'उद्देश्य' },
+              { id: 'how-it-works', labelEn: 'Workflow', labelHi: 'कार्यप्रणाली' },
+              { id: 'benefits', labelEn: 'Benefits', labelHi: 'लाभ' },
+              { id: 'faqs', labelEn: 'FAQs', labelHi: 'प्रश्न' }
+            ].map((link) => (
+              <a 
+                key={link.id}
+                href={`#${link.id}`}
+                className="text-xs font-medium text-slate-400 hover:text-indigo-400 transition-colors flex items-center gap-1.5"
+              >
+                <div className="w-1 h-1 rounded-full bg-slate-700 group-hover:bg-indigo-500" />
+                {language === 'hi' ? link.labelHi : link.labelEn}
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* 1. OVERVIEW SECTION */}
-      <section className="mb-10">
-        <h2 className="text-lg font-bold text-slate-100 mb-3 flex items-center gap-2 font-sans border-l-4 border-indigo-500 pl-3">
-          {language === 'hi' ? '1. अवलोकन (Overview)' : '1. Overview'}
+      <section className="mb-10 scroll-mt-24" id="overview">
+        <h2 className="text-lg font-bold text-slate-100 mb-3 flex items-center justify-between gap-2 font-sans border-l-4 border-indigo-500 pl-3">
+          <span>{language === 'hi' ? '1. अवलोकन (Overview)' : '1. Overview'}</span>
+          <a href="#article-top" className="text-[10px] font-mono text-slate-500 hover:text-indigo-400 transition-colors">↑ Top</a>
         </h2>
         
         {(language === 'en' || language === 'dual') && (
@@ -102,9 +130,10 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
       </section>
 
       {/* 2. PURPOSE SECTION */}
-      <section className="mb-10">
-        <h2 className="text-lg font-bold text-slate-100 mb-3 flex items-center gap-2 font-sans border-l-4 border-indigo-500 pl-3">
-          {language === 'hi' ? '2. उद्देश्य (Purpose)' : '2. Purpose'}
+      <section className="mb-10 scroll-mt-24" id="purpose">
+        <h2 className="text-lg font-bold text-slate-100 mb-3 flex items-center justify-between gap-2 font-sans border-l-4 border-indigo-500 pl-3">
+          <span>{language === 'hi' ? '2. उद्देश्य (Purpose)' : '2. Purpose'}</span>
+          <a href="#article-top" className="text-[10px] font-mono text-slate-500 hover:text-indigo-400 transition-colors">↑ Top</a>
         </h2>
 
         {(language === 'en' || language === 'dual') && (
@@ -122,10 +151,13 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
       </section>
 
       {/* 3. HOW IT WORKS (STEP-BY-STEP FLOW) */}
-      <section className="mb-10">
-        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2 font-sans border-l-4 border-indigo-500 pl-3">
-          <Workflow className="w-5 h-5 text-indigo-400" />
-          {language === 'hi' ? '3. यह कैसे काम करता है (How It Works)' : '3. How It Works (Step-by-Step)'}
+      <section className="mb-10 scroll-mt-24" id="how-it-works">
+        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center justify-between gap-2 font-sans border-l-4 border-indigo-500 pl-3">
+          <div className="flex items-center gap-2">
+            <Workflow className="w-5 h-5 text-indigo-400" />
+            {language === 'hi' ? '3. यह कैसे काम करता है (How It Works)' : '3. How It Works (Step-by-Step)'}
+          </div>
+          <a href="#article-top" className="text-[10px] font-mono text-slate-500 hover:text-indigo-400 transition-colors">↑ Top</a>
         </h2>
 
         <div className="grid grid-cols-1 gap-4">
@@ -161,9 +193,10 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
       )}
 
       {/* 4. BENEFITS GRID */}
-      <section className="mb-10">
-        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2 font-sans border-l-4 border-emerald-500 pl-3">
-          {language === 'hi' ? '4. प्रमुख लाभ (Benefits)' : '4. Benefits'}
+      <section className="mb-10 scroll-mt-24" id="benefits">
+        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center justify-between gap-2 font-sans border-l-4 border-emerald-500 pl-3">
+          <span>{language === 'hi' ? '4. प्रमुख लाभ (Benefits)' : '4. Benefits'}</span>
+          <a href="#article-top" className="text-[10px] font-mono text-slate-500 hover:text-indigo-400 transition-colors">↑ Top</a>
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -237,10 +270,13 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
       </section>
 
       {/* 8. FAQS ACCORDION */}
-      <section className="mb-12">
-        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2 font-sans border-l-4 border-amber-500 pl-3">
-          <HelpCircle className="w-5 h-5 text-amber-400" />
-          {language === 'hi' ? 'अक्सर पूछे जाने वाले प्रश्न (FAQs)' : 'Frequently Asked Questions (FAQs)'}
+      <section className="mb-12 scroll-mt-24" id="faqs">
+        <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center justify-between gap-2 font-sans border-l-4 border-amber-500 pl-3">
+          <div className="flex items-center gap-2">
+            <HelpCircle className="w-5 h-5 text-amber-400" />
+            {language === 'hi' ? 'अक्सर पूछे जाने वाले प्रश्न (FAQs)' : 'Frequently Asked Questions (FAQs)'}
+          </div>
+          <a href="#article-top" className="text-[10px] font-mono text-slate-500 hover:text-indigo-400 transition-colors">↑ Top</a>
         </h2>
 
         <div className="space-y-3">
@@ -282,7 +318,7 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
       </section>
 
       {/* ARTICLE HELPFULNESS FEEDBACK */}
-      <div className="mb-10 p-4 bg-slate-900/90 border border-slate-800 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="mb-8 p-4 bg-slate-900/90 border border-slate-800 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
         <span className="text-xs text-slate-300 font-medium">
           {language === 'hi' ? 'क्या यह जानकारी आपके लिए उपयोगी थी?' : 'Was this documentation article helpful?'}
         </span>
@@ -311,6 +347,36 @@ export const DocsArticle: React.FC<DocsArticleProps> = ({
           </div>
         )}
       </div>
+
+      {/* RELATED TOPICS (Internal Linking) */}
+      {section.relatedSectionIds && section.relatedSectionIds.length > 0 && (
+        <section className="mb-10 p-6 bg-indigo-950/10 border border-indigo-500/20 rounded-2xl">
+          <h2 className="text-sm font-bold text-slate-100 mb-4 flex items-center gap-2 uppercase tracking-wider font-mono">
+            <BookOpen className="w-4 h-4 text-indigo-400" />
+            {language === 'hi' ? 'संबंधित विषय (Related Topics)' : 'Related Documentation Topics'}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {section.relatedSectionIds.map(relId => {
+              // Find the related section object - Note: Ideally DOCUMENTATION_DATA should be imported or passed down
+              // For simplicity, we'll just show buttons that link to the IDs
+              return (
+                <button
+                  key={relId}
+                  onClick={() => onSelectSection(relId)}
+                  className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition-all flex items-center gap-3 group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                    <ChevronRight className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300 group-hover:text-white capitalize truncate">
+                    {relId.replace(/-/g, ' ')}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* PREVIOUS / NEXT ARTICLE JUMP BUTTONS */}
       <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">

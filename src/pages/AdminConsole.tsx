@@ -8,7 +8,7 @@ import {
   Settings, Flag, Wrench, Megaphone, ShieldCheck, 
   Database, Lock, Server, Terminal, Save, 
   Plus, Trash2, Edit3, CheckCircle2, AlertTriangle,
-  History, Eye, UserCheck, Activity, Globe
+  History, Eye, UserCheck, Activity, Globe, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -125,34 +125,34 @@ export const AdminConsole: React.FC = () => {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-10 p-1.5 bg-slate-900/50 rounded-2xl border border-slate-800 w-fit">
+        <div className="flex flex-wrap gap-2 mb-8 p-1 sm:p-1.5 bg-slate-900/50 rounded-xl sm:rounded-2xl border border-slate-800 w-full sm:w-fit overflow-x-auto scrollbar-hide">
           {[
-            { id: 'settings', label: 'Settings', icon: Settings },
-            { id: 'flags', label: 'Feature Flags', icon: Flag },
-            { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-            { id: 'announcements', label: 'Communications', icon: Megaphone },
-            { id: 'governance', label: 'Governance', icon: ShieldCheck },
+            { id: 'settings', label: 'Setup', icon: Settings },
+            { id: 'flags', label: 'Flags', icon: Flag },
+            { id: 'maintenance', label: 'Fix', icon: Wrench },
+            { id: 'announcements', label: 'Comms', icon: Megaphone },
+            { id: 'governance', label: 'Legal', icon: ShieldCheck },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as AdminTab)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
                 activeTab === tab.id 
-                  ? 'bg-indigo-600 text-white shadow-lg' 
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               {tab.label}
             </button>
           ))}
         </div>
 
         {/* Content Area */}
-        <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8 min-h-[500px]">
+        <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-6 md:p-8 min-h-[500px]">
           {isLoading ? (
             <div className="flex items-center justify-center h-96">
-              <Activity className="w-8 h-8 text-indigo-500 animate-pulse" />
+              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
             </div>
           ) : (
             <AnimatePresence mode="wait">

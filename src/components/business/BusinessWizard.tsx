@@ -71,6 +71,21 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
     businessStatus: 'active',
   });
 
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+    };
+  }, [logoPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+    };
+  }, [coverPreview]);
+
   const [docs, setDocs] = useState<{ type: string; file: File | null; name: string }[]>([]);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -80,10 +95,8 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover' | 'document') => {
     const file = e.target.files?.[0];
-    console.log(`[BusinessWizard] File selected for ${type}:`, file?.name);
     
     if (!file) {
-      console.warn(`[BusinessWizard] No file selected for ${type}`);
       return;
     }
     
@@ -100,23 +113,23 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
     }
 
     try {
-      console.log(`[BusinessWizard] Starting upload for ${type}...`);
       
       // For images, show local preview immediately
-      if (type === 'logo') {
-        setFormData(prev => ({ ...prev, logo: URL.createObjectURL(file) }));
-      } else if (type === 'cover') {
-        setFormData(prev => ({ ...prev, coverImage: URL.createObjectURL(file) }));
+      if (type === 'logo' || type === 'cover') {
+        const previewUrl = URL.createObjectURL(file);
+        if (type === 'logo') {
+          setLogoPreview(previewUrl);
+        } else {
+          setCoverPreview(previewUrl);
+        }
       }
 
       const asset = await mediaService.uploadMedia(file, user.uid, {
         module: 'businesses',
         onProgress: (progress: number) => {
-          console.log(`[BusinessWizard] ${type} upload progress: ${progress}%`);
         }
       });
       
-      console.log(`[BusinessWizard] ${type} upload success:`, asset.downloadUrl);
       
       if (type === 'logo') {
         setFormData(prev => ({ ...prev, logo: asset.downloadUrl }));
@@ -173,25 +186,25 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl shadow-indigo-500/10 overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] shadow-2xl shadow-indigo-500/10 overflow-hidden flex flex-col max-h-[90vh] pb-safe"
       >
         {/* Progress Header */}
-        <div className="px-8 pt-8 pb-6 border-b border-slate-800">
-          <div className="flex items-center justify-between mb-6">
+        <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6 border-b border-slate-800">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600 rounded-xl">
+              <div className="p-2 bg-indigo-600 rounded-xl shrink-0">
                 <Building2 className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white tracking-tight">Business Onboarding</h2>
-                <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Step {step} of {totalSteps}: {getStepTitle(step)}</p>
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">Business Onboarding</h2>
+                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest truncate">Step {step} of {totalSteps}: {getStepTitle(step)}</p>
               </div>
             </div>
-            <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-all">
+            <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-all shrink-0">
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>
-          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+          <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
             <motion.div 
               className="h-full bg-gradient-to-r from-indigo-600 to-violet-600"
               initial={{ width: 0 }}
@@ -202,7 +215,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
         </div>
 
         {/* Wizard Steps */}
-        <div className="flex-1 overflow-y-auto px-8 py-10 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-10 scrollbar-hide">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -371,7 +384,6 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                           </div>
                           <button 
                             onClick={() => {
-                              console.log(`[Upload] Selecting document for: ${docType}`);
                               setActiveDocType(docType);
                               docInputRef.current?.click();
                             }}
@@ -406,13 +418,12 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                     />
                     <div 
                       onClick={() => {
-                        console.log('[Upload] Opening logo file picker');
                         logoInputRef.current?.click();
                       }}
                       className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
                     >
-                      {formData.logo ? (
-                        <img src={formData.logo} alt="Logo Preview" className="w-full h-full object-cover" />
+                      {logoPreview || formData.logo ? (
+                        <img src={logoPreview || formData.logo} alt="Logo Preview" className="w-full h-full object-cover" />
                       ) : (
                         <>
                           <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
@@ -432,13 +443,12 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                     />
                     <div 
                       onClick={() => {
-                        console.log('[Upload] Opening cover file picker');
                         coverInputRef.current?.click();
                       }}
                       className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
                     >
-                      {formData.coverImage ? (
-                        <img src={formData.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                      {coverPreview || formData.coverImage ? (
+                        <img src={coverPreview || formData.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
                       ) : (
                         <>
                           <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
@@ -493,11 +503,11 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
         </div>
 
         {/* Footer Actions */}
-        <div className="px-8 py-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+        <div className="px-4 sm:px-8 py-4 sm:py-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
           <button
             onClick={handleBack}
             disabled={step === 1 || isSubmitting}
-            className="flex items-center gap-2 px-6 py-3 text-sm font-bold text-slate-400 hover:text-white transition-all disabled:opacity-0"
+            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all disabled:opacity-0"
           >
             <ChevronLeft className="w-4 h-4" /> Back
           </button>
@@ -505,7 +515,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
           {step < totalSteps ? (
             <button
               onClick={handleNext}
-              className="flex items-center gap-2 px-8 py-3 bg-white text-slate-950 rounded-xl font-bold hover:bg-slate-200 transition-all shadow-xl shadow-white/5"
+              className="flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 bg-white text-slate-950 rounded-xl font-bold hover:bg-slate-200 transition-all shadow-xl shadow-white/5 text-xs sm:text-sm"
             >
               Continue <ChevronRight className="w-4 h-4" />
             </button>
@@ -513,14 +523,14 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-10 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50"
+              className="flex items-center gap-2 px-6 sm:px-10 py-2.5 sm:py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50 text-xs sm:text-sm"
             >
               {isSubmitting ? (
-                <>Deploying Identity...</>
+                <>Deploying...</>
               ) : (
                 <>
                   <Zap className="w-4 h-4" />
-                  Finalize & Launch
+                  Finalize
                 </>
               )}
             </button>

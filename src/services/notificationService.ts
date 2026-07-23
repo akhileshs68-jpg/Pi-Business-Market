@@ -81,16 +81,21 @@ export const notificationService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'notifications'),
-      where('recipientUid', '==', recipientUid),
-      where('status', '!=', 'dismissed'),
-      orderBy('status'),
-      orderBy('createdAt', 'desc'),
-      limit(50)
+      where('recipientUid', '==', recipientUid)
     );
 
     return onSnapshot(q, (snapshot) => {
       const notifications = snapshot.docs.map(doc => this.mapDocToNotification(doc));
-      callback(notifications);
+      const filteredAndSorted = notifications
+        .filter(n => n.status !== 'dismissed')
+        .sort((a, b) => {
+          if (a.status !== b.status) {
+            return a.status.localeCompare(b.status);
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        })
+        .slice(0, 50);
+      callback(filteredAndSorted);
     });
   },
 

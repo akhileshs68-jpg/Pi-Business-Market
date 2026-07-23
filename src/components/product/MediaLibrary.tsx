@@ -32,6 +32,8 @@ interface MediaLibraryProps {
   title?: string;
 }
 
+export const formatBytes = (bytes: number) => { if (bytes === 0) return "0 Bytes"; const k = 1024; const sizes = ["Bytes", "KB", "MB", "GB"]; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]; };
+
 export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   ownerUid,
   module,
@@ -86,27 +88,27 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   ];
 
   return (
-    <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden flex flex-col h-[600px]">
+    <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden flex flex-col h-[500px] sm:h-[600px]">
       {/* Header */}
-      <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+      <div className="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
         <div>
-          <h2 className="text-xl font-black text-white tracking-tight">{title}</h2>
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">{title}</h2>
+          <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-1 flex items-center gap-2">
             <HardDrive className="w-3 h-3 text-violet-400" />
-            Enterprise Digital Assets
+            <span className="truncate">Digital Assets</span>
           </p>
         </div>
         <button 
           onClick={() => setShowUpload(!showUpload)}
           className={`
-            px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all
+            px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all
             ${showUpload 
               ? 'bg-slate-800 text-white' 
               : 'bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-600/20'
             }
           `}
         >
-          {showUpload ? 'Close Upload' : 'Upload New'}
+          {showUpload ? 'Close' : 'Upload'}
         </button>
       </div>
 
@@ -171,7 +173,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
               <FileUpload 
                 ownerUid={ownerUid}
                 module={filterModule === 'all' ? 'temporary' : filterModule}
-                onUploadSuccess={(asset) => {
+                onUploadSuccess={(asset: MediaAsset) => {
                   setAssets(prev => [asset, ...prev]);
                   setShowUpload(false);
                 }}
@@ -235,7 +237,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                     <>
                       {asset.mimeType.startsWith('image/') ? (
                         <img 
-                          src={asset.downloadUrl} 
+                          src={asset.thumbnailUrl || asset.downloadUrl} 
                           alt={asset.originalName}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           referrerPolicy="no-referrer"
@@ -251,7 +253,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                       
                       <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 text-center">
                         <p className="text-[10px] text-white font-bold line-clamp-2">{asset.originalName}</p>
-                        <p className="text-[9px] text-slate-400 font-mono">{mediaService.formatBytes(asset.size)}</p>
+                        <p className="text-[9px] text-slate-400 font-mono">{formatBytes(asset.size)}</p>
                         <div className="flex items-center gap-1 mt-1">
                           <a 
                             href={asset.downloadUrl} 
@@ -284,7 +286,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                     <>
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-950 flex-shrink-0">
                         {asset.mimeType.startsWith('image/') ? (
-                          <img src={asset.downloadUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={asset.thumbnailUrl || asset.downloadUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-slate-500">
                             <File className="w-5 h-5" />
@@ -296,7 +298,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                         <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                           <span>{asset.extension}</span>
                           <span>•</span>
-                          <span>{mediaService.formatBytes(asset.size)}</span>
+                          <span>{formatBytes(asset.size)}</span>
                           <span>•</span>
                           <span className="text-violet-400">{asset.module}</span>
                         </div>
@@ -333,16 +335,16 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
       </div>
 
       {/* Footer Info */}
-      <div className="px-6 py-4 bg-slate-900/50 border-t border-slate-800 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-        <div className="flex items-center gap-4">
-          <span>{filteredAssets.length} Assets Found</span>
+      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-slate-900/50 border-t border-slate-800 flex items-center justify-between text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span>{filteredAssets.length} Assets</span>
           {selectedIds.length > 0 && (
             <span className="text-violet-400">{selectedIds.length} Selected</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-3 h-3" />
-          <span>Filtered by: {filterModule}</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 truncate max-w-[150px]">
+          <Filter className="w-3 h-3 shrink-0" />
+          <span className="truncate">{filterModule}</span>
         </div>
       </div>
     </div>

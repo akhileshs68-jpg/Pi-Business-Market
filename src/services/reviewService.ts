@@ -134,12 +134,14 @@ export const reviewService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'reviews'),
-      where('entityId', '==', entityId),
-      where('status', '==', 'published'),
-      orderBy('createdAt', 'desc')
+      where('entityId', '==', entityId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => this.mapDocToReview(doc));
+    let reviews = snapshot.docs.map(doc => this.mapDocToReview(doc));
+    
+    return reviews
+      .filter(r => r.status === 'published')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async getEntityReputation(entityId: string): Promise<ReputationScore | null> {
