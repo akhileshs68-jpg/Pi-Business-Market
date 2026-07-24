@@ -52,8 +52,8 @@ export const BusinessCard: React.FC<BusinessCardProps> = ({ business, onEdit, on
       <div className="px-6 pb-6 -mt-8 relative z-10">
         {/* Avatar/Logo */}
         <div className="w-16 h-16 bg-slate-950 border-4 border-slate-950 rounded-2xl overflow-hidden mb-4 shadow-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-          {business.logo ? (
-            <img src={business.logo} alt={business.businessName} className="w-full h-full object-cover" />
+          {business.logoUrl ? (
+            <img src={business.logoUrl} alt={business.businessName} className="w-full h-full object-cover" />
           ) : (
             <Building2 className="w-8 h-8 text-indigo-400" />
           )}

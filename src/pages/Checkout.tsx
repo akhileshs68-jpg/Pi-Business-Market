@@ -316,7 +316,7 @@ export const Checkout: React.FC = () => {
                 {items.map((item) => (
                   <div key={item.itemId} className="flex gap-4">
                     <div className="w-12 h-12 bg-slate-800 rounded-xl overflow-hidden border border-slate-700 flex-shrink-0">
-                      {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
+                      {item.imageUrl && <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-[10px] font-bold text-white truncate uppercase">{item.name}</h4>

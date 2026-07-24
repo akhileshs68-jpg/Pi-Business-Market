@@ -453,8 +453,10 @@ export interface Business {
   category: string;
   subcategory?: string;
   description: string;
-  logo?: string;
-  coverImage?: string;
+  logoUrl?: string;
+  logoPublicId?: string;
+  coverImageUrl?: string;
+  coverPublicId?: string;
   email: string;
   phone: string;
   alternatePhone?: string;
@@ -682,8 +684,10 @@ export interface BusinessProfile {
   email: string;
   phone: string;
   website?: string;
-  logo?: string;
-  banner?: string;
+  logoUrl?: string;
+  logoPublicId?: string;
+  coverImageUrl?: string;
+  coverPublicId?: string;
   verified: boolean;
   featured: boolean;
   status: BusinessProfileStatus;
@@ -725,8 +729,10 @@ export interface Store {
   storeType: StoreType;
   storeCategory: string;
   description: string;
-  logo?: string;
-  banner?: string;
+  logoUrl?: string;
+  logoPublicId?: string;
+  coverImageUrl?: string;
+  coverPublicId?: string;
   email: string;
   phone: string;
   website?: string;
@@ -1058,7 +1064,8 @@ export interface Category {
   slug: string;
   description: string;
   icon?: string;
-  banner?: string;
+  coverImageUrl?: string;
+  coverPublicId?: string;
   parentId?: string; // For nested subcategories
   level: number;     // 0 for root, 1 for sub, etc.
   sortOrder: number;
@@ -1444,7 +1451,7 @@ export interface CartItem {
   variantId?: string;
   sku?: string;
   name: string;
-  image?: string;
+  imageUrl?: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;

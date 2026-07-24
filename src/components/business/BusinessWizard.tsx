@@ -132,9 +132,9 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
       
       
       if (type === 'logo') {
-        setFormData(prev => ({ ...prev, logo: asset.downloadUrl }));
+        setFormData(prev => ({ ...prev, logoUrl: asset.downloadUrl, logoPublicId: asset.storagePath }));
       } else if (type === 'cover') {
-        setFormData(prev => ({ ...prev, coverImage: asset.downloadUrl }));
+        setFormData(prev => ({ ...prev, coverImageUrl: asset.downloadUrl, coverPublicId: asset.storagePath }));
       } else if (type === 'document' && activeDocType) {
         setDocs(prev => {
           const filtered = prev.filter(d => d.type !== activeDocType);
@@ -422,8 +422,8 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                       }}
                       className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
                     >
-                      {logoPreview || formData.logo ? (
-                        <img src={logoPreview || formData.logo} alt="Logo Preview" className="w-full h-full object-cover" />
+                      {logoPreview || formData.logoUrl ? (
+                        <img src={logoPreview || formData.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
                       ) : (
                         <>
                           <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
@@ -447,8 +447,8 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                       }}
                       className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
                     >
-                      {coverPreview || formData.coverImage ? (
-                        <img src={coverPreview || formData.coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                      {coverPreview || formData.coverImageUrl ? (
+                        <img src={coverPreview || formData.coverImageUrl} alt="Cover Preview" className="w-full h-full object-cover" />
                       ) : (
                         <>
                           <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />

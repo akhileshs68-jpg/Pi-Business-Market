@@ -58,6 +58,44 @@ export const businessMemberService = {
     });
   },
 
+  async updateMember(
+    businessId: string, 
+    memberId: string, 
+    actorUid: string, 
+    actorName: string, 
+    updates: {
+      role?: BusinessRole;
+      title?: string;
+      department?: string;
+      status?: 'active' | 'suspended';
+      permissions?: string[];
+    }
+  ): Promise<void> {
+    return withRetry(async () => {
+      const db = getFirebaseDb();
+      const memberRef = doc(db, 'businessMembers', memberId);
+      
+      await setDoc(memberRef, {
+        ...updates,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      // Audit Log
+      const logRef = doc(collection(db, 'businessAuditLogs'));
+      await setDoc(logRef, {
+        logId: logRef.id,
+        businessId,
+        actorUid,
+        actorName,
+        action: 'MEMBER_UPDATED',
+        entityType: 'member',
+        entityId: memberId,
+        description: `Member details updated by ${actorName}`,
+        timestamp: serverTimestamp()
+      });
+    });
+  },
+
   async removeMember(businessId: string, memberId: string, actorUid: string, actorName: string): Promise<void> {
     return withRetry(async () => {
       const db = getFirebaseDb();

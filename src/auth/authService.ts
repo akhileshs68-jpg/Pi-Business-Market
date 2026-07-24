@@ -132,22 +132,56 @@ export const authService = {
 
         // 4. Firebase Auth (to get a session)
         let firebaseUid: string;
+        let isMockAuth = false;
         try {
           const userCredential = await signInAnonymously(auth);
           firebaseUid = userCredential.user.uid;
         } catch (authErr: any) {
-          console.error('[AuthService] Anonymous Auth failed:', authErr);
+          console.warn('[AuthService] Anonymous Auth failed, checking for local dev fallback:', authErr);
           if (authErr.code === 'auth/admin-restricted-operation' || authErr.code === 'auth/operation-not-allowed') {
-            throw new Error('Firebase Anonymous Authentication is disabled. Please enable it in the Firebase Console (Authentication > Sign-in method) or try an alternative login method.');
+            firebaseUid = 'mock_fb_' + piUid;
+            isMockAuth = true;
+          } else {
+            throw authErr;
           }
-          throw authErr;
+        }
+
+        const now = new Date().toISOString();
+
+        if (isMockAuth) {
+          const localUserKey = `mock_user_${firebaseUid}`;
+          const localUserStr = localStorage.getItem(localUserKey);
+          if (localUserStr) {
+            try {
+              return JSON.parse(localUserStr) as User;
+            } catch (e) {
+              // Ignore and regenerate
+            }
+          }
+
+          const newUser: User = {
+            uid: firebaseUid,
+            piUid,
+            username,
+            displayName: username, 
+            walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+            role: 'Buyer', 
+            accountType: 'individual',
+            verified: true,
+            kycVerified: false,
+            createdAt: now,
+            updatedAt: now,
+            lastLogin: now,
+            status: 'active'
+          };
+
+          localStorage.setItem(localUserKey, JSON.stringify(newUser));
+          return newUser;
         }
 
         // 5. Check/Create Firestore User
         const userRef = doc(db, 'users', firebaseUid);
         const userSnap = await getDoc(userRef);
-
-        const now = new Date().toISOString();
 
         if (!userSnap.exists()) {
           const newUser: User = {

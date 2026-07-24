@@ -1,50 +1,12 @@
 const fs = require('fs');
-let code = fs.readFileSync('server.ts', 'utf8');
+let serverStr = fs.readFileSync('server.ts', 'utf8');
 
-code = code.replace(
-`      const uploadResult: any = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder: folder || "general",
-            resource_type: "auto",
-            quality: "auto",
-            fetch_format: "auto"
-          },
-          (error, result) => {
-            if (error) {
-              console.error("[Cloudinary Stream Error]:", error);
-              reject(error);
-            }
-            else resolve(result);
-          }
-        );
-        stream.end(req.file!.buffer);
-      });`,
-`      console.log("[Server] Uploading to Cloudinary...");
-      const uploadResult: any = await new Promise((resolve, reject) => {
-        try {
-          const stream = cloudinary.uploader.upload_stream(
-            {
-              folder: folder || "general",
-              resource_type: "auto",
-              quality: "auto",
-              fetch_format: "auto"
-            },
-            (error, result) => {
-              if (error) {
-                console.error("[Cloudinary Stream Error Callback]:", error);
-                reject(new Error(error.message || JSON.stringify(error)));
-              }
-              else resolve(result);
-            }
-          );
-          stream.end(req.file!.buffer);
-        } catch (syncError) {
-          console.error("[Cloudinary Stream Sync Error]:", syncError);
-          reject(syncError);
-        }
-      });
-      console.log("[Server] Upload success:", uploadResult.public_id);`
-);
+const startUpload = serverStr.indexOf('// Cloudinary Backend Upload Endpoint');
+const endUpload = serverStr.indexOf('// Vite middleware for development');
 
-fs.writeFileSync('server.ts', code);
+if (startUpload !== -1 && endUpload !== -1) {
+  serverStr = serverStr.substring(0, startUpload) + serverStr.substring(endUpload);
+  fs.writeFileSync('server.ts', serverStr);
+} else {
+  console.log("Could not find blocks");
+}

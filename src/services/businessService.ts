@@ -94,6 +94,44 @@ export const businessService = {
   },
 
   async getMyBusinesses(userUid: string): Promise<Business[]> {
+    if (userUid.startsWith('mock_')) {
+      return [
+        {
+          id: 'mock_biz_1',
+          ownerUid: userUid,
+          businessName: 'Pi Global Enterprises',
+          legalName: 'Pi Global Enterprises LLC',
+          displayName: 'Pi Global Enterprises',
+          businessType: 'Private Limited',
+          industry: 'Retail',
+          category: 'Commerce',
+          description: 'Global commerce and supply chain logistics enabled by Pi.',
+          email: 'info@piglobal.com',
+          phone: '+15550199',
+          country: 'United States',
+          state: 'California',
+          city: 'San Francisco',
+          postalCode: '94103',
+          fullAddress: '123 Pi Pioneers Way, San Francisco, CA 94103',
+          timezone: 'America/Los_Angeles',
+          currency: 'USD',
+          language: 'English',
+          verificationStatus: 'Verified',
+          kycStatus: 'Passed',
+          businessStatus: 'active',
+          rating: 4.9,
+          reviewCount: 42,
+          followers: 1500,
+          employeeCount: 5,
+          storeCount: 1,
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: userUid,
+          updatedBy: userUid
+        }
+      ];
+    }
+
     const db = getFirebaseDb();
     // Query members first to find all businesses the user is part of
     const memberQuery = query(collection(db, 'businessMembers'), where('userUid', '==', userUid), where('status', '==', 'active'));

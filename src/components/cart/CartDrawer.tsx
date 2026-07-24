@@ -142,8 +142,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                 items.map((item) => (
                   <div key={item.itemId} className="flex gap-4 group">
                     <div className="w-20 h-20 bg-slate-800 rounded-2xl overflow-hidden border border-slate-700">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <ShoppingBag className="w-6 h-6 text-slate-600" />

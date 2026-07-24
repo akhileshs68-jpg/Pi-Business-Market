@@ -69,6 +69,77 @@ export const productService = {
    * Gets all products for a store
    */
   async getStoreProducts(storeId: string): Promise<Product[]> {
+    if (storeId.startsWith('mock_')) {
+      return [
+        {
+          productId: 'mock_prod_1',
+          storeId,
+          businessId: 'mock_biz_1',
+          ownerUid: 'mock_owner',
+          sku: 'PI-TSHIRT-001',
+          productName: 'Pi Branded T-Shirt',
+          productSlug: 'pi-branded-t-shirt',
+          shortDescription: 'The official premium Pi Network logo T-shirt.',
+          description: 'High-quality 100% cotton t-shirt with the official Pi Network logo.',
+          brand: 'PiNetwork',
+          type: 'physical',
+          category: 'Apparel',
+          subCategory: 'Shirts',
+          tags: ['pi', 'merch', 'tshirt'],
+          price: 15,
+          comparePrice: 20,
+          currency: 'USD',
+          taxClass: 'Standard',
+          stock: 150,
+          stockStatus: 'in_stock',
+          minOrderQty: 1,
+          maxOrderQty: 10,
+          featured: true,
+          status: 'published',
+          visibility: 'public',
+          seoTitle: 'Pi Branded T-Shirt',
+          seoDescription: 'The official premium Pi Network logo T-shirt.',
+          mainImage: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400',
+          imageUrls: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          productId: 'mock_prod_2',
+          storeId,
+          businessId: 'mock_biz_1',
+          ownerUid: 'mock_owner',
+          sku: 'PI-CAP-002',
+          productName: 'Pi Pioneer Cap',
+          productSlug: 'pi-pioneer-cap',
+          shortDescription: 'A stylish baseball cap for Pi pioneers.',
+          description: 'A stylish, adjustable baseball cap for Pi pioneers.',
+          brand: 'PiNetwork',
+          type: 'physical',
+          category: 'Apparel',
+          subCategory: 'Caps',
+          tags: ['pi', 'merch', 'cap'],
+          price: 8,
+          comparePrice: 12,
+          currency: 'USD',
+          taxClass: 'Standard',
+          stock: 85,
+          stockStatus: 'in_stock',
+          minOrderQty: 1,
+          maxOrderQty: 5,
+          featured: true,
+          status: 'published',
+          visibility: 'public',
+          seoTitle: 'Pi Pioneer Cap',
+          seoDescription: 'A stylish baseball cap for Pi pioneers.',
+          mainImage: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400',
+          imageUrls: ['https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+    }
+
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'products'), 

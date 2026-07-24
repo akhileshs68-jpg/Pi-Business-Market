@@ -63,10 +63,12 @@ async function startServer() {
     }
   });
 
+  
   // Cloudinary Backend Upload Endpoint
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     let currentStep = "Request received";
     console.log(`[Upload] ✓ ${currentStep}`);
+
     try {
       if (!req.file) {
         currentStep = "File received - FAILED (No file)";
@@ -77,7 +79,7 @@ async function startServer() {
           error: "No file uploaded" 
         });
       }
-
+      
       currentStep = "File received";
       console.log(`[Upload] ✓ ${currentStep}`);
 
@@ -90,7 +92,7 @@ async function startServer() {
           error: "req.file.buffer is undefined. Multer memory storage may be misconfigured."
         });
       }
-
+      
       currentStep = "Buffer size";
       console.log(`[Upload] ✓ ${currentStep} (${req.file.buffer.length} bytes)`);
 
@@ -103,7 +105,7 @@ async function startServer() {
           error: "Cloudinary is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables." 
         });
       }
-
+      
       currentStep = "Cloudinary initialized";
       console.log(`[Upload] ✓ ${currentStep}`);
 
@@ -128,6 +130,7 @@ async function startServer() {
               else resolve(result);
             }
           );
+
           stream.end(req.file!.buffer);
         } catch (err: any) {
           reject(err);
@@ -147,6 +150,7 @@ async function startServer() {
         format: uploadResult.format,
         bytes: uploadResult.bytes
       });
+      
     } catch (error: any) {
       console.error(`[Upload] ✗ Failed at step: ${currentStep}`, error);
       res.status(500).json({ 
@@ -171,6 +175,7 @@ async function startServer() {
           error: "Cloudinary is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables." 
         });
       }
+
       const result = await cloudinary.uploader.destroy(publicId);
       res.json({ success: true, result });
     } catch (error: any) {

@@ -14,7 +14,8 @@ import {
   orderBy, 
   serverTimestamp,
   Timestamp,
-  updateDoc
+  updateDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { BusinessDocument, VerificationStatus } from '../types';
@@ -90,6 +91,28 @@ export const businessVerificationService = {
         entityType: 'business',
         entityId: businessId,
         description: `Verification status changed to ${status} by ${actorName}. Reason: ${reason || 'N/A'}`,
+        timestamp: serverTimestamp()
+      });
+    });
+  },
+
+  async deleteDocument(businessId: string, documentId: string, actorUid: string, actorName: string): Promise<void> {
+    return withRetry(async () => {
+      const db = getFirebaseDb();
+      const docRef = doc(db, 'businessDocuments', documentId);
+      await deleteDoc(docRef);
+
+      // Audit Log
+      const logRef = doc(collection(db, 'businessAuditLogs'));
+      await setDoc(logRef, {
+        logId: logRef.id,
+        businessId,
+        actorUid,
+        actorName,
+        action: 'DOCUMENT_DELETED',
+        entityType: 'document',
+        entityId: documentId,
+        description: `Business document (${documentId}) deleted by ${actorName}`,
         timestamp: serverTimestamp()
       });
     });

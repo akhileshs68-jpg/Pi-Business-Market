@@ -40,7 +40,7 @@ export const CategoryWizard: React.FC<CategoryWizardProps> = ({
     slug: initialCategory?.slug || '',
     description: initialCategory?.description || '',
     icon: initialCategory?.icon || '📁',
-    banner: initialCategory?.banner || '',
+    coverImageUrl: initialCategory?.coverImageUrl || '',
     parentId: initialCategory?.parentId || '',
     level: initialCategory?.level || 0,
     sortOrder: initialCategory?.sortOrder || 0,

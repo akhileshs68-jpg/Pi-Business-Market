@@ -32,7 +32,7 @@ const STORE_TYPES: StoreType[] = [
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 interface StoreWizardProps {
-  onComplete: () => void;
+  onComplete: (storeId: string) => void;
   onCancel: () => void;
 }
 
@@ -59,8 +59,10 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
     openingHours: DAYS.map(day => ({ day, open: '09:00', close: '18:00', closed: false })) as OpeningHours[],
     deliveryAvailable: false,
     pickupAvailable: true,
-    logo: '',
-    banner: ''
+    logoUrl: '',
+    logoPublicId: '',
+    coverImageUrl: '',
+    coverPublicId: ''
   });
 
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
@@ -86,7 +88,7 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
     try {
       const slug = await storeService.generateUniqueSlug(formData.storeName);
       
-      await storeService.createStore({
+      const newStoreId = await storeService.createStore({
         ownerUid: user.uid,
         ...formData,
         storeSlug: slug,
@@ -95,7 +97,7 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
         status: 'active'
       });
 
-      onComplete();
+      onComplete(newStoreId);
     } catch (err: any) {
       setError(err.message || 'Failed to create store profile');
     } finally {
@@ -264,9 +266,9 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
                       onClick={() => { setActiveMediaTarget('banner'); setIsMediaPickerOpen(true); }}
                       className="relative h-40 w-full rounded-2xl bg-slate-950 border-2 border-dashed border-slate-800 overflow-hidden cursor-pointer hover:border-indigo-500 transition-all group"
                     >
-                      {formData.banner ? (
+                      {formData.coverImageUrl ? (
                         <>
-                          <img src={formData.banner} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <img src={formData.coverImageUrl} alt="Banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Camera className="w-8 h-8 text-white" />
                           </div>
@@ -287,9 +289,9 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
                         onClick={() => { setActiveMediaTarget('logo'); setIsMediaPickerOpen(true); }}
                         className="relative w-32 h-32 rounded-2xl bg-slate-950 border-2 border-dashed border-slate-800 overflow-hidden cursor-pointer hover:border-indigo-500 transition-all group"
                       >
-                        {formData.logo ? (
+                        {formData.logoUrl ? (
                           <>
-                            <img src={formData.logo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Camera className="w-6 h-6 text-white" />
                             </div>
@@ -506,8 +508,8 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
         ownerUid={user?.uid || ''}
         module="stores"
         onSelect={(asset) => {
-          if (activeMediaTarget === 'logo') setFormData({ ...formData, logo: asset.downloadUrl });
-          if (activeMediaTarget === 'banner') setFormData({ ...formData, banner: asset.downloadUrl });
+          if (activeMediaTarget === 'logo') setFormData({ ...formData, logoUrl: asset.downloadUrl, logoPublicId: asset.storagePath });
+          if (activeMediaTarget === 'banner') setFormData({ ...formData, coverImageUrl: asset.downloadUrl, coverPublicId: asset.storagePath });
         }}
         title={`Select Store ${activeMediaTarget === 'logo' ? 'Logo' : 'Banner'}`}
       />
