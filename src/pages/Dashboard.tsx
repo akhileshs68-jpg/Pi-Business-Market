@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { 
   LogOut, 
@@ -16,9 +17,11 @@ import {
 } from 'lucide-react';
 import { MediaPickerModal } from '../components/product/MediaPickerModal';
 import { Skeleton } from '../components/ui/Skeleton';
+import Navbar from '../components/Navbar';
 
 export const Dashboard: React.FC = () => {
   const { user, loading, logout, updateUser } = useAuth();
+  const navigate = useNavigate();
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [isAssetsModalOpen, setIsAssetsModalOpen] = useState(false);
 
@@ -54,8 +57,18 @@ export const Dashboard: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-4 sm:p-8 md:p-12 pb-24 md:pb-12">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
+      <Navbar 
+        currentUser={user as any}
+        currentView="dashboard"
+        onNavigate={(view) => navigate(`/${view}`)}
+        cartCount={0}
+        walletBalance={100}
+        onWalletUpdate={() => {}}
+        onToggleCart={() => {}}
+      />
+      
+      <div className="flex-1 p-4 sm:p-8 md:p-12 pb-24 md:pb-12 max-w-6xl mx-auto w-full">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 sm:mb-12">

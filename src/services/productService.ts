@@ -141,13 +141,28 @@ export const productService = {
     }
 
     const db = getFirebaseDb();
-    const q = query(
-      collection(db, 'products'), 
-      where('storeId', '==', storeId)
-    );
+    let docsList: any[] = [];
     
-    const snapshot = await getDocs(q);
-    const products = snapshot.docs.map(doc => {
+    try {
+      const q = query(
+        collection(db, 'products'), 
+        where('storeId', '==', storeId)
+      );
+      const snapshot = await getDocs(q);
+      docsList = snapshot.docs;
+    } catch (err) {
+      console.warn("getStoreProducts query failed, falling back to full collection fetch and in-memory filtering:", err);
+      try {
+        const qAll = query(collection(db, 'products'));
+        const snapshotAll = await getDocs(qAll);
+        docsList = snapshotAll.docs.filter(doc => doc.data().storeId === storeId);
+      } catch (fallbackErr) {
+        console.error("Critical fallback query failed:", fallbackErr);
+        docsList = [];
+      }
+    }
+
+    const products = docsList.map(doc => {
       const data = doc.data();
       return {
         ...data,

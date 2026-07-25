@@ -44,11 +44,50 @@ html, body {
 }
 
 /* Scrollbar Utility hiding */
-.scrollbar-none::-webkit-scrollbar {
+.scrollbar-none::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-.scrollbar-none {
+.scrollbar-none,
+.scrollbar-hide,
+.no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Premium Responsive Grid System for Product Cards */
+.premium-product-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+
+@media (min-width: 640px) {
+  .premium-product-grid {
+    gap: 16px;
+    grid-template-columns: repeat(2, minmax(170px, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .premium-product-grid {
+    gap: 20px;
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .premium-product-grid {
+    gap: 24px;
+    grid-template-columns: repeat(4, minmax(170px, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .premium-product-grid {
+    grid-template-columns: repeat(5, minmax(170px, 1fr));
+  }
+}
+
 

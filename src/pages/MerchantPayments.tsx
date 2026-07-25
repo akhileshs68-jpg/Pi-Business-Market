@@ -106,7 +106,7 @@ export const MerchantPayments: React.FC = () => {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
           <StatCard label="Total Revenue" value={`${totalRevenue.toFixed(2)} Pi`} icon={<TrendingUp />} color="text-emerald-400" />
           <StatCard label="Settled Funds" value={`${(totalRevenue * 0.95).toFixed(2)} Pi`} icon={<Wallet />} color="text-indigo-400" />
           <StatCard label="Pending Verif." value="12.50 Pi" icon={<Clock />} color="text-amber-400" />
@@ -227,13 +227,13 @@ export const MerchantPayments: React.FC = () => {
 };
 
 const StatCard = ({ label, value, icon, color }: any) => (
-  <div className="p-6 bg-slate-900/50 border border-slate-800 rounded-3xl">
-    <div className="flex items-center gap-3 mb-4">
-      <div className={`${color} p-2 bg-slate-950 rounded-xl border border-slate-800`}>
-        {React.cloneElement(icon, { size: 18 })}
+  <div className="p-4 sm:p-5 bg-slate-900/40 border border-slate-800 rounded-2xl backdrop-blur-sm">
+    <div className="flex items-center gap-2 sm:gap-3 mb-2">
+      <div className={`${color} p-1.5 bg-slate-950 rounded-lg border border-slate-850`}>
+        {React.cloneElement(icon, { size: 16 })}
       </div>
-      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</p>
+      <p className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</p>
     </div>
-    <p className="text-2xl font-black text-white">{value}</p>
+    <p className="text-lg sm:text-xl font-bold text-white">{value}</p>
   </div>
 );

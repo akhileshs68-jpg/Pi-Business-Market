@@ -57,6 +57,7 @@ export const ProductDetails: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState('M');
   const [selectedColor, setSelectedColor] = useState('Obsidian Black');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showStickyBar, setShowStickyBar] = useState(false);
   
   const [isAdding, setIsAdding] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
@@ -94,6 +95,19 @@ export const ProductDetails: React.FC = () => {
       setIsWishlisted(wish === 'true');
     }
   }, [product]);
+
+  // Track scroll position for sticky mobile buy bar
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowStickyBar(true);
+      } else {
+        setShowStickyBar(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const mapSearchEntryToProduct = (entry: SearchIndexEntry): Product => {
     return {
@@ -344,7 +358,7 @@ export const ProductDetails: React.FC = () => {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 right-6 z-50 bg-[#090e1a] border border-violet-500/30 text-white font-bold text-xs uppercase tracking-wider px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3"
+            className="fixed bottom-20 sm:bottom-6 right-6 z-50 bg-[#090e1a] border border-violet-500/30 text-white font-bold text-xs uppercase tracking-wider px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3"
           >
             <Sparkles className="w-4 h-4 text-violet-400" />
             {toastMessage}
@@ -701,7 +715,7 @@ export const ProductDetails: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="premium-product-grid">
               {relatedProducts.map(prod => (
                 <ProductCard 
                   key={prod.productId}
@@ -778,6 +792,67 @@ export const ProductDetails: React.FC = () => {
         </div>
 
       </main>
+
+      {/* Premium Sticky Mobile Buy Bar */}
+      <AnimatePresence>
+        {showStickyBar && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-md border-t border-slate-900 px-4 py-3 sm:py-4 pb-safe flex items-center justify-between gap-4 lg:hidden shadow-[0_-10px_25px_rgba(0,0,0,0.5)]"
+          >
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block truncate">
+                {product.productName}
+              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-base font-black text-white">{product.price} π</span>
+                <span className="text-[9px] text-slate-500 line-through font-bold">{originalPrice} π</span>
+                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider">
+                  ({selectedSize} / {selectedColor})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleAddToCart}
+                disabled={isAdding}
+                className={`p-3.5 rounded-xl border border-slate-800 transition-all flex items-center justify-center min-h-[44px] min-w-[44px] ${
+                  added 
+                    ? 'bg-emerald-600 border-emerald-500 text-white' 
+                    : 'bg-slate-900 text-slate-300 hover:text-white'
+                }`}
+                title="Add to Shopping Bag"
+              >
+                {isAdding ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                ) : added ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : (
+                  <ShoppingBag className="w-4 h-4 text-violet-400" />
+                )}
+              </button>
+
+              <button 
+                onClick={handleBuyNow}
+                disabled={isBuying}
+                className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-1.5 min-h-[44px] whitespace-nowrap"
+              >
+                {isBuying ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <>
+                    <BagIcon className="w-4 h-4 animate-spin" /> Buy Now
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

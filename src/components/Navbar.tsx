@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ShoppingBag,
   Wallet,
@@ -66,6 +67,83 @@ export default function Navbar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [faucetLoading, setFaucetLoading] = useState(false);
+
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Lock scroll, keyboard capture, and restore scroll position
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const scrollY = window.scrollY;
+    const originalStyle = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow,
+    };
+
+    // Prevent background scrolling completely without jumps
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!mobileMenuRef.current) return;
+        const focusable = mobileMenuRef.current.querySelectorAll(
+          'a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex="0"], [contenteditable]'
+        );
+        const first = focusable[0] as HTMLElement;
+        const last = focusable[focusable.length - 1] as HTMLElement;
+
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Auto focus first item
+    setTimeout(() => {
+      if (mobileMenuRef.current) {
+        const focusable = mobileMenuRef.current.querySelectorAll(
+          'a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex="0"], [contenteditable]'
+        );
+        if (focusable.length > 0) {
+          (focusable[0] as HTMLElement).focus();
+        }
+      }
+    }, 50);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.position = originalStyle.position;
+      document.body.style.top = originalStyle.top;
+      document.body.style.width = originalStyle.width;
+      document.body.style.overflow = originalStyle.overflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isMobileMenuOpen]);
 
   const handleFaucet = () => {
     setFaucetLoading(true);
@@ -392,117 +470,333 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* MOBILE DASHBOARD EXPANSION SYSTEM */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[55] xl:hidden"
-            />
-            <motion.div 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              className="fixed right-0 top-0 bottom-0 w-80 bg-slate-950 border-l border-slate-900 z-[60] xl:hidden overflow-y-auto"
-            >
-              <div className="p-6 space-y-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Navigation</h3>
-                  <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-500 hover:text-white transition-colors">
+      {/* MOBILE DASHBOARD EXPANSION SYSTEM - REDESIGNED FOR ENT-GRADE MOBILE UX VIA PORTAL */}
+      {typeof window !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <>
+              {/* High-Fidelity Blurred & Darkened Backdrop Overlay */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMobileMenuOpen(false)}
+                style={{
+                  background: 'rgba(0,0,0,0.55)',
+                  backdropFilter: 'blur(12px)',
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100dvh',
+                  zIndex: 99999
+                }}
+                className="cursor-pointer pointer-events-auto"
+                id="mobile_nav_backdrop"
+              />
+
+              {/* Full-Screen Hardware-Accelerated Drawer with swipe & drag physics */}
+              <motion.div 
+                ref={mobileMenuRef}
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 26, stiffness: 210 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 300 }}
+                dragElastic={{ left: 0.05, right: 0.85 }}
+                onDragEnd={(_, info) => {
+                  // Close on swipe right or swipe down
+                  if (info.offset.x > 80 || info.velocity.x > 400 || info.offset.y > 80 || info.velocity.y > 400) {
+                    setIsMobileMenuOpen(false);
+                  }
+                }}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100dvh',
+                  zIndex: 100000,
+                }}
+                className="bg-[#080d19]/95 backdrop-blur-md border-r border-slate-900 overflow-y-auto flex flex-col justify-between pt-safe pb-safe pointer-events-auto"
+                id="mobile_nav_drawer"
+              >
+                {/* Header Profile Info & Action Controls */}
+                <div className="flex-shrink-0 px-6 py-5 flex items-center justify-between border-b border-slate-900 bg-slate-950/40">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                      <span className="font-bold text-base tracking-wider">π</span>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-100 uppercase tracking-widest leading-none">Pi Market Menu</h3>
+                      <p className="text-[10px] text-slate-500 font-semibold mt-1">v1.2.0 (Consensus Core)</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    aria-label="Close menu"
+                  >
                     <X className="w-6 h-6" />
                   </button>
                 </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Marketplace</h4>
-                    <div className="grid gap-2">
-                      <button onClick={() => { onNavigate('marketplace'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold border transition-all ${currentView === 'marketplace' ? 'bg-violet-600/10 border-violet-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                        <Compass className="w-5 h-5 text-violet-400" /> Marketplace
+                {/* Symmetrical Scrollable Sections */}
+                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+                  {/* Category Section: Core Services */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Core Marketplace</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => { onNavigate('marketplace'); setIsMobileMenuOpen(false); }} 
+                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'marketplace' ? 'bg-violet-600/10 border-violet-500/30 text-white shadow-lg shadow-violet-600/5' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
+                      >
+                        <Compass className="w-5 h-5 text-violet-400" />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black uppercase tracking-wider block">Browse</span>
+                          <span className="text-[9px] text-slate-500 block">Home feed</span>
+                        </div>
                       </button>
-                      <button onClick={() => { onNavigate('discovery'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold border transition-all ${currentView === 'discovery' ? 'bg-violet-600/10 border-violet-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                        <Search className="w-5 h-5 text-violet-400" /> Search Market
+
+                      <button 
+                        onClick={() => { onNavigate('discovery'); setIsMobileMenuOpen(false); }} 
+                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'discovery' ? 'bg-violet-600/10 border-violet-500/30 text-white shadow-lg shadow-violet-600/5' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
+                      >
+                        <Search className="w-5 h-5 text-violet-400" />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black uppercase tracking-wider block">Search</span>
+                          <span className="text-[9px] text-slate-500 block">Find products</span>
+                        </div>
                       </button>
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Enterprise Suite</h4>
-                    <div className="grid gap-2">
-                      <button onClick={() => { onNavigate('business-dashboard'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold border transition-all ${currentView === 'business-dashboard' ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                        <Briefcase className="w-5 h-5 text-indigo-400" /> Businesses
+                  {/* Category Section: Merchant Portal */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Merchant Ecosystem</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => { onNavigate('business-dashboard'); setIsMobileMenuOpen(false); }} 
+                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'business-dashboard' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
+                      >
+                        <Briefcase className="w-5 h-5 text-indigo-400" />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black uppercase tracking-wider block">Businesses</span>
+                          <span className="text-[9px] text-slate-500 block">Overview</span>
+                        </div>
                       </button>
-                      <button onClick={() => { onNavigate('store-dashboard'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold border transition-all ${currentView === 'store-dashboard' ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                        <Store className="w-5 h-5 text-indigo-400" /> Stores
+
+                      <button 
+                        onClick={() => { onNavigate('store-dashboard'); setIsMobileMenuOpen(false); }} 
+                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'store-dashboard' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
+                      >
+                        <Store className="w-5 h-5 text-indigo-400" />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black uppercase tracking-wider block">Stores</span>
+                          <span className="text-[9px] text-slate-500 block">Manage storefronts</span>
+                        </div>
                       </button>
-                      <button onClick={() => { onNavigate('business-orders'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold border transition-all ${currentView === 'business-orders' ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                        <ClipboardList className="w-5 h-5 text-indigo-400" /> Order Hub
+
+                      <button 
+                        onClick={() => { onNavigate('business-orders'); setIsMobileMenuOpen(false); }} 
+                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'business-orders' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
+                      >
+                        <ClipboardList className="w-5 h-5 text-indigo-400" />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black uppercase tracking-wider block">Order Hub</span>
+                          <span className="text-[9px] text-slate-500 block">Fulfillment</span>
+                        </div>
+                      </button>
+
+                      <button 
+                        onClick={() => { onNavigate('business-payments'); setIsMobileMenuOpen(false); }} 
+                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'business-payments' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
+                      >
+                        <CreditCard className="w-5 h-5 text-emerald-400" />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-black uppercase tracking-wider block">Finance</span>
+                          <span className="text-[9px] text-slate-500 block">Settlements</span>
+                        </div>
                       </button>
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">System</h4>
-                    <div className="grid gap-2">
-                      <button onClick={() => { onNavigate('admin-console'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 p-3 rounded-xl text-sm font-bold border transition-all ${currentView === 'admin-console' ? 'bg-rose-600/10 border-rose-500/30 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                        <Terminal className="w-5 h-5 text-rose-400" /> Ops Console
+                  {/* Category Section: Analytics & Performance Ops */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Management & BI</h4>
+                    <div className="space-y-2">
+                      <button 
+                        onClick={() => { onNavigate('merchant-analytics'); setIsMobileMenuOpen(false); }} 
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm font-bold transition-all ${currentView === 'merchant-analytics' ? 'bg-amber-600/10 border-amber-500/30 text-white' : 'bg-slate-900/40 border-slate-900 hover:border-slate-800 text-slate-400 hover:text-white'}`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <BarChart3 className="w-4 h-4 text-amber-400" /> Merchant BI Analytics
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600" />
                       </button>
-                      <button onClick={() => { window.location.href = '/docs'; setIsMobileMenuOpen(false); }} className="flex items-center gap-3 p-3 rounded-xl text-sm font-bold border border-emerald-500/20 bg-emerald-600/10 text-emerald-400">
-                        <BookOpen className="w-5 h-5" /> Documentation
+
+                      <button 
+                        onClick={() => { onNavigate('admin-analytics'); setIsMobileMenuOpen(false); }} 
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm font-bold transition-all ${currentView === 'admin-analytics' ? 'bg-rose-600/10 border-rose-500/30 text-white' : 'bg-slate-900/40 border-slate-900 hover:border-slate-800 text-slate-400 hover:text-white'}`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <ShieldAlert className="w-4 h-4 text-rose-400" /> Platform System Health
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600" />
+                      </button>
+
+                      <button 
+                        onClick={() => { onNavigate('admin-console'); setIsMobileMenuOpen(false); }} 
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm font-bold transition-all ${currentView === 'admin-console' ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-slate-900/40 border-slate-900 hover:border-slate-800 text-slate-400 hover:text-white'}`}
+                      >
+                        <span className="flex items-center gap-3">
+                          <Terminal className="w-4 h-4 text-indigo-400" /> Admin Ops Console
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Category Section: Document Resources */}
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Platform Resources</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => { onNavigate('rewards'); setIsMobileMenuOpen(false); }} 
+                        className="flex items-center justify-center gap-2.5 p-3 rounded-xl border border-indigo-500/20 bg-indigo-600/5 text-indigo-400 text-xs font-black uppercase tracking-wider transition-all"
+                      >
+                        <Award className="w-4 h-4 text-indigo-400" /> Rewards Hub
+                      </button>
+                      <button 
+                        onClick={() => { window.location.href = '/docs'; setIsMobileMenuOpen(false); }} 
+                        className="flex items-center justify-center gap-2.5 p-3 rounded-xl border border-emerald-500/20 bg-emerald-600/5 text-emerald-400 text-xs font-black uppercase tracking-wider transition-all"
+                      >
+                        <BookOpen className="w-4 h-4 text-emerald-400" /> Document Root
                       </button>
                     </div>
                   </div>
                 </div>
+
+                {/* Footer section matching Android / Apple Native design */}
+                <div className="flex-shrink-0 px-6 py-5 border-t border-slate-900 bg-slate-950/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+                      <User className="w-4.5 h-4.5 text-violet-400" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-slate-100 block truncate max-w-[120px]">@{currentUser.username || 'PiMember'}</span>
+                      <span className="text-[9px] text-slate-500 block tracking-wider uppercase font-black">Consensus Participant</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-4 py-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:bg-slate-850"
+                  >
+                    Close
+                </button>
               </div>
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 xl:hidden bg-slate-950/90 backdrop-blur-lg border-t border-slate-900 px-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center justify-around h-16 max-w-md mx-auto">
-          <button 
-            onClick={() => onNavigate('marketplace')}
-            className={`flex flex-col items-center gap-1 flex-1 transition-all ${currentView === 'marketplace' ? 'text-violet-400' : 'text-slate-500'}`}
-          >
-            <Compass className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-widest">Market</span>
-          </button>
-          <button 
-            onClick={() => onNavigate('discovery')}
-            className={`flex flex-col items-center gap-1 flex-1 transition-all ${currentView === 'discovery' ? 'text-violet-400' : 'text-slate-500'}`}
-          >
-            <Search className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-widest">Search</span>
-          </button>
-          <button 
-            onClick={() => onNavigate('dashboard')}
-            className={`flex flex-col items-center gap-1 flex-1 transition-all ${currentView === 'dashboard' ? 'text-violet-400' : 'text-slate-500'}`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-widest">Dash</span>
-          </button>
-          <button 
-            onClick={() => onNavigate('orders')}
-            className={`flex flex-col items-center gap-1 flex-1 transition-all ${currentView === 'orders' ? 'text-violet-400' : 'text-slate-500'}`}
-          >
-            <Clock className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-widest">Orders</span>
-          </button>
-          <button 
-            onClick={() => setIsMobileMenuOpen(true)}
-            className={`flex flex-col items-center gap-1 flex-1 transition-all ${isMobileMenuOpen ? 'text-violet-400' : 'text-slate-500'}`}
-          >
-            <Menu className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase tracking-widest">Menu</span>
-          </button>
-        </div>
-      </nav>
+    {/* MOBILE BOTTOM NAVIGATION BAR - PREMIUM GLASS DESIGN WITH ACTIVE GLOWS */}
+    <nav className="fixed bottom-0 left-0 right-0 z-50 xl:hidden bg-[#080d19]/80 backdrop-blur-xl border-t border-slate-900 px-2 pb-safe shadow-[0_-8px_32px_0_rgba(0,0,0,0.5)]">
+      <div className="flex items-center justify-around h-16 max-w-md mx-auto relative">
+        
+        {/* Market Tab */}
+        <button 
+          onClick={() => onNavigate('marketplace')}
+          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+        >
+          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
+            <Compass className={`w-5 h-5 transition-all ${currentView === 'marketplace' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
+            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'marketplace' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Market</span>
+          </motion.div>
+          {currentView === 'marketplace' && (
+            <motion.div 
+              layoutId="active_bottom_tab_glow" 
+              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+            />
+          )}
+        </button>
+
+        {/* Search Tab */}
+        <button 
+          onClick={() => onNavigate('discovery')}
+          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+        >
+          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
+            <Search className={`w-5 h-5 transition-all ${currentView === 'discovery' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
+            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'discovery' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Search</span>
+          </motion.div>
+          {currentView === 'discovery' && (
+            <motion.div 
+              layoutId="active_bottom_tab_glow" 
+              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+            />
+          )}
+        </button>
+
+        {/* Dashboard Tab */}
+        <button 
+          onClick={() => onNavigate('dashboard')}
+          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+        >
+          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
+            <LayoutDashboard className={`w-5 h-5 transition-all ${currentView === 'dashboard' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
+            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'dashboard' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Dashboard</span>
+          </motion.div>
+          {currentView === 'dashboard' && (
+            <motion.div 
+              layoutId="active_bottom_tab_glow" 
+              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+            />
+          )}
+        </button>
+
+        {/* Orders Tab with Notification Badge */}
+        <button 
+          onClick={() => onNavigate('orders')}
+          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+        >
+          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center relative">
+            <Clock className={`w-5 h-5 transition-all ${currentView === 'orders' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
+            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'orders' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Orders</span>
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping" />
+            )}
+          </motion.div>
+          {currentView === 'orders' && (
+            <motion.div 
+              layoutId="active_bottom_tab_glow" 
+              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+            />
+          )}
+        </button>
+
+        {/* More Tab */}
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+        >
+          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
+            <Menu className={`w-5 h-5 transition-all ${isMobileMenuOpen ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
+            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${isMobileMenuOpen ? 'text-slate-200 font-black' : 'text-slate-500'}`}>More</span>
+          </motion.div>
+          {isMobileMenuOpen && (
+            <motion.div 
+              layoutId="active_bottom_tab_glow" 
+              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+            />
+          )}
+        </button>
+
+      </div>
+    </nav>
 
       <CartDrawer 
         isOpen={isCartOpen}

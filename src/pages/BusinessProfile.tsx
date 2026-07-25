@@ -25,6 +25,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
 import { StoreWizard } from '../components/store/StoreWizard';
+import { BottomDrawer } from '../components/ui/BottomDrawer';
 
 type TabType = 'overview' | 'members' | 'documents' | 'verification' | 'activity' | 'settings';
 
@@ -44,6 +45,14 @@ export const BusinessProfile: React.FC = () => {
 
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const [showStoreWizard, setShowStoreWizard] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
@@ -589,7 +598,7 @@ export const BusinessProfile: React.FC = () => {
 
           {/* More Actions Menu */}
           <AnimatePresence>
-            {showMoreMenu && (
+            {showMoreMenu && !isMobile && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
                 <motion.div 
@@ -658,6 +667,71 @@ export const BusinessProfile: React.FC = () => {
               </>
             )}
           </AnimatePresence>
+
+          {/* Mobile slide drawer for business profile menu */}
+          {isMobile && (
+            <BottomDrawer
+              isOpen={showMoreMenu}
+              onClose={() => setShowMoreMenu(false)}
+              title={business ? business.businessName : 'Business Console'}
+              description="Enterprise options and settings portal"
+            >
+              <div className="space-y-3 pt-1">
+                <button 
+                  onClick={() => { setShowMoreMenu(false); setIsSettingsModalOpen(true); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Settings className="w-5 h-5 text-indigo-400 shrink-0" /> 
+                  <span>Business Settings</span>
+                </button>
+                <button 
+                  onClick={() => { setShowMoreMenu(false); handleShareBusiness(); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Share2 className="w-5 h-5 text-violet-400 shrink-0" /> 
+                  <span>Share Business Profile</span>
+                </button>
+                <button 
+                  onClick={() => { setShowMoreMenu(false); handleCopyLink(); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Link className="w-5 h-5 text-emerald-400 shrink-0" /> 
+                  <span>Copy Shareable Link</span>
+                </button>
+                <button 
+                  onClick={() => { setShowMoreMenu(false); handleExportBusiness(); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Download className="w-5 h-5 text-amber-400 shrink-0" /> 
+                  <span>Export Diagnostic Data</span>
+                </button>
+                <button 
+                  onClick={() => { setShowMoreMenu(false); setActiveTab('verification'); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" /> 
+                  <span>Verification & Compliance</span>
+                </button>
+                <button 
+                  onClick={() => { setShowMoreMenu(false); setActiveTab('activity'); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <History className="w-5 h-5 text-slate-400 shrink-0" /> 
+                  <span>Audit Trail logs</span>
+                </button>
+                
+                <div className="h-px bg-slate-900 my-2" />
+                
+                <button 
+                  onClick={() => { setShowMoreMenu(false); setShowDeleteConfirm(true); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-rose-400 bg-rose-950/20 hover:bg-rose-950/40 rounded-2xl border border-rose-900/40 hover:text-rose-300 transition-all min-h-[48px]"
+                >
+                  <Trash2 className="w-5 h-5 shrink-0" /> 
+                  <span>Delete Business Console</span>
+                </button>
+              </div>
+            </BottomDrawer>
+          )}
         </div>
 
         {/* Enterprise Tab Selector */}
@@ -2584,7 +2658,7 @@ export const BusinessProfile: React.FC = () => {
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 z-[200] bg-[#0b0f19] border border-indigo-500/30 text-white font-bold text-sm px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md"
+            className="fixed bottom-20 sm:bottom-6 right-6 z-[200] bg-[#0b0f19] border border-indigo-500/30 text-white font-bold text-sm px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md"
           >
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{toastMessage}</span>
