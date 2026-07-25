@@ -63,6 +63,142 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // PI NETWORK PAYMENT ENDPOINTS (Server-to-Server Approval & Completion)
+  // Reference: https://pi-apps.github.io/pi-sdk-docs/quick-start/genai/Payments
+  // =========================================================================
+
+  // 1. Approve Payment Endpoint
+  app.post("/api/payments/approve", async (req, res) => {
+    try {
+      const { paymentId } = req.body;
+      if (!paymentId) {
+        return res.status(400).json({ error: "paymentId is required" });
+      }
+
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+      if (!apiKey) {
+        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval.");
+        return res.json({ 
+          success: true, 
+          message: "Payment approved in sandbox mode (PI_NETWORK_API_KEY missing)",
+          paymentId 
+        });
+      }
+
+      console.log(`[Pi Payment Approve] Requesting Pi server approval for payment ${paymentId}...`);
+      const response = await axios.post(
+        `https://api.minepi.com/v2/payments/${paymentId}/approve`,
+        {},
+        {
+          headers: {
+            Authorization: `Key ${apiKey}`,
+          },
+        }
+      );
+
+      console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
+      res.json({ success: true, payment: response.data });
+    } catch (error: any) {
+      console.error("[Pi Payment Approve] Error approving payment:", error.response?.data || error.message);
+      res.status(500).json({ 
+        error: "Failed to approve payment with Pi Network server", 
+        details: error.response?.data || error.message 
+      });
+    }
+  });
+
+  // 2. Complete Payment Endpoint
+  app.post("/api/payments/complete", async (req, res) => {
+    try {
+      const { paymentId, txid } = req.body;
+      if (!paymentId || !txid) {
+        return res.status(400).json({ error: "paymentId and txid are required" });
+      }
+
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+      if (!apiKey) {
+        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
+        return res.json({ 
+          success: true, 
+          message: "Payment completed in sandbox mode (PI_NETWORK_API_KEY missing)",
+          paymentId,
+          txid 
+        });
+      }
+
+      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+      const response = await axios.post(
+        `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+        { txid },
+        {
+          headers: {
+            Authorization: `Key ${apiKey}`,
+          },
+        }
+      );
+
+      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
+      res.json({ success: true, payment: response.data });
+    } catch (error: any) {
+      console.error("[Pi Payment Complete] Error completing payment:", error.response?.data || error.message);
+      res.status(500).json({ 
+        error: "Failed to complete payment with Pi Network server", 
+        details: error.response?.data || error.message 
+      });
+    }
+  });
+
+  // 3. Incomplete Payment Endpoint
+  app.post("/api/payments/incomplete", async (req, res) => {
+    try {
+      const { payment } = req.body;
+      if (!payment || !payment.identifier) {
+        return res.status(400).json({ error: "Invalid incomplete payment payload" });
+      }
+
+      const paymentId = payment.identifier;
+      const txid = payment.transaction?.txid;
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+
+      console.log(`[Pi Incomplete Payment] Handling incomplete payment ${paymentId}...`);
+
+      if (!apiKey) {
+        console.warn("[Pi Incomplete Payment] PI_NETWORK_API_KEY not configured. Acknowledging for sandbox.");
+        return res.json({ success: true, message: "Incomplete payment acknowledged in sandbox mode" });
+      }
+
+      const isApproved = payment.status?.developer_approved;
+      const isCompleted = payment.status?.developer_completed;
+
+      if (isApproved && txid && !isCompleted) {
+        console.log(`[Pi Incomplete Payment] Completing uncompleted payment ${paymentId}...`);
+        const response = await axios.post(
+          `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+          { txid },
+          { headers: { Authorization: `Key ${apiKey}` } }
+        );
+        return res.json({ success: true, action: "completed", payment: response.data });
+      } else if (!isApproved) {
+        console.log(`[Pi Incomplete Payment] Approving unapproved payment ${paymentId}...`);
+        const response = await axios.post(
+          `https://api.minepi.com/v2/payments/${paymentId}/approve`,
+          {},
+          { headers: { Authorization: `Key ${apiKey}` } }
+        );
+        return res.json({ success: true, action: "approved", payment: response.data });
+      }
+
+      res.json({ success: true, message: "Payment already processed", payment });
+    } catch (error: any) {
+      console.error("[Pi Incomplete Payment] Error handling incomplete payment:", error.response?.data || error.message);
+      res.status(500).json({ 
+        error: "Failed to handle incomplete payment", 
+        details: error.response?.data || error.message 
+      });
+    }
+  });
+
   
   // Cloudinary Backend Upload Endpoint
   app.post("/api/upload", upload.single("file"), async (req, res) => {

@@ -97,8 +97,19 @@ export const authService = {
         if (isPiBrowser && !isPreviewDomain) {
           try {
             await this.initPi();
-            const scopes = ['username'];
-            const onIncompletePaymentFound = (payment: any) => {
+            const scopes = ['username', 'payments'];
+            const onIncompletePaymentFound = async (payment: any) => {
+              console.log('[AuthService] Incomplete payment found during authentication:', payment);
+              if (!payment) return;
+              try {
+                await fetch('/api/payments/incomplete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ payment }),
+                });
+              } catch (err) {
+                console.error('[AuthService] Failed to complete in-flight payment:', err);
+              }
             };
 
             const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
