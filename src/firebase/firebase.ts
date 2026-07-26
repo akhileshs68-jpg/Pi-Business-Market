@@ -11,9 +11,10 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-console.log("API KEY:", import.meta.env.VITE_FIREBASE_API_KEY);
-console.log("PROJECT ID:", import.meta.env.VITE_FIREBASE_PROJECT_ID);
-console.log("AUTH DOMAIN:", import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+console.error("===== FIREBASE CONFIG =====");
+console.error("API:", import.meta.env.VITE_FIREBASE_API_KEY);
+console.error("PROJECT:", import.meta.env.VITE_FIREBASE_PROJECT_ID);
+console.error("AUTH:", import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 
 const app = initializeApp(firebaseConfig);
 
