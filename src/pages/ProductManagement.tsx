@@ -536,7 +536,12 @@ export const ProductManagement: React.FC = () => {
   const pendingOrdersCount = orders.filter(o => o.orderStatus === OrderStatus.PENDING_PAYMENT).length;
   const completedOrdersCount = orders.filter(o => o.orderStatus === OrderStatus.COMPLETED).length;
 
-  const isOwner = store?.ownerUid === user?.uid;
+  const isOwner = Boolean(
+    store && user && (
+      store.ownerUid === user.uid || 
+      (user.piUid && store.ownerUid === user.piUid)
+    )
+  );
 
   if (loading) {
     return (
@@ -860,6 +865,18 @@ export const ProductManagement: React.FC = () => {
             {/* Premium Header Customer Action Panel - Touch Target 48px compliant buttons with ripple animations */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-800/60 mt-6 pt-5">
               <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
+                {/* Store Owner: Add Product Button */}
+                {isOwner && (
+                  <motion.button 
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => { setEditingProduct(undefined); setIsWizardOpen(true); }}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 h-12 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black transition-all text-xs uppercase tracking-wider shadow-lg shadow-violet-600/25 border border-violet-400/30 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Product</span>
+                  </motion.button>
+                )}
+
                 {/* Follow Button - Primary Accent */}
                 <motion.button 
                   whileTap={{ scale: 0.96 }}

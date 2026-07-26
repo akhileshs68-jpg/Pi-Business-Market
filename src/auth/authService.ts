@@ -11,7 +11,11 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { PiSdkSim } from '../services/piSdk';
@@ -190,13 +194,41 @@ export const authService = {
           return newUser;
         }
 
-        // 5. Check/Create Firestore User
-        const userRef = doc(db, 'users', firebaseUid);
-        const userSnap = await getDoc(userRef);
+        // 5. Check/Create Firestore User with piUid persistence check
+        const usersCol = collection(db, 'users');
+        let effectiveUid = firebaseUid;
+        let existingUserData: any = null;
 
-        if (!userSnap.exists()) {
+        // First check by piUid
+        if (piUid) {
+          try {
+            const piUidQuery = query(usersCol, where('piUid', '==', piUid));
+            const piUidSnap = await getDocs(piUidQuery);
+            if (!piUidSnap.empty) {
+              const matchedDoc = piUidSnap.docs[0];
+              effectiveUid = matchedDoc.id;
+              existingUserData = matchedDoc.data();
+            }
+          } catch (qErr) {
+            console.warn('[AuthService] piUid query failed, falling back to firebaseUid check:', qErr);
+          }
+        }
+
+        // If not found by piUid, check by firebaseUid
+        if (!existingUserData) {
+          const userRef = doc(db, 'users', firebaseUid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            existingUserData = userSnap.data();
+            effectiveUid = firebaseUid;
+          }
+        }
+
+        const userRef = doc(db, 'users', effectiveUid);
+
+        if (!existingUserData) {
           const newUser: User = {
-            uid: firebaseUid,
+            uid: effectiveUid,
             piUid,
             username,
             displayName: username, 
@@ -228,12 +260,13 @@ export const authService = {
             username
           });
           
-          const data = userSnap.data();
           return {
-            ...data,
-            uid: firebaseUid,
-            createdAt: data.createdAt?.toDate?.()?.toISOString() || now,
-            updatedAt: data.updatedAt?.toDate?.()?.toISOString() || now,
+            ...existingUserData,
+            uid: effectiveUid,
+            piUid,
+            username,
+            createdAt: existingUserData.createdAt?.toDate?.()?.toISOString() || now,
+            updatedAt: existingUserData.updatedAt?.toDate?.()?.toISOString() || now,
             lastLogin: now,
           } as User;
         }

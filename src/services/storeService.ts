@@ -107,7 +107,7 @@ export const storeService = {
   },
 
   /**
-   * Fetches all stores owned by a user
+   * Fetches all stores owned by a user or associated with user's businesses
    */
   async getOwnedStores(ownerUid: string): Promise<Store[]> {
     if (ownerUid.startsWith('mock_')) {
@@ -155,22 +155,60 @@ export const storeService = {
     }
 
     const db = getFirebaseDb();
-    const q = query(
-      collection(db, 'stores'), 
-      where('ownerUid', '==', ownerUid)
-    );
-    
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map(doc => {
+    const storesMap = new Map<string, Store>();
+
+    // 1. Fetch stores by ownerUid
+    try {
+      const qOwner = query(
+        collection(db, 'stores'), 
+        where('ownerUid', '==', ownerUid)
+      );
+      const snapshotOwner = await getDocs(qOwner);
+      snapshotOwner.docs.forEach(doc => {
         const data = doc.data();
-        return {
+        const store: Store = {
           ...data,
+          storeId: doc.id,
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
           updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
         } as Store;
-      })
-      .filter(store => store.status !== 'deleted');
+        if (store.status !== 'deleted') {
+          storesMap.set(store.storeId, store);
+        }
+      });
+    } catch (err) {
+      console.warn('Query stores by ownerUid error:', err);
+    }
+
+    // 2. Fetch stores by user's businesses to ensure stores created under business context are never missed
+    try {
+      const { businessService } = await import('./businessService');
+      const businesses = await businessService.getMyBusinesses(ownerUid);
+      for (const biz of businesses) {
+        if (!biz.id) continue;
+        const qBiz = query(
+          collection(db, 'stores'),
+          where('businessId', '==', biz.id)
+        );
+        const snapshotBiz = await getDocs(qBiz);
+        snapshotBiz.docs.forEach(doc => {
+          const data = doc.data();
+          const store: Store = {
+            ...data,
+            storeId: doc.id,
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+          } as Store;
+          if (store.status !== 'deleted') {
+            storesMap.set(store.storeId, store);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Query stores by businessId fallback error:', err);
+    }
+
+    return Array.from(storesMap.values());
   },
 
   /**
