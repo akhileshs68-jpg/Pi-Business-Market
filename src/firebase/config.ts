@@ -9,7 +9,7 @@ let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
 export const isFirebaseConfigured = () => {
-  return !!((import.meta as any).env.VITE_FIREBASE_API_KEY || "AIzaSyDpXRJrE4aS2-wQKcn0WnegC22s02aWYrQ");
+  return !!((import.meta as any).env.VITE_FIREBASE_API_KEY || "AIzaSyCGGjzZxn0zLpXQxPak2-_Crhd7fNRXEG0");
 };
 
 const useEmulator = () => (import.meta as any).env.VITE_USE_FIREBASE_EMULATOR === 'true';
@@ -28,7 +28,7 @@ export const getFirebaseApp = () => {
     if (!firebaseConfig.apiKey) {
       // Last resort fallback for development environment only if env vars are missing
       const fallbackConfig = {
-        apiKey: "AIzaSyDpXRJrE4aS2-wQKcn0WnegC22s02aWYrQ",
+        apiKey: "AIzaSyCGGjzZxn0zLpXQxPak2-_Crhd7fNRXEG0",
         authDomain: "straight-modem-gw1xt.firebaseapp.com",
         projectId: "straight-modem-gw1xt",
         storageBucket: "straight-modem-gw1xt.firebasestorage.app",
