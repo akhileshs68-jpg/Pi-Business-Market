@@ -110,7 +110,7 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number; decimals?: n
 export const ProductManagement: React.FC = () => {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -329,6 +329,7 @@ export const ProductManagement: React.FC = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     if (storeId) {
       loadData();
     }
@@ -337,7 +338,7 @@ export const ProductManagement: React.FC = () => {
     };
     window.addEventListener('productsChanged', handleProductsChanged);
     return () => window.removeEventListener('productsChanged', handleProductsChanged);
-  }, [storeId]);
+  }, [storeId, authLoading]);
 
   // Sync following and favorite from localStorage on load
   useEffect(() => {
@@ -630,11 +631,11 @@ export const ProductManagement: React.FC = () => {
     };
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-[#030712] flex flex-col text-slate-100 font-sans">
         <Navbar 
-          currentUser={user!}
+          currentUser={user}
           currentView="discovery"
           onNavigate={(view) => navigate(`/${view}`)}
           cartCount={0}
@@ -710,7 +711,7 @@ export const ProductManagement: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#030712] flex flex-col">
         <Navbar 
-          currentUser={user!}
+          currentUser={user}
           currentView="store-dashboard"
           onNavigate={(view) => navigate(`/${view}`)}
           cartCount={0}
@@ -748,7 +749,7 @@ export const ProductManagement: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-violet-500/30">
       <Navbar 
-        currentUser={user!}
+        currentUser={user}
         currentView="discovery"
         onNavigate={(view) => navigate(`/${view}`)}
         cartCount={0}
@@ -2434,7 +2435,7 @@ export const ProductManagement: React.FC = () => {
           <ProductWizard 
             storeId={storeId!}
             businessId={store.businessId}
-            ownerUid={user!.uid}
+            ownerUid={user?.uid || ''}
             initialProduct={editingProduct}
             onClose={() => setIsWizardOpen(false)}
             onComplete={() => {

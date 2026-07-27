@@ -44,7 +44,6 @@ export const BusinessProfile: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [showActionMenu, setShowActionMenu] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -518,17 +517,11 @@ export const BusinessProfile: React.FC = () => {
             <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-3 shrink-0">
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => { setShowActionMenu(!showActionMenu); setShowMoreMenu(false); }}
+                  onClick={() => setShowActionMenu(true)}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-extrabold rounded-xl transition-all shadow-lg shadow-indigo-600/20 border border-indigo-500/50"
                 >
                   <Plus className="w-4 h-4" />
                   Quick Action
-                </button>
-                <button 
-                  onClick={() => { setShowMoreMenu(!showMoreMenu); setShowActionMenu(false); }}
-                  className="p-3 bg-[#030712] border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all"
-                >
-                  <MoreVertical className="w-4 h-4" />
                 </button>
               </div>
 
@@ -551,189 +544,139 @@ export const BusinessProfile: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Actions Panel Dropdown */}
-          <AnimatePresence>
-            {showActionMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowActionMenu(false)} />
-                <motion.div 
-                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 12, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-8 top-full mt-2 w-72 bg-[#0b0f19] border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                >
-                  <div className="p-3 space-y-1">
-                    <p className="px-3 py-1.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Primary Actions</p>
-                    <button onClick={() => { setShowActionMenu(false); setEditForm(business); setIsEditModalOpen(true); }} className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all group">
-                      <div className="flex items-center gap-3"><Edit2 className="w-4 h-4 text-indigo-400" /> Edit Profile</div>
-                      <span className="text-[10px] font-bold text-slate-500 bg-[#030712] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Alt + E</span>
-                    </button>
-                    <button onClick={() => { setShowActionMenu(false); setShowStoreWizard(true); }} className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all group">
-                      <div className="flex items-center gap-3"><Store className="w-4 h-4 text-amber-400" /> Create Store</div>
-                      <span className="text-[10px] font-bold text-slate-500 bg-[#030712] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Alt + S</span>
-                    </button>
-                    <button onClick={() => { setShowActionMenu(false); setIsInviteModalOpen(true); }} className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all group">
-                      <div className="flex items-center gap-3"><UserPlus className="w-4 h-4 text-pink-400" /> Invite Staff</div>
-                      <span className="text-[10px] font-bold text-slate-500 bg-[#030712] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Alt + I</span>
-                    </button>
-                    <button onClick={() => { setShowActionMenu(false); setIsDocumentModalOpen(true); }} className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all group">
-                      <div className="flex items-center gap-3"><Upload className="w-4 h-4 text-emerald-400" /> Upload Document</div>
-                      <span className="text-[10px] font-bold text-slate-500 bg-[#030712] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">Alt + U</span>
-                    </button>
-
-                    <div className="h-px bg-slate-800/80 my-2" />
-                    <p className="px-3 py-1.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Secondary Actions</p>
-                    <button onClick={() => { setShowActionMenu(false); setIsSettingsModalOpen(true); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all">
-                      <Settings className="w-4 h-4 text-slate-400" /> Console Settings
-                    </button>
-                    <button onClick={() => { setShowActionMenu(false); handleExportBusiness(); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all">
-                      <Share2 className="w-4 h-4 text-slate-400" /> Export Diagnostics
-                    </button>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-
-          {/* More Actions Menu */}
-          <AnimatePresence>
-            {showMoreMenu && !isMobile && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                <motion.div 
-                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 12, scale: 0.97 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-8 top-full mt-2 w-64 bg-[#0b0f19] border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                >
-                  <div className="p-2.5 space-y-1">
-                    <p className="px-3 py-1.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Management Options</p>
-                    <button 
-                      onClick={() => { setShowMoreMenu(false); setIsSettingsModalOpen(true); }} 
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
-                    >
-                      <Settings className="w-4 h-4 text-slate-400" /> Business Settings
-                    </button>
-                    <button 
-                      onClick={() => { 
-                        setShowMoreMenu(false); 
-                        handleShareBusiness();
-                      }} 
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
-                    >
-                      <Share2 className="w-4 h-4 text-slate-400" /> Share Business
-                    </button>
-                    <button 
-                      onClick={() => { 
-                        setShowMoreMenu(false); 
-                        handleCopyLink();
-                      }} 
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
-                    >
-                      <Link className="w-4 h-4 text-slate-400" /> Copy Business Link
-                    </button>
-                    <button 
-                      onClick={() => { 
-                        setShowMoreMenu(false); 
-                        handleExportBusiness();
-                      }} 
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
-                    >
-                      <Download className="w-4 h-4 text-slate-400" /> Export Business
-                    </button>
-                    <button 
-                      onClick={() => { setShowMoreMenu(false); setActiveTab('verification'); }} 
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
-                    >
-                      <ShieldCheck className="w-4 h-4 text-slate-400" /> Verification Status
-                    </button>
-                    <button 
-                      onClick={() => { setShowMoreMenu(false); setActiveTab('activity'); }} 
-                      className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-all"
-                    >
-                      <History className="w-4 h-4 text-slate-400" /> Activity Log
-                    </button>
-                    <div className="h-px bg-slate-800/80 my-1" />
-                    <button 
-                      onClick={() => { setShowMoreMenu(false); setShowDeleteConfirm(true); }} 
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-rose-400 hover:text-white hover:bg-rose-500/10 rounded-xl transition-all"
-                    >
-                      <Trash2 className="w-4 h-4 text-rose-400" /> Delete Business
-                    </button>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-
-          {/* Mobile slide drawer for business profile menu */}
-          {isMobile && (
-            <BottomDrawer
-              isOpen={showMoreMenu}
-              onClose={() => setShowMoreMenu(false)}
-              title={business ? business.businessName : 'Business Console'}
-              description="Enterprise options and settings portal"
-            >
-              <div className="space-y-3 pt-1">
+          {/* Unified Quick Actions Bottom Sheet (Desktop & Mobile) */}
+          <BottomDrawer
+            isOpen={showActionMenu}
+            onClose={() => setShowActionMenu(false)}
+            title="Quick Actions"
+            description="Manage your enterprise operations"
+          >
+            <div className="space-y-6 pt-2 pb-6">
+              {/* PRIMARY SECTION */}
+              <div className="space-y-2">
+                <p className="px-1 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Primary</p>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); setIsSettingsModalOpen(true); }} 
+                  onClick={() => { setShowActionMenu(false); setShowStoreWizard(true); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
                 >
-                  <Settings className="w-5 h-5 text-indigo-400 shrink-0" /> 
+                  <Store className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span>Create Store</span>
+                </button>
+                <button 
+                  onClick={() => { setShowActionMenu(false); navigate('/catalog'); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Box className="w-5 h-5 text-indigo-400 shrink-0" />
+                  <span>Add Product</span>
+                </button>
+                <button 
+                  onClick={() => { setShowActionMenu(false); navigate('/business-orders'); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <ShoppingCart className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>Orders</span>
+                </button>
+                <button 
+                  onClick={() => { setShowActionMenu(false); navigate('/business-payments'); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <CreditCard className="w-5 h-5 text-violet-400 shrink-0" />
+                  <span>Payments</span>
+                </button>
+              </div>
+
+              {/* BUSINESS SECTION */}
+              <div className="space-y-2">
+                <p className="px-1 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Business</p>
+                <button 
+                  onClick={() => { setShowActionMenu(false); setEditForm(business); setIsEditModalOpen(true); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Edit2 className="w-5 h-5 text-blue-400 shrink-0" />
+                  <span>Edit Profile</span>
+                </button>
+                <button 
+                  onClick={() => { setShowActionMenu(false); setIsInviteModalOpen(true); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <UserPlus className="w-5 h-5 text-pink-400 shrink-0" />
+                  <span>Invite Staff</span>
+                </button>
+                <button 
+                  onClick={() => { setShowActionMenu(false); setIsDocumentModalOpen(true); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Upload className="w-5 h-5 text-teal-400 shrink-0" />
+                  <span>Upload Documents</span>
+                </button>
+              </div>
+
+              {/* TOOLS SECTION */}
+              <div className="space-y-2">
+                <p className="px-1 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Tools</p>
+                <button 
+                  onClick={() => { setShowActionMenu(false); setIsSettingsModalOpen(true); }} 
+                  className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+                >
+                  <Settings className="w-5 h-5 text-slate-400 shrink-0" />
                   <span>Business Settings</span>
                 </button>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); handleShareBusiness(); }} 
+                  onClick={() => { setShowActionMenu(false); handleShareBusiness(); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
                 >
-                  <Share2 className="w-5 h-5 text-violet-400 shrink-0" /> 
-                  <span>Share Business Profile</span>
+                  <Share2 className="w-5 h-5 text-violet-400 shrink-0" />
+                  <span>Share Business</span>
                 </button>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); handleCopyLink(); }} 
+                  onClick={() => { setShowActionMenu(false); handleCopyLink(); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
                 >
-                  <Link className="w-5 h-5 text-emerald-400 shrink-0" /> 
-                  <span>Copy Shareable Link</span>
+                  <Link className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>Copy Link</span>
                 </button>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); handleExportBusiness(); }} 
+                  onClick={() => { setShowActionMenu(false); handleExportBusiness(); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
                 >
-                  <Download className="w-5 h-5 text-amber-400 shrink-0" /> 
-                  <span>Export Diagnostic Data</span>
+                  <Download className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span>Export Data</span>
                 </button>
+              </div>
+
+              {/* ADVANCED SECTION */}
+              <div className="space-y-2">
+                <p className="px-1 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Advanced</p>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); setActiveTab('verification'); }} 
+                  onClick={() => { setShowActionMenu(false); setActiveTab('verification'); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
                 >
-                  <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" /> 
-                  <span>Verification & Compliance</span>
+                  <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0" />
+                  <span>Verification</span>
                 </button>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); setActiveTab('activity'); }} 
+                  onClick={() => { setShowActionMenu(false); setActiveTab('activity'); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
                 >
-                  <History className="w-5 h-5 text-slate-400 shrink-0" /> 
-                  <span>Audit Trail logs</span>
+                  <History className="w-5 h-5 text-slate-400 shrink-0" />
+                  <span>Audit Logs</span>
                 </button>
-                
-                <div className="h-px bg-slate-900 my-2" />
-                
+              </div>
+
+              {/* DANGER ZONE */}
+              <div className="space-y-2 pt-2">
+                <p className="px-1 text-[10px] font-extrabold text-rose-500 uppercase tracking-widest">Danger Zone</p>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); setShowDeleteConfirm(true); }} 
+                  onClick={() => { setShowActionMenu(false); setShowDeleteConfirm(true); }} 
                   className="w-full flex items-center gap-3.5 px-4 py-3.5 text-sm font-bold text-rose-400 bg-rose-950/20 hover:bg-rose-950/40 rounded-2xl border border-rose-900/40 hover:text-rose-300 transition-all min-h-[48px]"
                 >
-                  <Trash2 className="w-5 h-5 shrink-0" /> 
+                  <Trash2 className="w-5 h-5 shrink-0" />
                   <span>Delete Business Console</span>
                 </button>
               </div>
-            </BottomDrawer>
-          )}
+            </div>
+          </BottomDrawer>
         </div>
-
         {/* Enterprise Tab Selector */}
         <div className="flex items-center gap-2 mb-8 border-b border-slate-800/85 pb-px overflow-x-auto scrollbar-hide">
           {[
