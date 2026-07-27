@@ -13,7 +13,10 @@ import {
   ArrowRight, 
   Loader2,
   Heart,
-  ChevronRight
+  ChevronRight,
+  Ticket,
+  Clock,
+  Bookmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cartService } from '../../services/cartService';
@@ -180,7 +183,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
-                        <p className="text-sm font-black text-white">{item.subtotal} Pi</p>
+                        <div className="flex items-center gap-2">
+                          <button className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors tooltip-trigger" title="Save for Later">
+                            <Bookmark className="w-4 h-4" />
+                          </button>
+                          <p className="text-sm font-black text-white">{item.subtotal} Pi</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -190,39 +198,68 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
 
             {/* Footer Summary */}
             {items.length > 0 && cart && (
-              <div className="p-6 bg-slate-950 border-t border-slate-800">
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span>Subtotal</span>
-                    <span className="text-white">{cart.subtotal} Pi</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span>Tax (5%)</span>
-                    <span className="text-white">{cart.tax.toFixed(2)} Pi</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span>Shipping</span>
-                    <span className="text-white">{cart.shipping} Pi</span>
-                  </div>
-                  <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
-                    <span className="text-xs font-black text-white uppercase tracking-widest">Total Amount</span>
-                    <span className="text-xl font-black text-white">{cart.grandTotal.toFixed(2)} Pi</span>
+              <div className="bg-slate-950 border-t border-slate-800 flex flex-col mt-auto">
+                {/* Coupon Code Section */}
+                <div className="px-6 py-4 border-b border-slate-800/50">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Ticket className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input 
+                        type="text" 
+                        placeholder="Have a coupon code?" 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600 font-bold uppercase tracking-widest"
+                      />
+                    </div>
+                    <button className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
+                      Apply
+                    </button>
                   </div>
                 </div>
 
-                <button 
-                  onClick={handleCheckout}
-                  disabled={processing}
-                  className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-3"
-                >
-                  {processing ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      Proceed to Checkout <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </button>
+                {/* Delivery Estimate */}
+                <div className="px-6 py-3 bg-indigo-500/5 flex items-center gap-3">
+                  <Clock className="w-4 h-4 text-indigo-400" />
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Estimated Delivery: <span className="text-white">3-5 Business Days</span></p>
+                </div>
+
+                <div className="p-6 pb-6">
+                  <div className="space-y-3 mb-6">
+                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      <span>Subtotal</span>
+                      <span className="text-white">{cart.subtotal} Pi</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                      <span>Discount</span>
+                      <span>-0.00 Pi</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      <span>Tax (5%)</span>
+                      <span className="text-white">{cart.tax.toFixed(2)} Pi</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      <span>Shipping</span>
+                      <span className="text-white">{cart.shipping > 0 ? `${cart.shipping} Pi` : 'FREE'}</span>
+                    </div>
+                    <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+                      <span className="text-xs font-black text-white uppercase tracking-widest">Total Amount</span>
+                      <span className="text-xl font-black text-white">{cart.grandTotal.toFixed(2)} Pi</span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleCheckout}
+                    disabled={processing}
+                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-3"
+                  >
+                    {processing ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        Proceed to Checkout <ArrowRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>

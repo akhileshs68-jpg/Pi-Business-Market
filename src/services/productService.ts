@@ -32,6 +32,17 @@ export const productService = {
     const newProduct: Product = {
       ...productData,
       productId,
+      metrics: {
+        views: 0,
+        wishlistCount: 0,
+        shares: 0,
+        cartCount: 0,
+        orders: 0,
+        revenue: 0,
+        conversionRate: 0,
+        performanceScore: 100,
+        lastViewed: new Date().toISOString()
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -61,14 +72,35 @@ export const productService = {
   /**
    * Soft deletes a product
    */
-  async softDeleteProduct(productId: string): Promise<void> {
-    return this.updateProduct(productId, { status: 'deleted' });
+  async archiveProduct(productId: string): Promise<void> {
+    return this.updateProduct(productId, { status: 'archived' });
+  },
+
+  async restoreProduct(productId: string): Promise<void> {
+    return this.updateProduct(productId, { status: 'published' });
+  },
+
+  async softDeleteProduct(productId: string, userId?: string): Promise<void> {
+    const updates: any = { 
+      status: 'deleted',
+      deletedAt: new Date().toISOString()
+    };
+    if (userId) {
+      updates.deletedBy = userId;
+    }
+    return this.updateProduct(productId, updates);
+  },
+
+  async permanentDeleteProduct(productId: string): Promise<void> {
+    const db = getFirebaseDb();
+    const productRef = doc(db, 'products', productId);
+    await deleteDoc(productRef);
   },
 
   /**
    * Gets all products for a store
    */
-  async getStoreProducts(storeId: string): Promise<Product[]> {
+  async getStoreProducts(storeId: string, options?: { includeDeleted?: boolean }): Promise<Product[]> {
     if (storeId.startsWith('mock_')) {
       return [
         {
@@ -173,7 +205,7 @@ export const productService = {
     });
     
     return products
-      .filter(p => p.status !== 'deleted')
+      .filter(p => options?.includeDeleted ? true : p.status !== 'deleted')
       .sort((a, b) => {
         if (a.status !== b.status) {
           return a.status.localeCompare(b.status);

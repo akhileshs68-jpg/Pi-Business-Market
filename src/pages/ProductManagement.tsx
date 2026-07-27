@@ -120,7 +120,7 @@ export const ProductManagement: React.FC = () => {
   const [isProductIndexCompiling, setIsProductIndexCompiling] = useState(false);
   
   // High-Level Mode: Owner can toggle between Customer Storefront or Seller Admin Console
-  const [isMerchantConsoleMode, setIsMerchantConsoleMode] = useState(false);
+  const [isMerchantConsoleMode, setIsMerchantConsoleMode] = useState(window.location.pathname.endsWith('/products'));
   
   // Customer Storefront View Tab
   const [customerTab, setCustomerTab] = useState<'shop' | 'products' | 'offers' | 'reviews' | 'gallery' | 'about'>('shop');
@@ -130,6 +130,8 @@ export const ProductManagement: React.FC = () => {
   
   // Seller Console Tab Management
   const [activeTab, setActiveTab] = useState<'overview' | 'catalog' | 'categories' | 'inventory' | 'orders' | 'crm' | 'analytics' | 'settings'>('overview');
+  const [merchantStatusFilter, setMerchantStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived' | 'deleted' | 'low_stock' | 'out_of_stock' | 'newest' | 'best_seller' | 'highest_revenue'>('all');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   // Customer Filtering and Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -227,13 +229,25 @@ export const ProductManagement: React.FC = () => {
       const storeData = await storeService.getStore(storeId!);
       if (!storeData) throw new Error('Store not found');
       
+      const currentUserIsOwner = Boolean(
+        user && (
+          storeData.ownerUid === user.uid || 
+          (user.piUid && storeData.ownerUid === user.piUid)
+        )
+      );
+
+      if (window.location.pathname.endsWith('/products') && !currentUserIsOwner) {
+        navigate(`/store/${storeId}`, { replace: true });
+        setIsMerchantConsoleMode(false);
+      }
+      
       setStore(storeData);
       setFollowersCount(storeData.followers || 1250);
 
       // Fetch products in a separate try-catch so product index issue doesn't crash the profile
       let productsData: Product[] = [];
       try {
-        productsData = await productService.getStoreProducts(storeId!);
+        productsData = await productService.getStoreProducts(storeId!, { includeDeleted: true });
         setProducts(productsData);
         
         // Dynamically adjust priceRange to show all products initially
@@ -318,6 +332,11 @@ export const ProductManagement: React.FC = () => {
     if (storeId) {
       loadData();
     }
+    const handleProductsChanged = () => {
+      if (storeId) loadData();
+    };
+    window.addEventListener('productsChanged', handleProductsChanged);
+    return () => window.removeEventListener('productsChanged', handleProductsChanged);
   }, [storeId]);
 
   // Sync following and favorite from localStorage on load
@@ -518,8 +537,21 @@ export const ProductManagement: React.FC = () => {
   });
 
   // Filter products for MERCHANT CONSOLE
-  const filteredProductsMerchant = products.filter(p => {
+  let filteredProductsMerchant = products.filter(p => {
     if (!p) return false;
+    
+    if (merchantStatusFilter !== 'all' && merchantStatusFilter !== 'newest' && merchantStatusFilter !== 'best_seller' && merchantStatusFilter !== 'highest_revenue') {
+      const pStatus = (p.status || 'published').toLowerCase();
+      
+      if (merchantStatusFilter === 'low_stock') {
+        if ((p.stock || 0) === 0 || (p.stock || 0) > 10) return false;
+      } else if (merchantStatusFilter === 'out_of_stock') {
+        if ((p.stock || 0) > 0) return false;
+      } else {
+        if (pStatus !== merchantStatusFilter) return false;
+      }
+    }
+    
     const name = (p.productName || '').toLowerCase();
     const sku = (p.sku || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
@@ -527,6 +559,14 @@ export const ProductManagement: React.FC = () => {
 
     return search === '' || name.includes(search) || sku.includes(search) || category.includes(search);
   });
+
+  if (merchantStatusFilter === 'newest') {
+    filteredProductsMerchant.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (merchantStatusFilter === 'best_seller') {
+    filteredProductsMerchant.sort((a, b) => (b.metrics?.orders || 0) - (a.metrics?.orders || 0));
+  } else if (merchantStatusFilter === 'highest_revenue') {
+    filteredProductsMerchant.sort((a, b) => (b.metrics?.revenue || 0) - (a.metrics?.revenue || 0));
+  }
 
   // Stats calculation
   const totalStockCount = products.reduce((acc, p) => acc + (p.stock || 0), 0);
@@ -542,6 +582,53 @@ export const ProductManagement: React.FC = () => {
       (user.piUid && store.ownerUid === user.piUid)
     )
   );
+
+  const toggleProductSelection = (productId: string, selected: boolean) => {
+    setSelectedProductIds(prev => 
+      selected ? [...prev, productId] : prev.filter(id => id !== productId)
+    );
+  };
+
+  const handleBulkAction = async (action: 'archive' | 'delete' | 'restore' | 'publish' | 'draft' | 'permanent_delete') => {
+    if (selectedProductIds.length === 0) return;
+    
+    const actionText = action.replace('_', ' ');
+    if (!window.confirm(`Are you sure you want to ${actionText} ${selectedProductIds.length} product(s)?`)) return;
+
+    try {
+      const promises = selectedProductIds.map(id => {
+        switch (action) {
+          case 'archive': return productService.archiveProduct(id);
+          case 'restore': return productService.restoreProduct(id);
+          case 'publish': return productService.updateProduct(id, { status: 'published' });
+          case 'draft': return productService.updateProduct(id, { status: 'draft' });
+          case 'delete': return productService.softDeleteProduct(id, user?.uid);
+          case 'permanent_delete': return productService.permanentDeleteProduct(id);
+        }
+      });
+      await Promise.all(promises);
+      triggerToast(`Bulk ${actionText} successful`);
+      setSelectedProductIds([]);
+      loadData();
+    } catch (err) {
+      console.error(err);
+      triggerToast(`Error performing bulk ${actionText}`);
+    }
+  };
+
+  const getCommonProductCardProps = (forConsole: boolean = false) => {
+    return {
+      ...(isOwner ? {
+        onEdit: (p: Product) => { setEditingProduct(p); setIsWizardOpen(true); },
+        onManageVariants: (p: Product) => { setSelectedProduct(p); setIsVariantListOpen(true); }
+      } : {}),
+      onView: (p: Product) => navigate(`/product/${p.productId}`),
+      isMerchantView: forConsole,
+      ...(forConsole ? {
+        onSelect: toggleProductSelection
+      } : {})
+    };
+  };
 
   if (loading) {
     return (
@@ -865,18 +952,6 @@ export const ProductManagement: React.FC = () => {
             {/* Premium Header Customer Action Panel - Touch Target 48px compliant buttons with ripple animations */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-800/60 mt-6 pt-5">
               <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
-                {/* Store Owner: Add Product Button */}
-                {isOwner && (
-                  <motion.button 
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => { setEditingProduct(undefined); setIsWizardOpen(true); }}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 h-12 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black transition-all text-xs uppercase tracking-wider shadow-lg shadow-violet-600/25 border border-violet-400/30 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Product</span>
-                  </motion.button>
-                )}
-
                 {/* Follow Button - Primary Accent */}
                 <motion.button 
                   whileTap={{ scale: 0.96 }}
@@ -1102,6 +1177,38 @@ export const ProductManagement: React.FC = () => {
                       </div>
                     </div>
 
+                    {selectedProductIds.length > 0 && (
+                      <div className="bg-violet-900/20 border border-violet-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 text-violet-300 text-xs font-bold pl-2">
+                          <span className="bg-violet-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px]">{selectedProductIds.length}</span>
+                          Selected
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button onClick={() => setSelectedProductIds(filteredProductsMerchant.map(p => p.productId))} className="px-3 py-1.5 rounded-lg bg-slate-900/50 text-slate-300 text-xs hover:bg-slate-800 transition-all border border-slate-700">Select All</button>
+                          <button onClick={() => setSelectedProductIds([])} className="px-3 py-1.5 rounded-lg bg-slate-900/50 text-slate-300 text-xs hover:bg-slate-800 transition-all border border-slate-700">Clear</button>
+                          <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                          <button onClick={() => handleBulkAction('publish')} className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs hover:bg-emerald-500/30 transition-all border border-emerald-500/30">Publish</button>
+                          <button onClick={() => handleBulkAction('draft')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">Draft</button>
+                          <button onClick={() => triggerToast('Update Price coming soon')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">Update Price</button>
+                          <button onClick={() => triggerToast('Update Stock coming soon')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">Update Stock</button>
+                          <button onClick={() => triggerToast('Export CSV coming soon')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">CSV</button>
+                          <button onClick={() => triggerToast('Export Excel coming soon')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">Excel</button>
+                          
+                          {merchantStatusFilter === 'deleted' ? (
+                            <>
+                              <button onClick={() => handleBulkAction('restore')} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs hover:bg-blue-500/30 transition-all border border-blue-500/30">Restore</button>
+                              <button onClick={() => handleBulkAction('permanent_delete')} className="px-3 py-1.5 rounded-lg bg-red-900/40 text-red-400 text-xs hover:bg-red-900/60 transition-all border border-red-500/30 flex items-center gap-1"><Trash2 className="w-3 h-3"/> Permanent Delete</button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => handleBulkAction('archive')} className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs hover:bg-amber-500/30 transition-all border border-amber-500/30">Archive</button>
+                              <button onClick={() => handleBulkAction('delete')} className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs hover:bg-red-500/30 transition-all border border-red-500/30 flex items-center gap-1"><Trash2 className="w-3 h-3"/> Delete</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Controls Bar */}
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
                       <div className="relative flex-1">
@@ -1114,8 +1221,23 @@ export const ProductManagement: React.FC = () => {
                         />
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       </div>
-                      <div className="flex items-center gap-2 w-full lg:w-auto">
-                        <div className="bg-[#090e1a] border border-slate-800 rounded-xl p-1 flex items-center">
+                      <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
+                        <div className="flex bg-[#090e1a] border border-slate-800 rounded-xl p-1 whitespace-nowrap">
+                          {(['all', 'published', 'draft', 'archived', 'deleted', 'low_stock', 'out_of_stock', 'newest', 'best_seller', 'highest_revenue'] as const).map(status => (
+                            <button
+                              key={status}
+                              onClick={() => setMerchantStatusFilter(status as any)}
+                              className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                                merchantStatusFilter === status 
+                                  ? 'bg-[#030712] text-violet-400 shadow-sm' 
+                                  : 'text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              {status === 'published' ? 'Active' : status.replace('_', ' ')}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="bg-[#090e1a] border border-slate-800 rounded-xl p-1 flex items-center shrink-0">
                           <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[#030712] text-violet-400 shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>
                             <LayoutGrid className="w-4 h-4" />
                           </button>
@@ -1142,15 +1264,8 @@ export const ProductManagement: React.FC = () => {
                             key={product.productId}
                             product={product}
                             viewMode={viewMode}
-                            onEdit={(p) => { setEditingProduct(p); setIsWizardOpen(true); }}
-                            onDelete={handleDelete}
-                            onDuplicate={handleDuplicate}
-                            onView={(p) => navigate(`/product/${p.productId}`)}
-                            onManageVariants={(p) => {
-                              setSelectedProduct(p);
-                              setIsVariantListOpen(true);
-                            }}
-                            isMerchantView={true}
+                            isSelected={selectedProductIds.includes(product.productId)}
+                            {...getCommonProductCardProps(true)}
                           />
                         ))}
                       </div>
@@ -1279,7 +1394,7 @@ export const ProductManagement: React.FC = () => {
                               key={product.productId}
                               product={product}
                               viewMode="grid"
-                              onView={(p) => navigate(`/product/${p.productId}`)}
+                              {...getCommonProductCardProps(false)}
                             />
                           ))}
                         </div>
@@ -1317,7 +1432,7 @@ export const ProductManagement: React.FC = () => {
                               key={product.productId}
                               product={product}
                               viewMode="grid"
-                              onView={(p) => navigate(`/product/${p.productId}`)}
+                              {...getCommonProductCardProps(false)}
                             />
                           ))}
                         </div>
@@ -1355,7 +1470,7 @@ export const ProductManagement: React.FC = () => {
                               key={product.productId}
                               product={product}
                               viewMode="grid"
-                              onView={(p) => navigate(`/product/${p.productId}`)}
+                              {...getCommonProductCardProps(false)}
                             />
                           ))}
                         </div>
@@ -1393,7 +1508,7 @@ export const ProductManagement: React.FC = () => {
                               key={product.productId}
                               product={product}
                               viewMode="grid"
-                              onView={(p) => navigate(`/product/${p.productId}`)}
+                              {...getCommonProductCardProps(false)}
                             />
                           ))}
                         </div>
@@ -1687,7 +1802,7 @@ export const ProductManagement: React.FC = () => {
                               key={product.productId}
                               product={product}
                               viewMode={viewMode}
-                              onView={(p) => navigate(`/product/${p.productId}`)}
+                              {...getCommonProductCardProps(false)}
                             />
                           ))}
                         </div>

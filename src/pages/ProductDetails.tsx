@@ -25,7 +25,8 @@ import {
   MapPin,
   Store as StoreIcon,
   ShoppingBag as BagIcon,
-  Lock
+  Lock,
+  PlayCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
@@ -58,6 +59,7 @@ export const ProductDetails: React.FC = () => {
   const [selectedColor, setSelectedColor] = useState('Obsidian Black');
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   
   const [isAdding, setIsAdding] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
@@ -391,15 +393,25 @@ export const ProductDetails: React.FC = () => {
               ref={imageContainerRef}
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
-              className="aspect-square bg-slate-900 border border-slate-800/80 rounded-2xl sm:rounded-[2rem] overflow-hidden relative group shadow-2xl shadow-violet-950/5"
+              className="aspect-square bg-slate-900 border border-slate-800/80 rounded-2xl sm:rounded-[2rem] overflow-hidden relative group shadow-2xl shadow-violet-950/5 flex touch-pan-x"
             >
-              <img 
-                src={currentGalleryImg} 
-                alt={product.productName} 
-                className="w-full h-full object-cover transition-transform duration-100 ease-out" 
-                style={zoomStyle}
-                referrerPolicy="no-referrer"
-              />
+              {showVideo ? (
+                <div className="w-full h-full flex items-center justify-center bg-slate-950">
+                  <div className="text-center p-6">
+                    <PlayCircle className="w-16 h-16 text-violet-500 mx-auto mb-4 animate-pulse" />
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Product Video Demo</p>
+                    <p className="text-xs text-slate-600 mt-2">Interactive video player rendering...</p>
+                  </div>
+                </div>
+              ) : (
+                <img 
+                  src={currentGalleryImg} 
+                  alt={product.productName} 
+                  className="w-full h-full object-cover transition-transform duration-100 ease-out" 
+                  style={zoomStyle}
+                  referrerPolicy="no-referrer"
+                />
+              )}
               
               {/* Badge Overlays on Gallery */}
               <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex flex-col gap-2 z-10">
@@ -431,9 +443,9 @@ export const ProductDetails: React.FC = () => {
               {generatedGallery.map((img, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedImageIndex(idx)}
+                  onClick={() => { setSelectedImageIndex(idx); setShowVideo(false); }}
                   className={`aspect-square rounded-xl overflow-hidden border-2 bg-slate-900 transition-all ${
-                    selectedImageIndex === idx 
+                    selectedImageIndex === idx && !showVideo
                       ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
                       : 'border-slate-850 hover:border-slate-700'
                   }`}
@@ -441,6 +453,19 @@ export const ProductDetails: React.FC = () => {
                   <img src={img} alt={`${product.productName} preview ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </button>
               ))}
+              {/* Product Video Thumbnail */}
+              <button
+                onClick={() => setShowVideo(true)}
+                className={`aspect-square rounded-xl overflow-hidden border-2 bg-slate-900 relative flex items-center justify-center transition-all ${
+                  showVideo 
+                    ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
+                    : 'border-slate-850 hover:border-slate-700'
+                }`}
+              >
+                <div className="absolute inset-0 bg-slate-950/40 z-10" />
+                <img src={mainImageUrl} alt="Video Thumbnail" className="w-full h-full object-cover blur-[2px]" referrerPolicy="no-referrer" />
+                <PlayCircle className="w-8 h-8 text-white absolute z-20 shadow-xl" />
+              </button>
             </div>
           </div>
 
@@ -452,6 +477,9 @@ export const ProductDetails: React.FC = () => {
               <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <span className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-widest">
                   {product.category || 'General'}
+                </span>
+                <span className="px-3 py-1 bg-slate-800/50 text-slate-300 border border-slate-700/50 rounded-full text-[10px] font-black uppercase tracking-widest">
+                  {product.brand || 'Premium Brand'}
                 </span>
                 <div className="flex items-center gap-1 text-amber-400 text-sm font-bold bg-amber-500/5 border border-amber-500/10 px-2.5 py-0.5 rounded-full">
                   <Star className="w-4 h-4 fill-current text-amber-400" />
@@ -599,7 +627,7 @@ export const ProductDetails: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <ShoppingBag className="w-4 h-4 text-violet-400" /> Add to bag
+                      <ShoppingBag className="w-4 h-4 text-violet-400" /> Add to cart
                     </>
                   )}
                 </button>
@@ -614,7 +642,7 @@ export const ProductDetails: React.FC = () => {
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      <BagIcon className="w-4 h-4" /> Buy Now
+                      <BagIcon className="w-4 h-4" /> Pi Pay Now
                     </>
                   )}
                 </button>
@@ -630,13 +658,30 @@ export const ProductDetails: React.FC = () => {
               </button>
             </div>
 
-            {/* Delivery Estimation details */}
-            <div className="bg-slate-900/40 border border-slate-850 rounded-2xl p-5 space-y-4 text-xs font-medium text-slate-400">
+            {/* Delivery Estimation details & Policies */}
+            <div className="bg-slate-900/40 border border-slate-850 rounded-2xl p-5 space-y-5 text-xs font-medium text-slate-400">
               <div className="flex items-start gap-3">
                 <Truck className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">Pi Network Express Delivery</h4>
                   <p className="leading-relaxed">Get delivery estimated between <span className="text-white font-black">{formatEstimateDate(deliveryStart)}</span> and <span className="text-white font-black">{formatEstimateDate(deliveryEnd)}</span>.</p>
+                  <p className="text-[10px] text-emerald-400 font-bold mt-1">Shipping: FREE on orders over 100 Pi</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <RefreshCcw className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">7-Day Return Policy</h4>
+                  <p className="leading-relaxed">Hassle-free returns within 7 days of delivery for defective items or unfulfilled descriptions.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Award className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">1 Year Manufacturer Warranty</h4>
+                  <p className="leading-relaxed">Covered against manufacturing defects directly by {product.brand || 'the merchant'}.</p>
                 </div>
               </div>
 
@@ -645,6 +690,37 @@ export const ProductDetails: React.FC = () => {
                 <div>
                   <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">Safe Escrow Transactions</h4>
                   <p className="leading-relaxed">All Pi Network transactions are protected. Funds released to merchant only upon confirmed delivery receipt.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Specifications & Highlights */}
+            <div className="border-t border-slate-900 pt-6">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">Product Specifications</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                <div className="flex flex-col">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Brand</span>
+                  <span className="text-slate-300">{product.brand || 'Unbranded'}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Material</span>
+                  <span className="text-slate-300">Premium Grade</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Weight</span>
+                  <span className="text-slate-300">1.2 kg</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Dimensions</span>
+                  <span className="text-slate-300">12 x 8 x 4 inches</span>
+                </div>
+                <div className="flex flex-col col-span-2">
+                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Highlights</span>
+                  <ul className="mt-1.5 space-y-1 text-slate-300 list-disc list-inside">
+                    <li>Durable and highly resilient construction</li>
+                    <li>Verified genuine component standard</li>
+                    <li>Eco-friendly packaging</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -845,7 +921,7 @@ export const ProductDetails: React.FC = () => {
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
                 ) : (
                   <>
-                    <BagIcon className="w-4 h-4 animate-spin" /> Buy Now
+                    <BagIcon className="w-4 h-4" /> Pi Pay Now
                   </>
                 )}
               </button>

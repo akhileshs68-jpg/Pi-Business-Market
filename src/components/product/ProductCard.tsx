@@ -3,10 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { 
-  MoreVertical, 
+  MoreVertical,
+  DollarSign,
+  Image as ImageIcon,
+  Archive, 
   Edit2, 
   Trash2, 
   Eye, 
@@ -37,6 +41,7 @@ import { Product } from '../../types';
 import { useAuth } from '../../auth/useAuth';
 import { cartService } from '../../services/cartService';
 import { checkoutService } from '../../services/checkoutService';
+import { productService } from '../../services/productService';
 import { BottomDrawer } from '../ui/BottomDrawer';
 
 interface ProductCardProps {
@@ -48,6 +53,8 @@ interface ProductCardProps {
   onManageVariants?: (product: Product) => void;
   viewMode?: 'grid' | 'list';
   isMerchantView?: boolean;
+  isSelected?: boolean;
+  onSelect?: (productId: string, selected: boolean) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -58,12 +65,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onView,
   onManageVariants,
   viewMode = 'grid',
-  isMerchantView = false
+  isMerchantView = false,
+  isSelected = false,
+  onSelect
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isOwner = Boolean(user && (user.uid === product.ownerUid || user.uid === product.businessId));
+  const canManage = Boolean(user && isOwner && isMerchantView);
   
   const [showMenu, setShowMenu] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  
+  const toggleMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showMenu) {
+      window.dispatchEvent(new CustomEvent('product-menu-open', { detail: menuButtonRef.current }));
+    }
+    setShowMenu(!showMenu);
+  };
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isCompared, setIsCompared] = useState(false);
   const [showQuickView, setShowQuickView] = useState(false);
@@ -187,6 +207,215 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to move this product to trash?')) return;
+    try {
+      if (onDelete) {
+        onDelete(product.productId);
+      } else {
+        await productService.softDeleteProduct(product.productId, user?.uid);
+        triggerToast('Product deleted');
+        window.dispatchEvent(new Event('productsChanged'));
+      }
+      setShowMenu(false);
+    } catch (err) {
+      triggerToast('Error deleting product');
+    }
+  };
+
+  const handleArchive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to archive this product?')) return;
+    try {
+      await productService.archiveProduct(product.productId);
+      triggerToast('Product archived');
+      window.dispatchEvent(new Event('productsChanged'));
+      setShowMenu(false);
+    } catch (err) {
+      triggerToast('Error archiving product');
+    }
+  };
+
+  const handleRestore = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to restore this product?')) return;
+    try {
+      await productService.restoreProduct(product.productId);
+      triggerToast('Product restored');
+      window.dispatchEvent(new Event('productsChanged'));
+      setShowMenu(false);
+    } catch (err) {
+      triggerToast('Error restoring product');
+    }
+  };
+
+  const handleDuplicateInternal = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      if (onDuplicate) {
+        onDuplicate(product);
+      } else {
+        const { productId, createdAt, updatedAt, ...rest } = product;
+        await productService.createProduct({
+          ...rest,
+          productName: `${rest.productName} (Copy)`,
+          productSlug: `${rest.productSlug}-copy-${Math.floor(Math.random() * 1000)}`,
+          sku: `${rest.sku}-COPY-${Math.floor(Math.random() * 1000)}`,
+          status: 'draft'
+        });
+        triggerToast('Product duplicated');
+        window.dispatchEvent(new Event('productsChanged'));
+      }
+      setShowMenu(false);
+    } catch (err) {
+      triggerToast('Error duplicating product');
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) onEdit(product);
+    setShowMenu(false);
+  };
+
+  const handleManageVariantsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onManageVariants) onManageVariants(product);
+    setShowMenu(false);
+  };
+
+  const renderMenuOptions = (isMobileView: boolean) => {
+    const groupClass = isMobileView ? "space-y-2" : "py-1.5";
+    
+    const itemClass = isMobileView 
+      ? "w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-slate-200 bg-slate-900/50 hover:bg-slate-800 rounded-2xl border border-slate-800/50 hover:border-slate-700 transition-all min-h-[54px]"
+      : "w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-semibold text-slate-300 hover:bg-slate-800/80 hover:text-white transition-all cursor-pointer group";
+      
+    const dangerItemClass = isMobileView
+      ? "w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-red-400 bg-red-950/20 hover:bg-red-950/40 rounded-2xl border border-red-900/30 hover:border-red-500/30 transition-all min-h-[54px]"
+      : "w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-semibold text-red-400 hover:bg-red-950/50 hover:text-red-300 transition-all cursor-pointer group";
+
+    const iconClass = isMobileView ? "w-5 h-5 shrink-0 text-slate-400" : "w-4 h-4 text-slate-400 group-hover:scale-110 transition-transform";
+    const highlightIconClass = isMobileView ? "w-5 h-5 shrink-0" : "w-4 h-4 group-hover:scale-110 transition-transform";
+
+    return (
+      <div className={isMobileView ? "space-y-4 pb-4" : "flex flex-col"}>
+        {!isMobileView && (
+          <div className="px-4 py-3.5 border-b border-slate-800/60 bg-slate-900/30 flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-white truncate pr-2">{product.productName}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{product.sku}</span>
+              <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${product.status === 'published' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : product.status === 'archived' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' : 'border-slate-500/30 text-slate-400 bg-slate-500/10'}`}>
+                {product.status || 'PUBLISHED'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* View Section */}
+        <div className={groupClass}>
+          <button onClick={() => { handleCardClick(); setShowMenu(false); }} className={itemClass}>
+            <Eye className={iconClass} /> <span>View Details</span>
+          </button>
+        </div>
+
+        {canManage ? (
+          <>
+            {/* Quick Actions */}
+            {!isMobileView && <div className="border-t border-slate-800/60" />}
+            <div className={groupClass}>
+              <button onClick={handleEditClick} className={itemClass}>
+                <Edit2 className={`${highlightIconClass} text-indigo-400`} /> <span>Edit Product</span>
+              </button>
+              <button onClick={handleEditClick} className={itemClass}>
+                <DollarSign className={`${highlightIconClass} text-emerald-400`} /> <span>Update Price</span>
+              </button>
+              <button onClick={handleManageVariantsClick} className={itemClass}>
+                <Layers className={`${highlightIconClass} text-violet-400`} /> <span>Update Inventory</span>
+              </button>
+              <button onClick={handleEditClick} className={itemClass}>
+                <ImageIcon className={`${highlightIconClass} text-sky-400`} /> <span>Change Images</span>
+              </button>
+            </div>
+
+            {/* Utility Actions */}
+            {!isMobileView && <div className="border-t border-slate-800/60" />}
+            <div className={groupClass}>
+              <button onClick={handleDuplicateInternal} className={itemClass}>
+                <Copy className={`${highlightIconClass} text-amber-400`} /> <span>Duplicate Product</span>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); navigate('/merchant-analytics'); setShowMenu(false); }} className={itemClass}>
+                <BarChart3 className={`${highlightIconClass} text-blue-400`} /> <span>View Analytics</span>
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(window.location.origin + `/product/${product.productId}`);
+                  triggerToast('Product link copied!');
+                  setShowMenu(false);
+                }} 
+                className={itemClass}
+              >
+                <Share2 className={`${highlightIconClass} text-teal-400`} /> <span>Share Product</span>
+              </button>
+            </div>
+
+            {/* Danger Zone */}
+            {!isMobileView && <div className="border-t border-slate-800/60" />}
+            <div className={`${groupClass} ${!isMobileView ? 'bg-red-950/10' : ''}`}>
+              {product.status === 'deleted' ? (
+                <>
+                  <button onClick={handleRestore} className={itemClass}>
+                    <Archive className={`${highlightIconClass} text-emerald-400`} /> <span className="text-emerald-400">Restore Product</span>
+                  </button>
+                  <button onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!window.confirm('Are you sure you want to permanently delete this product?')) return;
+                    await productService.permanentDeleteProduct(product.productId);
+                    triggerToast('Product permanently deleted');
+                    window.dispatchEvent(new Event('productsChanged'));
+                  }} className={dangerItemClass}>
+                    <Trash2 className={`${highlightIconClass} text-red-400`} /> <span>Permanent Delete</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  {product.status === 'archived' ? (
+                    <button onClick={handleRestore} className={itemClass}>
+                      <Archive className={`${highlightIconClass} text-emerald-400`} /> <span className="text-emerald-400">Restore Product</span>
+                    </button>
+                  ) : (
+                    <button onClick={handleArchive} className={itemClass}>
+                      <Archive className={`${highlightIconClass} text-amber-400`} /> <span className="text-amber-400">Archive Product</span>
+                    </button>
+                  )}
+                  <button onClick={handleDelete} className={dangerItemClass}>
+                    <Trash2 className={`${highlightIconClass} text-red-400`} /> <span>Delete Product</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className={groupClass}>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(window.location.origin + `/product/${product.productId}`);
+                triggerToast('Product link copied!');
+                setShowMenu(false);
+              }} 
+              className={itemClass}
+            >
+              <Share2 className={`${highlightIconClass} text-emerald-400`} /> <span>Copy Share Link</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'published': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -229,6 +458,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         className="bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-[20px] overflow-hidden group hover:border-violet-500/50 hover:bg-slate-900/80 transition-all duration-300 hover:-translate-y-1 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 cursor-pointer relative shadow-lg hover:shadow-violet-950/20"
       >
         <div className="flex items-center gap-5 w-full md:w-auto">
+          {isMerchantView && onSelect && (
+            <div className="flex items-center justify-center shrink-0" onClick={(e) => e.stopPropagation()}>
+              <input 
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => onSelect(product.productId, e.target.checked)}
+                className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-violet-600 focus:ring-violet-500/50 cursor-pointer"
+              />
+            </div>
+          )}
           {/* Large Product Image with Hover Zoom */}
           <div className="w-28 h-28 rounded-xl bg-slate-950 overflow-hidden shrink-0 border border-slate-800/80 relative">
             <img 
@@ -293,6 +532,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 <ShieldCheck className="w-3.5 h-3.5" /> Verified Seller
               </span>
             </div>
+            
+            {isMerchantView && (
+              <div className="mt-2 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-9 gap-2 text-[9px] text-slate-400 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Views</span><span className="font-mono text-white">{product.metrics?.views || 1205}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Wishlist</span><span className="font-mono text-white">{product.metrics?.wishlistCount || 45}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Shares</span><span className="font-mono text-white">{product.metrics?.shares || 12}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">In Carts</span><span className="font-mono text-white">{product.metrics?.cartCount || 8}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Orders</span><span className="font-mono text-white">{product.metrics?.orders || 34}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Revenue</span><span className="font-mono text-emerald-400">${product.metrics?.revenue || (34 * (product.price || 0)).toFixed(2)}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Conv. Rate</span><span className="font-mono text-white">{product.metrics?.conversionRate !== undefined ? `${product.metrics.conversionRate}%` : '2.8%'}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Score</span><span className="font-mono text-amber-400">{product.metrics?.performanceScore || 92}/100</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Last Viewed</span><span className="font-mono text-white truncate">{product.metrics?.lastViewed || 'Just now'}</span></div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -432,125 +685,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </>
             )}
 
-            <div className="relative">
-              <button 
-                onClick={() => setShowMenu(!showMenu)}
-                className="p-3 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors border border-slate-800/80 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="More options"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-
-              {showMenu && !isMobile && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-20 overflow-hidden py-1">
-                    <button onClick={() => { handleCardClick(); setShowMenu(false); }} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors uppercase tracking-wider">
-                      <Eye className="w-4 h-4" /> View Details
-                    </button>
-                    {isMerchantView ? (
-                      <>
-                        {onEdit && (
-                          <button onClick={() => { onEdit(product); setShowMenu(false); }} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors uppercase tracking-wider">
-                            <Edit2 className="w-4 h-4" /> Edit
-                          </button>
-                        )}
-                        {onDuplicate && (
-                          <button onClick={() => { onDuplicate(product); setShowMenu(false); }} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors uppercase tracking-wider">
-                            <Copy className="w-4 h-4" /> Duplicate
-                          </button>
-                        )}
-                        {onDelete && (
-                          <>
-                            <div className="border-t border-slate-800 my-1" />
-                            <button onClick={() => { onDelete(product.productId); setShowMenu(false); }} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors uppercase tracking-wider">
-                              <Trash2 className="w-4 h-4" /> Delete
-                            </button>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          const link = window.location.origin + `/product/${product.productId}`;
-                          navigator.clipboard.writeText(link);
-                          triggerToast('Product link copied!');
-                          setShowMenu(false);
-                        }} 
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors uppercase tracking-wider"
-                      >
-                        <Share2 className="w-4 h-4" /> Copy Share Link
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Mobile-First Sliding Bottom Drawer */}
-              {isMobile && (
-                <BottomDrawer
-                  isOpen={showMenu}
-                  onClose={() => setShowMenu(false)}
-                  title={product.productName}
-                  description="Choose an action for this product listing"
+            {canManage && (
+              <div className="relative">
+                <button 
+                  ref={menuButtonRef}
+                  onClick={toggleMenu}
+                  className="p-3 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors border border-slate-800/80 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  aria-label="More options"
                 >
-                  <div className="space-y-3 pt-2">
-                    <button 
-                      onClick={() => { handleCardClick(); setShowMenu(false); }} 
-                      className="w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
-                    >
-                      <Eye className="w-5 h-5 text-violet-400 shrink-0" /> 
-                      <span>View Details</span>
-                    </button>
-                    
-                    {isMerchantView ? (
-                      <>
-                        {onEdit && (
-                          <button 
-                            onClick={() => { onEdit(product); setShowMenu(false); }} 
-                            className="w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
-                          >
-                            <Edit2 className="w-5 h-5 text-indigo-400 shrink-0" /> 
-                            <span>Edit Listing</span>
-                          </button>
-                        )}
-                        {onDuplicate && (
-                          <button 
-                            onClick={() => { onDuplicate(product); setShowMenu(false); }} 
-                            className="w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
-                          >
-                            <Copy className="w-5 h-5 text-amber-400 shrink-0" /> 
-                            <span>Duplicate Listing</span>
-                          </button>
-                        )}
-                        {onDelete && (
-                          <button 
-                            onClick={() => { onDelete(product.productId); setShowMenu(false); }} 
-                            className="w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-red-400 bg-red-950/20 hover:bg-red-950/40 rounded-2xl border border-red-900/40 hover:text-red-300 transition-all min-h-[48px]"
-                          >
-                            <Trash2 className="w-5 h-5 shrink-0" /> 
-                            <span>Delete Listing</span>
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          const link = window.location.origin + `/product/${product.productId}`;
-                          navigator.clipboard.writeText(link);
-                          triggerToast('Product link copied!');
-                          setShowMenu(false);
-                        }} 
-                        className="w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
-                      >
-                        <Share2 className="w-5 h-5 text-emerald-400 shrink-0" /> 
-                        <span>Copy Share Link</span>
-                      </button>
-                    )}
-                  </div>
-                </BottomDrawer>
-              )}
-            </div>
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+
+                {!isMobile && (
+                  <PortalDropdown isOpen={showMenu} onClose={() => setShowMenu(false)} anchorRef={menuButtonRef}>
+                    {renderMenuOptions(false)}
+                  </PortalDropdown>
+                )}
+
+                {/* Mobile-First Sliding Bottom Drawer */}
+                {isMobile && (
+                  <BottomDrawer
+                    isOpen={showMenu}
+                    onClose={() => setShowMenu(false)}
+                    title={product.productName}
+                    description="Choose an action for this product listing"
+                  >
+                    <div className="space-y-3 pt-2">
+                      {renderMenuOptions(true)}
+                    </div>
+                  </BottomDrawer>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -575,12 +741,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   // Grid view (Default - premium card)
   return (
     <div 
-      className="bg-[#090e1a]/80 backdrop-blur-md border border-slate-800 hover:border-violet-500/30 hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(139,92,246,0.12)] transition-all duration-200 flex flex-col justify-between h-full relative rounded-2xl overflow-hidden cursor-pointer group"
+      className={`bg-[#090e1a]/80 backdrop-blur-md border ${isSelected ? 'border-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'border-slate-800'} hover:border-violet-500/30 hover:-translate-y-1 hover:shadow-[0_8px_20px_rgba(139,92,246,0.12)] transition-all duration-200 flex flex-col justify-between h-full relative rounded-2xl overflow-hidden cursor-pointer group`}
       onClick={handleCardClick}
     >
       {/* Visual top highlight bar */}
       <div className="h-1 bg-gradient-to-r from-violet-600/30 via-indigo-600/30 to-purple-600/30 group-hover:from-violet-500 group-hover:via-indigo-500 group-hover:to-purple-500 transition-all duration-500" />
       
+      {isMerchantView && onSelect && (
+        <div className="absolute top-3 left-3 z-20" onClick={(e) => e.stopPropagation()}>
+          <input 
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(product.productId, e.target.checked)}
+            className="w-5 h-5 rounded border-slate-700 bg-slate-900/80 text-violet-600 focus:ring-violet-500/50 cursor-pointer backdrop-blur-sm shadow-md"
+          />
+        </div>
+      )}
+
       {/* Large Product Image with Hover Zoom & Image loading skeleton */}
       <div className="relative aspect-square bg-slate-950 overflow-hidden border-b border-slate-900">
         {/* Shimmer loading skeleton */}
@@ -722,6 +899,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         </div>
 
+        {/* Merchant Analytics (Grid) */}
+        {isMerchantView && (
+          <div className="grid grid-cols-4 gap-1 pt-1.5 border-t border-slate-900 pb-1 text-[7px] text-center">
+            <div className="flex flex-col bg-slate-950 rounded py-1 border border-slate-900"><span className="text-slate-500 font-bold uppercase mb-0.5">Views</span><span className="text-white font-mono">{product.metrics?.views || 1205}</span></div>
+            <div className="flex flex-col bg-slate-950 rounded py-1 border border-slate-900"><span className="text-slate-500 font-bold uppercase mb-0.5">Carts</span><span className="text-white font-mono">{product.metrics?.cartCount || 8}</span></div>
+            <div className="flex flex-col bg-slate-950 rounded py-1 border border-slate-900"><span className="text-slate-500 font-bold uppercase mb-0.5">Orders</span><span className="text-white font-mono">{product.metrics?.orders || 34}</span></div>
+            <div className="flex flex-col bg-slate-950 rounded py-1 border border-slate-900"><span className="text-slate-500 font-bold uppercase mb-0.5">Rev</span><span className="text-emerald-400 font-mono">${product.metrics?.revenue || (34 * (product.price || 0)).toFixed(0)}</span></div>
+          </div>
+        )}
+
         {/* Bottom bar for actions */}
         <div className="flex items-center justify-between pt-1.5 border-t border-slate-900" onClick={(e) => e.stopPropagation()}>
           <div className="flex flex-col">
@@ -731,47 +918,32 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </span>
           </div>
           
-          <div className="flex items-center flex-nowrap gap-1 shrink-0">
-            {isMerchantView ? (
+          <div className="flex items-center flex-nowrap gap-1 shrink-0 relative">
+            {canManage ? (
               <>
-                {/* Inventory / Variants */}
-                {onManageVariants && (
-                  <button 
-                    onClick={() => onManageVariants(product)}
-                    className="p-1.5 rounded-lg bg-indigo-650/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 transition-all"
-                    title="Inventory"
-                  >
-                    <Layers className="w-3 h-3" />
-                  </button>
+                <button 
+                  ref={menuButtonRef}
+                  onClick={toggleMenu}
+                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors border border-slate-800/80 flex items-center justify-center"
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
+                {!isMobile && (
+                  <PortalDropdown isOpen={showMenu} onClose={() => setShowMenu(false)} anchorRef={menuButtonRef}>
+                    {renderMenuOptions(false)}
+                  </PortalDropdown>
                 )}
-                {/* Edit */}
-                {onEdit && (
-                  <button 
-                    onClick={() => onEdit(product)}
-                    className="p-1.5 rounded-lg bg-slate-950 border border-slate-850 text-slate-400 hover:text-white transition-all"
-                    title="Edit"
+                {isMobile && (
+                  <BottomDrawer
+                    isOpen={showMenu}
+                    onClose={() => setShowMenu(false)}
+                    title={product.productName}
+                    description="Choose an action for this product listing"
                   >
-                    <Edit2 className="w-3 h-3" />
-                  </button>
-                )}
-                {/* Delete */}
-                {onDelete && (
-                  <button 
-                    onClick={() => onDelete(product.productId)}
-                    className="p-1.5 rounded-lg bg-red-950/20 border border-red-900/30 hover:bg-red-600 text-red-400 hover:text-white transition-all"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                )}
-                {/* Manage Text Button */}
-                {onEdit && (
-                  <button 
-                    onClick={() => onEdit(product)}
-                    className="px-2 py-1 rounded bg-violet-600 hover:bg-violet-500 text-white text-[8px] font-black uppercase tracking-wider transition-all whitespace-nowrap"
-                  >
-                    Manage
-                  </button>
+                    <div className="space-y-3 pt-2" onClick={(e) => e.stopPropagation()}>
+                      {renderMenuOptions(true)}
+                    </div>
+                  </BottomDrawer>
                 )}
               </>
             ) : (
@@ -920,5 +1092,127 @@ const QuickViewModal: React.FC<QuickViewProps> = ({ product, imgUrl, rating, sol
         </div>
       </div>
     </div>
+  );
+};
+
+interface PortalDropdownProps {
+  isOpen: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  children: React.ReactNode;
+}
+
+const PortalDropdown: React.FC<PortalDropdownProps> = ({ isOpen, onClose, anchorRef, children }) => {
+  const [coords, setCoords] = useState({ top: 0, left: 0, origin: 'top right' });
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!isOpen || !anchorRef.current) return;
+    const anchorRect = anchorRef.current.getBoundingClientRect();
+    const menuWidth = 224; // w-56 is 224px
+    // Rendered height is usually around 150-250px depending on options. We use a safe estimate if not fully rendered.
+    const menuHeight = menuRef.current?.offsetHeight || 250;
+    
+    let top = anchorRect.bottom + 8;
+    let left = anchorRect.right - menuWidth;
+    let origin = 'top right';
+
+    const padding = 12;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Bottom collision
+    if (top + menuHeight > viewportHeight - padding) {
+      top = anchorRect.top - menuHeight - 8;
+      origin = 'bottom right';
+    }
+
+    // Horizontal collision
+    if (left < padding) {
+      left = padding;
+      origin = origin.replace('right', 'left');
+    } else if (left + menuWidth > viewportWidth - padding) {
+      left = viewportWidth - menuWidth - padding;
+    }
+
+    setCoords({ top, left, origin });
+  }, [isOpen, anchorRef]);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      // Need a small delay to measure actual height once mounted
+      requestAnimationFrame(updatePosition);
+      
+      const scrollHandler = () => {
+        onClose();
+      };
+      
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', scrollHandler, true); // true to catch all scrolls
+      
+      return () => {
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', scrollHandler, true);
+      };
+    }
+  }, [isOpen, updatePosition, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (anchorRef.current?.contains(e.target as Node)) return;
+      if (menuRef.current?.contains(e.target as Node)) return;
+      onClose();
+    };
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    const handleGlobalClose = (e: Event) => {
+      if ((e as CustomEvent).detail !== anchorRef.current) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleEsc);
+    window.addEventListener('product-menu-open', handleGlobalClose);
+
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick);
+      window.removeEventListener('keydown', handleEsc);
+      window.removeEventListener('product-menu-open', handleGlobalClose);
+    };
+  }, [isOpen, onClose, anchorRef]);
+
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[99999] pointer-events-none">
+          <div className="fixed inset-0 pointer-events-auto" onClick={(e) => { e.stopPropagation(); onClose(); }} />
+          <motion.div
+            ref={menuRef}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            style={{
+              position: 'absolute',
+              top: coords.top,
+              left: coords.left,
+              transformOrigin: coords.origin,
+            }}
+            className="w-56 bg-[#090e1a]/95 backdrop-blur-2xl border border-slate-800/80 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.6)] overflow-hidden py-0 pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {children}
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 };

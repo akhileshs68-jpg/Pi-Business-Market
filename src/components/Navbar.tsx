@@ -45,7 +45,7 @@ import { CartDrawer } from './cart/CartDrawer';
 import { NotificationCenter } from './NotificationCenter';
 
 interface NavbarProps {
-  currentUser: UserType;
+  currentUser?: UserType | null;
   currentView: string;
   onNavigate: (view: string, params?: any) => void;
   cartCount: number;
@@ -400,7 +400,7 @@ export default function Navbar({
                     {walletBalance.toFixed(2)} <span className="text-amber-400">π</span>
                   </p>
                   <p className="text-[9px] text-slate-400 font-mono mt-1.5 select-all truncate bg-slate-950/40 px-1.5 py-1 rounded">
-                    {currentUser.walletAddress}
+                    {currentUser?.walletAddress || 'GUEST-WALLET-XXXXXXXX'}
                   </p>
                 </div>
 
@@ -685,7 +685,7 @@ export default function Navbar({
                       <User className="w-4.5 h-4.5 text-violet-400" />
                     </div>
                     <div>
-                      <span className="text-xs font-black text-slate-100 block truncate max-w-[120px]">@{currentUser.username || 'PiMember'}</span>
+                      <span className="text-xs font-black text-slate-100 block truncate max-w-[120px]">@{currentUser?.username || 'Guest'}</span>
                       <span className="text-[9px] text-slate-500 block tracking-wider uppercase font-black">Consensus Participant</span>
                     </div>
                   </div>
@@ -801,7 +801,7 @@ export default function Navbar({
       <CartDrawer 
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        userUid={currentUser.uid}
+        userUid={currentUser?.uid || ''}
         businessId="PI-CORP-001"
       />
     </header>

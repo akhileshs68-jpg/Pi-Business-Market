@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { Store, StoreStatus } from '../types';
+import { businessService } from './businessService';
 
 export const storeService = {
   /**
@@ -182,7 +183,6 @@ export const storeService = {
 
     // 2. Fetch stores by user's businesses to ensure stores created under business context are never missed
     try {
-      const { businessService } = await import('./businessService');
       const businesses = await businessService.getMyBusinesses(ownerUid);
       for (const biz of businesses) {
         if (!biz.id) continue;

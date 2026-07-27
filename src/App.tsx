@@ -250,11 +250,11 @@ function App() {
           />
           <Route 
             path="/store/:storeId/products" 
-            element={
-              <ProtectedRoute>
-                <ProductManagement />
-              </ProtectedRoute>
-            } 
+            element={<ProductManagement />} 
+          />
+          <Route 
+            path="/store/:storeId" 
+            element={<ProductManagement />} 
           />
           <Route 
             path="/merchant-analytics" 

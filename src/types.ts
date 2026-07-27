@@ -144,6 +144,21 @@ export interface Product {
   // Timestamps
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string;
+  deletedBy?: string;
+  
+  // Analytics
+  metrics?: {
+    views: number;
+    wishlistCount: number;
+    shares: number;
+    cartCount: number;
+    orders: number;
+    revenue: number;
+    conversionRate: number;
+    lastViewed?: string;
+    performanceScore: number;
+  };
 }
 
 // ==========================================
