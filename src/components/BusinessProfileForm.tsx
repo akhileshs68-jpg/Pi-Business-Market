@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FormField } from '../config/businessProfileConfig';
-import { Save, Check, AlertCircle } from 'lucide-react';
+import { Save, Check, AlertCircle, X } from 'lucide-react';
+import { FileUpload } from './product/FileUpload';
+import { useAuth } from '../auth/useAuth';
 
 interface BusinessProfileFormProps {
   generalFields: FormField[];
@@ -10,6 +12,7 @@ interface BusinessProfileFormProps {
 }
 
 export const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({ generalFields, specificFields, initialData, onSave }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<any>(initialData || {});
 
   useEffect(() => {
@@ -69,6 +72,24 @@ export const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({ genera
             />
             <span className="text-sm text-slate-300">Yes</span>
           </label>
+        ) : f.type === 'image' ? (
+          <div className="w-full">
+            {value ? (
+              <div className={`w-full ${f.name === 'logoUrl' ? 'h-32 w-32' : 'h-32 w-full'} bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-800`}>
+                <img src={value} alt={f.label} className="w-full h-full object-cover" />
+                <button onClick={() => handleChange(f.name, '')} className="absolute top-2 right-2 p-1.5 bg-rose-500/90 hover:bg-rose-500 text-white rounded-lg backdrop-blur shadow-lg">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <FileUpload
+                ownerUid={user?.uid || ''}
+                module="businesses"
+                label={`Upload ${f.label}`}
+                onUploadSuccess={(asset) => handleChange(f.name, asset.downloadUrl)}
+              />
+            )}
+          </div>
         ) : (
           <input
             type={f.type === 'number' ? 'number' : f.type === 'url' ? 'url' : 'text'}

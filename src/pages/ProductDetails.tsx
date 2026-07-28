@@ -185,7 +185,11 @@ export const ProductDetails: React.FC = () => {
   const fetchProduct = async () => {
     setLoading(true);
     try {
-      const dbProd = await productService.getProduct(id!) as any;
+      let dbProd = await productService.getProduct(id!) as any;
+      if (!dbProd) {
+        // Try getting as a service as well
+        dbProd = await productService.getItemById(id!, 'service') as any;
+      }
       if (dbProd) {
         setProduct({
           ...dbProd,
@@ -194,13 +198,13 @@ export const ProductDetails: React.FC = () => {
         return;
       }
 
-      const { results } = await searchService.search('', { entityType: 'product' });
+      const { results } = await searchService.search('', {});
       const found = results.find(p => p.entityId === id);
       if (found) {
         setProduct(mapSearchEntryToProduct(found));
       }
     } catch (err) {
-      console.error('Failed to fetch product', err);
+      console.error('Failed to fetch product/service', err);
     } finally {
       setLoading(false);
     }

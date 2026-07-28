@@ -1598,7 +1598,10 @@ export interface Address {
 export interface CheckoutSession {
   sessionId: string;
   cartId: string;
+  cartIds?: string[];
   userUid: string;
+  businessId?: string;
+  storeId?: string;
   billingAddress?: Address;
   shippingAddress?: Address;
   deliveryMethod?: 'shipping' | 'pickup';

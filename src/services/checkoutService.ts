@@ -22,7 +22,7 @@ import { getFirebaseDb } from '../firebase/config';
 import { CheckoutSession, OrderDraft, Cart, CartItem, Address } from '../types';
 
 export const checkoutService = {
-  async createSession(cart: Cart, userUid: string): Promise<string> {
+  async createSession(cart: Cart, userUid: string, cartIds?: string[]): Promise<string> {
     const db = getFirebaseDb();
     const sessionId = Math.random().toString(36).substring(2, 15);
     const expiresAt = new Date();
@@ -31,7 +31,10 @@ export const checkoutService = {
     const session: CheckoutSession = {
       sessionId,
       cartId: cart.cartId,
+      cartIds: cartIds || [cart.cartId],
       userUid,
+      businessId: cart.businessId,
+      storeId: cart.storeId,
       currency: cart.currency,
       subtotal: cart.subtotal,
       discount: cart.discount,

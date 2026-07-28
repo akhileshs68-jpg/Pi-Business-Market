@@ -27,6 +27,8 @@
     "strictNullChecks": true
   },
   "exclude": [
-    "server.ts"
+    "server.ts",
+    "dist",
+    "node_modules"
   ]
 }

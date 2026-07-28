@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Store, OpeningHours, StoreType } from '../../types';
 import { storeService } from '../../services/storeService';
+import { useAuth } from '../../auth/useAuth';
+import { MediaPickerModal } from '../product/MediaPickerModal';
 import { 
   Settings, 
   Globe, 
@@ -25,8 +27,13 @@ interface StoreSettingsTabProps {
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({ store, onRefreshStore, onToast }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [subSection, setSubSection] = useState<'general' | 'shipping' | 'hours' | 'seo'>('general');
+
+  // Media picker states
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [activeMediaTarget, setActiveMediaTarget] = useState<'logo' | 'banner' | null>(null);
 
   // Form State
   const [storeName, setStoreName] = useState(store.storeName || '');
@@ -223,24 +230,42 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({ store, onRef
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Logo URL</label>
-                  <input 
-                    type="text" 
-                    value={logoUrl} 
-                    onChange={(e) => setLogoUrl(e.target.value)} 
-                    placeholder="https://example.com/logo.png"
-                    className="w-full bg-[#030712] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none"
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={logoUrl} 
+                      onChange={(e) => setLogoUrl(e.target.value)} 
+                      placeholder="https://example.com/logo.png"
+                      className="flex-1 bg-[#030712] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setActiveMediaTarget('logo'); setIsMediaPickerOpen(true); }}
+                      className="px-4 py-3 bg-[#030712] hover:bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all"
+                    >
+                      Upload/Pick
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Banner Cover Image URL</label>
-                  <input 
-                    type="text" 
-                    value={coverImageUrl} 
-                    onChange={(e) => setCoverImageUrl(e.target.value)} 
-                    placeholder="https://example.com/cover.png"
-                    className="w-full bg-[#030712] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none"
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={coverImageUrl} 
+                      onChange={(e) => setCoverImageUrl(e.target.value)} 
+                      placeholder="https://example.com/cover.png"
+                      className="flex-1 bg-[#030712] border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setActiveMediaTarget('banner'); setIsMediaPickerOpen(true); }}
+                      className="px-4 py-3 bg-[#030712] hover:bg-slate-900 border border-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all"
+                    >
+                      Upload/Pick
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -444,6 +469,18 @@ export const StoreSettingsTab: React.FC<StoreSettingsTabProps> = ({ store, onRef
           </div>
         </form>
       </div>
+
+      <MediaPickerModal 
+        isOpen={isMediaPickerOpen}
+        onClose={() => { setIsMediaPickerOpen(false); setActiveMediaTarget(null); }}
+        ownerUid={user?.uid || store.ownerUid || ''}
+        module="stores"
+        onSelect={(asset) => {
+          if (activeMediaTarget === 'logo') setLogoUrl(asset.downloadUrl);
+          if (activeMediaTarget === 'banner') setCoverImageUrl(asset.downloadUrl);
+        }}
+        title={`Select Store ${activeMediaTarget === 'logo' ? 'Logo' : 'Banner'}`}
+      />
     </div>
   );
 };

@@ -61,8 +61,13 @@ export const Checkout: React.FC = () => {
       const data = await checkoutService.getSession(sessionId!);
       if (data) {
         setSession(data);
-        const cartItems = await cartService.getCartItems(data.cartId);
-        setItems(cartItems);
+        const sessionCartIds = data.cartIds || [data.cartId];
+        const allItems: CartItem[] = [];
+        for (const cid of sessionCartIds) {
+          const itemsFromCart = await cartService.getCartItems(cid);
+          allItems.push(...itemsFromCart);
+        }
+        setItems(allItems);
       }
     } catch (err) {
       console.error('Failed to fetch session', err);
@@ -126,7 +131,13 @@ export const Checkout: React.FC = () => {
           async (txid) => {
             // Success callback
             await checkoutService.updateSession(session.sessionId, { status: 'completed' });
-            await cartService.clearCart(session.cartId);
+            if (session.cartIds) {
+              for (const cid of session.cartIds) {
+                await cartService.clearCart(cid);
+              }
+            } else {
+              await cartService.clearCart(session.cartId);
+            }
             navigate(`/order-success/${orderId}`);
           },
           (err) => {
@@ -140,7 +151,13 @@ export const Checkout: React.FC = () => {
         await paymentService.updateTransactionStatus(paymentId, 'Completed', 'simulated_tx');
         await orderService.updatePaymentStatus(order.orderId, 'Paid');
         await checkoutService.updateSession(session.sessionId, { status: 'completed' });
-        await cartService.clearCart(session.cartId);
+        if (session.cartIds) {
+          for (const cid of session.cartIds) {
+            await cartService.clearCart(cid);
+          }
+        } else {
+          await cartService.clearCart(session.cartId);
+        }
         navigate(`/order-success/${orderId}`);
       }
     } catch (err) {

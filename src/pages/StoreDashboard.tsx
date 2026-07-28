@@ -254,7 +254,7 @@ export const StoreDashboard: React.FC = () => {
                 >
                   <StoreCard 
                     store={store}
-                    onEdit={() => {}}
+                    onEdit={(s) => navigate(`/store/${s.storeId}/products`, { state: { tab: 'settings' } })}
                     onDelete={handleDelete}
                     onArchive={handleArchive}
                   />

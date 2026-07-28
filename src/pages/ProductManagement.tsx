@@ -130,7 +130,18 @@ export const ProductManagement: React.FC = () => {
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   
   // Seller Console Tab Management
-  const [activeTab, setActiveTab] = useState<'overview' | 'catalog' | 'categories' | 'inventory' | 'orders' | 'crm' | 'analytics' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'catalog' | 'categories' | 'inventory' | 'orders' | 'crm' | 'analytics' | 'settings'>(() => {
+    const stateTab = window.history.state?.usr?.tab;
+    if (stateTab && ['overview', 'catalog', 'categories', 'inventory', 'orders', 'crm', 'analytics', 'settings'].includes(stateTab)) {
+      return stateTab as any;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const queryTab = params.get('tab');
+    if (queryTab && ['overview', 'catalog', 'categories', 'inventory', 'orders', 'crm', 'analytics', 'settings'].includes(queryTab)) {
+      return queryTab as any;
+    }
+    return 'overview';
+  });
   const [merchantFilter, setMerchantFilter] = useState<'all' | 'published' | 'draft' | 'archived' | 'deleted' | 'low_stock' | 'out_of_stock' | 'featured' | 'trending'>('all');
   const [merchantSort, setMerchantSort] = useState<'newest' | 'oldest' | 'highest_price' | 'lowest_price' | 'highest_revenue' | 'best_seller' | 'highest_rating' | 'views' | 'wishlist' | 'alphabetical'>('newest');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);

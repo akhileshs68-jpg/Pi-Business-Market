@@ -111,32 +111,23 @@ export const storeService = {
    * Fetches all stores owned by a user or associated with user's businesses
    */
     async getOwnedStores(ownerUid: string): Promise<Store[]> {
-    if (ownerUid.startsWith('mock_')) {
-      // Return mock data for demo purposes, but for real users we want real data.
-    }
     const db = getFirebaseDb();
     const storesMap = new Map<string, Store>();
 
-    // 1. Fetch stores by ownerUid
+    // 1. Fetch stores by ownerUid, userId, sellerId in parallel
     try {
-      let qOwner = query(
-        collection(db, 'stores'), 
-        where('ownerUid', '==', ownerUid)
-      );
-      let snapshotOwner = await getDocs(qOwner);
-      
-      // Legacy fallback: checking 'userId' if 'ownerUid' didn't match (just in case)
-      if (snapshotOwner.empty) {
-        qOwner = query(collection(db, 'stores'), where('userId', '==', ownerUid));
-        snapshotOwner = await getDocs(qOwner);
-      }
-      // Or sellerId
-      if (snapshotOwner.empty) {
-        qOwner = query(collection(db, 'stores'), where('sellerId', '==', ownerUid));
-        snapshotOwner = await getDocs(qOwner);
-      }
+      const qOwner = query(collection(db, 'stores'), where('ownerUid', '==', ownerUid));
+      const qUser = query(collection(db, 'stores'), where('userId', '==', ownerUid));
+      const qSeller = query(collection(db, 'stores'), where('sellerId', '==', ownerUid));
 
-      snapshotOwner.docs.forEach(doc => {
+      const [snapOwner, snapUser, snapSeller] = await Promise.all([
+        getDocs(qOwner),
+        getDocs(qUser),
+        getDocs(qSeller)
+      ]);
+
+      const allDocs = [...snapOwner.docs, ...snapUser.docs, ...snapSeller.docs];
+      allDocs.forEach(doc => {
         const data = doc.data();
         const store: Store = {
           ...data,
@@ -144,12 +135,13 @@ export const storeService = {
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
           updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
         } as Store;
-        if (store.status !== 'deleted') {
+        const statusStr = (store.status as any) || '';
+        if (statusStr !== 'deleted' && statusStr !== 'Deleted') {
           storesMap.set(store.storeId, store);
         }
       });
     } catch (err) {
-      console.warn('Query stores by ownerUid error:', err);
+      console.warn('Query stores by ownerUid/userId/sellerId error:', err);
     }
 
     // 2. Fetch stores by user's businesses
@@ -157,7 +149,26 @@ export const storeService = {
       const qBizProfile = query(collection(db, 'businesses'), where('ownerUid', '==', ownerUid));
       const bizSnap = await getDocs(qBizProfile);
       
-      for (const docSnap of bizSnap.docs) {
+      const bizDocs = [...bizSnap.docs];
+
+      // Also find businesses where the user is a member
+      try {
+        const memberQuery = query(collection(db, 'businessMembers'), where('userUid', '==', ownerUid), where('status', '==', 'active'));
+        const memberSnap = await getDocs(memberQuery);
+        for (const memberDoc of memberSnap.docs) {
+          const bizId = memberDoc.data().businessId;
+          if (bizId) {
+            const bizDocSnap = await getDoc(doc(db, 'businesses', bizId));
+            if (bizDocSnap.exists() && !bizDocs.some(d => d.id === bizId)) {
+              bizDocs.push(bizDocSnap);
+            }
+          }
+        }
+      } catch (memErr) {
+        console.warn('businessMembers query failed in getOwnedStores:', memErr);
+      }
+      
+      for (const docSnap of bizDocs) {
         const bizData = docSnap.data();
         const bizId = docSnap.id;
         
@@ -210,7 +221,8 @@ export const storeService = {
               createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
               updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
             } as Store;
-            if (store.status !== 'deleted') {
+            const statusStr = (store.status as any) || '';
+            if (statusStr !== 'deleted' && statusStr !== 'Deleted') {
               storesMap.set(store.storeId, store);
             }
           });

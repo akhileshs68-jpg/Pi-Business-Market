@@ -24,9 +24,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserType } from '../../types';
 import { cartService } from '../../services/cartService';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
-import { seedingService } from '../../services/seedingService';
 
 interface BuyerHomeProps {
   user: UserType | null;
@@ -35,25 +34,6 @@ interface BuyerHomeProps {
   onCategorySelect: (catId: string) => void;
 }
 
-// Sponsored Ads Database (Can remain as local config since they are ads guidelines, but cleaned up)
-const SPONSORED_ADS = [
-  {
-    id: 'ad_1',
-    title: 'Earn Extra Pi: Host Your Node Today',
-    description: 'Join the consensus framework. Safe, fast integration with 24/7 priority support.',
-    badge: 'Consensus Partner',
-    cta: 'Learn More',
-    image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=500&auto=format&fit=crop&q=60'
-  },
-  {
-    id: 'ad_2',
-    title: 'Verified Global Pi Escrow Services',
-    description: 'Secure trade settlement for high-value merchandise using multi-signature lockers.',
-    badge: 'Security Badge',
-    cta: 'Check Escrow',
-    image: 'https://images.unsplash.com/photo-1563013544-824ae1d704d3?w=500&auto=format&fit=crop&q=60'
-  }
-];
 
 export const BuyerHome: React.FC<BuyerHomeProps> = ({ 
   user, 
@@ -194,10 +174,9 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         const db = getFirebaseDb();
         
         // Seed first if collections are empty to ensure full-stack dynamic functionality
-        await seedingService.seedAllIfNeeded();
                 
         // Fetch products
-        const productsSnap = await getDocs(collection(db, 'products'));
+        const productsSnap = await getDocs(query(collection(db, 'products'), limit(30)));
         const productsList = productsSnap.docs.map(doc => {
           const data = doc.data();
           return {
@@ -215,12 +194,13 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             isTrending: data.isTrending !== undefined ? data.isTrending : true,
             isRecommended: data.isRecommended !== undefined ? data.isRecommended : true,
             category: data.category || 'Electronics',
+            status: data.status || 'Active',
             type: 'product'
           };
-        });
+        }).filter(p => p.status !== 'Deleted');
 
         // Fetch services
-        const servicesSnap = await getDocs(collection(db, 'services'));
+        const servicesSnap = await getDocs(query(collection(db, 'services'), limit(15)));
         const servicesList = servicesSnap.docs.map(doc => {
           const data = doc.data();
           return {
@@ -238,9 +218,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             isTrending: true,
             isRecommended: true,
             category: data.category || 'Services',
+            status: data.status || 'Active',
             type: 'service'
           };
-        });
+        }).filter(s => s.status !== 'Deleted');
 
         const combined = [...productsList, ...servicesList];
         setFirestoreProducts(combined);
@@ -399,11 +380,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   };
 
   // Modular Premium Compact Product Card Component
-  const renderProductCard = (prod: any, isCarousel = false) => {
+    const renderProductCard = (prod: any, isCarousel = false) => {
     const isSaved = wishlist.includes(prod.id);
     const hasDiscount = prod.oldPrice && prod.oldPrice > prod.price;
     const discountPercent = hasDiscount ? Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100) : 0;
     const isSponsored = prod.isSponsored;
+
     return (
       <motion.div 
         key={prod.id}
@@ -415,62 +397,65 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           localStorage.setItem('pi_marketplace_recent_viewed', JSON.stringify(freshRecent));
           onNavigate(`product/${prod.id}`);
         }}
-        className={`group bg-slate-900/40 hover:bg-slate-900/80 border border-slate-900/80 hover:border-violet-500/30 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col h-full shadow-lg relative ${isCarousel ? 'w-[calc(50%-6px)] sm:w-[170px] shrink-0 snap-start' : 'w-full'}`}
+        className={`group bg-slate-900/40 hover:bg-slate-900/80 border border-slate-900/80 hover:border-violet-500/30 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col shadow-lg relative ${isCarousel ? 'w-[calc(50%-0.375rem)] sm:w-[200px] shrink-0 snap-start' : 'w-full'} max-w-full`}
       >
         {/* Compact Product Image Container */}
-        <div className="relative aspect-square w-full overflow-hidden bg-slate-950">
+        <div className="relative w-full aspect-square overflow-hidden bg-slate-950 shrink-0">
           <div className="w-full h-full transform group-hover:scale-105 transition-transform duration-500 ease-out">
             <LazyImage src={prod.image} alt={prod.title} />
           </div>
           
           {/* Badges Overlay */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+          <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
             {isSponsored && (
-              <span className="bg-amber-500/95 text-slate-950 font-black text-[7px] xs:text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md">
+              <span className="bg-amber-500/95 text-slate-950 font-black text-[9px] px-2 py-1 rounded uppercase tracking-wider shadow-md">
                 Sponsored
               </span>
             )}
             {prod.isTrending && (
-              <span className="bg-amber-500 text-slate-950 font-black text-[7px] xs:text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md">
+              <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-1 rounded uppercase tracking-wider shadow-md">
                 🔥 Trending
               </span>
             )}
             {!isSponsored && hasDiscount && (
-              <span className="bg-rose-600 text-white font-black text-[7px] xs:text-[8px] px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md">
+              <span className="bg-rose-600 text-white font-black text-[9px] px-2 py-1 rounded uppercase tracking-wider shadow-md">
                 {discountPercent}% OFF
               </span>
             )}
           </div>
+
           {/* Interactive Wishlist Heart (Floating) */}
           <motion.button 
             whileTap={{ scale: 0.8 }}
             whileHover={{ scale: 1.15 }}
             onClick={(e) => toggleWishlist(prod.id, e)}
-            className="absolute top-2 right-2 p-1.5 bg-slate-950/85 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800 z-10 shadow-lg"
+            className="absolute top-3 right-3 p-2 bg-slate-950/85 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800 z-10 shadow-lg"
           >
-            <Heart className={`w-3 h-3 ${isSaved ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-300'}`} />
+            <Heart className={`w-4 h-4 ${isSaved ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-300'}`} />
           </motion.button>
         </div>
         
         {/* Product Details Section */}
-        <div className="p-2.5 flex flex-col flex-1 gap-1.5 bg-slate-900/10 relative">
-          <div className="space-y-1">
+        <div className="p-3 flex flex-col flex-1 gap-2 bg-slate-900/10 relative">
+          <div className="flex flex-col gap-1">
             {/* Title / Name */}
-            <h3 className="text-[11px] sm:text-xs font-bold text-slate-200 line-clamp-2 tracking-tight leading-tight group-hover:text-violet-400 transition-colors h-[28px] overflow-hidden">
+            <h3 className="text-sm font-bold text-slate-200 line-clamp-2 tracking-tight leading-snug group-hover:text-violet-400 transition-colors h-[2.5rem] overflow-hidden text-ellipsis">
               {prod.title}
             </h3>
+
             {/* Rating */}
-            <div className="flex items-center gap-1 text-[9px] font-semibold text-slate-400">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
               <div className="flex items-center text-amber-400">
-                <Star className="w-2.5 h-2.5 fill-amber-400 mr-0.5" />
+                <Star className="w-3 h-3 fill-amber-400 mr-1" />
                 <span>{prod.rating.toFixed(1)}</span>
               </div>
               <span className="text-slate-700">•</span>
               <span>({prod.reviews})</span>
             </div>
+
             {/* Seller Info */}
-            <div className="flex items-center gap-1 text-[8.5px] text-slate-500 font-medium truncate leading-tight">
-              <Building2 className="w-2.5 h-2.5 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium truncate leading-tight">
+              <Building2 className="w-3 h-3 text-slate-600 shrink-0" />
               <span className="truncate">{prod.seller}</span>
             </div>
           </div>
@@ -479,31 +464,32 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           <div className="flex-1" />
 
           {/* Price and Cart Layout */}
-          <div className="pt-2 border-t border-slate-900/40 flex items-end justify-between">
+          <div className="pt-3 border-t border-slate-900/40 flex items-end justify-between">
             <div className="flex flex-col">
-              <div className="flex items-baseline gap-0.5 font-mono text-sm sm:text-base font-black text-white leading-none">
-                {prod.price} <span className="text-violet-400 text-[10px] sm:text-xs font-black">π</span>
+              <div className="flex items-baseline gap-1 font-mono text-lg font-black text-white leading-none">
+                {prod.price} <span className="text-violet-400 text-sm font-black">π</span>
               </div>
               {hasDiscount && (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[10px] font-semibold text-slate-500 line-through font-mono">
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[11px] font-semibold text-slate-500 line-through font-mono">
                     {prod.oldPrice}π
                   </span>
-                  <span className="text-[9px] font-bold text-rose-500 uppercase">
+                  <span className="text-[10px] font-bold text-rose-500 uppercase">
                     -{discountPercent}%
                   </span>
                 </div>
               )}
             </div>
+
             {/* Add-to-cart */}
             <motion.button 
               whileTap={{ scale: 0.85 }}
               whileHover={{ scale: 1.1 }}
               onClick={(e) => handleAddToCart(prod, e)}
-              className="p-1.5 sm:p-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-all shadow-lg shrink-0 cursor-pointer z-10"
+              className="p-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-all shadow-lg shrink-0 cursor-pointer z-10 flex items-center justify-center"
               title="Add to Cart"
             >
-              <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <ShoppingBag className="w-4 h-4" />
             </motion.button>
           </div>
         </div>

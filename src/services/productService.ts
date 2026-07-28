@@ -83,25 +83,36 @@ export const productService = {
 
     async getStoreProducts(storeIdOrOwnerUid: string, ...args: any[]): Promise<any> {
     const db = getFirebaseDb();
-    // In legacy, products belong to ownerUid. The parameter passed might be storeId or ownerUid.
-    // To fix this universally:
-    // First try querying by storeId (in case new schema added storeId)
-    let q = query(collection(db, 'products'), where('storeId', '==', storeIdOrOwnerUid));
-    let snap = await getDocs(q);
     
-    if (snap.empty) {
-      // Then try businessId
-      q = query(collection(db, 'products'), where('businessId', '==', storeIdOrOwnerUid));
-      snap = await getDocs(q);
+    // Query by storeId, businessId, and ownerUid in parallel
+    const qStore = query(collection(db, 'products'), where('storeId', '==', storeIdOrOwnerUid));
+    const qBusiness = query(collection(db, 'products'), where('businessId', '==', storeIdOrOwnerUid));
+    const qOwner = query(collection(db, 'products'), where('ownerUid', '==', storeIdOrOwnerUid));
+
+    try {
+      const [snapStore, snapBusiness, snapOwner] = await Promise.all([
+        getDocs(qStore),
+        getDocs(qBusiness),
+        getDocs(qOwner)
+      ]);
+
+      const productsMap = new Map<string, any>();
+      const allDocs = [...snapStore.docs, ...snapBusiness.docs, ...snapOwner.docs];
+      
+      allDocs.forEach(doc => {
+        const data = doc.data();
+        productsMap.set(doc.id, {
+          id: doc.id,
+          productId: doc.id, // For backwards compatibility
+          ...data
+        });
+      });
+
+      return Array.from(productsMap.values());
+    } catch (err) {
+      console.error('Error fetching store products in parallel:', err);
+      return [];
     }
-    
-    if (snap.empty) {
-      // Then try ownerUid (the old way)
-      q = query(collection(db, 'products'), where('ownerUid', '==', storeIdOrOwnerUid));
-      snap = await getDocs(q);
-    }
-    
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
   async getProduct(id: string) {
     return this.getItemById(id, 'product');

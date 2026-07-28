@@ -1,7 +1,7 @@
 export interface FormField {
   name: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'url' | 'select' | 'boolean' | 'location';
+  type: 'text' | 'textarea' | 'number' | 'url' | 'select' | 'boolean' | 'location' | 'image';
   options?: string[]; // for select
   required?: boolean;
   placeholder?: string;
@@ -14,6 +14,8 @@ export interface RoleProfileConfig {
 }
 
 const commonGeneralFields: FormField[] = [
+  { name: 'logoUrl', label: 'Business Logo', type: 'image' },
+  { name: 'coverImageUrl', label: 'Cover Image', type: 'image' },
   { name: 'businessName', label: 'Business Name', type: 'text', required: true },
   { name: 'category', label: 'Business Category', type: 'text', required: true },
   { name: 'description', label: 'Business Description', type: 'textarea', required: true },

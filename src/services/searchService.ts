@@ -93,7 +93,7 @@ export const searchService = {
     
     // Products
     if (!filters.entityType || filters.entityType === 'product') {
-      promises.push(getDocs(collection(db, 'products'))
+      promises.push(getDocs(query(collection(db, 'products'), limit(100)))
         .then(snap => {
           console.log('[Search Debug] Products returned:', snap.size);
           snap.forEach(d => {
@@ -127,7 +127,7 @@ export const searchService = {
 
     // Businesses
     if (!filters.entityType || filters.entityType === 'business') {
-      promises.push(getDocs(collection(db, 'businesses'))
+      promises.push(getDocs(query(collection(db, 'businesses'), limit(50)))
         .then(snap => {
           console.log('[Search Debug] Businesses returned:', snap.size);
           snap.forEach(d => {
@@ -170,7 +170,7 @@ export const searchService = {
 
     // Stores
     if (!filters.entityType || filters.entityType === 'store') {
-      promises.push(getDocs(collection(db, 'stores'))
+      promises.push(getDocs(query(collection(db, 'stores'), limit(50)))
         .then(snap => {
           console.log('[Search Debug] Stores returned:', snap.size);
           snap.forEach(d => {
@@ -204,7 +204,7 @@ export const searchService = {
 
     // Services
     if (!filters.entityType || filters.entityType === 'service') {
-      promises.push(getDocs(collection(db, 'services'))
+      promises.push(getDocs(query(collection(db, 'services'), limit(100)))
         .then(snap => {
           console.log('[Search Debug] Services returned:', snap.size);
           snap.forEach(d => {
@@ -236,7 +236,7 @@ export const searchService = {
 
     // Jobs
     if (!filters.entityType || filters.entityType === 'job') {
-      promises.push(getDocs(collection(db, 'jobs'))
+      promises.push(getDocs(query(collection(db, 'jobs'), limit(50)))
         .then(snap => {
           console.log('[Search Debug] Jobs returned:', snap.size);
           snap.forEach(d => {

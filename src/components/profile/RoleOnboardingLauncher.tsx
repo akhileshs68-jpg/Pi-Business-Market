@@ -26,6 +26,8 @@ import { Business } from '../../types';
 import { businessService } from '../../services/businessService';
 import { BusinessWizard } from '../business/BusinessWizard';
 import { ServiceWizard } from '../service/ServiceWizard';
+import { StoreWizard } from '../store/StoreWizard';
+import { storeService } from '../../services/storeService';
 
 interface RoleOnboardingLauncherProps {
   role: string;
@@ -47,30 +49,48 @@ export const RoleOnboardingLauncher: React.FC<RoleOnboardingLauncherProps> = ({
   // For Service Provider flow
   const [serviceFlowState, setServiceFlowState] = useState<'check' | 'needs_business' | 'create_business' | 'create_service'>('check');
   const [tempBusinessId, setTempBusinessId] = useState<string | null>(null);
+  
+  // For Seller flow
+  const [sellerFlowState, setSellerFlowState] = useState<'check' | 'needs_business' | 'create_business' | 'needs_store' | 'create_store'>('check');
 
-  // Load user's businesses if the role is Service Provider
+  // Load user's businesses if the role is Service Provider or Seller
   useEffect(() => {
-    if (role === 'Service Provider') {
-      const checkBusinesses = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-          const myBiz = await businessService.getMyBusinesses(user.uid);
-          setBusinesses(myBiz);
+    const checkStatus = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const myBiz = await businessService.getMyBusinesses(user.uid);
+        setBusinesses(myBiz);
+        
+        if (role === 'Service Provider') {
           if (myBiz.length > 0) {
             setTempBusinessId(myBiz[0].id);
             setServiceFlowState('create_service');
           } else {
             setServiceFlowState('needs_business');
           }
-        } catch (err: any) {
-          console.error('[RoleOnboardingLauncher] Error checking businesses:', err);
-          setError('Failed to query your business profile status. Please try again.');
-        } finally {
-          setLoading(false);
+        } else if (role === 'Seller') {
+          if (myBiz.length > 0) {
+            setTempBusinessId(myBiz[0].id);
+            const myStores = await storeService.getOwnedStores(user.uid);
+            if (myStores.length > 0) {
+              onComplete();
+            } else {
+              setSellerFlowState('needs_store');
+            }
+          } else {
+            setSellerFlowState('needs_business');
+          }
         }
-      };
-      checkBusinesses();
+      } catch (err: any) {
+        console.error('[RoleOnboardingLauncher] Error checking status:', err);
+        setError('Failed to query your profile status. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (role === 'Service Provider' || role === 'Seller') {
+      checkStatus();
     }
   }, [role, user.uid]);
 
@@ -121,12 +141,18 @@ export const RoleOnboardingLauncher: React.FC<RoleOnboardingLauncherProps> = ({
   };
 
   const handleBusinessComplete = (bizId: string) => {
+    setTempBusinessId(bizId);
     if (role === 'Service Provider') {
-      setTempBusinessId(bizId);
       setServiceFlowState('create_service');
+    } else if (role === 'Seller') {
+      setSellerFlowState('needs_store');
     } else {
       onComplete();
     }
+  };
+
+  const handleStoreComplete = (storeId: string) => {
+    onComplete();
   };
 
   const handleServiceSuccess = () => {
@@ -146,40 +172,138 @@ export const RoleOnboardingLauncher: React.FC<RoleOnboardingLauncherProps> = ({
     );
   }
 
-  // Rendering Seller onboarding flow (BusinessWizard)
+  // Rendering Seller onboarding flow
   if (role === 'Seller') {
-    return (
-      <div className="fixed inset-0 z-50 bg-slate-950 overflow-y-auto">
-        <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-            <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet-600/10 flex items-center justify-center text-violet-400 border border-violet-500/20">
-                  <Store className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-white">Seller Registration</h2>
-                  <p className="text-xs text-slate-400">Step up your Pi Business</p>
-                </div>
-              </div>
-              <button 
-                onClick={onClose}
-                className="text-xs font-bold px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all"
-              >
-                Back to Profile
-              </button>
+    if (error) {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
+            <AlertCircle className="w-10 h-10 text-rose-400 mx-auto mb-4" />
+            <p className="text-white font-bold text-lg mb-1">Error Occurred</p>
+            <p className="text-slate-400 text-sm mb-6">{error}</p>
+            <button 
+              onClick={onClose}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all"
+            >
+              Back to Profile
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    if (sellerFlowState === 'needs_business') {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center text-amber-400 mb-6 mx-auto sm:mx-0">
+              <Info className="w-7 h-7" />
             </div>
-            <div className="p-6 sm:p-8 bg-slate-950/20">
-              <BusinessWizard 
-                onComplete={handleBusinessComplete} 
-                onCancel={onClose} 
-                initialData={{ businessType: 'Product Seller' }}
-              />
+            <h3 className="text-xl font-black text-white mb-2 text-center sm:text-left">
+              Business Profile Required
+            </h3>
+            <p className="text-slate-400 text-sm mb-6 text-center sm:text-left leading-relaxed">
+              To create a store in our marketplace, you must first initialize a corporate or individual Business Profile.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold rounded-xl text-sm transition-all order-2 sm:order-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setSellerFlowState('create_business')}
+                className="flex-1 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-violet-600/10 flex items-center justify-center gap-1.5 order-1 sm:order-2"
+              >
+                Create Profile
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    if (sellerFlowState === 'create_business') {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-950 overflow-y-auto">
+          <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setSellerFlowState('needs_business')}
+                    className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <div>
+                    <h2 className="text-lg font-black text-white">Seller Registration</h2>
+                    <p className="text-xs text-slate-400">Step 1: Set up your business profile</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={onClose}
+                  className="text-xs font-bold px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all"
+                >
+                  Back to Profile
+                </button>
+              </div>
+              <div className="p-6 sm:p-8 bg-slate-950/20">
+                <BusinessWizard 
+                  onComplete={handleBusinessComplete} 
+                  onCancel={() => setSellerFlowState('needs_business')} 
+                  initialData={{ businessType: 'Product Seller' }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (sellerFlowState === 'needs_store') {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <div className="w-14 h-14 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 mb-6 mx-auto sm:mx-0">
+              <Store className="w-7 h-7" />
+            </div>
+            <h3 className="text-xl font-black text-white mb-2 text-center sm:text-left">
+              Store Required
+            </h3>
+            <p className="text-slate-400 text-sm mb-6 text-center sm:text-left leading-relaxed">
+              You have a Business Profile. Now, let's set up your Store to start selling products.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 font-bold rounded-xl text-sm transition-all order-2 sm:order-1"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setSellerFlowState('create_store')}
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/10 flex items-center justify-center gap-1.5 order-1 sm:order-2"
+              >
+                Create Store
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (sellerFlowState === 'create_store') {
+      return (
+        <StoreWizard 
+          onComplete={handleStoreComplete}
+          onCancel={onClose}
+        />
+      );
+    }
   }
 
   // Rendering Service Provider onboarding flow

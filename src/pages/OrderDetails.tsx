@@ -192,6 +192,9 @@ export const OrderDetails: React.FC = () => {
               <button onClick={handleChatAboutOrder} className="px-4 py-2 bg-indigo-600/15 border border-indigo-500/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
                 <MessageSquare className="w-3 h-3" /> Chat with Customer
               </button>
+              <button onClick={() => window.print()} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+                <Printer className="w-3 h-3" /> Print Invoice
+              </button>
             </div>
           )}
           {!isMerchant && (

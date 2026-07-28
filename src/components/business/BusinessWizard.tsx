@@ -42,6 +42,7 @@ import { useAuth } from '../../auth/useAuth';
 import { businessService } from '../../services/businessService';
 import { mediaService } from '../../services/mediaService';
 import { Business } from '../../types';
+import { FileUpload } from '../product/FileUpload';
 
 interface WizardProps {
   onComplete: (businessId: string) => void;
@@ -537,35 +538,41 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                   </div>
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
-                    <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'logo')} />
-                    <div 
-                      onClick={() => logoInputRef.current?.click()}
-                      className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden mx-auto md:mx-0"
-                    >
-                      {logoPreview || formData.logoUrl ? (
-                        <img src={logoPreview || formData.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
+                    <div className="w-full">
+                      {formData.logoUrl ? (
+                        <div className="w-32 h-32 bg-slate-950 rounded-3xl overflow-hidden relative mx-auto md:mx-0 border border-slate-800">
+                          <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                          <button onClick={() => setFormData({...formData, logoUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       ) : (
-                        <>
-                          <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
-                          <span className="text-[10px] font-bold text-slate-600">Square SVG/PNG</span>
-                        </>
+                        <FileUpload
+                          ownerUid={user?.uid || ''}
+                          module="businesses"
+                          label="Upload Logo"
+                          onUploadSuccess={(asset) => setFormData({ ...formData, logoUrl: asset.downloadUrl })}
+                        />
                       )}
                     </div>
                   </div>
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cover Image</label>
-                    <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'cover')} />
-                    <div 
-                      onClick={() => coverInputRef.current?.click()}
-                      className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
-                    >
-                      {coverPreview || formData.coverImageUrl ? (
-                        <img src={coverPreview || formData.coverImageUrl} alt="Cover Preview" className="w-full h-full object-cover" />
+                    <div className="w-full">
+                      {formData.coverImageUrl ? (
+                        <div className="w-full h-32 bg-slate-950 rounded-3xl overflow-hidden relative border border-slate-800">
+                          <img src={formData.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                          <button onClick={() => setFormData({...formData, coverImageUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       ) : (
-                        <>
-                          <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
-                          <span className="text-[10px] font-bold text-slate-600">Landscape 16:9</span>
-                        </>
+                        <FileUpload
+                          ownerUid={user?.uid || ''}
+                          module="businesses"
+                          label="Upload Cover"
+                          onUploadSuccess={(asset) => setFormData({ ...formData, coverImageUrl: asset.downloadUrl })}
+                        />
                       )}
                     </div>
                   </div>

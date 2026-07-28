@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cartService } from '../../services/cartService';
+import { checkoutService } from '../../services/checkoutService';
 import { getFirebaseDb } from '../../firebase/config';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { Cart, CartItem } from '../../types';
@@ -479,15 +480,32 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 
           <div className="space-y-3">
             <button 
-              onClick={() => {
-                // Go to checkout session for first cart
+              onClick={async () => {
                 if (carts.length > 0) {
-                  navigate(`/checkout/${carts[0].cartId}`);
+                  try {
+                    setActionLoading('checkout');
+                    // In a real multi-cart scenario, you might merge carts or pick one. Here we just pick the first.
+                    // Or we could pass the entire subtotal/total.
+                    const cart = carts[0];
+                    // Make sure totals match the universal cart
+                    cart.subtotal = subtotal;
+                    cart.shipping = estimatedCharges;
+                    cart.grandTotal = finalTotal;
+                    
+                    const sessionId = await checkoutService.createSession(cart, userUid, carts.map(c => c.cartId));
+                    navigate(`/checkout/${sessionId}`);
+                  } catch (e) {
+                    console.error('Failed to create session:', e);
+                    alert('Could not initiate checkout');
+                  } finally {
+                    setActionLoading(null);
+                  }
                 }
               }}
-              className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-violet-600/10 cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+              disabled={actionLoading === 'checkout'}
+              className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-violet-600/10 cursor-pointer flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
-              <span>Proceed to Checkout</span>
+              {actionLoading === 'checkout' ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Proceed to Checkout</span>}
               <ArrowRight className="w-4 h-4" />
             </button>
 
