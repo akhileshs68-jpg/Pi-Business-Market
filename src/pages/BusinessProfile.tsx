@@ -5,7 +5,9 @@ import { businessProfileService } from '../services/businessProfileService';
 import { BUSINESS_PROFILE_CONFIG } from '../config/businessProfileConfig';
 import { BusinessProfileForm } from '../components/BusinessProfileForm';
 import Navbar from '../components/Navbar';
-import { Edit2, Eye, MapPin, Mail, Phone, Globe, Shield, Star, Briefcase, ExternalLink, Camera } from 'lucide-react';
+import { Edit2, Eye, MapPin, Mail, Phone, Globe, Shield, Star, Briefcase, ExternalLink, Camera, MessageSquare } from 'lucide-react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getFirebaseDb } from '../firebase/config';
 
 export const BusinessProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>(); // This could be businessId, storeId, etc.
@@ -16,6 +18,41 @@ export const BusinessProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [storeProducts, setStoreProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchStoreItems = async () => {
+      if (!profileData?.ownerUid) return;
+      try {
+        const db = getFirebaseDb();
+        const collectionName = profileData.businessType === 'service provider' || profileData.businessType === 'services' ? 'services' : 'products';
+        const q = query(
+          collection(db, collectionName),
+          where('ownerUid', '==', profileData.ownerUid)
+        );
+        const snap = await getDocs(q);
+        const list = snap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.productName || data.serviceName || data.name || data.title || 'Untitled',
+            price: typeof data.price === 'string' ? parseFloat(data.price) : (data.price || 0),
+            currency: data.currency || 'π',
+            oldPrice: typeof data.oldPrice === 'string' ? parseFloat(data.oldPrice) : (data.oldPrice || data.discount || 0),
+            image: data.imageUrl || data.image || data.coverImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+            category: data.category || 'General',
+            rating: typeof data.rating === 'number' ? data.rating : (data.rating ? parseFloat(data.rating) : 4.8),
+            reviews: typeof data.reviews === 'number' ? data.reviews : (data.reviewCount || 12),
+            type: collectionName === 'services' ? 'service' : 'product'
+          };
+        });
+        setStoreProducts(list);
+      } catch (err) {
+        console.error("Error fetching store items:", err);
+      }
+    };
+    fetchStoreItems();
+  }, [profileData]);
 
   // If there is no ID, we are trying to edit the active role of the current user.
   useEffect(() => {
@@ -84,6 +121,18 @@ export const BusinessProfile: React.FC = () => {
   const roleConfig = BUSINESS_PROFILE_CONFIG[role] || BUSINESS_PROFILE_CONFIG['seller'];
   const isOwner = user && profileData && user.uid === profileData.ownerUid;
 
+  const handleMessageBusiness = () => {
+    if (!profileData || !user) return;
+    navigate('/inbox', {
+      state: {
+        targetUid: profileData.ownerUid,
+        targetName: profileData.businessName,
+        contextType: 'business_customer',
+        contextId: profileData.businessId || profileData.ownerUid
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
       <Navbar 
@@ -138,6 +187,16 @@ export const BusinessProfile: React.FC = () => {
               <h1 className="text-3xl font-black text-white tracking-tight">{profileData?.businessName || 'Unnamed Business'}</h1>
               <p className="text-slate-400 font-medium">{profileData?.category || 'No category specified'}</p>
             </div>
+            {!isOwner && profileData && (
+              <div className="pb-2 shrink-0">
+                <button 
+                  onClick={handleMessageBusiness}
+                  className="px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4" /> Message {role}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -149,7 +208,8 @@ export const BusinessProfile: React.FC = () => {
             onSave={handleSave}
           />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
               {/* Description */}
               <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8">
@@ -246,7 +306,44 @@ export const BusinessProfile: React.FC = () => {
               )}
             </div>
           </div>
-        )}
+          
+          {/* Our Products & Services list */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 mt-8 col-span-1 lg:col-span-3">
+            <h3 className="text-lg font-bold text-white mb-6">Our Products & Services</h3>
+            {storeProducts.length === 0 ? (
+              <p className="text-slate-500 text-sm font-semibold">No products or services listed yet.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {storeProducts.map((prod) => (
+                  <div 
+                    key={prod.id}
+                    onClick={() => navigate(`/product/${prod.id}`)}
+                    className="group bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-violet-500/30 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col h-full shadow-lg relative"
+                  >
+                    <div className="relative aspect-square w-full overflow-hidden bg-slate-950">
+                      <img 
+                        src={prod.image} 
+                        alt={prod.title} 
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="p-3 flex flex-col flex-1 justify-between gap-1">
+                      <h4 className="text-xs font-bold text-slate-200 line-clamp-2 leading-tight group-hover:text-violet-400 transition-colors">
+                        {prod.title}
+                      </h4>
+                      <div className="pt-2 border-t border-slate-800/40 flex items-baseline gap-1 mt-2">
+                        <span className="font-mono text-sm font-black text-white">{prod.price}</span>
+                        <span className="text-violet-400 text-[10px] font-black">{prod.currency}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
       </div>
     </div>
   );

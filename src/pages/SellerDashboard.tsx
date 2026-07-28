@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { SellerDashboard } from '../components/seller/SellerDashboard';
@@ -7,17 +7,38 @@ import { ShieldAlert, RefreshCw, ArrowLeft, Store, Briefcase } from 'lucide-reac
 export const SellerDashboardPage: React.FC = () => {
   const { user, loading, updateUser } = useAuth();
   const navigate = useNavigate();
+  const [isSwitching, setIsSwitching] = useState(false);
 
-  if (loading) {
+  // Support case-insensitive "Seller" role checks
+  const activeRole = (user as any)?.activeRole || (user as any)?.role || '';
+  const isSeller = activeRole.toLowerCase() === 'seller';
+  
+  const userRoles = (user as any)?.roles || [];
+  const hasSellerRole = userRoles.map((r: string) => r.toLowerCase()).includes('seller');
+
+  useEffect(() => {
+    if (user && !isSeller && hasSellerRole && !isSwitching) {
+      setIsSwitching(true);
+      updateUser({ activeRole: 'Seller' }).catch((err: any) => {
+        console.error('Auto switch failed:', err);
+        setIsSwitching(false);
+      });
+    }
+  }, [user, isSeller, hasSellerRole, updateUser, isSwitching]);
+
+  if (loading || isSwitching) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col items-center justify-center p-6">
         <RefreshCw className="w-8 h-8 text-violet-500 animate-spin" />
-        <p className="text-xs font-mono text-slate-500 mt-4 uppercase tracking-widest">Verifying merchant credentials...</p>
+        <p className="text-xs font-mono text-slate-500 mt-4 uppercase tracking-widest">
+          {isSwitching ? 'Switching to Seller account...' : 'Verifying merchant credentials...'}
+        </p>
       </div>
     );
   }
 
   if (!user) {
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col items-center justify-center p-6 text-center">
         <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl mb-6">
@@ -35,9 +56,6 @@ export const SellerDashboardPage: React.FC = () => {
     );
   }
 
-  // Support case-insensitive "Seller" role checks
-  const activeRole = (user as any).activeRole || user.role || '';
-  const isSeller = activeRole.toLowerCase() === 'seller';
 
   if (!isSeller) {
     return (
@@ -50,30 +68,16 @@ export const SellerDashboardPage: React.FC = () => {
           The current active identity is <span className="text-amber-400 font-bold">"{activeRole || 'Buyer'}"</span>.
           This console is strictly reserved for verified Pi merchants with an active Seller role.
         </p>
-
+        
         <div className="mt-8 space-y-3 w-full">
           <button 
-            onClick={async () => {
-              try {
-                await updateUser({ activeRole: 'Seller' });
-              } catch (err) {
-                console.error('Failed to update active role:', err);
-              }
-            }}
+            onClick={() => navigate('/profile')}
             className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-violet-600/10"
           >
             <Store className="w-4 h-4" />
-            Switch Active Role to Seller
+            Become a Seller
           </button>
-
-          <button 
-            onClick={() => navigate('/profile')}
-            className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-slate-900 hover:bg-slate-850 border border-slate-850 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
-          >
-            <Briefcase className="w-4 h-4" />
-            Onboard New Role / Edit Profile
-          </button>
-
+          
           <button 
             onClick={() => navigate('/discovery')}
             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-transparent text-slate-500 hover:text-slate-300 text-xs font-bold transition-all cursor-pointer"

@@ -2,17 +2,37 @@ import { collection, doc, setDoc, getDoc, getDocs, query, where, serverTimestamp
 import { getFirebaseDb } from '../firebase/config';
 
 export const businessProfileService = {
-  async getProfile(ownerUid: string, roleId: string) {
+    async getProfile(ownerUid: string, roleId: string) {
     const db = getFirebaseDb();
-    const q = query(
+    
+    // First try the legacy way just in case
+    let q = query(
       collection(db, 'businesses'),
       where('ownerUid', '==', ownerUid),
       where('businessType', '==', roleId)
     );
-    const snap = await getDocs(q);
+    let snap = await getDocs(q);
+    
+    if (snap.empty) {
+      // Fallback: Just find ANY business owned by this user
+      q = query(
+        collection(db, 'businesses'),
+        where('ownerUid', '==', ownerUid)
+      );
+      snap = await getDocs(q);
+    }
+    
     if (!snap.empty) {
       return { id: snap.docs[0].id, ...snap.docs[0].data() };
     }
+    
+    // Also check legacy businessProfiles collection just in case
+    const legacyQ = query(collection(db, 'businessProfiles'), where('ownerUid', '==', ownerUid));
+    const legacySnap = await getDocs(legacyQ);
+    if (!legacySnap.empty) {
+      return { id: legacySnap.docs[0].id, ...legacySnap.docs[0].data() };
+    }
+
     return null;
   },
 

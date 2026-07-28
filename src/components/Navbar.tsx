@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ShoppingBag,
   Wallet,
@@ -55,6 +56,9 @@ interface NavbarProps {
   walletBalance: number;
   onWalletUpdate: (newBalance: number) => void;
   onToggleCart: () => void;
+  searchQuery?: string;
+  onSearchChange?: (val: string) => void;
+  onSearchSubmit?: (val: string) => void;
 }
 
 export default function Navbar({
@@ -64,8 +68,14 @@ export default function Navbar({
   cartCount,
   walletBalance,
   onWalletUpdate,
-  onToggleCart
+  onToggleCart,
+  searchQuery,
+  onSearchChange,
+  onSearchSubmit
 }: NavbarProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [localSearchVal, setLocalSearchVal] = useState('');
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -104,18 +114,48 @@ export default function Navbar({
   };
 
   const getBottomNavItems = () => {
-    const homeItem = navItems.find(item => item.id === 'home');
-    const profileItem = navItems.find(item => item.id === 'profile');
+    return [
+      { id: 'home', label: 'Home', iconName: 'Home', view: 'discovery' },
+      { id: 'discover', label: 'Discover', iconName: 'Compass', view: 'discovery' },
+      { id: 'sell', label: 'Sell', iconName: 'ShoppingBag', view: 'store-dashboard' },
+      { id: 'inbox', label: 'Inbox', iconName: 'MessageSquare', view: 'inbox' },
+      { id: 'profile', label: 'Profile', iconName: 'User', view: 'profile' }
+    ];
+  };
+
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/inbox') return 'inbox';
+    if (path === '/profile') return 'profile';
+    if (
+      path.startsWith('/store-dashboard') || 
+      path.startsWith('/dashboard') || 
+      path.startsWith('/catalog') || 
+      path.startsWith('/business-dashboard')
+    ) {
+      return 'sell';
+    }
+    if (path === '/discovery' || path === '/') {
+      const hasQuery = searchQuery && searchQuery.trim() !== '';
+      return hasQuery ? 'discover' : 'home';
+    }
     
-    // Get up to 3 other items that are not home or profile
-    const middleItems = navItems.filter(item => item.id !== 'home' && item.id !== 'profile').slice(0, 3);
-    
-    const items = [];
-    if (homeItem) items.push(homeItem);
-    items.push(...middleItems);
-    if (profileItem) items.push(profileItem);
-    
-    return items;
+    // Fallbacks using currentView
+    if (currentView === 'inbox') return 'inbox';
+    if (currentView === 'profile') return 'profile';
+    if (
+      currentView === 'store-dashboard' || 
+      currentView === 'dashboard' || 
+      currentView === 'catalog' || 
+      currentView === 'business_dashboard'
+    ) {
+      return 'sell';
+    }
+    if (currentView === 'discovery') {
+      const hasQuery = searchQuery && searchQuery.trim() !== '';
+      return hasQuery ? 'discover' : 'home';
+    }
+    return 'home';
   };
 
   // Lock scroll, keyboard capture, and restore scroll position
@@ -193,188 +233,106 @@ export default function Navbar({
     };
   }, [isMobileMenuOpen]);
 
-  const handleFaucet = () => {
-    setFaucetLoading(true);
-    setTimeout(() => {
-      const updated = PiSdkSim.requestFaucet();
-      onWalletUpdate(updated);
-      setFaucetLoading(false);
-    }, 800);
-  };
-
   return (
     <header className="sticky top-0 z-50 w-full bg-slate-950/80 backdrop-blur-md border-b border-slate-900 shadow-lg shadow-violet-950/5 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2.5 sm:gap-4">
+        
         {/* LOGO SECTION */}
         <div 
-          onClick={() => onNavigate('marketplace')}
-          className="flex items-center gap-2 cursor-pointer group select-none shrink-0"
+          onClick={() => onNavigate('discovery')}
+          className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group select-none shrink-0"
           id="nav_logo_container"
         >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-violet-500/10 group-hover:scale-105 transition-transform border border-violet-500/20">
-            <span className="font-bold text-base sm:text-lg tracking-wider">π</span>
+          <div className="w-7.5 h-7.5 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-violet-500/10 group-hover:scale-105 transition-transform border border-violet-500/20">
+            <span className="font-bold text-sm sm:text-lg tracking-wider">π</span>
           </div>
-          <div className="hidden xs:block">
+          <div className="hidden sm:block">
             <h1 className="font-sans font-bold text-xs sm:text-base text-slate-100 tracking-tight leading-none flex items-center gap-1">
-              <span className="truncate max-w-[80px] sm:max-w-none">Pi Market</span>
+              <span className="truncate">Pi Marketplace</span>
               <span className="text-[7px] sm:text-[9px] font-mono font-bold uppercase px-1 py-0.5 bg-amber-500/10 text-amber-400 rounded-md border border-amber-500/20">
                 SB
               </span>
             </h1>
-            <p className="hidden sm:block text-[10px] text-slate-500 font-medium mt-1">Web3 Commerce</p>
+            <p className="hidden sm:block text-[10px] text-slate-500 font-medium mt-1">Decentralized Web3 Commerce</p>
           </div>
         </div>
 
-        {/* NAVIGATION / CONTROL TOOLS */}
-        <div className="flex items-center gap-1.5 sm:gap-3 ml-auto">
+        {/* UNIVERSAL SEARCH BAR CENTER */}
+        <div className="flex items-center flex-1 mx-1 sm:mx-4" id="nav_center_search">
+          <div className="relative w-full group">
+            <input
+              type="text"
+              value={searchQuery !== undefined ? searchQuery : localSearchVal}
+              onChange={(e) => {
+                if (onSearchChange) {
+                  onSearchChange(e.target.value);
+                } else {
+                  setLocalSearchVal(e.target.value);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = searchQuery !== undefined ? searchQuery : localSearchVal;
+                  if (onSearchSubmit) {
+                    onSearchSubmit(val);
+                  } else {
+                    onNavigate('discovery');
+                    navigate('/discovery', { state: { query: val } });
+                  }
+                }
+              }}
+              onClick={() => {
+                if (currentView !== 'discovery') {
+                  onNavigate('discovery');
+                }
+              }}
+              placeholder="Search products..."
+              className="w-full bg-slate-900 border border-slate-850 focus:border-violet-500 rounded-xl py-1.5 pl-7 sm:pl-9 pr-3 text-[10px] sm:text-xs font-bold text-white placeholder:text-slate-600 outline-none transition-all shadow-inner"
+            />
+            <Search className="absolute left-2.5 top-2.5 sm:left-3 sm:top-3 w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500" />
+          </div>
+        </div>
+
+        {/* NAVIGATION / CONTROL TOOLS RIGHT */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
-          {/* DESKTOP-ONLY LINKS CONTAINER */}
-          <div className="hidden xl:flex items-center gap-3" id="nav_desktop_links">
-            {navItems.map((item) => {
-              const Icon = getIconComponent(item.iconName);
-              const isActive = currentView === item.view;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.view === 'docs') {
-                      window.location.href = '/docs';
-                    } else {
-                      onNavigate(item.view);
-                    }
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-violet-600 text-white border-violet-500/35 shadow-md shadow-violet-500/10'
-                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 text-violet-400" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* MOBILE TOGGLE (COMPACT CLASS FOR VIEWPORTS < XL) */}
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(!isMobileMenuOpen);
-              setIsWalletOpen(false);
-            }}
-            className="xl:hidden p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer select-none"
-            id="btn_nav_mobile_toggle"
-            aria-label="Toggle navigation menu"
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-
-
-          {/* SIMULATED PI WALLET STATUS */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            <button
-              onClick={() => onNavigate('rewards')}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-500/20 bg-indigo-600/10 hover:bg-indigo-600/20 transition-all cursor-pointer"
-            >
-              <Award className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest hidden md:inline">Rewards</span>
-            </button>
-
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setIsWalletOpen(!isWalletOpen);
-                }}
-                className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-850 transition-all cursor-pointer"
-                id="nav_wallet_button"
-              >
-              <Wallet className="w-3.5 h-3.5 text-violet-400" />
-              <div className="text-left font-mono text-[10px] sm:text-xs font-bold text-slate-200">
-                {walletBalance.toFixed(1)} <span className="text-violet-400 font-bold">π</span>
-              </div>
-              <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform hidden xs:block ${isWalletOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* WALLET DROPDOWN SHEET */}
-            {isWalletOpen && (
-              <div className="absolute right-0 mt-2.5 w-72 bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl p-4.5 z-50 animate-fade-in">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pi Wallet Simulator</span>
-                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-bold">Verified Active</span>
-                </div>
-                
-                <div className="bg-gradient-to-br from-violet-950 to-indigo-950 rounded-xl p-3.5 text-white mb-4 shadow-inner border border-violet-800/20 relative overflow-hidden">
-                  <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-20 h-20 rounded-full bg-violet-600/10"></div>
-                  <span className="text-[9px] text-violet-300 uppercase tracking-wider font-semibold font-mono">Consensus balance</span>
-                  <p className="text-2xl font-mono font-bold tracking-tight mt-1 flex items-baseline gap-1 text-slate-100">
-                    {walletBalance.toFixed(2)} <span className="text-amber-400">π</span>
-                  </p>
-                  <p className="text-[9px] text-slate-400 font-mono mt-1.5 select-all truncate bg-slate-950/40 px-1.5 py-1 rounded">
-                    {currentUser?.walletAddress || 'GUEST-WALLET-XXXXXXXX'}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <button
-                    onClick={handleFaucet}
-                    disabled={faucetLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-700 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-md"
-                  >
-                    {faucetLoading ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <PlusCircle className="w-3.5 h-3.5" />
-                    )}
-                    <span>Mine Sandbox Pi (+50 π Faucet)</span>
-                  </button>
-                  
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 mt-2 px-1 font-mono">
-                    <span>Platform: Testnet Node</span>
-                    <span>Gas: ~0.01 π</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
           {/* ACTIVE NOTIFICATIONS BUTTON */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            <button
-              onClick={() => onNavigate('inbox')}
-              className={`p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-all ${
-                currentView === 'inbox' ? 'text-indigo-400 bg-slate-900 border-slate-800' : ''
-              }`}
-              title="Messages"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-            <NotificationCenter />
-          </div>
-
-          {/* ACTIVE CUSTOMER ORDERS / PURCHASES HUB */}
-          <button
-            onClick={() => onNavigate('orders')}
-            className={`hidden xs:flex p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-900 border transition-all ${
-              currentView === 'orders' ? 'bg-slate-900 text-violet-400 border-slate-800' : 'border-transparent'
-            }`}
-            title="My Orders"
-          >
-            <Clock className="w-4 h-4" />
-          </button>
+          <NotificationCenter />
 
           {/* VISUAL CART TOGGLE */}
           <button
             onClick={() => setIsCartOpen(true)}
-            className="p-2 rounded-lg sm:rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition-all relative flex items-center gap-1 sm:gap-1.5 cursor-pointer shadow-md border border-violet-500/30"
+            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition-all relative flex items-center gap-1 sm:gap-1.5 cursor-pointer shadow-md border border-violet-500/30"
             id="nav_cart_button"
           >
-            <ShoppingBag className="w-4 h-4" />
+            <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {cartCount > 0 && (
-              <span className="text-[9px] sm:text-[10px] font-bold font-mono px-1 sm:px-1.5 py-0.5 bg-white text-violet-950 rounded-md">
+              <span className="text-[8px] sm:text-[10px] font-bold font-mono px-1 sm:px-1.5 py-0.5 bg-white text-violet-950 rounded-md">
                 {cartCount}
               </span>
             )}
+          </button>
+
+          {/* PROFILE ICON (OPENS PROFILE PAGE) */}
+          <button
+            onClick={() => onNavigate('profile')}
+            className={`p-0.5 rounded-full border transition-all cursor-pointer ${
+              currentView === 'profile' ? 'bg-violet-600 border-violet-500' : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+            }`}
+            title="My Profile"
+          >
+            <div className="w-6.5 h-6.5 sm:w-8 sm:h-8 rounded-full overflow-hidden bg-slate-950 flex items-center justify-center">
+              {currentUser?.photoUrl ? (
+                <img 
+                  src={currentUser.photoUrl} 
+                  alt={currentUser.displayName || 'Pioneer'} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <User className="w-3.5 h-3.5 text-violet-400" />
+              )}
+            </div>
           </button>
 
         </div>
@@ -455,9 +413,9 @@ export default function Navbar({
                 {/* Symmetrical Scrollable Sections */}
                 <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{activeRoleStr.toUpperCase()} Navigation</h4>
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Marketplace Navigation</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      {navItems.map((item) => {
+                      {getBottomNavItems().map((item) => {
                         const Icon = getIconComponent(item.iconName);
                         const isActive = currentView === item.view;
                         return (
@@ -514,17 +472,50 @@ export default function Navbar({
       document.body
     )}
 
-    {/* MOBILE BOTTOM NAVIGATION BAR - PREMIUM GLASS DESIGN WITH ACTIVE GLOWS */}
-    <nav className="fixed bottom-0 left-0 right-0 z-50 xl:hidden bg-[#080d19]/80 backdrop-blur-xl border-t border-slate-900 px-2 pb-safe shadow-[0_-8px_32px_0_rgba(0,0,0,0.5)]">
+    {/* BOTTOM NAVIGATION BAR - PREMIUM GLASS DESIGN WITH ACTIVE GLOWS */}
+    <nav 
+      className="fixed bottom-0 left-0 right-0 z-50 bg-[#080d19]/90 backdrop-blur-xl border-t border-slate-900 px-2 shadow-[0_-8px_32px_0_rgba(0,0,0,0.5)]"
+      style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom))' }}
+    >
       <div className="flex items-center justify-around h-16 max-w-md mx-auto relative">
         {getBottomNavItems().map((item) => {
           const Icon = getIconComponent(item.iconName);
-          const isActive = currentView === item.view;
+          const activeTabId = getActiveTab();
+          const isActive = activeTabId === item.id;
+          const isSell = item.id === 'sell';
+
+          if (isSell) {
+            return (
+              <button 
+                key={item.id}
+                onClick={() => onNavigate(item.view)}
+                className="flex flex-col items-center justify-center flex-1 h-full relative focus:outline-none -top-2.5"
+                id="nav_bottom_sell_fab"
+              >
+                <motion.div 
+                  whileTap={{ scale: 0.88 }} 
+                  className="flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 border border-violet-400/20 shadow-lg shadow-violet-500/30 text-white"
+                >
+                  <Icon className="w-5 h-5" />
+                </motion.div>
+                <span className="text-[7.5px] font-black uppercase tracking-widest mt-1 text-slate-400">
+                  {item.label}
+                </span>
+              </button>
+            );
+          }
+
           return (
             <button 
               key={item.id}
               onClick={() => {
-                if (item.view === 'docs') {
+                if (item.id === 'home') {
+                  if (onSearchChange) onSearchChange('');
+                  if (onSearchSubmit) onSearchSubmit('');
+                  onNavigate('discovery');
+                } else if (item.id === 'discover') {
+                  onNavigate('discovery');
+                } else if (item.view === 'docs') {
                   window.location.href = '/docs';
                 } else {
                   onNavigate(item.view);

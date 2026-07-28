@@ -90,4 +90,195 @@ html, body {
   }
 }
 
+/* ==========================================================================
+   UNIVERSAL THEME ENGINE OVERRIDES
+   ========================================================================== */
+
+/* Smooth, high-performance transitions for a premium application feel */
+body, 
+div:not([id^="promo_banner_slideshow"]), 
+h1, h2, h3, h4, h5, h6, 
+p, span, button, input, textarea, select, 
+a, header, nav, main, section, footer, svg, img {
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              color 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              fill 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* LIGHT THEME OVERRIDES */
+.theme-light, [data-theme="light"] {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+.theme-light body {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+/* Background Color Overrides for Containers & Layouts */
+.theme-light .bg-slate-950 { background-color: #f8fafc !important; }
+.theme-light .bg-slate-900 { background-color: #ffffff !important; }
+.theme-light .bg-slate-900\/40 { background-color: rgba(255, 255, 255, 0.7) !important; }
+.theme-light .bg-slate-900\/60 { background-color: rgba(241, 245, 249, 0.75) !important; }
+.theme-light .bg-slate-900\/80 { background-color: rgba(255, 255, 255, 0.9) !important; }
+.theme-light .bg-slate-950\/40 { background-color: rgba(241, 245, 249, 0.6) !important; }
+.theme-light .bg-slate-950\/60 { background-color: rgba(241, 245, 249, 0.8) !important; }
+.theme-light .bg-slate-950\/80 { background-color: rgba(255, 255, 255, 0.8) !important; }
+.theme-light .bg-slate-950\/30 { background-color: rgba(241, 245, 249, 0.5) !important; }
+.theme-light .bg-slate-950\/20 { background-color: rgba(241, 245, 249, 0.4) !important; }
+.theme-light .bg-slate-950\/40 { background-color: rgba(241, 245, 249, 0.6) !important; }
+.theme-light .bg-slate-950\/10 { background-color: rgba(241, 245, 249, 0.3) !important; }
+.theme-light .bg-slate-950/20 { background-color: rgba(241, 245, 249, 0.4) !important; }
+.theme-light .bg-slate-900/10 { background-color: rgba(241, 245, 249, 0.2) !important; }
+.theme-light .bg-slate-950\/15 { background-color: rgba(241, 245, 249, 0.35) !important; }
+.theme-light .bg-slate-950\/50 { background-color: rgba(241, 245, 249, 0.7) !important; }
+.theme-light .bg-slate-950\/90 { background-color: rgba(255, 255, 255, 0.95) !important; }
+.theme-light .bg-slate-850 { background-color: #f1f5f9 !important; }
+.theme-light .bg-slate-800 { background-color: #e2e8f0 !important; }
+
+/* Interactive Hover state overrides */
+.theme-light .hover\:bg-slate-900:hover { background-color: #f1f5f9 !important; }
+.theme-light .hover\:bg-slate-850:hover { background-color: #e2e8f0 !important; }
+.theme-light .hover\:bg-slate-800:hover { background-color: #cbd5e1 !important; }
+.theme-light .hover\:bg-slate-950:hover { background-color: #f1f5f9 !important; }
+.theme-light .group-hover\:text-violet-400 { color: #6d28d9 !important; }
+
+/* Border Overrides */
+.theme-light .border-slate-900 { border-color: #e2e8f0 !important; }
+.theme-light .border-slate-900\/80 { border-color: #e2e8f0 !important; }
+.theme-light .border-slate-900\/60 { border-color: #e2e8f0 !important; }
+.theme-light .border-slate-850 { border-color: #e2e8f0 !important; }
+.theme-light .border-slate-800 { border-color: #cbd5e1 !important; }
+.theme-light .border-slate-800\/20 { border-color: rgba(109, 40, 217, 0.15) !important; }
+.theme-light .border-slate-750 { border-color: #cbd5e1 !important; }
+.theme-light .border-slate-950 { border-color: #e2e8f0 !important; }
+.theme-light .border-transparent { border-color: transparent !important; }
+
+/* Typography/Text Color Overrides */
+.theme-light .text-white { color: #0f172a !important; }
+.theme-light .text-slate-100 { color: #1e293b !important; }
+.theme-light .text-slate-200 { color: #334155 !important; }
+.theme-light .text-slate-250 { color: #1e293b !important; }
+.theme-light .text-slate-300 { color: #475569 !important; }
+.theme-light .text-slate-400 { color: #475569 !important; }
+.theme-light .text-slate-500 { color: #64748b !important; }
+.theme-light .text-slate-600 { color: #94a3b8 !important; }
+.theme-light .text-slate-700 { color: #cbd5e1 !important; }
+.theme-light .text-slate-800 { color: #cbd5e1 !important; }
+
+/* Buttons & Navigation Overrides in Light mode */
+.theme-light .bg-violet-600\/15 { background-color: rgba(109, 40, 217, 0.1) !important; }
+.theme-light .bg-violet-600\/10 { background-color: rgba(109, 40, 217, 0.08) !important; }
+.theme-light .bg-violet-500\/10 { background-color: rgba(109, 40, 217, 0.08) !important; }
+.theme-light .bg-violet-950\/15 { background-color: rgba(109, 40, 217, 0.05) !important; }
+.theme-light .bg-violet-950/15 { background-color: rgba(109, 40, 217, 0.05) !important; }
+.theme-light .bg-emerald-500\/10 { background-color: rgba(16, 185, 129, 0.12) !important; }
+.theme-light .bg-rose-500\/10 { background-color: rgba(244, 63, 94, 0.12) !important; }
+.theme-light .bg-amber-500\/10 { background-color: rgba(245, 158, 11, 0.12) !important; }
+.theme-light .bg-rose-500/5 { background-color: rgba(244, 63, 94, 0.05) !important; }
+
+/* Modal and dialog specific backdrops for light mode */
+.theme-light .bg-slate-950\/80 { background-color: rgba(15, 23, 42, 0.5) !important; }
+
+/* Banner and Premium Accents in Light Theme */
+.theme-light .from-violet-900 { --tw-gradient-from: #eddcfc !important; --tw-gradient-to: #d8b4fe !important; }
+.theme-light .via-indigo-950 { --tw-gradient-via: #e0f2fe !important; }
+.theme-light .to-slate-950 { --tw-gradient-to: #f8fafc !important; }
+.theme-light .from-emerald-950 { --tw-gradient-from: #d1fae5 !important; --tw-gradient-to: #a7f3d0 !important; }
+.theme-light .via-teal-950 { --tw-gradient-via: #f0fdf4 !important; }
+.theme-light .from-pink-950 { --tw-gradient-from: #fce7f3 !important; --tw-gradient-to: #fbcfe8 !important; }
+.theme-light .via-violet-950 { --tw-gradient-via: #faf5ff !important; }
+
+
+/* PI SIGNATURE THEME OVERRIDES (Luxurious dark purple and rich warm gold theme) */
+.theme-pi-signature, [data-theme="pi-signature"] {
+  background-color: #120320 !important;
+  color: #fef3c7 !important;
+}
+
+.theme-pi-signature body {
+  background-color: #120320 !important;
+  color: #fef3c7 !important;
+}
+
+/* Background Color Overrides for Pi Signature */
+.theme-pi-signature .bg-slate-950 { background-color: #120320 !important; }
+.theme-pi-signature .bg-slate-900 { background-color: #1e0933 !important; }
+.theme-pi-signature .bg-slate-900\/40 { background-color: rgba(30, 9, 51, 0.6) !important; }
+.theme-pi-signature .bg-slate-900\/60 { background-color: rgba(25, 7, 43, 0.75) !important; }
+.theme-pi-signature .bg-slate-900\/80 { background-color: rgba(30, 9, 51, 0.85) !important; }
+.theme-pi-signature .bg-slate-950\/40 { background-color: rgba(18, 5, 32, 0.5) !important; }
+.theme-pi-signature .bg-slate-950\/60 { background-color: rgba(18, 5, 32, 0.7) !important; }
+.theme-pi-signature .bg-slate-950\/80 { background-color: rgba(18, 5, 32, 0.9) !important; }
+.theme-pi-signature .bg-slate-950\/30 { background-color: rgba(18, 5, 32, 0.4) !important; }
+.theme-pi-signature .bg-slate-950\/20 { background-color: rgba(18, 5, 32, 0.3) !important; }
+.theme-pi-signature .bg-slate-950\/10 { background-color: rgba(18, 5, 32, 0.2) !important; }
+.theme-pi-signature .bg-slate-950/20 { background-color: rgba(18, 5, 32, 0.3) !important; }
+.theme-pi-signature .bg-slate-900/10 { background-color: rgba(30, 9, 51, 0.1) !important; }
+.theme-pi-signature .bg-slate-950\/15 { background-color: rgba(18, 5, 32, 0.25) !important; }
+.theme-pi-signature .bg-slate-950\/50 { background-color: rgba(18, 5, 32, 0.6) !important; }
+.theme-pi-signature .bg-slate-950\/90 { background-color: rgba(18, 5, 32, 0.95) !important; }
+.theme-pi-signature .bg-slate-850 { background-color: #270d42 !important; }
+.theme-pi-signature .bg-slate-800 { background-color: #331254 !important; }
+
+/* Interactive Hover state overrides */
+.theme-pi-signature .hover\:bg-slate-900:hover { background-color: #270d42 !important; }
+.theme-pi-signature .hover\:bg-slate-850:hover { background-color: #2f104e !important; }
+.theme-pi-signature .hover\:bg-slate-800:hover { background-color: #3b1461 !important; }
+.theme-pi-signature .hover\:bg-slate-950:hover { background-color: #120320 !important; }
+.theme-pi-signature .group-hover\:text-violet-400 { color: #f5c242 !important; }
+
+/* Border Overrides - golden accents on borders */
+.theme-pi-signature .border-slate-900 { border-color: rgba(245, 194, 66, 0.15) !important; }
+.theme-pi-signature .border-slate-900\/80 { border-color: rgba(245, 194, 66, 0.12) !important; }
+.theme-pi-signature .border-slate-900\/60 { border-color: rgba(245, 194, 66, 0.1) !important; }
+.theme-pi-signature .border-slate-850 { border-color: rgba(245, 194, 66, 0.15) !important; }
+.theme-pi-signature .border-slate-800 { border-color: rgba(245, 194, 66, 0.2) !important; }
+.theme-pi-signature .border-slate-800\/20 { border-color: rgba(245, 194, 66, 0.15) !important; }
+.theme-pi-signature .border-slate-750 { border-color: rgba(245, 194, 66, 0.18) !important; }
+.theme-pi-signature .border-slate-950 { border-color: #120320 !important; }
+
+/* Typography/Text Color Overrides - rich golden hues */
+.theme-pi-signature .text-white { color: #fef3c7 !important; }
+.theme-pi-signature .text-slate-100 { color: #fde68a !important; }
+.theme-pi-signature .text-slate-200 { color: #fde68a !important; }
+.theme-pi-signature .text-slate-250 { color: #fef3c7 !important; }
+.theme-pi-signature .text-slate-300 { color: #f5c242 !important; }
+.theme-pi-signature .text-slate-400 { color: #f5c242 !important; }
+.theme-pi-signature .text-slate-500 { color: #b45309 !important; }
+.theme-pi-signature .text-slate-600 { color: #b45309 !important; }
+.theme-pi-signature .text-slate-700 { color: #3b1461 !important; }
+.theme-pi-signature .text-slate-800 { color: #3b1461 !important; }
+
+/* Premium Highlight Accents (Violet shifts to Gold) */
+.theme-pi-signature .text-violet-400 { color: #fde68a !important; }
+.theme-pi-signature .text-violet-500 { color: #fde68a !important; }
+.theme-pi-signature .bg-violet-600 { background-color: #eab308 !important; color: #120320 !important; }
+.theme-pi-signature .hover\:bg-violet-500:hover { background-color: #facc15 !important; }
+.theme-pi-signature .focus-within\:border-violet-500\/80 { border-color: #eab308 !important; }
+.theme-pi-signature .focus-within\:border-violet-500 { border-color: #eab308 !important; }
+.theme-pi-signature .group-hover\:border-violet-500\/30 { border-color: rgba(234, 179, 8, 0.25) !important; }
+.theme-pi-signature .hover\:border-violet-500\/30:hover { border-color: rgba(234, 179, 8, 0.3) !important; }
+.theme-pi-signature .hover\:border-violet-500\/20:hover { border-color: rgba(234, 179, 8, 0.2) !important; }
+
+/* Buttons & Navigation Overrides in Pi Signature */
+.theme-pi-signature .bg-violet-600\/15 { background-color: rgba(234, 179, 8, 0.12) !important; }
+.theme-pi-signature .bg-violet-600\/10 { background-color: rgba(234, 179, 8, 0.1) !important; }
+.theme-pi-signature .bg-violet-500\/10 { background-color: rgba(234, 179, 8, 0.1) !important; }
+.theme-pi-signature .bg-violet-950\/15 { background-color: rgba(234, 179, 8, 0.08) !important; }
+.theme-pi-signature .bg-violet-950/15 { background-color: rgba(234, 179, 8, 0.08) !important; }
+.theme-pi-signature .bg-emerald-500\/10 { background-color: rgba(16, 185, 129, 0.15) !important; }
+.theme-pi-signature .bg-rose-500\/10 { background-color: rgba(244, 63, 94, 0.15) !important; }
+.theme-pi-signature .bg-amber-500\/10 { background-color: rgba(245, 158, 11, 0.15) !important; }
+.theme-pi-signature .bg-rose-500/5 { background-color: rgba(244, 63, 94, 0.05) !important; }
+
+/* Banners in Pi Signature */
+.theme-pi-signature .from-violet-900 { --tw-gradient-from: #1e0933 !important; --tw-gradient-to: #331254 !important; }
+.theme-pi-signature .via-indigo-950 { --tw-gradient-via: #270d42 !important; }
+.theme-pi-signature .to-slate-950 { --tw-gradient-to: #120320 !important; }
+
+
 

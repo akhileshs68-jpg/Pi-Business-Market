@@ -91,7 +91,7 @@ export const Wishlist: React.FC<WishlistProps> = ({
             }
           } else {
             // Fetch product details
-            const prod = await productService.getProduct(item.entityId);
+            const prod = await productService.getProduct(item.entityId) as any;
             if (prod) {
               name = prod.productName;
               price = prod.price || 0;

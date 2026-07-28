@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -35,7 +35,16 @@ import { BuyerHome } from '../components/marketplace/BuyerHome';
 export const UniversalSearch: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (location.state?.query) {
+      setQuery(location.state.query);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state]);
+
   const [results, setResults] = useState<SearchIndexEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeType, setActiveType] = useState<SearchEntityType | 'all'>('all');
@@ -110,6 +119,12 @@ export const UniversalSearch: React.FC = () => {
         walletBalance={100}
         onWalletUpdate={() => {}}
         onToggleCart={() => {}}
+        searchQuery={query}
+        onSearchChange={setQuery}
+        onSearchSubmit={(val) => {
+          setQuery(val);
+          handleSearch();
+        }}
       />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-24 sm:pb-12">
@@ -141,29 +156,8 @@ export const UniversalSearch: React.FC = () => {
                 </h1>
 
                 <div className="max-w-3xl mx-auto">
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-violet-600/20 blur-xl group-focus-within:bg-violet-600/40 transition-all rounded-[1.5rem] sm:rounded-[2.5rem]" />
-                    <div className="relative flex items-center bg-slate-900 border border-slate-800 focus-within:border-violet-500 rounded-2xl sm:rounded-[2.5rem] p-1.5 sm:p-2 shadow-2xl transition-all">
-                      <Search className="w-5 h-5 sm:w-6 h-6 text-slate-500 ml-3 sm:ml-6 shrink-0" />
-                      <input 
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search market..." 
-                        className="flex-1 min-w-0 bg-transparent border-none outline-none px-3 sm:px-6 py-3 sm:py-4 text-sm sm:text-lg font-bold text-white placeholder:text-slate-600"
-                      />
-                      {query && (
-                        <button onClick={() => setQuery('')} className="p-2 text-slate-500 hover:text-white mr-1 sm:mr-2 shrink-0">
-                          <X className="w-4 h-4 sm:w-5 h-5" />
-                        </button>
-                      )}
-                      <button className="px-4 sm:px-8 py-3 sm:py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-xl sm:rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all shadow-xl shadow-violet-600/20 active:scale-95 shrink-0">
-                        Search
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Entity Type Filters */}
-                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-6 sm:mt-8">
+                  {/* Entity Type Filters - Compact */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-2">
                     {[
                       { id: 'all', label: 'All', icon: LayoutGrid },
                       { id: 'product', label: 'Products', icon: ShoppingBag },

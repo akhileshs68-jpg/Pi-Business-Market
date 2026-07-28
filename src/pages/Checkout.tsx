@@ -6,6 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CheckoutInput } from '../components/checkout/CheckoutInput';
+import { PaymentSelector } from '../components/PaymentSelector';
+import { PaymentMethodId } from '../types/payment';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -35,6 +37,7 @@ export const Checkout: React.FC = () => {
   const [step, setStep] = useState<'shipping' | 'payment' | 'review'>('shipping');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodId>('pi');
   const [address, setAddress] = useState<Address>({
     fullName: '',
     email: user?.email || '',
@@ -94,53 +97,52 @@ export const Checkout: React.FC = () => {
         shippingAddress: address,
         billingAddress: address 
       }, orderItems);
-
       const order = await orderService.getOrder(orderId);
       if (!order) throw new Error('Order creation failed');
 
-      // 3. Create Payment Intent
-      const intent = await paymentService.createPaymentIntent(order);
+      // 3. Create Transaction in Payment Engine
+      const paymentId = await paymentService.createTransaction({
+        buyerId: user.uid,
+        businessId: order.businessId,
+        orderId: order.orderId,
+        currency: 'Pi', // Or whatever currency is configured
+        paymentMethod: selectedPaymentMethod,
+        amount: order.grandTotal
+      });
 
-      // 4. Launch Pi SDK Payment (U2A Payment Flow)
-      await piPaymentService.createPayment({
-        amount: order.grandTotal,
-        memo: `Order ${order.orderNumber} at Pi Business Market`,
-        metadata: {
-          productType: 'MarketplaceOrder',
-          orderId: order.orderId,
-          storeId: order.businessId,
-          itemsCount: orderItems.length
-        }
-      }, {
-        onReadyForServerApproval: (paymentId) => {
-          console.log('[Checkout] Server approved Pi payment:', paymentId);
-        },
-        onReadyForServerCompletion: async (paymentId, txid) => {
-          try {
-            // 5. Verify and Process Payment (creates Ledger, Receipt, Updates Order)
-            await paymentService.verifyAndProcessPayment(intent.paymentIntentId, txid, user.uid);
-            
-            // 6. Update Session & Clear Cart
+      if (selectedPaymentMethod === 'pi') {
+        // 4. Launch Pi SDK Payment (U2A Payment Flow)
+        await paymentService.processPiPayment(
+          paymentId,
+          order.grandTotal,
+          `Order ${order.orderNumber} at Pi Business Market`,
+          {
+            productType: 'MarketplaceOrder',
+            orderId: order.orderId,
+            storeId: order.businessId,
+            itemsCount: orderItems.length,
+            transactionId: paymentId
+          },
+          async (txid) => {
+            // Success callback
             await checkoutService.updateSession(session.sessionId, { status: 'completed' });
             await cartService.clearCart(session.cartId);
-            
-            // 7. Redirect to Success
             navigate(`/order-success/${orderId}`);
-          } catch (err) {
+          },
+          (err) => {
+            // Error callback
             console.error('[Checkout] Payment verification failed:', err);
             setIsProcessing(false);
           }
-        },
-        onCancel: (paymentId) => {
-          console.log('[Checkout] Payment cancelled by user:', paymentId);
-          setIsProcessing(false);
-        },
-        onError: (error, paymentId) => {
-          console.error('[Checkout] Pi SDK Error:', error, paymentId);
-          setIsProcessing(false);
-        }
-      });
-
+        );
+      } else {
+        // Handle future or alternative payment methods (e.g., BMT, UPI, Cash)
+        await paymentService.updateTransactionStatus(paymentId, 'Completed', 'simulated_tx');
+        await orderService.updatePaymentStatus(order.orderId, 'Paid');
+        await checkoutService.updateSession(session.sessionId, { status: 'completed' });
+        await cartService.clearCart(session.cartId);
+        navigate(`/order-success/${orderId}`);
+      }
     } catch (err) {
       console.error('Order placement failed', err);
       setIsProcessing(false);
@@ -249,20 +251,7 @@ export const Checkout: React.FC = () => {
                   <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-tight mb-6 md:mb-8 flex items-center gap-3">
                     <CreditCard className="w-6 h-6 text-violet-400" /> Payment
                   </h2>
-                  <div className="p-6 md:p-8 bg-slate-950 border border-slate-800 rounded-2xl sm:rounded-3xl text-center">
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-600/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                      <CreditCard className="w-7 h-7 sm:w-8 sm:h-8 text-indigo-400" />
-                    </div>
-                    <h3 className="text-base sm:text-lg font-black text-white uppercase mb-2">Pi Wallet</h3>
-                    <p className="text-[10px] sm:text-xs text-slate-500 font-medium mb-6 sm:mb-8 max-w-xs mx-auto leading-relaxed">Securely authorize transaction via Pi Browser or Wallet app.</p>
-                    <div className="px-4 md:px-6 py-4 bg-slate-900 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-800">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-[10px] font-black text-white">PI</div>
-                        <span className="text-[11px] sm:text-sm font-bold text-slate-300">Balance available</span>
-                      </div>
-                      <span className="text-base sm:text-lg font-black text-white">1,240.50 Pi</span>
-                    </div>
-                  </div>
+                  <PaymentSelector selectedMethod={selectedPaymentMethod} onSelect={setSelectedPaymentMethod} />
                 </section>
 
                 <button 
@@ -293,7 +282,7 @@ export const Checkout: React.FC = () => {
                       <div>
                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Payment Method</h4>
                         <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                          <p className="text-sm font-bold text-white">Pi Network Wallet</p>
+                          {selectedPaymentMethod === 'pi' ? <p className="text-sm font-bold text-white">Pi Network Wallet</p> : <p className="text-sm font-bold text-white text-transform-capitalize">{selectedPaymentMethod}</p>}
                           <p className="text-xs text-slate-400">Secure Consensus Authorization</p>
                         </div>
                       </div>

@@ -1,3 +1,5 @@
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import fs from "fs";
 import "dotenv/config";
 import express from "express";
@@ -24,6 +26,12 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
+
+if (process.env.VITE_FIREBASE_PROJECT_ID && !getApps().length) {
+  initializeApp({
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  });
+}
 
 async function startServer() {
   const app = express();
@@ -78,46 +86,58 @@ async function startServer() {
   // 1. Approve Payment Endpoint
   app.post("/api/payments/approve", async (req, res) => {
     try {
-      const { paymentId } = req.body;
+      const { paymentId, metadata } = req.body;
       if (!paymentId) {
         return res.status(400).json({ error: "paymentId is required" });
       }
 
       const apiKey = process.env.PI_NETWORK_API_KEY;
       if (!apiKey) {
-        console.warn(
-          "[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval.",
-        );
+        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval.");
+        
+        // Update firestore transaction to Processing in Sandbox Mode
+        if (metadata?.transactionId && getApps().length > 0) {
+          try {
+            await getFirestore().collection('payments').doc(metadata.transactionId).update({
+              status: 'Processing',
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          } catch(err) {
+            console.error("Failed to update firestore", err);
+          }
+        }
+
         return res.json({
           success: true,
-          message:
-            "Payment approved in sandbox mode (PI_NETWORK_API_KEY missing)",
+          message: "Payment approved in sandbox mode",
           paymentId,
         });
       }
 
-      console.log(
-        `[Pi Payment Approve] Requesting Pi server approval for payment ${paymentId}...`,
-      );
+      console.log(`[Pi Payment Approve] Requesting Pi server approval for payment ${paymentId}...`);
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/approve`,
         {},
-        {
-          headers: {
-            Authorization: `Key ${apiKey}`,
-          },
-        },
+        { headers: { Authorization: `Key ${apiKey}` } }
       );
+      
+      // Update firestore transaction to Processing
+      if (metadata?.transactionId && getApps().length > 0) {
+        try {
+          await getFirestore().collection('payments').doc(metadata.transactionId).update({
+            status: 'Processing',
+            piPaymentId: paymentId,
+            updatedAt: FieldValue.serverTimestamp()
+          });
+        } catch(err) {
+          console.error("Failed to update firestore", err);
+        }
+      }
 
-      console.log(
-        `[Pi Payment Approve] Successfully approved payment ${paymentId}`,
-      );
+      console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
       res.json({ success: true, payment: response.data });
     } catch (error: any) {
-      console.error(
-        "[Pi Payment Approve] Error approving payment:",
-        error.response?.data || error.message,
-      );
+      console.error("[Pi Payment Approve] Error approving payment:", error.response?.data || error.message);
       res.status(500).json({
         error: "Failed to approve payment with Pi Network server",
         details: error.response?.data || error.message,
@@ -125,52 +145,85 @@ async function startServer() {
     }
   });
 
-  // 2. Complete Payment Endpoint
   app.post("/api/payments/complete", async (req, res) => {
     try {
-      const { paymentId, txid } = req.body;
+      const { paymentId, txid, metadata } = req.body;
       if (!paymentId || !txid) {
-        return res
-          .status(400)
-          .json({ error: "paymentId and txid are required" });
+        return res.status(400).json({ error: "paymentId and txid are required" });
+      }
+
+      // 1. Verify idempotency using Firestore
+      if (metadata?.transactionId && getApps().length > 0) {
+        const paymentRef = getFirestore().collection('payments').doc(metadata.transactionId);
+        
+        try {
+          const result = await getFirestore().runTransaction(async (t) => {
+            const doc = await t.get(paymentRef);
+            if (!doc.exists) {
+              throw new Error("Transaction not found");
+            }
+            if (doc.data()?.status === 'Completed') {
+              throw new Error("Payment already completed");
+            }
+            
+            // Mark as completed
+            t.update(paymentRef, {
+              status: 'Completed',
+              transactionId: txid,
+              piPaymentId: paymentId,
+              updatedAt: FieldValue.serverTimestamp()
+            });
+
+            // Update order status if provided
+            if (metadata.orderId) {
+              const orderRef = getFirestore().collection('orders').doc(metadata.orderId);
+              t.update(orderRef, {
+                paymentStatus: 'Paid',
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            }
+            
+            return true;
+          });
+        } catch(err: any) {
+          if (err.message === "Payment already completed") {
+            return res.json({ success: true, message: "Payment already processed", paymentId, txid });
+          }
+          console.error("Transaction update failed", err);
+        }
       }
 
       const apiKey = process.env.PI_NETWORK_API_KEY;
       if (!apiKey) {
-        console.warn(
-          "[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.",
-        );
+        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
         return res.json({
           success: true,
-          message:
-            "Payment completed in sandbox mode (PI_NETWORK_API_KEY missing)",
+          message: "Payment completed in sandbox mode",
           paymentId,
           txid,
         });
       }
 
-      console.log(
-        `[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`,
-      );
+      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/complete`,
         { txid },
-        {
-          headers: {
-            Authorization: `Key ${apiKey}`,
-          },
-        },
+        { headers: { Authorization: `Key ${apiKey}` } }
       );
-
-      console.log(
-        `[Pi Payment Complete] Successfully completed payment ${paymentId}`,
-      );
+      
+      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
       res.json({ success: true, payment: response.data });
     } catch (error: any) {
-      console.error(
-        "[Pi Payment Complete] Error completing payment:",
-        error.response?.data || error.message,
-      );
+      console.error("[Pi Payment Complete] Error completing payment:", error.response?.data || error.message);
+      
+      // Rollback to failed
+      if (req.body.metadata?.transactionId && getApps().length > 0) {
+        await getFirestore().collection('payments').doc(req.body.metadata.transactionId).update({
+          status: 'Failed',
+          updatedAt: FieldValue.serverTimestamp()
+        }).catch(console.error);
+      }
+
       res.status(500).json({
         error: "Failed to complete payment with Pi Network server",
         details: error.response?.data || error.message,
@@ -178,7 +231,40 @@ async function startServer() {
     }
   });
 
-  // 3. Incomplete Payment Endpoint
+  app.post("/api/payments/status", async (req, res) => {
+    try {
+      const { transactionId, status } = req.body;
+      if (!transactionId || !status) {
+        return res.status(400).json({ error: "transactionId and status are required" });
+      }
+
+      if (getApps().length > 0) {
+        const paymentRef = getFirestore().collection('payments').doc(transactionId);
+        
+        // Only allow changing from Pending/Processing to Cancelled/Failed
+        await getFirestore().runTransaction(async (t) => {
+          const doc = await t.get(paymentRef);
+          if (!doc.exists) throw new Error("Transaction not found");
+          
+          const currentStatus = doc.data()?.status;
+          if (currentStatus === 'Completed' || currentStatus === 'Refunded') {
+            throw new Error("Cannot change status of a completed payment");
+          }
+          
+          t.update(paymentRef, {
+            status,
+            updatedAt: FieldValue.serverTimestamp()
+          });
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Payment Status] Error updating status:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/payments/incomplete", async (req, res) => {
     try {
       const { payment } = req.body;

@@ -26,7 +26,8 @@ import {
   Store as StoreIcon,
   ShoppingBag as BagIcon,
   Lock,
-  PlayCircle
+  PlayCircle,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
@@ -50,6 +51,16 @@ export const ProductDetails: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  
+  // Premium marketplace navigation & product carousel states
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  const [sponsoredProducts, setSponsoredProducts] = useState<Product[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'specifications' | 'shipping'>('overview');
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const [loading, setLoading] = useState(true);
   const [loadingRelated, setLoadingRelated] = useState(false);
   
@@ -87,6 +98,7 @@ export const ProductDetails: React.FC = () => {
   useEffect(() => {
     if (product) {
       fetchStoreAndRelated();
+      fetchAdditionalProducts();
     }
   }, [product]);
 
@@ -97,6 +109,30 @@ export const ProductDetails: React.FC = () => {
       setIsWishlisted(wish === 'true');
     }
   }, [product]);
+
+  // Sync cart count
+  useEffect(() => {
+    if (user && product) {
+      const updateCartCount = async () => {
+        try {
+          const cart = await cartService.getOrCreateCart(user.uid, product.businessId);
+          if (cart && cart.cartId) {
+            const itemsKey = `cart_items_${cart.cartId}`;
+            const localItems = localStorage.getItem(itemsKey);
+            if (localItems) {
+              const parsed = JSON.parse(localItems);
+              setCartCount(parsed.reduce((sum: number, item: any) => sum + item.quantity, 0));
+            } else {
+              setCartCount(0);
+            }
+          }
+        } catch (e) {
+          console.warn('Cart count fetch failed', e);
+        }
+      };
+      updateCartCount();
+    }
+  }, [user, product, isAdding, added]);
 
   // Track scroll position for sticky mobile buy bar
   useEffect(() => {
@@ -149,9 +185,12 @@ export const ProductDetails: React.FC = () => {
   const fetchProduct = async () => {
     setLoading(true);
     try {
-      const dbProd = await productService.getProduct(id!);
+      const dbProd = await productService.getProduct(id!) as any;
       if (dbProd) {
-        setProduct(dbProd);
+        setProduct({
+          ...dbProd,
+          productId: dbProd.productId || dbProd.id || id
+        } as Product);
         return;
       }
 
@@ -179,7 +218,7 @@ export const ProductDetails: React.FC = () => {
         if (storeInfo) setStore(storeInfo);
         if (storeProducts) {
           // Filter out current product
-          const filtered = storeProducts.filter(p => p.productId !== product.productId);
+          const filtered = storeProducts.filter((p: any) => p.productId !== product.productId);
           setRelatedProducts(filtered.slice(0, 4));
         }
       }
@@ -187,6 +226,238 @@ export const ProductDetails: React.FC = () => {
       console.error('Failed to load store and related items', err);
     } finally {
       setLoadingRelated(false);
+    }
+  };
+
+  const fetchAdditionalProducts = async () => {
+    if (!product) return;
+    try {
+      const { results } = await searchService.search('', { entityType: 'product' });
+      const allProducts = results
+        .map(entry => mapSearchEntryToProduct(entry))
+        .filter(p => p.productId !== product.productId);
+
+      // 1. Similar Products (same category or similar name keywords)
+      const similar = allProducts.filter(p => p.category === product.category);
+      if (similar.length > 0) {
+        setSimilarProducts(similar.slice(0, 6));
+      } else {
+        // Fallback demo items styled gorgeously
+        setSimilarProducts([
+          {
+            productId: 'demo_sim_1',
+            storeId: product.storeId || 'demo_store',
+            businessId: product.businessId,
+            ownerUid: '',
+            sku: 'SIM-PRO-1',
+            productName: `${product.productName.split(' ')[0]} Max Pro Edition`,
+            productSlug: '',
+            shortDescription: 'Upgraded flagship edition designed for enterprise standards.',
+            description: '',
+            brand: product.brand || 'Elite Series',
+            type: 'physical',
+            category: product.category || 'Electronics',
+            subCategory: '',
+            tags: [],
+            price: Math.round((product.price * 1.3) * 100) / 100,
+            currency: 'Pi',
+            taxClass: 'Standard',
+            stock: 25,
+            stockStatus: 'in_stock',
+            minOrderQty: 1,
+            maxOrderQty: 2,
+            featured: true,
+            status: 'published',
+            visibility: 'public',
+            seoTitle: '',
+            seoDescription: '',
+            mainImage: product.mainImage || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=60',
+            imageUrls: [],
+            createdAt: '',
+            updatedAt: ''
+          },
+          {
+            productId: 'demo_sim_2',
+            storeId: product.storeId || 'demo_store',
+            businessId: product.businessId,
+            ownerUid: '',
+            sku: 'SIM-PRO-2',
+            productName: `Essential ${product.productName.split(' ')[0]} Accessory Kit`,
+            productSlug: '',
+            shortDescription: 'The perfect companion toolkit for enhanced capabilities.',
+            description: '',
+            brand: product.brand || 'Elite Series',
+            type: 'physical',
+            category: product.category || 'Accessories',
+            subCategory: '',
+            tags: [],
+            price: Math.round((product.price * 0.45) * 100) / 100,
+            currency: 'Pi',
+            taxClass: 'Standard',
+            stock: 120,
+            stockStatus: 'in_stock',
+            minOrderQty: 1,
+            maxOrderQty: 5,
+            featured: false,
+            status: 'published',
+            visibility: 'public',
+            seoTitle: '',
+            seoDescription: '',
+            mainImage: 'https://images.unsplash.com/photo-1622445262465-2481c4574875?auto=format&fit=crop&q=80&w=400',
+            imageUrls: [],
+            createdAt: '',
+            updatedAt: ''
+          }
+        ]);
+      }
+
+      // 2. Recommended Products
+      const recommended = allProducts.filter(p => p.category !== product.category);
+      if (recommended.length > 0) {
+        setRecommendedProducts(recommended.slice(0, 6));
+      } else {
+        setRecommendedProducts([
+          {
+            productId: 'demo_rec_1',
+            storeId: 'store_rec_1',
+            businessId: 'bus_rec_1',
+            ownerUid: '',
+            sku: 'REC-DEAL-1',
+            productName: 'Pioneer Horizon Smart Glasses v2',
+            productSlug: '',
+            shortDescription: 'Augmented reality overlay glasses built for the Pi Web3 Browser.',
+            description: '',
+            brand: 'PioneerTech',
+            type: 'physical',
+            category: 'Electronics',
+            subCategory: '',
+            tags: [],
+            price: 55.0,
+            currency: 'Pi',
+            taxClass: 'Standard',
+            stock: 15,
+            stockStatus: 'in_stock',
+            minOrderQty: 1,
+            maxOrderQty: 1,
+            featured: true,
+            status: 'published',
+            visibility: 'public',
+            seoTitle: '',
+            seoDescription: '',
+            mainImage: 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?auto=format&fit=crop&q=80&w=400',
+            imageUrls: [],
+            createdAt: '',
+            updatedAt: ''
+          },
+          {
+            productId: 'demo_rec_2',
+            storeId: 'store_rec_2',
+            businessId: 'bus_rec_2',
+            ownerUid: '',
+            sku: 'REC-DEAL-2',
+            productName: 'Full-Grain Leather Voyager Backpack',
+            productSlug: '',
+            shortDescription: 'Handcrafted genuine leather backpack with protective laptop sleeves.',
+            description: '',
+            brand: 'Voyager Goods',
+            type: 'physical',
+            category: 'Fashion',
+            subCategory: '',
+            tags: [],
+            price: 12.5,
+            currency: 'Pi',
+            taxClass: 'Standard',
+            stock: 45,
+            stockStatus: 'in_stock',
+            minOrderQty: 1,
+            maxOrderQty: 2,
+            featured: false,
+            status: 'published',
+            visibility: 'public',
+            seoTitle: '',
+            seoDescription: '',
+            mainImage: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=400',
+            imageUrls: [],
+            createdAt: '',
+            updatedAt: ''
+          }
+        ]);
+      }
+
+      // 3. Sponsored Products
+      const sponsored = allProducts.filter(p => p.featured);
+      if (sponsored.length > 0) {
+        setSponsoredProducts(sponsored.slice(0, 4));
+      } else {
+        setSponsoredProducts([
+          {
+            productId: 'demo_spon_1',
+            storeId: 'store_spon_1',
+            businessId: 'bus_spon_1',
+            ownerUid: '',
+            sku: 'SPON-1',
+            productName: 'Pi-Integrated Secure Cold Wallet',
+            productSlug: '',
+            shortDescription: 'Military-grade hardware wallet with instant Pi balance sync.',
+            description: '',
+            brand: 'PiSafe Labs',
+            type: 'physical',
+            category: 'Electronics',
+            subCategory: '',
+            tags: [],
+            price: 75.0,
+            currency: 'Pi',
+            taxClass: 'Standard',
+            stock: 8,
+            stockStatus: 'in_stock',
+            minOrderQty: 1,
+            maxOrderQty: 1,
+            featured: true,
+            status: 'published',
+            visibility: 'public',
+            seoTitle: '',
+            seoDescription: '',
+            mainImage: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?auto=format&fit=crop&q=80&w=400',
+            imageUrls: [],
+            createdAt: '',
+            updatedAt: ''
+          },
+          {
+            productId: 'demo_spon_2',
+            storeId: 'store_spon_2',
+            businessId: 'bus_spon_2',
+            ownerUid: '',
+            sku: 'SPON-2',
+            productName: 'AeroFiber Lightweight Running Shoes',
+            productSlug: '',
+            shortDescription: 'Advanced carbon-fiber running shoes optimized for endurance athletics.',
+            description: '',
+            brand: 'Stratus',
+            type: 'physical',
+            category: 'Fashion',
+            subCategory: '',
+            tags: [],
+            price: 8.9,
+            currency: 'Pi',
+            taxClass: 'Standard',
+            stock: 35,
+            stockStatus: 'in_stock',
+            minOrderQty: 1,
+            maxOrderQty: 2,
+            featured: true,
+            status: 'published',
+            visibility: 'public',
+            seoTitle: '',
+            seoDescription: '',
+            mainImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=60',
+            imageUrls: [],
+            createdAt: '',
+            updatedAt: ''
+          }
+        ]);
+      }
+    } catch (e) {
+      console.warn('Could not fetch additional products for details page carousels', e);
     }
   };
 
@@ -258,6 +529,13 @@ export const ProductDetails: React.FC = () => {
     setIsWishlisted(newState);
     localStorage.setItem(`wishlist_${product.productId}`, String(newState));
     triggerToast(newState ? 'Added to your favorites list!' : 'Removed from your favorites list.');
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/discovery?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
   };
 
   // Magnifying Zoom Effect following Cursor
@@ -369,20 +647,79 @@ export const ProductDetails: React.FC = () => {
       </AnimatePresence>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-24 sm:pb-12">
-        {/* Back Link and Share */}
-        <div className="flex items-center justify-between mb-8 sm:mb-12">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 hover:text-white group">
-            <ArrowLeft className="w-4 h-4 sm:w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest">Back to catalog</span>
-          </button>
-          
-          <button 
-            onClick={handleShare}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all text-xs font-bold uppercase tracking-wider"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Share Item</span>
-          </button>
+        {/* Premium Details-Page Top Sticky Bar */}
+        <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-900/80 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 py-3.5 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Back button */}
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="flex items-center justify-center p-2.5 bg-slate-900 hover:bg-slate-805 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl transition-all shadow-md group"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            </button>
+            <div>
+              <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest block leading-none mb-1">Business Market Pi</span>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider leading-none">Product Space</h2>
+            </div>
+          </div>
+
+          {/* Search bar inside details page */}
+          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-lg relative">
+            <input 
+              type="text" 
+              placeholder={`Search products or merchants...`} 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#030712] border border-slate-850 hover:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl py-2 px-4 pl-10 text-xs font-medium text-slate-200 placeholder-slate-600 outline-none transition-all shadow-inner"
+            />
+            <Search className="w-4 h-4 text-slate-600 absolute left-3.5 top-3" />
+            <button 
+              type="submit" 
+              className="absolute right-2 top-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all shadow-md"
+            >
+              Search
+            </button>
+          </form>
+
+          {/* Quick Access Actions: Cart, Share, Wishlist */}
+          <div className="flex items-center gap-3.5 self-end md:self-auto">
+            {/* Wishlist toggle */}
+            <button 
+              onClick={handleToggleWishlist}
+              className={`p-2.5 rounded-xl border transition-all flex items-center justify-center shadow-md relative group ${
+                isWishlisted 
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/20' 
+                  : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+              title="Add to Favorites"
+            >
+              <Heart className={`w-4.5 h-4.5 ${isWishlisted ? 'fill-current' : ''}`} />
+            </button>
+
+            {/* Share action */}
+            <button 
+              onClick={handleShare}
+              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition-all shadow-md group"
+              title="Share Product"
+            >
+              <Share2 className="w-4.5 h-4.5" />
+            </button>
+
+            {/* Cart with count badge */}
+            <button 
+              onClick={() => navigate('/cart')}
+              className="px-4 py-2.5 bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 text-indigo-400 hover:text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 relative"
+              title="View Shopping Bag"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Bag</span>
+              {cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center shadow-lg animate-bounce shadow-rose-500/25 border border-slate-950">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-16 items-start">
@@ -486,6 +823,10 @@ export const ProductDetails: React.FC = () => {
                   <span>4.9</span>
                   <span className="text-slate-500 text-xs">({45 + (product.productId.charCodeAt(0) % 20)} reviews)</span>
                 </div>
+                {/* Sold Count Badge */}
+                <span className="px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                  🔥 {180 + (product.productId.charCodeAt(0) % 30) * 12} Sold Recently
+                </span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-tight leading-none mb-4">
@@ -503,25 +844,36 @@ export const ProductDetails: React.FC = () => {
               </p>
             </div>
 
-            {/* Premium Price Box */}
-            <div className="p-6 bg-slate-900/60 border border-slate-800 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Premium Price Box (Pi Price - Future Ready) */}
+            <div className="p-6 bg-gradient-to-br from-slate-900 to-slate-900/40 border border-slate-800/80 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/5 rounded-full blur-2xl group-hover:bg-violet-600/10 transition-all duration-500 pointer-events-none" />
               <div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Verified Pi Network Listing</p>
-                <div className="flex items-baseline gap-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Verified Pi Network Listing</p>
+                  <span className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-300 rounded font-bold text-[8px] uppercase tracking-wider border border-indigo-500/20">Future Ready</span>
+                </div>
+                <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-4xl font-black text-white">{product.price} <span className="text-xl font-bold text-slate-400">π</span></span>
                   <span className="text-sm text-slate-500 line-through font-bold">{originalPrice} π</span>
                   <span className="text-xs text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
                     -{discountPercent}% OFF
                   </span>
                 </div>
+                {/* Consensus Dual Pricing */}
+                <p className="text-[10px] text-slate-400 mt-2 font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  Consensus Value: <span className="text-white font-black">${(product.price * 3.14).toFixed(2)} USD</span>
+                  <span className="text-slate-600 text-[9px] font-medium">(at 1 Pi = $3.14)</span>
+                </p>
               </div>
 
-              <div className="sm:text-right">
+              <div className="sm:text-right shrink-0 border-t sm:border-t-0 border-slate-800/60 pt-4 sm:pt-0">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Stock Level</span>
-                <p className="text-xs font-bold text-slate-300 flex items-center gap-1.5 justify-end">
+                <p className="text-xs font-bold text-slate-300 flex items-center gap-1.5 justify-end mb-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   {product.stock > 0 ? `${product.stock} Units Available` : 'Temporarily Out'}
                 </p>
+                <span className="text-[8px] text-emerald-400 font-black uppercase tracking-wider block">✓ Ready to ship</span>
               </div>
             </div>
 
@@ -658,70 +1010,135 @@ export const ProductDetails: React.FC = () => {
               </button>
             </div>
 
-            {/* Delivery Estimation details & Policies */}
-            <div className="bg-slate-900/40 border border-slate-850 rounded-2xl p-5 space-y-5 text-xs font-medium text-slate-400">
-              <div className="flex items-start gap-3">
-                <Truck className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">Pi Network Express Delivery</h4>
-                  <p className="leading-relaxed">Get delivery estimated between <span className="text-white font-black">{formatEstimateDate(deliveryStart)}</span> and <span className="text-white font-black">{formatEstimateDate(deliveryEnd)}</span>.</p>
-                  <p className="text-[10px] text-emerald-400 font-bold mt-1">Shipping: FREE on orders over 100 Pi</p>
-                </div>
+            {/* Interactive Tabbed Product Details Panels */}
+            <div className="border-t border-slate-900 pt-6 space-y-4">
+              <div className="flex border-b border-slate-900 text-xs font-black uppercase tracking-wider">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`pb-3.5 px-4 relative transition-all ${
+                    activeTab === 'overview' ? 'text-indigo-400 font-extrabold' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Specifications
+                  {activeTab === 'overview' && (
+                    <motion.div layoutId="detailsTabUnderline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('specifications')}
+                  className={`pb-3.5 px-4 relative transition-all ${
+                    activeTab === 'specifications' ? 'text-indigo-400 font-extrabold' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Key Highlights
+                  {activeTab === 'specifications' && (
+                    <motion.div layoutId="detailsTabUnderline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('shipping')}
+                  className={`pb-3.5 px-4 relative transition-all ${
+                    activeTab === 'shipping' ? 'text-indigo-400 font-extrabold' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  Shipping & Safety
+                  {activeTab === 'shipping' && (
+                    <motion.div layoutId="detailsTabUnderline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
+                  )}
+                </button>
               </div>
 
-              <div className="flex items-start gap-3">
-                <RefreshCcw className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">7-Day Return Policy</h4>
-                  <p className="leading-relaxed">Hassle-free returns within 7 days of delivery for defective items or unfulfilled descriptions.</p>
-                </div>
-              </div>
+              <div className="pt-2 text-xs font-medium text-slate-400 min-h-[180px]">
+                {activeTab === 'overview' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    className="grid grid-cols-2 gap-x-6 gap-y-4"
+                  >
+                    <div className="flex flex-col pb-2 border-b border-slate-900/60">
+                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px] mb-0.5">Brand / Manufacturer</span>
+                      <span className="text-slate-200 font-bold text-sm">{product.brand || 'Unbranded'}</span>
+                    </div>
+                    <div className="flex flex-col pb-2 border-b border-slate-900/60">
+                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px] mb-0.5">Material Composition</span>
+                      <span className="text-slate-200 font-bold text-sm">Industrial Grade Composite</span>
+                    </div>
+                    <div className="flex flex-col pb-2 border-b border-slate-900/60">
+                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px] mb-0.5">Shipping Weight</span>
+                      <span className="text-slate-200 font-bold text-sm">1.25 kg (Standard Parcel)</span>
+                    </div>
+                    <div className="flex flex-col pb-2 border-b border-slate-900/60">
+                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px] mb-0.5">Packaging Size</span>
+                      <span className="text-slate-200 font-bold text-sm">12.2" x 8.4" x 4.1"</span>
+                    </div>
+                    <div className="flex flex-col pb-2 border-b border-slate-900/60">
+                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px] mb-0.5">Standard SKU ID</span>
+                      <span className="text-slate-300 font-mono text-sm uppercase">{product.sku}</span>
+                    </div>
+                    <div className="flex flex-col pb-2 border-b border-slate-900/60">
+                      <span className="text-slate-500 font-bold uppercase tracking-wider text-[9px] mb-0.5">Listing Status</span>
+                      <span className="text-emerald-400 font-bold text-sm uppercase flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                        Verified Active
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
 
-              <div className="flex items-start gap-3">
-                <Award className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">1 Year Manufacturer Warranty</h4>
-                  <p className="leading-relaxed">Covered against manufacturing defects directly by {product.brand || 'the merchant'}.</p>
-                </div>
-              </div>
+                {activeTab === 'specifications' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    className="space-y-4"
+                  >
+                    <div className="p-4 bg-[#030712] border border-slate-850 rounded-xl space-y-3">
+                      <h4 className="text-white font-black text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1.5 text-indigo-400">
+                        <Sparkles className="w-3.5 h-3.5" /> High Performance Standard Selection
+                      </h4>
+                      <ul className="space-y-2 list-disc list-inside text-slate-300 text-xs pl-1">
+                        <li>Durable, highly resilient outer construction optimized for dynamic shock protection.</li>
+                        <li>Verified genuine raw material build with custom high-end finishing layouts.</li>
+                        <li>Undergoes multi-point quality check inspections before parcel sealing.</li>
+                        <li>Supplied with environment-friendly biodegradable outer carton packaging.</li>
+                      </ul>
+                    </div>
+                  </motion.div>
+                )}
 
-              <div className="flex items-start gap-3">
-                <Lock className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-1">Safe Escrow Transactions</h4>
-                  <p className="leading-relaxed">All Pi Network transactions are protected. Funds released to merchant only upon confirmed delivery receipt.</p>
-                </div>
-              </div>
-            </div>
+                {activeTab === 'shipping' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    className="space-y-4"
+                  >
+                    <div className="bg-slate-900/40 border border-slate-850 rounded-xl p-4.5 space-y-4 text-xs font-medium text-slate-400">
+                      <div className="flex items-start gap-3.5">
+                        <Truck className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-0.5">Pi Network Express Logistics</h4>
+                          <p className="leading-relaxed text-slate-400">Get delivery estimated between <span className="text-indigo-400 font-black">{formatEstimateDate(deliveryStart)}</span> and <span className="text-indigo-400 font-black">{formatEstimateDate(deliveryEnd)}</span>.</p>
+                          <p className="text-[10px] text-emerald-400 font-black mt-1">Shipping: FREE on checkout totals exceeding 100 Pi</p>
+                        </div>
+                      </div>
 
-            {/* Product Specifications & Highlights */}
-            <div className="border-t border-slate-900 pt-6">
-              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">Product Specifications</h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                <div className="flex flex-col">
-                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Brand</span>
-                  <span className="text-slate-300">{product.brand || 'Unbranded'}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Material</span>
-                  <span className="text-slate-300">Premium Grade</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Weight</span>
-                  <span className="text-slate-300">1.2 kg</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Dimensions</span>
-                  <span className="text-slate-300">12 x 8 x 4 inches</span>
-                </div>
-                <div className="flex flex-col col-span-2">
-                  <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Highlights</span>
-                  <ul className="mt-1.5 space-y-1 text-slate-300 list-disc list-inside">
-                    <li>Durable and highly resilient construction</li>
-                    <li>Verified genuine component standard</li>
-                    <li>Eco-friendly packaging</li>
-                  </ul>
-                </div>
+                      <div className="flex items-start gap-3.5 border-t border-slate-900/60 pt-3">
+                        <RefreshCcw className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-0.5">7-Day Refund Commitment</h4>
+                          <p className="leading-relaxed text-slate-400">Compliant hassle-free returns within 7 calendar days of receipt for any item issues or mismatches.</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3.5 border-t border-slate-900/60 pt-3">
+                        <Lock className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-0.5">Safe Pioneer Escrow Service</h4>
+                          <p className="leading-relaxed text-slate-400">Pi network balance is secure. Escrow funds are only dispersed to merchant upon customer delivery confirmation.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </div>
 
@@ -808,6 +1225,77 @@ export const ProductDetails: React.FC = () => {
           </div>
         )}
 
+        {/* SIMILAR PRODUCTS CAROUSEL */}
+        {similarProducts.length > 0 && (
+          <div className="mt-16 border-t border-slate-900 pt-12 space-y-6">
+            <div>
+              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Based on this category</span>
+              <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Similar Selections</h2>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+              {similarProducts.map(prod => (
+                <CarouselProductCard 
+                  key={prod.productId} 
+                  prod={prod} 
+                  onClick={(p: any) => navigate(`/product/${p.productId}`)} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* RECOMMENDED PRODUCTS CAROUSEL */}
+        {recommendedProducts.length > 0 && (
+          <div className="mt-16 border-t border-slate-900 pt-12 space-y-6">
+            <div>
+              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block mb-1">Pioneers are also buying</span>
+              <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Recommended For You</h2>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+              {recommendedProducts.map(prod => (
+                <CarouselProductCard 
+                  key={prod.productId} 
+                  prod={prod} 
+                  badge="Pioneer's Choice" 
+                  onClick={(p: any) => navigate(`/product/${p.productId}`)} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SPONSORED PRODUCTS SECTION */}
+        {sponsoredProducts.length > 0 && (
+          <div className="mt-16 border-t border-slate-900 pt-12 space-y-6">
+            <div>
+              <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Sponsored Partnerships</span>
+              <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Featured Offers</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {sponsoredProducts.map(prod => (
+                <div 
+                  key={prod.productId}
+                  onClick={() => navigate(`/product/${prod.productId}`)}
+                  className="bg-gradient-to-br from-[#0c1221] to-slate-900/60 border border-amber-500/20 hover:border-amber-500/40 rounded-2xl p-4 flex flex-col group cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-lg relative overflow-hidden"
+                >
+                  <div className="absolute top-2 right-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[8px] uppercase tracking-wider px-2 py-0.5 rounded z-10">
+                    Sponsored
+                  </div>
+                  <div className="aspect-square bg-slate-950 rounded-xl overflow-hidden relative mb-3">
+                    <img src={prod.mainImage} alt={prod.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
+                  </div>
+                  <span className="text-[9px] font-black text-amber-500/80 uppercase tracking-wider block mb-1">{prod.brand}</span>
+                  <h4 className="text-xs font-bold text-slate-200 group-hover:text-white leading-snug line-clamp-2 min-h-[2.5rem] mb-2">{prod.productName}</h4>
+                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-850">
+                    <span className="text-sm font-black text-white">{prod.price} <span className="text-xs font-bold text-slate-400">π</span></span>
+                    <span className="text-[9px] text-slate-500 font-bold">${(prod.price * 3.14).toFixed(1)} USD</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* CUSTOMER REVIEWS & FEEDBACK */}
         <div className="mt-20 border-t border-slate-900 pt-16 space-y-12 sm:space-y-16">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 border-b border-slate-900 pb-8 sm:pb-12">
@@ -877,7 +1365,7 @@ export const ProductDetails: React.FC = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-md border-t border-slate-900 px-4 py-3 sm:py-4 pb-safe flex items-center justify-between gap-4 lg:hidden shadow-[0_-10px_25px_rgba(0,0,0,0.5)]"
+            className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-slate-950/90 backdrop-blur-md border-t border-slate-900 px-4 py-3 sm:py-4 flex items-center justify-between gap-4 lg:hidden shadow-[0_-10px_25px_rgba(0,0,0,0.5)]"
           >
             <div className="flex-1 min-w-0">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block truncate">
@@ -948,6 +1436,28 @@ const TrustBadge = ({ icon, label, sub }: any) => (
     <div>
       <h4 className="text-[10px] font-black text-white uppercase tracking-tight leading-none mb-1">{label}</h4>
       <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">{sub}</p>
+    </div>
+  </div>
+);
+
+const CarouselProductCard = ({ prod, badge, onClick }: any) => (
+  <div 
+    onClick={() => onClick(prod)}
+    className="min-w-[200px] sm:min-w-[240px] max-w-[240px] bg-slate-900/60 hover:bg-slate-900 border border-slate-855 hover:border-indigo-500/40 rounded-2xl p-4 flex flex-col group cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-lg shrink-0"
+  >
+    <div className="aspect-square bg-slate-950 rounded-xl overflow-hidden relative mb-3">
+      <img src={prod.mainImage} alt={prod.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
+      {badge && (
+        <span className="absolute top-2 left-2 px-2 py-0.5 bg-indigo-600 text-white font-black text-[8px] uppercase tracking-wider rounded">
+          {badge}
+        </span>
+      )}
+    </div>
+    <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1 truncate">{prod.brand}</span>
+    <h4 className="text-xs font-bold text-slate-200 group-hover:text-white leading-snug line-clamp-2 min-h-[2.5rem] mb-2">{prod.productName}</h4>
+    <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-850">
+      <span className="text-sm font-black text-white">{prod.price} <span className="text-xs font-bold text-slate-400">π</span></span>
+      <span className="text-[9px] text-slate-500 font-bold">${(prod.price * 3.14).toFixed(1)} USD</span>
     </div>
   </div>
 );

@@ -6,6 +6,8 @@ import { LoginPage } from './pages/LoginPage';
 import { MyWorkspace } from './pages/MyWorkspace';
 import { BusinessDashboard } from './pages/BusinessDashboard';
 import { StoreDashboard } from './pages/StoreDashboard';
+import { OrdersPage } from './pages/OrdersPage';
+import { BookingsPage } from './pages/BookingsPage';
 import { ProductServiceManager } from './pages/ProductServiceManager';
 import { CatalogManagement } from './pages/CatalogManagement';
 import { WarehouseDashboard } from './pages/WarehouseDashboard';
@@ -97,14 +99,26 @@ function App() {
           <Route path="/farmer/:id" element={<BusinessProfile />} />
           
           {/* Universal Product & Service Manager */}
+          
+          {/* Universal Orders & Bookings */}
           <Route 
-            path="/store-dashboard" 
+            path="/orders" 
             element={
               <ProtectedRoute>
-                <ProductServiceManager />
+                <OrdersPage />
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/bookings" 
+            element={
+              <ProtectedRoute>
+                <BookingsPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route path="/store-dashboard" element={<ProtectedRoute><ProductServiceManager /></ProtectedRoute>} />
           <Route 
             path="/services" 
             element={

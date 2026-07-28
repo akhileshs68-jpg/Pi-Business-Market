@@ -289,7 +289,7 @@ export const ProductManagement: React.FC = () => {
       // Fetch related orders
       try {
         const orderList = await orderService.getBusinessOrders(storeData.businessId);
-        const storeOrders = orderList.filter(o => !o.storeId || o.storeId === storeId);
+        const storeOrders = orderList.filter((o: any) => !o.storeId || o.storeId === storeId);
         setOrders(storeOrders);
       } catch (oErr) {
         console.warn('Could not fetch business orders.');

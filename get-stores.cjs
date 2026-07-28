@@ -1,4 +1,5 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 const { readFileSync } = require('fs');
 
 let serviceAccount;
@@ -9,8 +10,8 @@ try {
 }
 
 if (serviceAccount) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  initializeApp({
+    credential: cert(serviceAccount),
     databaseId: 'ai-studio-pibusinessmarket-77787f2f-7898-4843-8acf-68b0116d2c80'
   });
 } else {
@@ -18,7 +19,7 @@ if (serviceAccount) {
   process.exit(1);
 }
 
-const db = admin.firestore();
+const db = getFirestore();
 
 async function run() {
   try {

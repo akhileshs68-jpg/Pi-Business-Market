@@ -110,61 +110,32 @@ export const storeService = {
   /**
    * Fetches all stores owned by a user or associated with user's businesses
    */
-  async getOwnedStores(ownerUid: string): Promise<Store[]> {
+    async getOwnedStores(ownerUid: string): Promise<Store[]> {
     if (ownerUid.startsWith('mock_')) {
-      return [
-        {
-          storeId: 'mock_store_1',
-          businessId: 'mock_biz_1',
-          ownerUid,
-          storeName: 'Pi Pioneers Hub',
-          storeSlug: 'pi-pioneers',
-          storeType: 'Online Store',
-          storeCategory: 'Retail',
-          description: 'The premium merchandise store for Pi Network pioneers.',
-          email: 'hub@pioneers.com',
-          phone: '+15550199',
-          country: 'United States',
-          state: 'California',
-          city: 'San Francisco',
-          address: '123 Pi Pioneers Way',
-          latitude: 37.7749,
-          longitude: -122.4194,
-          openingHours: [
-            { day: 'Monday', open: '09:00', close: '18:00', closed: false },
-            { day: 'Tuesday', open: '09:00', close: '18:00', closed: false },
-            { day: 'Wednesday', open: '09:00', close: '18:00', closed: false },
-            { day: 'Thursday', open: '09:00', close: '18:00', closed: false },
-            { day: 'Friday', open: '09:00', close: '18:00', closed: false },
-            { day: 'Saturday', open: '10:00', close: '16:00', closed: false },
-            { day: 'Sunday', open: '00:00', close: '00:00', closed: true }
-          ],
-          deliveryAvailable: true,
-          pickupAvailable: true,
-          verified: true,
-          featured: true,
-          status: 'active',
-          logoUrl: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=150',
-          coverImageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800',
-          followers: 1250,
-          rating: 4.8,
-          reviewCount: 36,
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
+      // Return mock data for demo purposes, but for real users we want real data.
     }
-
     const db = getFirebaseDb();
     const storesMap = new Map<string, Store>();
 
     // 1. Fetch stores by ownerUid
     try {
-      const qOwner = query(
+      let qOwner = query(
         collection(db, 'stores'), 
         where('ownerUid', '==', ownerUid)
       );
-      const snapshotOwner = await getDocs(qOwner);
+      let snapshotOwner = await getDocs(qOwner);
+      
+      // Legacy fallback: checking 'userId' if 'ownerUid' didn't match (just in case)
+      if (snapshotOwner.empty) {
+        qOwner = query(collection(db, 'stores'), where('userId', '==', ownerUid));
+        snapshotOwner = await getDocs(qOwner);
+      }
+      // Or sellerId
+      if (snapshotOwner.empty) {
+        qOwner = query(collection(db, 'stores'), where('sellerId', '==', ownerUid));
+        snapshotOwner = await getDocs(qOwner);
+      }
+
       snapshotOwner.docs.forEach(doc => {
         const data = doc.data();
         const store: Store = {
@@ -181,33 +152,74 @@ export const storeService = {
       console.warn('Query stores by ownerUid error:', err);
     }
 
-    // 2. Fetch stores by user's businesses to ensure stores created under business context are never missed
+    // 2. Fetch stores by user's businesses
     try {
-      const businesses = await businessService.getMyBusinesses(ownerUid);
-      for (const biz of businesses) {
-        if (!biz.id) continue;
-        const qBiz = query(
+      const qBizProfile = query(collection(db, 'businesses'), where('ownerUid', '==', ownerUid));
+      const bizSnap = await getDocs(qBizProfile);
+      
+      for (const docSnap of bizSnap.docs) {
+        const bizData = docSnap.data();
+        const bizId = docSnap.id;
+        
+        const qBizStores = query(
           collection(db, 'stores'),
-          where('businessId', '==', biz.id)
+          where('businessId', '==', bizId)
         );
-        const snapshotBiz = await getDocs(qBiz);
-        snapshotBiz.docs.forEach(doc => {
-          const data = doc.data();
+        const snapshotBiz = await getDocs(qBizStores);
+        
+        // If the business has no stores, map the business itself as a store (Legacy fallback)
+        if (snapshotBiz.empty && !storesMap.has(bizId)) {
           const store: Store = {
-            ...data,
-            storeId: doc.id,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
-          } as Store;
-          if (store.status !== 'deleted') {
-            storesMap.set(store.storeId, store);
-          }
-        });
+             storeId: bizId,
+             businessId: bizId,
+             ownerUid: ownerUid,
+             storeName: bizData.businessName || bizData.displayName || 'My Store',
+             storeSlug: bizData.businessSlug || bizId.toLowerCase(),
+             storeType: bizData.businessType || 'Online Store',
+             storeCategory: bizData.category || 'Retail',
+             description: bizData.description || '',
+             email: bizData.email || '',
+             phone: bizData.phone || '',
+             country: bizData.country || '',
+             state: bizData.state || '',
+             city: bizData.city || '',
+             address: bizData.address || '',
+             latitude: bizData.latitude || 0,
+             longitude: bizData.longitude || 0,
+             openingHours: [],
+             deliveryAvailable: true,
+             pickupAvailable: true,
+             verified: false,
+             featured: false,
+             status: bizData.status || 'active',
+             logoUrl: bizData.logoUrl || '',
+             coverImageUrl: bizData.coverImageUrl || '',
+             followers: bizData.followers || 0,
+             rating: bizData.rating || 0,
+             reviewCount: bizData.reviewCount || 0,
+             createdAt: bizData.createdAt instanceof Timestamp ? bizData.createdAt.toDate().toISOString() : bizData.createdAt,
+             updatedAt: bizData.updatedAt instanceof Timestamp ? bizData.updatedAt.toDate().toISOString() : bizData.updatedAt
+          };
+          storesMap.set(bizId, store);
+        } else {
+          snapshotBiz.docs.forEach(d => {
+            const data = d.data();
+            const store: Store = {
+              ...data,
+              storeId: d.id,
+              createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+              updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+            } as Store;
+            if (store.status !== 'deleted') {
+              storesMap.set(store.storeId, store);
+            }
+          });
+        }
       }
     } catch (err) {
-      console.warn('Query stores by businessId fallback error:', err);
+      console.warn('Query stores by business error:', err);
     }
-
+    
     return Array.from(storesMap.values());
   },
 

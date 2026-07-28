@@ -19,7 +19,8 @@ import {
   User,
   ShoppingBag,
   ExternalLink,
-  ClipboardList
+  ClipboardList,
+  MessageSquare
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/useAuth';
@@ -116,6 +117,20 @@ export const OrderDetails: React.FC = () => {
 
   const isMerchant = user?.uid === order?.businessId; // Simplified check for foundation
 
+  const handleChatAboutOrder = () => {
+    if (!order || !user) return;
+    const partnerId = isMerchant ? order.userUid : order.businessId;
+    const partnerName = isMerchant ? 'Customer' : 'Merchant';
+    navigate('/inbox', { 
+      state: { 
+        targetUid: partnerId,
+        targetName: partnerName,
+        contextType: 'order',
+        contextId: order.orderId
+      }
+    });
+  };
+
   const handleUpdateStatus = async (status: OrderStatus) => {
     if (!order || !user) return;
     try {
@@ -174,10 +189,16 @@ export const OrderDetails: React.FC = () => {
               {(order.orderStatus === OrderStatus.READY_FOR_PICKUP || order.orderStatus === OrderStatus.SHIPPED || order.orderStatus === OrderStatus.OUT_FOR_DELIVERY) && (
                 <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Navigation className="w-3 h-3" /> Track Shipment</button>
               )}
+              <button onClick={handleChatAboutOrder} className="px-4 py-2 bg-indigo-600/15 border border-indigo-500/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+                <MessageSquare className="w-3 h-3" /> Chat with Customer
+              </button>
             </div>
           )}
           {!isMerchant && (
             <div className="flex gap-2">
+              <button onClick={handleChatAboutOrder} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+                <MessageSquare className="w-3 h-3" /> Chat with Merchant
+              </button>
               <button onClick={() => window.print()} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
                 <Printer className="w-3 h-3" /> Print Invoice
               </button>

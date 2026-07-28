@@ -328,10 +328,10 @@ export interface Order {
 // MESSAGING & NOTIFICATION DOMAIN
 // ==========================================
 
-export type ConversationType = 'direct' | 'group' | 'business_customer' | 'system' | 'support';
+export type ConversationType = 'direct' | 'group' | 'business_customer' | 'system' | 'support' | 'order' | 'booking';
 export type ConversationStatus = 'active' | 'archived' | 'deleted' | 'blocked';
-export type MessageType = 'text' | 'image' | 'document' | 'system' | 'voice_placeholder';
-export type MessageStatus = 'sent' | 'delivered' | 'read' | 'failed' | 'deleted';
+export type MessageType = 'text' | 'image' | 'document' | 'system' | 'voice_placeholder' | 'product_share' | 'business_share' | 'location' | 'voice' | 'video' | 'pdf';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'deleted';
 
 export interface Conversation {
   conversationId: string;
@@ -339,13 +339,18 @@ export interface Conversation {
   participants: string[]; // Array of user UIDs
   businessId?: string;
   storeId?: string;
-  relatedEntityType?: SearchEntityType | 'order' | 'job_application';
+  productId?: string;
+  orderId?: string;
+  bookingId?: string;
+  relatedEntityType?: SearchEntityType | 'order' | 'job_application' | 'booking' | 'product';
   relatedEntityId?: string;
   lastMessage?: {
     content: string;
     senderUid: string;
     createdAt: string;
   };
+  lastMessageTime?: string;
+  lastSenderId?: string;
   lastActivity: string;
   status: ConversationStatus;
   unreadCounts: Record<string, number>; // UID -> count
@@ -357,15 +362,20 @@ export interface Message {
   messageId: string;
   conversationId: string;
   senderUid: string;
+  senderRole?: string;
   messageType: MessageType;
   content: string;
-  attachments?: string[]; // Array of mediaAsset IDs
+  text?: string; // Duplicate/fallback for text field if needed
+  attachments?: string[]; // Array of mediaAsset URLs/IDs
+  replyTo?: string;
   status: MessageStatus;
   edited: boolean;
   deleted: boolean;
   metadata?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
+  editedAt?: string;
+  deletedAt?: string;
 }
 
 export type EnterpriseNotificationType =

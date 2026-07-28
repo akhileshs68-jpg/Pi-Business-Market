@@ -52,7 +52,7 @@ export const getFirebaseDb = () => {
       ignoreUndefinedProperties: true,
     };
 
-    const databaseId = (import.meta as any).env.VITE_FIREBASE_DATABASE_ID;
+    const databaseId = (import.meta as any).env.VITE_FIREBASE_DATABASE_ID || (import.meta as any).env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
     if (databaseId) {
       db = initializeFirestore(getFirebaseApp(), settings, databaseId);
     } else {

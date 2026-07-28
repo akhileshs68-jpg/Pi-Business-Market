@@ -30,8 +30,15 @@ const InboxPage: React.FC = () => {
       if (state?.targetUid) {
         try {
           const participants = [user.uid, state.targetUid];
-          const type = state.contextType === 'product' ? 'business' : 'direct';
+          const type = state.contextType === 'order' ? 'order' : 
+                       state.contextType === 'booking' ? 'booking' :
+                       state.contextType === 'product' ? 'business_customer' : 'direct';
+
           const conv = await messagingService.getOrCreateConversation(participants, type as any, {
+            businessId: state.targetName || undefined,
+            productId: state.contextType === 'product' ? state.contextId : undefined,
+            orderId: state.contextType === 'order' ? state.contextId : undefined,
+            bookingId: state.contextType === 'booking' ? state.contextId : undefined,
             relatedEntityType: state.contextType,
             relatedEntityId: state.contextId
           });

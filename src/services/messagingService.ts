@@ -39,6 +39,9 @@ export const messagingService = {
     options?: {
       businessId?: string;
       storeId?: string;
+      productId?: string;
+      orderId?: string;
+      bookingId?: string;
       relatedEntityType?: any;
       relatedEntityId?: string;
     }
@@ -48,10 +51,22 @@ export const messagingService = {
     // Sort participants to ensure consistent ID generation for direct chats
     const sortedParticipants = [...participants].sort();
     
-    // Check for existing direct/business conversation
-    let conversationId = options?.relatedEntityId 
-      ? `CONV_${options.relatedEntityId}`
-      : `CONV_${sortedParticipants.join('_')}`;
+    // Check and generate specific conversation IDs for orders, bookings, products to prevent collision
+    let conversationId = `CONV_${sortedParticipants.join('_')}`;
+    
+    const resolvedOrderId = options?.orderId || (options?.relatedEntityType === 'order' ? options?.relatedEntityId : undefined);
+    const resolvedBookingId = options?.bookingId || (options?.relatedEntityType === 'booking' ? options?.relatedEntityId : undefined);
+    const resolvedProductId = options?.productId || (options?.relatedEntityType === 'product' ? options?.relatedEntityId : undefined);
+
+    if (resolvedOrderId) {
+      conversationId = `CONV_ORDER_${resolvedOrderId}`;
+    } else if (resolvedBookingId) {
+      conversationId = `CONV_BOOKING_${resolvedBookingId}`;
+    } else if (resolvedProductId) {
+      conversationId = `CONV_PRODUCT_${resolvedProductId}_${sortedParticipants.join('_')}`;
+    } else if (options?.relatedEntityId) {
+      conversationId = `CONV_${options.relatedEntityId}`;
+    }
 
     const convRef = doc(db, 'conversations', conversationId);
     const snap = await getDoc(convRef);
@@ -69,6 +84,9 @@ export const messagingService = {
       participants: sortedParticipants,
       businessId: options?.businessId,
       storeId: options?.storeId,
+      productId: resolvedProductId,
+      orderId: resolvedOrderId,
+      bookingId: resolvedBookingId,
       relatedEntityType: options?.relatedEntityType,
       relatedEntityId: options?.relatedEntityId,
       status: 'active',
@@ -97,7 +115,10 @@ export const messagingService = {
     senderUid: string,
     content: string,
     type: MessageType = 'text',
-    attachments?: string[]
+    attachments?: string[],
+    metadata?: Record<string, any>,
+    replyTo?: string,
+    senderRole?: string
   ): Promise<string> {
     const db = getFirebaseDb();
     const messageId = `MSG_${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
@@ -108,12 +129,16 @@ export const messagingService = {
       messageId,
       conversationId,
       senderUid,
+      senderRole,
       messageType: type,
       content,
+      text: content,
       attachments,
+      replyTo,
       status: 'sent',
       edited: false,
       deleted: false,
+      metadata,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -129,6 +154,8 @@ export const messagingService = {
           senderUid,
           createdAt: serverTimestamp()
         },
+        lastMessageTime: new Date().toISOString(),
+        lastSenderId: senderUid,
         lastActivity: serverTimestamp(),
         updatedAt: serverTimestamp()
       };

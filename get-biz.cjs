@@ -1,12 +1,13 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 const { readFileSync } = require('fs');
 const serviceAccount = JSON.parse(readFileSync('./firebase-service-account.json', 'utf8'));
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+initializeApp({
+  credential: cert(serviceAccount)
 });
 
-const db = admin.firestore();
+const db = getFirestore();
 
 async function run() {
   const snapshot = await db.collection('businesses').limit(1).get();
