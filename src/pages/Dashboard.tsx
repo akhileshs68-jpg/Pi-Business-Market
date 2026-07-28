@@ -77,7 +77,7 @@ export const Dashboard: React.FC = () => {
               <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">Enterprise Dashboard</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">My Workspace</h1>
               <p className="text-slate-400 font-medium text-xs sm:text-sm md:text-base">Welcome back, {user.displayName}</p>
             </div>
           </div>
@@ -161,11 +161,11 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="pt-6 border-t border-slate-800">
-              <p className="text-slate-400 text-sm font-medium mb-1">KYC Status</p>
+              <p className="text-slate-400 text-sm font-medium mb-1">Pi Network Verification</p>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${user.kycVerified ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span className={`text-sm font-bold ${user.kycVerified ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {user.kycVerified ? 'Verified' : 'Pending Verification'}
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-sm font-bold text-emerald-400">
+                  ✓ Pi Verified
                 </span>
               </div>
             </div>

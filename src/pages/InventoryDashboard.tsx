@@ -100,7 +100,7 @@ export const InventoryDashboard: React.FC = () => {
               </div>
               <h1 className="text-3xl font-black text-white tracking-tight uppercase">Inventory Ledger</h1>
             </div>
-            <p className="text-slate-500 font-medium">Enterprise SKU management and transactional stock auditing.</p>
+            <p className="text-slate-500 font-medium">Keep track of your products, stock counts, and sales history.</p>
           </div>
           <div className="flex items-center gap-4">
             <button className="flex items-center gap-2 px-6 py-3 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all">

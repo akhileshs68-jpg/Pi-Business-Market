@@ -21,6 +21,27 @@ import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { PiSdkSim } from '../services/piSdk';
 import { User, UserRole } from '../types';
 
+export interface RoleConfig {
+  id: string;
+  label: string;
+  iconName: string;
+  hasWorkspace: boolean;
+  descEn?: string;
+}
+
+export const ROLES_CONFIG: Record<string, RoleConfig> = {
+  buyer: { id: 'buyer', label: 'Buyer', iconName: '🛒', hasWorkspace: false },
+  seller: { id: 'seller', label: 'Seller', iconName: '🏪', hasWorkspace: true },
+  'service provider': { id: 'service provider', label: 'Service Provider', iconName: '🛠', hasWorkspace: true },
+  manufacturer: { id: 'manufacturer', label: 'Manufacturer', iconName: '🏭', hasWorkspace: true },
+  farmer: { id: 'farmer', label: 'Farmer', iconName: '🌾', hasWorkspace: true },
+  artist: { id: 'artist', label: 'Artist', iconName: '🎨', hasWorkspace: true },
+  freelancer: { id: 'freelancer', label: 'Freelancer', iconName: '💻', hasWorkspace: true },
+  company: { id: 'company', label: 'Company', iconName: '🏢', hasWorkspace: true },
+  doctor: { id: 'doctor', label: 'Doctor', iconName: '👨⚕️', hasWorkspace: true },
+  teacher: { id: 'teacher', label: 'Teacher', iconName: '👨🏫', hasWorkspace: true }
+};
+
 declare global {
   interface Window {
     Pi: any;
@@ -179,7 +200,9 @@ export const authService = {
             piUid,
             username,
             displayName: username, 
-            walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+            walletAddress: '',
+            roles: ['buyer'],
+            activeRole: 'buyer',
             role: 'Buyer', 
             accountType: 'individual',
             verified: true,
@@ -227,12 +250,16 @@ export const authService = {
         const userRef = doc(db, 'users', effectiveUid);
 
         if (!existingUserData) {
-          const newUser: User = {
+          const newUser: any = {
             uid: effectiveUid,
             piUid,
             username,
             displayName: username, 
-            walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+            walletAddress: '',
+            photoUrl: '', // Will be updated if Pi provides image later
+            roles: ['buyer'],
+            activeRole: 'buyer',
+            // Keeping these for backwards compatibility with existing types
             role: 'Buyer', 
             accountType: 'individual',
             verified: true,
@@ -250,7 +277,7 @@ export const authService = {
             lastLogin: serverTimestamp()
           });
 
-          return newUser;
+          return newUser as User;
         } else {
           // Update last login
           await updateDoc(userRef, {
@@ -262,6 +289,8 @@ export const authService = {
           
           return {
             ...existingUserData,
+            roles: existingUserData.roles || ['buyer'],
+            activeRole: existingUserData.activeRole || 'buyer',
             uid: effectiveUid,
             piUid,
             username,
@@ -328,12 +357,15 @@ export const authService = {
       const now = new Date().toISOString();
 
       if (!userSnap.exists()) {
-        const newUser: User = {
+        const newUser: any = {
           uid: firebaseUid,
           piUid: 'google_' + firebaseUid,
           username: firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUid.slice(0, 5),
           displayName: firebaseUser.displayName || 'Enterprise User',
-          walletAddress: 'pi_wallet_' + Math.random().toString(36).substring(7),
+          walletAddress: '',
+          photoUrl: firebaseUser.photoURL || '',
+          roles: ['buyer'],
+          activeRole: 'buyer',
           role: 'Buyer',
           accountType: 'individual',
           verified: true,
@@ -351,7 +383,7 @@ export const authService = {
           lastLogin: serverTimestamp()
         });
 
-        return newUser;
+        return newUser as User;
       } else {
         await updateDoc(userRef, {
           lastLogin: serverTimestamp(),
@@ -360,6 +392,8 @@ export const authService = {
         const data = userSnap.data();
         return {
           ...data,
+          roles: data.roles || ['buyer'],
+          activeRole: data.activeRole || 'buyer',
           uid: firebaseUid,
           createdAt: data.createdAt?.toDate?.()?.toISOString() || now,
           updatedAt: data.updatedAt?.toDate?.()?.toISOString() || now,

@@ -12,7 +12,7 @@ export const LoginPage: React.FC = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      const from = (location.state as any)?.from?.pathname || '/discovery';
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, location]);
@@ -22,7 +22,7 @@ export const LoginPage: React.FC = () => {
       setAuthError(null);
       const loggedInUser = await login();
       if (loggedInUser && loggedInUser.uid) {
-        const from = (location.state as any)?.from?.pathname || '/dashboard';
+        const from = (location.state as any)?.from?.pathname || '/discovery';
         navigate(from, { replace: true });
       }
     } catch (err: any) {
@@ -35,7 +35,7 @@ export const LoginPage: React.FC = () => {
       setAuthError(null);
       const loggedInUser = await loginWithGoogle();
       if (loggedInUser && loggedInUser.uid) {
-        const from = (location.state as any)?.from?.pathname || '/dashboard';
+        const from = (location.state as any)?.from?.pathname || '/discovery';
         navigate(from, { replace: true });
       }
     } catch (err: any) {
@@ -60,7 +60,7 @@ export const LoginPage: React.FC = () => {
               Pi Business Market
             </h1>
             <p className="text-slate-400 text-xs sm:text-sm font-medium">
-              Enterprise Network Authentication
+              Merchant Sign In
             </p>
           </div>
 
@@ -117,7 +117,7 @@ export const LoginPage: React.FC = () => {
             </button>
             
             <p className="text-center text-slate-500 text-xs mt-6 leading-relaxed">
-              By authenticating, you agree to the Enterprise Terms of Service and Privacy Protocol.
+              By authenticating, you agree to the Terms of Service and Privacy Policy.
             </p>
           </div>
 

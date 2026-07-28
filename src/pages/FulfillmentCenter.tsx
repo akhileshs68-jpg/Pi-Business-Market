@@ -56,9 +56,17 @@ export const FulfillmentCenter: React.FC = () => {
   const getStatusColor = (status: ShipmentStatus) => {
     switch (status) {
       case ShipmentStatus.DELIVERED: return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case ShipmentStatus.IN_TRANSIT: return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
-      case ShipmentStatus.PENDING: return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-      case ShipmentStatus.CANCELLED: return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+      case ShipmentStatus.IN_TRANSIT: 
+      case ShipmentStatus.HUB_PROCESSING:
+      case ShipmentStatus.OUT_FOR_DELIVERY: return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+      case ShipmentStatus.PENDING: 
+      case ShipmentStatus.CREATED: 
+      case ShipmentStatus.PACKED:
+      case ShipmentStatus.READY_FOR_PICKUP:
+      case ShipmentStatus.PICKUP_SCHEDULED: return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case ShipmentStatus.CANCELLED: 
+      case ShipmentStatus.DELIVERY_FAILED:
+      case ShipmentStatus.RETURNED: return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
       default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
     }
   };

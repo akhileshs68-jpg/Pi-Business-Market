@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  Package, 
+  Package, Printer, Navigation, 
   Truck, 
   CheckCircle2, 
   Clock, 
@@ -37,6 +37,56 @@ export const OrderDetails: React.FC = () => {
   const [timeline, setTimeline] = useState<OrderTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
+  const [showShipmentModal, setShowShipmentModal] = useState(false);
+  const [shipmentMethod, setShipmentMethod] = useState('');
+  const [courierName, setCourierName] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  
+  const handleCreateShipment = async () => {
+    if (!user || !order || !shipmentMethod) return;
+    try {
+      const { shippingService } = await import('../services/shippingService');
+      const { ShippingMethod } = await import('../types');
+      
+      let method = ShippingMethod.STANDARD;
+      if (shipmentMethod === 'courier') method = ShippingMethod.COURIER;
+      if (shipmentMethod === 'local_delivery') method = ShippingMethod.LOCAL_DELIVERY;
+      if (shipmentMethod === 'self_delivery') method = ShippingMethod.SELF_DELIVERY;
+      if (shipmentMethod === 'store_pickup') method = ShippingMethod.STORE_PICKUP;
+      
+      const shipmentId = await shippingService.createShipment(order, method);
+      
+      // Update local tracking info
+      if (trackingNumber || courierName) {
+        const { getFirebaseDb } = await import('../firebase/config');
+        const { writeBatch, doc, serverTimestamp } = await import('firebase/firestore');
+        const db = getFirebaseDb();
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'shipments', shipmentId), {
+          trackingNumber,
+          courierName,
+          updatedAt: serverTimestamp()
+        });
+        batch.update(doc(db, 'orders', order.orderId), {
+          shipmentId,
+          deliveryMethod: method,
+          'logistics.trackingNumber': trackingNumber,
+          'logistics.courierName': courierName,
+          updatedAt: serverTimestamp()
+        });
+        await batch.commit();
+      }
+      
+      setShowShipmentModal(false);
+      
+      // Refresh order
+      const { orderService } = await import('../services/orderService');
+      const updatedOrder = await orderService.getOrder(order.orderId);
+      if (updatedOrder) setOrder(updatedOrder);
+    } catch (err) {
+      console.error('Failed to create shipment', err);
+    }
+  };
 
   useEffect(() => {
     if (orderId) {
@@ -106,23 +156,35 @@ export const OrderDetails: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">Placed on {new Date(order.createdAt).toLocaleString()}</p>
           </div>
 
-          {isMerchant && (
+          
+                    {isMerchant && (
+            <div className="flex flex-wrap gap-2">
+              {order.orderStatus === OrderStatus.NEW_ORDER && (
+                <>
+                  <button onClick={() => handleUpdateStatus(OrderStatus.ACCEPTED)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Accept Order</button>
+                  <button onClick={() => handleUpdateStatus(OrderStatus.CANCELLED)} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Reject Order</button>
+                </>
+              )}
+              {order.orderStatus === OrderStatus.ACCEPTED && (
+                <button onClick={() => handleUpdateStatus(OrderStatus.PACKED)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Pack Order</button>
+              )}
+              {order.orderStatus === OrderStatus.PACKED && (
+                <button onClick={() => setShowShipmentModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Truck className="w-3 h-3" /> Create Shipment</button>
+              )}
+              {(order.orderStatus === OrderStatus.READY_FOR_PICKUP || order.orderStatus === OrderStatus.SHIPPED || order.orderStatus === OrderStatus.OUT_FOR_DELIVERY) && (
+                <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Navigation className="w-3 h-3" /> Track Shipment</button>
+              )}
+            </div>
+          )}
+          {!isMerchant && (
             <div className="flex gap-2">
-              <button 
-                onClick={() => handleUpdateStatus(OrderStatus.PROCESSING)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                Start Processing
-              </button>
-              <button 
-                onClick={() => handleUpdateStatus(OrderStatus.READY_FOR_DISPATCH)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                Mark Ready
+              <button onClick={() => window.print()} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+                <Printer className="w-3 h-3" /> Print Invoice
               </button>
             </div>
           )}
         </div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Left Column: Details */}
@@ -201,22 +263,41 @@ export const OrderDetails: React.FC = () => {
             {/* Logistics & Delivery */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
               <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-emerald-400" /> Delivery Address
-                </h3>
+                <div className="flex justify-between items-center mb-4 sm:mb-6">
+                  <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-emerald-400" /> Delivery Details
+                  </h3>
+                  {order.shipmentId && (
+                    <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-3 py-1.5 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2">
+                      <Navigation className="w-3 h-3" /> Track
+                    </button>
+                  )}
+                </div>
                 {order.shippingAddress ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-slate-200">{order.shippingAddress.fullName}</p>
-                    <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.street}</p>
-                    <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
-                    <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-4 flex items-center gap-2">
-                      <Truck className="w-3 h-3" /> Standard Shipping
-                    </p>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-200">{order.shippingAddress.fullName}</p>
+                      <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.street}</p>
+                      <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
+                    </div>
+                    {order.logistics && (
+                      <div className="pt-4 border-t border-slate-800/50 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[9px] text-slate-500 uppercase font-black">Courier</p>
+                          <p className="text-xs font-bold text-white">{order.logistics.courierName || 'Standard'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-slate-500 uppercase font-black">Tracking Number</p>
+                          <p className="text-xs font-mono text-emerald-400 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded">{order.logistics.trackingNumber || 'Pending'}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-[10px] sm:text-xs text-slate-600 italic">No address (Digital/Service)</p>
                 )}
               </section>
+
 
               <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
                 <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
@@ -269,7 +350,75 @@ export const OrderDetails: React.FC = () => {
             </section>
           </div>
         </div>
+      
+      {showShipmentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md">
+            <h2 className="text-xl font-black text-white uppercase tracking-tight mb-6">Create Shipment</h2>
+            
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Delivery Method</label>
+                <select 
+                  value={shipmentMethod}
+                  onChange={(e) => setShipmentMethod(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Method</option>
+                  <option value="store_pickup">Store Pickup</option>
+                  <option value="self_delivery">Self Delivery</option>
+                  <option value="local_delivery">Local Delivery</option>
+                  <option value="courier">Courier Delivery</option>
+                </select>
+              </div>
+              
+              {shipmentMethod === 'courier' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Courier Name</label>
+                    <input 
+                      type="text" 
+                      value={courierName}
+                      onChange={(e) => setCourierName(e.target.value)}
+                      placeholder="e.g. Shiprocket, Blue Dart"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tracking Number</label>
+                    <input 
+                      type="text" 
+                      value={trackingNumber}
+                      onChange={(e) => setTrackingNumber(e.target.value)}
+                      placeholder="Tracking ID"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowShipmentModal(false)}
+                className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCreateShipment}
+                disabled={!shipmentMethod}
+                className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );
 };
+export default OrderDetails;

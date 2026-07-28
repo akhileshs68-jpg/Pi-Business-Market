@@ -110,6 +110,7 @@ export function BottomDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
+            transition={{ duration: 0.2 }}
             style={{
               background: 'rgba(0,0,0,0.55)',
               backdropFilter: 'blur(12px)',
@@ -129,7 +130,7 @@ export function BottomDrawer({
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
             drag={true}
             dragConstraints={{ top: 0, bottom: 300, left: 0, right: 300 }}
             dragElastic={{ top: 0.05, bottom: 0.85, left: 0.05, right: 0.85 }}
@@ -167,7 +168,7 @@ export function BottomDrawer({
               </div>
               <button
                 onClick={onClose}
-                className="p-2.5 rounded-full bg-slate-900/80 border border-slate-800/80 text-slate-400 hover:text-white transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className="p-2.5 rounded-full bg-slate-900/80 border border-slate-800/80 text-slate-400 hover:text-white transition-colors cursor-pointer min-w-[48px] min-h-[48px] flex items-center justify-center"
                 aria-label="Close drawer"
               >
                 <X className="w-5 h-5" />

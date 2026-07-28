@@ -21,7 +21,7 @@ const puppeteer = require('puppeteer');
     console.log('Injecting Firestore read test...');
     await page.evaluate(async () => {
       try {
-        const projectId = "straight-modem-gw1xt";
+        const projectId = process.env.VITE_FIREBASE_PROJECT_ID || "";
         const dbId = "ai-studio-pibusinessmarket-77787f2f-7898-4843-8acf-68b0116d2c80";
         const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/users`;
         const response = await fetch(url);

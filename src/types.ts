@@ -34,6 +34,8 @@ export interface User {
   lastLogin: string;     // ISO string
   status: AccountStatus;
   photoUrl?: string;
+  activeRole?: string;
+  roles?: string[];
   
   // Backward compatibility fields
   email?: string;
@@ -188,16 +190,20 @@ export interface LegacyProductAttribute {
 // ==========================================
 
 export enum OrderStatus {
-  DRAFT = 'draft',
   PENDING_PAYMENT = 'pending_payment',
-  CONFIRMED = 'confirmed',
-  PROCESSING = 'processing',
-  READY_FOR_DISPATCH = 'ready_for_dispatch',
+  PAYMENT_VERIFIED = 'payment_verified',
+  NEW_ORDER = 'new_order',
+  ACCEPTED = 'accepted',
+  PACKED = 'packed',
+  READY_FOR_PICKUP = 'ready_for_pickup',
+  SHIPPED = 'shipped',
+  OUT_FOR_DELIVERY = 'out_for_delivery',
+  DELIVERED = 'delivered',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
   RETURNED = 'returned',
   REFUND_PENDING = 'refund_pending',
-  REFUNDED = 'refunded'
+  REFUND_COMPLETED = 'refund_completed'
 }
 
 export enum PaymentStatus {
@@ -245,6 +251,35 @@ export interface OrderItem {
   status: string;
 }
 
+export interface OrderHistoryLog {
+  status: OrderStatus;
+  timestamp: string;
+  updatedBy: string;
+  remarks?: string;
+}
+
+export interface LogisticsDetails {
+  shipmentNumber?: string;
+  trackingNumber?: string;
+  courierName?: string;
+  deliveryPartner?: string;
+  pickupDate?: string;
+  dispatchDate?: string;
+  expectedDelivery?: string;
+  actualDelivery?: string;
+  shippingCost?: number;
+  deliveryNotes?: string;
+  shipmentWeight?: number;
+  packageDimensions?: {
+    length: number;
+    width: number;
+    height: number;
+  };
+  deliveryType?: 'self_delivery' | 'store_pickup' | 'local_delivery' | 'third_party_courier';
+}
+
+export type DeliveryMethod = 'shipping' | 'pickup' | 'self_delivery' | 'store_pickup' | 'local_delivery' | 'third_party_courier';
+
 export interface Order {
   orderId: string;
   orderNumber: string;
@@ -253,18 +288,37 @@ export interface Order {
   userUid: string;
   businessId: string;
   storeId?: string;
+  
   currency: string;
   subtotal: number;
   discount: number;
   tax: number;
   shipping: number;
   grandTotal: number;
+  
   paymentStatus: PaymentStatus;
   orderStatus: OrderStatus;
   fulfillmentStatus: FulfillmentStatus;
+  
   billingAddress?: Address;
   shippingAddress?: Address;
   customerNotes?: string;
+  
+  // Logistics
+  logistics?: LogisticsDetails;
+  deliveryMethod?: DeliveryMethod;
+  shipmentId?: string;
+  
+  // Payment Linking
+  paymentTxId?: string; // Pi Transaction ID
+  paymentWalletAddress?: string;
+  paymentTxHash?: string;
+  paymentTimestamp?: string;
+  paymentVerificationStatus?: string;
+  
+  // History log as requested
+  historyLog?: OrderHistoryLog[];
+  
   createdAt: string;
   updatedAt: string;
   blockchainTxId?: string;
@@ -441,14 +495,7 @@ export interface AuditLog {
 // BUSINESS IDENTITY & ONBOARDING DOMAIN
 // ==========================================
 
-export type BusinessType = 
-  | 'Individual' | 'Freelancer' | 'Startup' | 'Sole Proprietorship' | 'Partnership' 
-  | 'LLP' | 'Private Limited' | 'Public Limited' | 'NGO' | 'Trust' | 'Society' 
-  | 'Government' | 'Educational Institute' | 'School' | 'College' | 'University' 
-  | 'Hospital' | 'Clinic' | 'Pharmacy' | 'Restaurant' | 'Hotel' | 'Manufacturer' 
-  | 'Wholesaler' | 'Distributor' | 'Retailer' | 'Service Provider' | 'Digital Agency' 
-  | 'IT Company' | 'Finance Company' | 'Agriculture' | 'Construction' | 'Transport' 
-  | 'Logistics' | 'Real Estate' | 'Tourism' | 'Entertainment' | 'Other';
+export type BusinessType = string; // 'Product Seller' | 'Service Provider' | 'Manufacturer' | 'Freelancer' | 'Professional' | 'Agriculture / Farmer' | 'Local Shop' | 'Company' | 'Startup' | 'NGO' | 'Artist / Creator' | 'Distributor' | 'Wholesaler' | 'Transporter' | 'Educational Institute' | 'Healthcare' | 'Hospitality' | 'Construction' | 'Repair Services' | 'Other';
 
 export type BusinessRole = 
   | 'Owner' | 'Super Admin' | 'Business Admin' | 'Manager' | 'Finance' | 'Sales' 
@@ -457,7 +504,42 @@ export type BusinessRole =
 export type VerificationStatus = 'Pending' | 'Submitted' | 'Under Review' | 'Approved' | 'Rejected' | 'Suspended' | 'Verified';
 export type BusinessStatus = 'active' | 'inactive' | 'suspended' | 'archived' | 'deleted';
 
+export interface BusinessProfileData {
+  skills?: string;
+  experience?: string;
+  serviceArea?: string;
+  workingHours?: string;
+  startingPrice?: string;
+  languages?: string;
+  portfolioImages?: string;
+  homeVisit?: string;
+  emergencyService?: string;
+  farmName?: string;
+  cropType?: string;
+  harvestSeason?: string;
+  quantity?: string;
+  deliveryRadius?: string;
+  organic?: string;
+  factoryName?: string;
+  productionCapacity?: string;
+  moq?: string;
+  factoryAddress?: string;
+  sellsWholesale?: string;
+  sellsRetail?: string;
+  exportReady?: string;
+  productCategories?: string;
+  hasPhysicalStore?: string;
+  offersDelivery?: string;
+  artMedium?: string;
+  portfolio?: string;
+  acceptsCommissions?: string;
+  storeName?: string;
+  deliveryAvailable?: string;
+  pickupAvailable?: string;
+}
+
 export interface Business {
+  profileData?: BusinessProfileData;
   id: string;
   ownerUid: string;
   businessName: string;
@@ -1438,6 +1520,9 @@ export interface SearchFilters {
   minPrice?: number;
   maxPrice?: number;
   featured?: boolean;
+  businessType?: string;
+  minRating?: number;
+  isVerified?: boolean;
 }
 
 export interface RecentSearch {
@@ -1620,11 +1705,14 @@ export interface Refund {
 // ==========================================
 
 export enum ShipmentStatus {
+  CREATED = 'created',
   PENDING = 'pending',
   PACKED = 'packed',
   READY_FOR_PICKUP = 'ready_for_pickup',
+  PICKUP_SCHEDULED = 'pickup_scheduled',
   PICKED_UP = 'picked_up',
   IN_TRANSIT = 'in_transit',
+  HUB_PROCESSING = 'hub_processing',
   OUT_FOR_DELIVERY = 'out_for_delivery',
   DELIVERED = 'delivered',
   DELIVERY_FAILED = 'delivery_failed',
@@ -1637,7 +1725,11 @@ export enum ShippingMethod {
   EXPRESS = 'express',
   SAME_DAY = 'same_day',
   PICKUP = 'pickup',
-  DIGITAL = 'digital'
+  DIGITAL = 'digital',
+  STORE_PICKUP = 'store_pickup',
+  SELF_DELIVERY = 'self_delivery',
+  LOCAL_DELIVERY = 'local_delivery',
+  COURIER = 'courier'
 }
 
 export interface Carrier {

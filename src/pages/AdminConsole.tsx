@@ -114,7 +114,7 @@ export const AdminConsole: React.FC = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white tracking-tight">Ops Console</h1>
-              <p className="text-slate-500 font-medium">Enterprise governance & platform control</p>
+              <p className="text-slate-500 font-medium">Marketplace governance & platform control</p>
             </div>
           </div>
 

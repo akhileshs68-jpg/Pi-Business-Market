@@ -14,9 +14,10 @@ export interface PiPaymentData {
   amount: number;
   memo: string;
   metadata: {
-    storeId: string;
+    storeId?: string;
     productId?: string;
-    itemsCount: number;
+    itemsCount?: number;
+    [key: string]: any;
   };
 }
 

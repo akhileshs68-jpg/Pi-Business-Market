@@ -43,6 +43,7 @@ import { cartService } from '../../services/cartService';
 import { checkoutService } from '../../services/checkoutService';
 import { productService } from '../../services/productService';
 import { BottomDrawer } from '../ui/BottomDrawer';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
 interface ProductCardProps {
   product: Product;
@@ -98,6 +99,50 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }, []);
   
   const [isAdding, setIsAdding] = useState(false);
+
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, isDestructive?: boolean}>({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: () => {},
+    isDestructive: true
+  });
+
+  const confirmAction = (title: string, message: string, action: () => void, isDestructive = true) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      action,
+      isDestructive
+    });
+  };
+
+  
+  // Quick Inline Edit State
+  const [isInlineEditing, setIsInlineEditing] = useState(false);
+  const [inlineData, setInlineData] = useState({
+    price: product.price || 0,
+    stock: product.stock || 0,
+    status: product.status || 'published',
+    featured: product.featured || false,
+    visibility: product.visibility || 'public'
+  });
+  const [isSavingInline, setIsSavingInline] = useState(false);
+
+  const handleSaveInline = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsSavingInline(true);
+    try {
+      await productService.updateProduct(product.productId, inlineData);
+      setIsInlineEditing(false);
+      triggerToast('Product updated quickly');
+    } catch (err) {
+      console.error('Error inline editing:', err);
+    } finally {
+      setIsSavingInline(false);
+    }
+  };
   const [isBuying, setIsBuying] = useState(false);
   const [added, setAdded] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -209,45 +254,48 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to move this product to trash?')) return;
-    try {
-      if (onDelete) {
-        onDelete(product.productId);
-      } else {
-        await productService.softDeleteProduct(product.productId, user?.uid);
-        triggerToast('Product deleted');
-        window.dispatchEvent(new Event('productsChanged'));
+    confirmAction('Delete Product', 'Are you sure you want to move this product to trash?', async () => {
+      try {
+        if (onDelete) {
+          onDelete(product.productId);
+        } else {
+          await productService.softDeleteProduct(product.productId, user?.uid);
+          triggerToast('Product deleted');
+          window.dispatchEvent(new Event('productsChanged'));
+        }
+        setShowMenu(false);
+      } catch (err) {
+        triggerToast('Error deleting product');
       }
-      setShowMenu(false);
-    } catch (err) {
-      triggerToast('Error deleting product');
-    }
+    });
   };
 
   const handleArchive = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to archive this product?')) return;
-    try {
-      await productService.archiveProduct(product.productId);
-      triggerToast('Product archived');
-      window.dispatchEvent(new Event('productsChanged'));
-      setShowMenu(false);
-    } catch (err) {
-      triggerToast('Error archiving product');
-    }
+    confirmAction('Archive Product', 'Are you sure you want to archive this product?', async () => {
+      try {
+        await productService.archiveProduct(product.productId);
+        triggerToast('Product archived');
+        window.dispatchEvent(new Event('productsChanged'));
+        setShowMenu(false);
+      } catch (err) {
+        triggerToast('Error archiving product');
+      }
+    });
   };
 
   const handleRestore = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to restore this product?')) return;
-    try {
-      await productService.restoreProduct(product.productId);
-      triggerToast('Product restored');
-      window.dispatchEvent(new Event('productsChanged'));
-      setShowMenu(false);
-    } catch (err) {
-      triggerToast('Error restoring product');
-    }
+    confirmAction('Restore Product', 'Are you sure you want to restore this product?', async () => {
+      try {
+        await productService.restoreProduct(product.productId);
+        triggerToast('Product restored');
+        window.dispatchEvent(new Event('productsChanged'));
+        setShowMenu(false);
+      } catch (err) {
+        triggerToast('Error restoring product');
+      }
+    });
   };
 
   const handleDuplicateInternal = async (e: React.MouseEvent) => {
@@ -328,8 +376,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <button onClick={handleEditClick} className={itemClass}>
                 <Edit2 className={`${highlightIconClass} text-indigo-400`} /> <span>Edit Product</span>
               </button>
-              <button onClick={handleEditClick} className={itemClass}>
-                <DollarSign className={`${highlightIconClass} text-emerald-400`} /> <span>Update Price</span>
+              <button onClick={(e) => { e.stopPropagation(); setShowMenu(false); setIsInlineEditing(true); }} className={itemClass}>
+                <DollarSign className={`\${highlightIconClass} text-emerald-400`} /> <span>Quick Inline Edit</span>
               </button>
               <button onClick={handleManageVariantsClick} className={itemClass}>
                 <Layers className={`${highlightIconClass} text-violet-400`} /> <span>Update Inventory</span>
@@ -371,10 +419,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   </button>
                   <button onClick={async (e) => {
                     e.stopPropagation();
-                    if (!window.confirm('Are you sure you want to permanently delete this product?')) return;
-                    await productService.permanentDeleteProduct(product.productId);
-                    triggerToast('Product permanently deleted');
-                    window.dispatchEvent(new Event('productsChanged'));
+                    confirmAction('Permanent Delete', 'Are you sure you want to permanently delete this product?', async () => {
+                      await productService.permanentDeleteProduct(product.productId);
+                      triggerToast('Product permanently deleted');
+                      window.dispatchEvent(new Event('productsChanged'));
+                    });
                   }} className={dangerItemClass}>
                     <Trash2 className={`${highlightIconClass} text-red-400`} /> <span>Permanent Delete</span>
                   </button>
@@ -450,6 +499,62 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   // Badges logic
   const isBestSeller = (product.productId.charCodeAt(0) % 3) === 0;
   const isTrending = (product.productId.charCodeAt(product.productId.length - 1) % 3) === 0;
+
+  if (isInlineEditing) {
+    return (
+      <div className={`bg-slate-900/60 backdrop-blur-md border border-violet-500/50 rounded-[20px] p-5 relative shadow-lg shadow-violet-900/20 w-full ${viewMode === 'list' ? 'flex flex-col md:flex-row items-start md:items-center gap-4' : 'flex flex-col gap-4'}`}>
+        <div className="flex-1 w-full space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-white uppercase tracking-wider">{product.productName}</h4>
+            <button onClick={(e) => { e.stopPropagation(); setIsInlineEditing(false); }} className="text-slate-400 hover:text-white p-1 rounded-md">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Price (Pi)</label>
+              <input type="number" value={inlineData.price} onChange={e => setInlineData({...inlineData, price: parseFloat(e.target.value) || 0})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Stock</label>
+              <input type="number" value={inlineData.stock} onChange={e => setInlineData({...inlineData, stock: parseInt(e.target.value) || 0})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Status</label>
+              <select value={inlineData.status} onChange={e => setInlineData({...inlineData, status: e.target.value as any})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500 transition-all">
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Visibility</label>
+              <select value={inlineData.visibility} onChange={e => setInlineData({...inlineData, visibility: e.target.value as any})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500 transition-all">
+                <option value="public">Public</option>
+                <option value="unlisted">Unlisted</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={inlineData.featured} onChange={e => setInlineData({...inlineData, featured: e.target.checked})} className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-violet-600 focus:ring-violet-500/50 cursor-pointer" />
+              <span className="text-xs font-bold text-slate-300">Featured</span>
+            </label>
+          </div>
+          
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button onClick={(e) => { e.stopPropagation(); setIsInlineEditing(false); }} className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-all border border-slate-700">Cancel</button>
+            <button onClick={handleSaveInline} disabled={isSavingInline} className="px-4 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 rounded-xl transition-all shadow-lg shadow-violet-500/20 disabled:opacity-50">
+              {isSavingInline ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (viewMode === 'list') {
     return (
@@ -534,16 +639,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
             
             {isMerchantView && (
-              <div className="mt-2 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-9 gap-2 text-[9px] text-slate-400 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+              <div className="mt-2 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 text-[9px] text-slate-400 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                 <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Views</span><span className="font-mono text-white">{product.metrics?.views || 1205}</span></div>
                 <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Wishlist</span><span className="font-mono text-white">{product.metrics?.wishlistCount || 45}</span></div>
-                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Shares</span><span className="font-mono text-white">{product.metrics?.shares || 12}</span></div>
-                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">In Carts</span><span className="font-mono text-white">{product.metrics?.cartCount || 8}</span></div>
                 <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Orders</span><span className="font-mono text-white">{product.metrics?.orders || 34}</span></div>
                 <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Revenue</span><span className="font-mono text-emerald-400">${product.metrics?.revenue || (34 * (product.price || 0)).toFixed(2)}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Stock</span><span className={`font-mono font-bold ${product.stock > 10 ? 'text-emerald-400' : product.stock > 0 ? 'text-amber-400' : 'text-red-400'}`}>{product.stock || 0}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Shares</span><span className="font-mono text-white">{product.metrics?.shares || 12}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">In Carts</span><span className="font-mono text-white">{product.metrics?.cartCount || 8}</span></div>
                 <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Conv. Rate</span><span className="font-mono text-white">{product.metrics?.conversionRate !== undefined ? `${product.metrics.conversionRate}%` : '2.8%'}</span></div>
                 <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Score</span><span className="font-mono text-amber-400">{product.metrics?.performanceScore || 92}/100</span></div>
-                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Last Viewed</span><span className="font-mono text-white truncate">{product.metrics?.lastViewed || 'Just now'}</span></div>
+                <div className="flex flex-col"><span className="uppercase text-slate-500 font-bold text-[8px]">Updated</span><span className="font-mono text-white truncate">{new Date(product.updatedAt).toLocaleDateString()}</span></div>
               </div>
             )}
           </div>
@@ -734,6 +840,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {showQuickView && (
           <QuickViewModal product={product} imgUrl={productImgUrl} rating={rating} soldCount={soldCount} oldPrice={oldPrice} onClose={() => setShowQuickView(false)} />
         )}
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          isDestructive={confirmModal.isDestructive}
+          onConfirm={confirmModal.action}
+          onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+        />
       </div>
     );
   }
@@ -997,9 +1111,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </AnimatePresence>
 
       {/* Quick View Modal */}
-      {showQuickView && (
-        <QuickViewModal product={product} imgUrl={productImgUrl} rating={rating} soldCount={soldCount} oldPrice={oldPrice} onClose={() => setShowQuickView(false)} />
-      )}
+        {showQuickView && (
+          <QuickViewModal product={product} imgUrl={productImgUrl} rating={rating} soldCount={soldCount} oldPrice={oldPrice} onClose={() => setShowQuickView(false)} />
+        )}
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          isDestructive={confirmModal.isDestructive}
+          onConfirm={confirmModal.action}
+          onCancel={() => setConfirmModal(prev => ({...prev, isOpen: false}))}
+        />
     </div>
   );
 };
@@ -1145,7 +1267,7 @@ const PortalDropdown: React.FC<PortalDropdownProps> = ({ isOpen, onClose, anchor
       requestAnimationFrame(updatePosition);
       
       const scrollHandler = () => {
-        onClose();
+        updatePosition();
       };
       
       window.addEventListener('resize', updatePosition);

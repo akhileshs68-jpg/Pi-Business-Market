@@ -1,9 +1,8 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/types.ts', 'utf8');
+let code = fs.readFileSync('src/types.ts', 'utf8');
 
-content = content.replace('logo?: string;\n  coverImage?: string;', 'logoUrl?: string;\n  logoPublicId?: string;\n  coverImageUrl?: string;\n  coverPublicId?: string;');
-content = content.replace('logo?: string;\n  banner?: string;', 'logoUrl?: string;\n  logoPublicId?: string;\n  coverImageUrl?: string;\n  coverPublicId?: string;');
-content = content.replace('logo?: string;\n  banner?: string;', 'logoUrl?: string;\n  logoPublicId?: string;\n  coverImageUrl?: string;\n  coverPublicId?: string;');
-content = content.replace('banner?: string;', 'coverImageUrl?: string;\n  coverPublicId?: string;');
+const newBusinessType = `export type BusinessType = string; // 'Product Seller' | 'Service Provider' | 'Manufacturer' | 'Freelancer' | 'Professional' | 'Agriculture / Farmer' | 'Local Shop' | 'Company' | 'Startup' | 'NGO' | 'Artist / Creator' | 'Distributor' | 'Wholesaler' | 'Transporter' | 'Educational Institute' | 'Healthcare' | 'Hospitality' | 'Construction' | 'Repair Services' | 'Other';`;
 
-fs.writeFileSync('src/types.ts', content);
+code = code.replace(/export type BusinessType =[\s\S]*?;/, newBusinessType);
+
+fs.writeFileSync('src/types.ts', code);

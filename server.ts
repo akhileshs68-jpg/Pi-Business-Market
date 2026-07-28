@@ -1,3 +1,4 @@
+import fs from "fs";
 import "dotenv/config";
 import express from "express";
 import path from "path";
@@ -8,17 +9,20 @@ import { createServer as createViteServer } from "vite";
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: (process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME),
-  api_key: (process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY),
-  api_secret: (process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET),
-  secure: true
+  cloud_name:
+    process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME,
+  api_key:
+    process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY,
+  api_secret:
+    process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET,
+  secure: true,
 });
 
 // Configure Multer for memory storage
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
 async function startServer() {
@@ -45,20 +49,23 @@ async function startServer() {
 
       // Pi user data
       const piUser = response.data;
-      
+
       // Return the validated user info
       res.json({
         success: true,
         user: {
           uid: piUser.uid,
           username: piUser.username,
-        }
+        },
       });
     } catch (error: any) {
-      console.error("[Backend Auth] Pi validation failed:", error.response?.data || error.message);
-      res.status(401).json({ 
-        error: "Pi authentication failed", 
-        details: error.response?.data || error.message 
+      console.error(
+        "[Backend Auth] Pi validation failed:",
+        error.response?.data || error.message,
+      );
+      res.status(401).json({
+        error: "Pi authentication failed",
+        details: error.response?.data || error.message,
       });
     }
   });
@@ -78,15 +85,20 @@ async function startServer() {
 
       const apiKey = process.env.PI_NETWORK_API_KEY;
       if (!apiKey) {
-        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval.");
-        return res.json({ 
-          success: true, 
-          message: "Payment approved in sandbox mode (PI_NETWORK_API_KEY missing)",
-          paymentId 
+        console.warn(
+          "[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval.",
+        );
+        return res.json({
+          success: true,
+          message:
+            "Payment approved in sandbox mode (PI_NETWORK_API_KEY missing)",
+          paymentId,
         });
       }
 
-      console.log(`[Pi Payment Approve] Requesting Pi server approval for payment ${paymentId}...`);
+      console.log(
+        `[Pi Payment Approve] Requesting Pi server approval for payment ${paymentId}...`,
+      );
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/approve`,
         {},
@@ -94,16 +106,21 @@ async function startServer() {
           headers: {
             Authorization: `Key ${apiKey}`,
           },
-        }
+        },
       );
 
-      console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
+      console.log(
+        `[Pi Payment Approve] Successfully approved payment ${paymentId}`,
+      );
       res.json({ success: true, payment: response.data });
     } catch (error: any) {
-      console.error("[Pi Payment Approve] Error approving payment:", error.response?.data || error.message);
-      res.status(500).json({ 
-        error: "Failed to approve payment with Pi Network server", 
-        details: error.response?.data || error.message 
+      console.error(
+        "[Pi Payment Approve] Error approving payment:",
+        error.response?.data || error.message,
+      );
+      res.status(500).json({
+        error: "Failed to approve payment with Pi Network server",
+        details: error.response?.data || error.message,
       });
     }
   });
@@ -113,21 +130,28 @@ async function startServer() {
     try {
       const { paymentId, txid } = req.body;
       if (!paymentId || !txid) {
-        return res.status(400).json({ error: "paymentId and txid are required" });
+        return res
+          .status(400)
+          .json({ error: "paymentId and txid are required" });
       }
 
       const apiKey = process.env.PI_NETWORK_API_KEY;
       if (!apiKey) {
-        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
-        return res.json({ 
-          success: true, 
-          message: "Payment completed in sandbox mode (PI_NETWORK_API_KEY missing)",
+        console.warn(
+          "[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.",
+        );
+        return res.json({
+          success: true,
+          message:
+            "Payment completed in sandbox mode (PI_NETWORK_API_KEY missing)",
           paymentId,
-          txid 
+          txid,
         });
       }
 
-      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+      console.log(
+        `[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`,
+      );
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/complete`,
         { txid },
@@ -135,16 +159,21 @@ async function startServer() {
           headers: {
             Authorization: `Key ${apiKey}`,
           },
-        }
+        },
       );
 
-      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
+      console.log(
+        `[Pi Payment Complete] Successfully completed payment ${paymentId}`,
+      );
       res.json({ success: true, payment: response.data });
     } catch (error: any) {
-      console.error("[Pi Payment Complete] Error completing payment:", error.response?.data || error.message);
-      res.status(500).json({ 
-        error: "Failed to complete payment with Pi Network server", 
-        details: error.response?.data || error.message 
+      console.error(
+        "[Pi Payment Complete] Error completing payment:",
+        error.response?.data || error.message,
+      );
+      res.status(500).json({
+        error: "Failed to complete payment with Pi Network server",
+        details: error.response?.data || error.message,
       });
     }
   });
@@ -154,52 +183,79 @@ async function startServer() {
     try {
       const { payment } = req.body;
       if (!payment || !payment.identifier) {
-        return res.status(400).json({ error: "Invalid incomplete payment payload" });
+        return res
+          .status(400)
+          .json({ error: "Invalid incomplete payment payload" });
       }
 
       const paymentId = payment.identifier;
       const txid = payment.transaction?.txid;
       const apiKey = process.env.PI_NETWORK_API_KEY;
 
-      console.log(`[Pi Incomplete Payment] Handling incomplete payment ${paymentId}...`);
+      console.log(
+        `[Pi Incomplete Payment] Handling incomplete payment ${paymentId}...`,
+      );
 
       if (!apiKey) {
-        console.warn("[Pi Incomplete Payment] PI_NETWORK_API_KEY not configured. Acknowledging for sandbox.");
-        return res.json({ success: true, message: "Incomplete payment acknowledged in sandbox mode" });
+        console.warn(
+          "[Pi Incomplete Payment] PI_NETWORK_API_KEY not configured. Acknowledging for sandbox.",
+        );
+        return res.json({
+          success: true,
+          message: "Incomplete payment acknowledged in sandbox mode",
+        });
       }
 
       const isApproved = payment.status?.developer_approved;
       const isCompleted = payment.status?.developer_completed;
 
       if (isApproved && txid && !isCompleted) {
-        console.log(`[Pi Incomplete Payment] Completing uncompleted payment ${paymentId}...`);
+        console.log(
+          `[Pi Incomplete Payment] Completing uncompleted payment ${paymentId}...`,
+        );
         const response = await axios.post(
           `https://api.minepi.com/v2/payments/${paymentId}/complete`,
           { txid },
-          { headers: { Authorization: `Key ${apiKey}` } }
+          { headers: { Authorization: `Key ${apiKey}` } },
         );
-        return res.json({ success: true, action: "completed", payment: response.data });
+        return res.json({
+          success: true,
+          action: "completed",
+          payment: response.data,
+        });
       } else if (!isApproved) {
-        console.log(`[Pi Incomplete Payment] Approving unapproved payment ${paymentId}...`);
+        console.log(
+          `[Pi Incomplete Payment] Approving unapproved payment ${paymentId}...`,
+        );
         const response = await axios.post(
           `https://api.minepi.com/v2/payments/${paymentId}/approve`,
           {},
-          { headers: { Authorization: `Key ${apiKey}` } }
+          { headers: { Authorization: `Key ${apiKey}` } },
         );
-        return res.json({ success: true, action: "approved", payment: response.data });
+        return res.json({
+          success: true,
+          action: "approved",
+          payment: response.data,
+        });
       }
 
-      res.json({ success: true, message: "Payment already processed", payment });
+      res.json({
+        success: true,
+        message: "Payment already processed",
+        payment,
+      });
     } catch (error: any) {
-      console.error("[Pi Incomplete Payment] Error handling incomplete payment:", error.response?.data || error.message);
-      res.status(500).json({ 
-        error: "Failed to handle incomplete payment", 
-        details: error.response?.data || error.message 
+      console.error(
+        "[Pi Incomplete Payment] Error handling incomplete payment:",
+        error.response?.data || error.message,
+      );
+      res.status(500).json({
+        error: "Failed to handle incomplete payment",
+        details: error.response?.data || error.message,
       });
     }
   });
 
-  
   // Cloudinary Backend Upload Endpoint
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     let currentStep = "Request received";
@@ -209,13 +265,13 @@ async function startServer() {
       if (!req.file) {
         currentStep = "File received - FAILED (No file)";
         console.error(`[Upload] ✗ ${currentStep}`);
-        return res.status(400).json({ 
-          success: false, 
+        return res.status(400).json({
+          success: false,
           step: "File received",
-          error: "No file uploaded" 
+          error: "No file uploaded",
         });
       }
-      
+
       currentStep = "File received";
       console.log(`[Upload] ✓ ${currentStep}`);
 
@@ -225,28 +281,44 @@ async function startServer() {
         return res.status(400).json({
           success: false,
           step: "Buffer size",
-          error: "req.file.buffer is undefined. Multer memory storage may be misconfigured."
+          error:
+            "req.file.buffer is undefined. Multer memory storage may be misconfigured.",
         });
       }
-      
-      currentStep = "Buffer size";
-      console.log(`[Upload] ✓ ${currentStep} (${req.file.buffer.length} bytes)`);
 
-      if (!(process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME) || !(process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY) || !(process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET)) {
+      currentStep = "Buffer size";
+      console.log(
+        `[Upload] ✓ ${currentStep} (${req.file.buffer.length} bytes)`,
+      );
+
+      if (
+        !(
+          process.env.CLOUDINARY_CLOUD_NAME ||
+          process.env.VITE_CLOUDINARY_CLOUD_NAME
+        ) ||
+        !(
+          process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY
+        ) ||
+        !(
+          process.env.CLOUDINARY_API_SECRET ||
+          process.env.VITE_CLOUDINARY_API_SECRET
+        )
+      ) {
         currentStep = "Cloudinary initialized - FAILED (Missing env vars)";
         console.error(`[Upload] ✗ ${currentStep}`);
-        return res.status(500).json({ 
+        return res.status(500).json({
           success: false,
           step: "Cloudinary initialized",
-          error: "Cloudinary is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables." 
+          error:
+            "Cloudinary is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables.",
         });
       }
-      
+
       currentStep = "Cloudinary initialized";
       console.log(`[Upload] ✓ ${currentStep}`);
 
       const { folder } = req.body;
-      
+
       currentStep = "Upload started";
       console.log(`[Upload] ✓ ${currentStep}`);
 
@@ -257,14 +329,13 @@ async function startServer() {
               folder: folder || "general",
               resource_type: "auto",
               quality: "auto",
-              fetch_format: "auto"
+              fetch_format: "auto",
             },
             (error, result) => {
               if (error) {
                 reject(new Error(error.message || JSON.stringify(error)));
-              }
-              else resolve(result);
-            }
+              } else resolve(result);
+            },
           );
 
           stream.end(req.file!.buffer);
@@ -284,16 +355,15 @@ async function startServer() {
         width: uploadResult.width,
         height: uploadResult.height,
         format: uploadResult.format,
-        bytes: uploadResult.bytes
+        bytes: uploadResult.bytes,
       });
-      
     } catch (error: any) {
       console.error(`[Upload] ✗ Failed at step: ${currentStep}`, error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         step: currentStep,
         error: error.message || String(error),
-        stack: process.env.NODE_ENV !== "production" ? error.stack : undefined
+        stack: process.env.NODE_ENV !== "production" ? error.stack : undefined,
       });
     }
   });
@@ -306,9 +376,22 @@ async function startServer() {
         return res.status(400).json({ error: "Public ID is required" });
       }
 
-      if (!(process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME) || !(process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY) || !(process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET)) {
-        return res.status(500).json({ 
-          error: "Cloudinary is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables." 
+      if (
+        !(
+          process.env.CLOUDINARY_CLOUD_NAME ||
+          process.env.VITE_CLOUDINARY_CLOUD_NAME
+        ) ||
+        !(
+          process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY
+        ) ||
+        !(
+          process.env.CLOUDINARY_API_SECRET ||
+          process.env.VITE_CLOUDINARY_API_SECRET
+        )
+      ) {
+        return res.status(500).json({
+          error:
+            "Cloudinary is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables.",
         });
       }
 
@@ -316,15 +399,68 @@ async function startServer() {
       res.json({ success: true, result });
     } catch (error: any) {
       console.error("[Cloudinary Delete] Failed:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
-        error: "Deletion from Cloudinary failed: " + (error.message || String(error)),
-        stack: process.env.NODE_ENV !== "production" ? error.stack : undefined
+        error:
+          "Deletion from Cloudinary failed: " +
+          (error.message || String(error)),
+        stack: process.env.NODE_ENV !== "production" ? error.stack : undefined,
       });
     }
   });
 
   // Vite middleware for development
+
+  app.get("/api/debug-search", async (req, res) => {
+    try {
+      const { initializeApp, getApps, getApp } = await import("firebase/app");
+      const { getFirestore, collection, getDocs } =
+        await import("firebase/firestore");
+
+      const firebaseConfig = {
+        apiKey: process.env.VITE_FIREBASE_API_KEY,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      };
+
+      const firebaseApp =
+        getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      const db = process.env.VITE_FIREBASE_DATABASE_ID 
+        ? getFirestore(firebaseApp, process.env.VITE_FIREBASE_DATABASE_ID)
+        : getFirestore(firebaseApp);
+
+      const storesRef = collection(db, "stores");
+      const snap = await getDocs(storesRef);
+
+      const stores: any[] = [];
+      snap.forEach((doc) => {
+        stores.push({ id: doc.id, ...doc.data() });
+      });
+
+      res.json({ count: stores.length, stores });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, stack: err.stack });
+    }
+  });
+
+  app.get("/api/debug-env", (req, res) => {
+    res.json({
+      env: Object.keys(process.env).filter(
+        (k) => k.includes("FIREBASE") || k.includes("VITE_"),
+      ),
+      firebase: {
+        apiKey: process.env.VITE_FIREBASE_API_KEY,
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        databaseId: process.env.VITE_FIREBASE_DATABASE_ID,
+      },
+    });
+  });
+
+  
+  app.post("/api/debug-log", (req, res) => {
+    fs.writeFileSync('/tmp/client_debug.json', JSON.stringify(req.body, null, 2));
+    res.json({ success: true });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -332,10 +468,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
@@ -345,3 +481,5 @@ async function startServer() {
 }
 
 startServer();
+
+

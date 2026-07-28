@@ -1,0 +1,81 @@
+      ? "w-full flex items-center gap-3.5 px-4 py-3 text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-850 rounded-2xl border border-slate-850 hover:text-white transition-all min-h-[48px]"
+      : "w-full flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors uppercase tracking-wider";
+    
+    const iconClass = isMobileView ? "w-5 h-5 shrink-0 text-slate-400" : "w-4 h-4 text-slate-400";
+    const highlightIconClass = isMobileView ? "w-5 h-5 shrink-0" : "w-4 h-4";
+
+    return (
+      <>
+        <button onClick={() => { handleCardClick(); setShowMenu(false); }} className={itemClass}>
+          <Eye className={iconClass} /> View Details
+        </button>
+        {canManage ? (
+          <>
+            <button onClick={handleEditClick} className={itemClass}>
+              <Edit2 className={`${highlightIconClass} text-indigo-400`} /> Edit Product
+            </button>
+            <button onClick={handleEditClick} className={itemClass}>
+              <DollarSign className={`${highlightIconClass} text-emerald-400`} /> Update Price
+            </button>
+            <button onClick={handleManageVariantsClick} className={itemClass}>
+              <Layers className={`${highlightIconClass} text-violet-400`} /> Update Inventory
+            </button>
+            <button onClick={handleEditClick} className={itemClass}>
+              <ImageIcon className={`${highlightIconClass} text-sky-400`} /> Change Images
+            </button>
+            <button onClick={handleDuplicateInternal} className={itemClass}>
+              <Copy className={`${highlightIconClass} text-amber-400`} /> Duplicate Product
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); navigate('/merchant-analytics'); setShowMenu(false); }} className={itemClass}>
+              <BarChart3 className={`${highlightIconClass} text-blue-400`} /> View Analytics
+            </button>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(window.location.origin + `/product/${product.productId}`);
+                triggerToast('Product link copied!');
+                setShowMenu(false);
+              }} 
+              className={itemClass}
+            >
+              <Share2 className={`${highlightIconClass} text-teal-400`} /> Share Product
+            </button>
+            {!isMobileView && <div className="border-t border-slate-800 my-1" />}
+            
+            {product.status === 'deleted' ? (
+              <>
+                <button onClick={handleRestore} className={`${itemClass} ${isMobileView ? '!border-emerald-900/40 !bg-emerald-950/20 text-emerald-400 hover:!text-emerald-300' : 'text-emerald-400 hover:bg-emerald-500/10'}`}>
+                  <Archive className={`${highlightIconClass} ${!isMobileView && 'text-emerald-400'}`} /> Restore Product
+                </button>
+                <button onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!window.confirm('Are you sure you want to permanently delete this product?')) return;
+                  await productService.permanentDeleteProduct(product.productId);
+                  triggerToast('Product permanently deleted');
+                  window.dispatchEvent(new Event('productsChanged'));
+                }} className={`${itemClass} ${isMobileView ? '!border-red-900/40 !bg-red-950/20 text-red-400 hover:!text-red-300' : 'text-red-400 hover:bg-red-500/10'}`}>
+                  <Trash2 className={`${highlightIconClass} ${!isMobileView && 'text-red-400'}`} /> Permanent Delete
+                </button>
+              </>
+            ) : (
+              <>
+                {product.status === 'archived' ? (
+                  <button onClick={handleRestore} className={`${itemClass} ${isMobileView ? '!border-emerald-900/40 !bg-emerald-950/20 text-emerald-400 hover:!text-emerald-300' : 'text-emerald-400 hover:bg-emerald-500/10'}`}>
+                    <Archive className={`${highlightIconClass} ${!isMobileView && 'text-emerald-400'}`} /> Restore Product
+                  </button>
+                ) : (
+                  <button onClick={handleArchive} className={`${itemClass} ${isMobileView ? '!border-amber-900/40 !bg-amber-950/20 text-amber-400 hover:!text-amber-300' : 'text-amber-400 hover:bg-amber-500/10'}`}>
+                    <Archive className={`${highlightIconClass} ${!isMobileView && 'text-amber-400'}`} /> Archive Product
+                  </button>
+                )}
+                <button onClick={handleDelete} className={`${itemClass} ${isMobileView ? '!border-red-900/40 !bg-red-950/20 text-red-400 hover:!text-red-300' : 'text-red-400 hover:bg-red-500/10'}`}>
+                  <Trash2 className={`${highlightIconClass} ${!isMobileView && 'text-red-400'}`} /> Delete Product
+                </button>
+              </>
+            )}
+          </>
+        ) : (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(window.location.origin + `/product/${product.productId}`);

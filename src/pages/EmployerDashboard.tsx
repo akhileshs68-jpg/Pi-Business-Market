@@ -110,9 +110,9 @@ export const EmployerDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
           {[
             { label: 'Active Openings', value: jobs.filter(j => j.status === 'published').length, icon: Briefcase, color: 'text-indigo-400' },
-            { label: 'Total Applicants', value: '124', icon: Users, color: 'text-violet-400' },
-            { label: 'Interviews Slated', value: '12', icon: Calendar, color: 'text-emerald-400' },
-            { label: 'Pipeline Velocity', value: '88%', icon: Layers, color: 'text-amber-400' },
+            { label: 'Total Applicants', value: 'Live data pending', icon: Users, color: 'text-violet-400' },
+            { label: 'Interviews Slated', value: 'Live data pending', icon: Calendar, color: 'text-emerald-400' },
+            { label: 'Pipeline Velocity', value: 'Live data pending', icon: Layers, color: 'text-amber-400' },
           ].map((stat, i) => (
             <div key={i} className="p-6 bg-slate-900/50 border border-slate-800 rounded-3xl">
               <div className="flex items-center gap-3 mb-4">
@@ -176,7 +176,7 @@ export const EmployerDashboard: React.FC = () => {
                   <h3 className="text-2xl font-bold text-white mb-2">No active jobs</h3>
                   <p className="text-slate-500 mb-8">Start your hiring process by creating your first job posting.</p>
                   <button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs">
-                    Post Enterprise Job
+                    Post New Job
                   </button>
                 </div>
               ) : (

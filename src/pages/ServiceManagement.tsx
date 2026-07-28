@@ -89,7 +89,7 @@ export const ServiceManagement: React.FC = () => {
               </div>
               <h1 className="text-3xl font-black text-white tracking-tight uppercase">Service Portal</h1>
             </div>
-            <p className="text-slate-500 font-medium">Enterprise marketplace for professional services and expertise.</p>
+            <p className="text-slate-500 font-medium">Marketplace for professional services and expertise.</p>
           </div>
           <button 
             onClick={() => setIsWizardOpen(true)}
@@ -106,8 +106,8 @@ export const ServiceManagement: React.FC = () => {
           <div className="lg:col-span-1 space-y-6">
             {[
               { label: 'Active Services', value: services.length, icon: Briefcase, color: 'text-violet-400' },
-              { label: 'Pending Quotes', value: '4', icon: Clock, color: 'text-amber-400' },
-              { label: 'Market Visibility', value: 'High', icon: Globe, color: 'text-emerald-400' },
+              { label: 'Pending Quotes', value: 'Live computation pending', icon: Clock, color: 'text-amber-400' },
+              { label: 'Market Visibility', value: 'Live computation pending', icon: Globe, color: 'text-emerald-400' },
             ].map((stat, i) => (
               <div key={i} className="p-6 bg-slate-900/50 border border-slate-800 rounded-3xl">
                 <div className="flex items-center gap-3 mb-4">
@@ -158,7 +158,7 @@ export const ServiceManagement: React.FC = () => {
                 <h3 className="text-2xl font-bold text-white mb-2">No Services Published</h3>
                 <p className="text-slate-500 max-w-sm mx-auto mb-10">Begin offering your expertise to the Pi Network community by publishing your first service.</p>
                 <button className="px-10 py-4 bg-violet-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-violet-600/20">
-                  Launch Enterprise Service
+                  Launch New Service
                 </button>
               </div>
             ) : (

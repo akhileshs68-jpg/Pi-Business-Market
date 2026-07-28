@@ -82,6 +82,13 @@ export const shippingService = {
       order.businessId, 
       'Logistics Engine'
     );
+    
+    // Also update order with shipmentId
+    batch.update(doc(db, 'orders', order.orderId), {
+      shipmentId: shipmentId,
+      deliveryMethod: method,
+      updatedAt: serverTimestamp()
+    });
 
     await batch.commit();
 
@@ -132,12 +139,47 @@ export const shippingService = {
       createdBy: actorUid
     });
 
-    // 3. Conditional: If Delivered, update order status to completed
-    if (newStatus === ShipmentStatus.DELIVERED) {
-      const snap = await getDoc(doc(db, 'shipments', shipmentId));
-      const shipment = snap.data() as Shipment;
-      await orderService.updateOrderStatus(shipment.orderId, OrderStatus.COMPLETED, actorUid, 'Logistics Engine', 'Shipment delivered successfully.');
-      await orderService.updateFulfillmentStatus(shipment.orderId, FulfillmentStatus.DELIVERED, actorUid, 'Logistics Engine');
+    // 3. Map Shipment Status to Order Status
+    const snap = await getDoc(doc(db, 'shipments', shipmentId));
+    if (snap.exists()) {
+      const shipment = snap.data();
+      let orderStatusToSet = null;
+      let fulfillmentStatusToSet = null;
+
+      switch (newStatus) {
+        case ShipmentStatus.PICKED_UP:
+        case ShipmentStatus.IN_TRANSIT:
+        case ShipmentStatus.HUB_PROCESSING:
+          orderStatusToSet = OrderStatus.SHIPPED;
+          break;
+        case ShipmentStatus.OUT_FOR_DELIVERY:
+          orderStatusToSet = OrderStatus.OUT_FOR_DELIVERY;
+          break;
+        case ShipmentStatus.DELIVERED:
+          orderStatusToSet = OrderStatus.DELIVERED;
+          fulfillmentStatusToSet = FulfillmentStatus.DELIVERED;
+          break;
+        case ShipmentStatus.RETURNED:
+        case ShipmentStatus.DELIVERY_FAILED:
+          orderStatusToSet = OrderStatus.RETURNED;
+          break;
+      }
+
+      if (orderStatusToSet) {
+        try {
+          await orderService.updateOrderStatus(shipment.orderId, orderStatusToSet, actorUid, 'Logistics Engine', `Shipment status updated to ${newStatus}`);
+        } catch (e) {
+          console.error('Failed to update order status from shipment', e);
+        }
+      }
+      
+      if (fulfillmentStatusToSet) {
+        try {
+          await orderService.updateFulfillmentStatus(shipment.orderId, fulfillmentStatusToSet, actorUid, 'Logistics Engine');
+        } catch (e) {
+          console.error('Failed to update fulfillment status from shipment', e);
+        }
+      }
     }
 
     await batch.commit();

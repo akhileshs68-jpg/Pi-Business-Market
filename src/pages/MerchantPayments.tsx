@@ -26,6 +26,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { paymentService } from '../services/paymentService';
 import { ledgerService } from '../services/ledgerService';
+import { PiInAppPaymentModal } from '../components/payment/PiInAppPaymentModal';
 import { Payment, LedgerEntry, PaymentStatus } from '../types';
 
 export const MerchantPayments: React.FC = () => {
@@ -36,6 +37,7 @@ export const MerchantPayments: React.FC = () => {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'payments' | 'ledger'>('payments');
+  const [isInAppModalOpen, setIsInAppModalOpen] = useState(false);
   
   const businessId = 'PI-CORP-001'; // Derived from context
 
@@ -85,23 +87,33 @@ export const MerchantPayments: React.FC = () => {
             <p className="text-slate-500 font-medium">Manage your revenue, payments, and immutable ledger history.</p>
           </div>
 
-          <div className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800">
-            <button 
-              onClick={() => setActiveTab('payments')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === 'payments' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'
-              }`}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setIsInAppModalOpen(true)}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
             >
-              Recent Payments
+              <CreditCard className="w-4 h-4" />
+              <span>In-App Pi Payment</span>
             </button>
-            <button 
-              onClick={() => setActiveTab('ledger')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === 'ledger' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'
-              }`}
-            >
-              Enterprise Ledger
-            </button>
+
+            <div className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800">
+              <button 
+                onClick={() => setActiveTab('payments')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'payments' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'
+                }`}
+              >
+                Recent Payments
+              </button>
+              <button 
+                onClick={() => setActiveTab('ledger')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'ledger' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'
+                }`}
+              >
+                Sales Ledger
+              </button>
+            </div>
           </div>
         </div>
 
@@ -221,6 +233,11 @@ export const MerchantPayments: React.FC = () => {
             </div>
           </div>
         )}
+
+        <PiInAppPaymentModal 
+          isOpen={isInAppModalOpen} 
+          onClose={() => setIsInAppModalOpen(false)} 
+        />
       </main>
     </div>
   );

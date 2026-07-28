@@ -67,8 +67,8 @@ export const BusinessOrderDashboard: React.FC = () => {
     switch (status) {
       case OrderStatus.COMPLETED: return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
       case OrderStatus.CANCELLED: return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-      case OrderStatus.READY_FOR_DISPATCH: return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
-      case OrderStatus.PROCESSING: return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case OrderStatus.READY_FOR_PICKUP: return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+      case OrderStatus.PACKED: return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
       default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
     }
   };
@@ -101,7 +101,7 @@ export const BusinessOrderDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 overflow-x-auto scrollbar-hide">
-            {['all', OrderStatus.CONFIRMED, OrderStatus.PROCESSING, OrderStatus.READY_FOR_DISPATCH].map((status) => (
+            {['all', OrderStatus.ACCEPTED, OrderStatus.PACKED, OrderStatus.READY_FOR_PICKUP].map((status) => (
               <button
                 key={status}
                 onClick={() => setActiveStatus(status)}
@@ -121,8 +121,8 @@ export const BusinessOrderDashboard: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
           {[
             { label: 'Pending', value: orders.filter(o => o.orderStatus !== OrderStatus.COMPLETED).length, icon: Package, color: 'text-amber-400' },
-            { label: 'Dispatched', value: '14', icon: Truck, color: 'text-indigo-400' },
-            { label: 'Velocity', value: '2.4/h', icon: Clock, color: 'text-emerald-400' },
+            { label: 'Dispatched', value: orders.filter(o => o.orderStatus === OrderStatus.SHIPPED || o.orderStatus === OrderStatus.OUT_FOR_DELIVERY).length, icon: Truck, color: 'text-indigo-400' },
+            { label: 'Completed', value: orders.filter(o => o.orderStatus === OrderStatus.COMPLETED).length, icon: CheckCircle2, color: 'text-emerald-400' },
             { label: 'Revenue', value: orders.reduce((acc, o) => acc + o.grandTotal, 0).toFixed(1), icon: LayoutDashboard, color: 'text-violet-400' },
           ].map((stat, i) => (
             <div key={i} className="p-4 sm:p-6 bg-slate-900/50 border border-slate-800 rounded-2xl sm:rounded-3xl">
@@ -228,7 +228,7 @@ export const BusinessOrderDashboard: React.FC = () => {
                   <div className="flex justify-between md:justify-end items-center w-full gap-3 pt-4 md:pt-0 border-t border-slate-800 md:border-0 mt-2 md:mt-0">
                     <div className="md:hidden text-[10px] font-black text-slate-600 uppercase tracking-widest">Action</div>
                     <div className="flex items-center gap-3">
-                      {order.orderStatus === OrderStatus.CONFIRMED && (
+                      {order.orderStatus === OrderStatus.ACCEPTED && (
                         <button 
                           onClick={(e) => handleFulfillOrder(e, order)}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20"

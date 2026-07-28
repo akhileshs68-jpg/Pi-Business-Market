@@ -4,7 +4,7 @@
  */
 
 import { authService } from '../auth/authService';
-import { PiSdkSim } from './__tests__/piSdk';
+import { PiSdkSim } from './piSdk';
 
 export interface PiPaymentCallbacks {
   onReadyForServerApproval: (paymentId: string) => void;

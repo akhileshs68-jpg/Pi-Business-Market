@@ -80,6 +80,7 @@ import { Product, Store, Order, OrderStatus } from '../types';
 import { CardSkeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { BottomDrawer } from '../components/ui/BottomDrawer';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 
 // Modular Tab components
 import { StoreCategoriesTab } from '../components/store/StoreCategoriesTab';
@@ -130,7 +131,8 @@ export const ProductManagement: React.FC = () => {
   
   // Seller Console Tab Management
   const [activeTab, setActiveTab] = useState<'overview' | 'catalog' | 'categories' | 'inventory' | 'orders' | 'crm' | 'analytics' | 'settings'>('overview');
-  const [merchantStatusFilter, setMerchantStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived' | 'deleted' | 'low_stock' | 'out_of_stock' | 'newest' | 'best_seller' | 'highest_revenue'>('all');
+  const [merchantFilter, setMerchantFilter] = useState<'all' | 'published' | 'draft' | 'archived' | 'deleted' | 'low_stock' | 'out_of_stock' | 'featured' | 'trending'>('all');
+  const [merchantSort, setMerchantSort] = useState<'newest' | 'oldest' | 'highest_price' | 'lowest_price' | 'highest_revenue' | 'best_seller' | 'highest_rating' | 'views' | 'wishlist' | 'alphabetical'>('newest');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
   // Customer Filtering and Search State
@@ -141,6 +143,24 @@ export const ProductManagement: React.FC = () => {
   const [onlyInStock, setOnlyInStock] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<string>('newest');
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, action: () => void, isDestructive?: boolean}>({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: () => {},
+    isDestructive: true
+  });
+
+  const confirmAction = (title: string, message: string, action: () => void, isDestructive = true) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      action,
+      isDestructive
+    });
+  };
+
   const [isListening, setIsListening] = useState(false);
   const [selectedRating, setSelectedRating] = useState<number>(0);
   const [selectedDiscount, setSelectedDiscount] = useState<number>(0);
@@ -541,33 +561,65 @@ export const ProductManagement: React.FC = () => {
   let filteredProductsMerchant = products.filter(p => {
     if (!p) return false;
     
-    if (merchantStatusFilter !== 'all' && merchantStatusFilter !== 'newest' && merchantStatusFilter !== 'best_seller' && merchantStatusFilter !== 'highest_revenue') {
+    // Apply Filters
+    if (merchantFilter !== 'all') {
       const pStatus = (p.status || 'published').toLowerCase();
       
-      if (merchantStatusFilter === 'low_stock') {
+      if (merchantFilter === 'low_stock') {
         if ((p.stock || 0) === 0 || (p.stock || 0) > 10) return false;
-      } else if (merchantStatusFilter === 'out_of_stock') {
+      } else if (merchantFilter === 'out_of_stock') {
         if ((p.stock || 0) > 0) return false;
+      } else if (merchantFilter === 'featured') {
+        if (!p.featured) return false;
+      } else if (merchantFilter === 'trending') {
+        // Example logic for trending
+        if ((p.metrics?.views || 0) < 50) return false;
       } else {
-        if (pStatus !== merchantStatusFilter) return false;
+        if (pStatus !== merchantFilter) return false;
       }
     }
     
-    const name = (p.productName || '').toLowerCase();
-    const sku = (p.sku || '').toLowerCase();
-    const category = (p.category || '').toLowerCase();
+    // Instant Search
     const search = searchQuery.toLowerCase().trim();
+    if (search !== '') {
+      const name = (p.productName || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      const barcode = (p.barcode || '').toLowerCase();
+      const category = (p.category || '').toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      const pStatus = (p.status || '').toLowerCase();
+      const tags = (p.tags || []).join(' ').toLowerCase();
+      const owner = (p.ownerUid || '').toLowerCase();
 
-    return search === '' || name.includes(search) || sku.includes(search) || category.includes(search);
+      return name.includes(search) || 
+             sku.includes(search) || 
+             barcode.includes(search) || 
+             category.includes(search) || 
+             brand.includes(search) || 
+             pStatus.includes(search) || 
+             tags.includes(search) || 
+             owner.includes(search);
+    }
+    
+    return true;
   });
 
-  if (merchantStatusFilter === 'newest') {
-    filteredProductsMerchant.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  } else if (merchantStatusFilter === 'best_seller') {
-    filteredProductsMerchant.sort((a, b) => (b.metrics?.orders || 0) - (a.metrics?.orders || 0));
-  } else if (merchantStatusFilter === 'highest_revenue') {
-    filteredProductsMerchant.sort((a, b) => (b.metrics?.revenue || 0) - (a.metrics?.revenue || 0));
-  }
+  // Apply Sorting
+  filteredProductsMerchant.sort((a, b) => {
+    switch (merchantSort) {
+      case 'newest': return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case 'oldest': return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      case 'highest_price': return (b.price || 0) - (a.price || 0);
+      case 'lowest_price': return (a.price || 0) - (b.price || 0);
+      case 'highest_revenue': return (b.metrics?.revenue || 0) - (a.metrics?.revenue || 0);
+      case 'best_seller': return (b.metrics?.orders || 0) - (a.metrics?.orders || 0);
+      case 'highest_rating': return (b.metrics?.performanceScore || 0) - (a.metrics?.performanceScore || 0);
+      case 'views': return (b.metrics?.views || 0) - (a.metrics?.views || 0);
+      case 'wishlist': return (b.metrics?.wishlistCount || 0) - (a.metrics?.wishlistCount || 0);
+      case 'alphabetical': return (a.productName || '').localeCompare(b.productName || '');
+      default: return 0;
+    }
+  });
 
   // Stats calculation
   const totalStockCount = products.reduce((acc, p) => acc + (p.stock || 0), 0);
@@ -594,7 +646,34 @@ export const ProductManagement: React.FC = () => {
     if (selectedProductIds.length === 0) return;
     
     const actionText = action.replace('_', ' ');
-    if (!window.confirm(`Are you sure you want to ${actionText} ${selectedProductIds.length} product(s)?`)) return;
+    confirmAction(
+      `Confirm ${actionText}`,
+      `Are you sure you want to ${actionText} ${selectedProductIds.length} product(s)?`,
+      async () => {
+        try {
+          const promises = selectedProductIds.map(id => {
+            switch (action) {
+              case 'archive': return productService.archiveProduct(id);
+              case 'restore': return productService.restoreProduct(id);
+              case 'publish': return productService.updateProduct(id, { status: 'published' });
+              case 'draft': return productService.updateProduct(id, { status: 'draft' });
+              case 'delete': return productService.softDeleteProduct(id, user?.uid);
+              case 'permanent_delete': return productService.permanentDeleteProduct(id);
+            }
+          });
+          await Promise.all(promises);
+          triggerToast(`Bulk ${actionText} successful`);
+          setSelectedProductIds([]);
+          window.dispatchEvent(new Event('productsChanged'));
+        } catch (err) {
+          console.error(err);
+          triggerToast('Failed to perform bulk action');
+        }
+      },
+      action === 'delete' || action === 'permanent_delete'
+    );
+    return; // Stop here, the modal will handle the execution
+
 
     try {
       const promises = selectedProductIds.map(id => {
@@ -1118,8 +1197,8 @@ export const ProductManagement: React.FC = () => {
                         { label: 'Pending checkout', value: pendingOrdersCount, suffix: 'Orders', color: 'text-amber-400', bg: 'bg-amber-500/10' },
                         { label: 'Completed checkout', value: completedOrdersCount, suffix: 'Completed', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
                         { label: 'Low Stock SKU', value: lowStockCount, suffix: 'Models', color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
-                        { label: 'Disputes/Returns', value: '0.0%', suffix: 'Disputes', color: 'text-rose-400', bg: 'bg-rose-500/10' },
-                        { label: 'Operations Health', value: '99.9%', suffix: 'Excellent', color: 'text-teal-400', bg: 'bg-teal-500/10' },
+                        { label: 'Disputes/Returns', value: 'Pending', suffix: 'Disputes', color: 'text-rose-400', bg: 'bg-rose-500/10' },
+                        { label: 'Operations Health', value: 'Pending', suffix: 'Health', color: 'text-teal-400', bg: 'bg-teal-500/10' },
                       ].map((card, idx) => (
                         <div key={idx} className="bg-[#090e1a]/95 border border-slate-800/80 p-4 rounded-xl flex flex-col justify-between h-28 hover:border-slate-700/80 transition-all">
                           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-normal">{card.label}</span>
@@ -1195,7 +1274,7 @@ export const ProductManagement: React.FC = () => {
                           <button onClick={() => triggerToast('Export CSV coming soon')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">CSV</button>
                           <button onClick={() => triggerToast('Export Excel coming soon')} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all border border-slate-600">Excel</button>
                           
-                          {merchantStatusFilter === 'deleted' ? (
+                          {merchantFilter === 'deleted' ? (
                             <>
                               <button onClick={() => handleBulkAction('restore')} className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs hover:bg-blue-500/30 transition-all border border-blue-500/30">Restore</button>
                               <button onClick={() => handleBulkAction('permanent_delete')} className="px-3 py-1.5 rounded-lg bg-red-900/40 text-red-400 text-xs hover:bg-red-900/60 transition-all border border-red-500/30 flex items-center gap-1"><Trash2 className="w-3 h-3"/> Permanent Delete</button>
@@ -1215,29 +1294,50 @@ export const ProductManagement: React.FC = () => {
                       <div className="relative flex-1">
                         <input 
                           type="text" 
-                          placeholder="Search by name, SKU, or category..."
+                          placeholder="Search Name, SKU, Barcode, Brand, Tags, Owner..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="w-full bg-[#090e1a] border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-xs text-white focus:outline-none focus:border-violet-500 transition-all"
                         />
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       </div>
-                      <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
-                        <div className="flex bg-[#090e1a] border border-slate-800 rounded-xl p-1 whitespace-nowrap">
-                          {(['all', 'published', 'draft', 'archived', 'deleted', 'low_stock', 'out_of_stock', 'newest', 'best_seller', 'highest_revenue'] as const).map(status => (
-                            <button
-                              key={status}
-                              onClick={() => setMerchantStatusFilter(status as any)}
-                              className={`px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
-                                merchantStatusFilter === status 
-                                  ? 'bg-[#030712] text-violet-400 shadow-sm' 
-                                  : 'text-slate-500 hover:text-slate-300'
-                              }`}
-                            >
-                              {status === 'published' ? 'Active' : status.replace('_', ' ')}
-                            </button>
-                          ))}
-                        </div>
+                      
+                      <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0 hide-scrollbar shrink-0">
+                        <select 
+                          value={merchantFilter}
+                          onChange={(e) => setMerchantFilter(e.target.value as any)}
+                          className="bg-[#090e1a] border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-violet-500 transition-all font-bold appearance-none cursor-pointer pr-10"
+                          style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem top 50%', backgroundSize: '0.65rem auto' }}
+                        >
+                          <option value="all">All Status</option>
+                          <option value="published">Active</option>
+                          <option value="draft">Draft</option>
+                          <option value="archived">Archived</option>
+                          <option value="deleted">Deleted</option>
+                          <option value="out_of_stock">Out of Stock</option>
+                          <option value="low_stock">Low Stock</option>
+                          <option value="featured">Featured</option>
+                          <option value="trending">Trending</option>
+                        </select>
+
+                        <select 
+                          value={merchantSort}
+                          onChange={(e) => setMerchantSort(e.target.value as any)}
+                          className="bg-[#090e1a] border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-violet-500 transition-all font-bold appearance-none cursor-pointer pr-10"
+                          style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem top 50%', backgroundSize: '0.65rem auto' }}
+                        >
+                          <option value="newest">Newest</option>
+                          <option value="oldest">Oldest</option>
+                          <option value="highest_price">Highest Price</option>
+                          <option value="lowest_price">Lowest Price</option>
+                          <option value="highest_revenue">Highest Revenue</option>
+                          <option value="best_seller">Best Seller</option>
+                          <option value="highest_rating">Highest Rating</option>
+                          <option value="views">Most Views</option>
+                          <option value="wishlist">Most Wishlist</option>
+                          <option value="alphabetical">Alphabetical</option>
+                        </select>
+
                         <div className="bg-[#090e1a] border border-slate-800 rounded-xl p-1 flex items-center shrink-0">
                           <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[#030712] text-violet-400 shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>
                             <LayoutGrid className="w-4 h-4" />

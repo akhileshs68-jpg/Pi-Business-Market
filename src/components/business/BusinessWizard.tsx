@@ -23,428 +23,540 @@ import {
   X,
   Plus,
   ArrowRight,
-  FileText
+  FileText,
+  ShoppingCart,
+  Wrench,
+  Factory,
+  Tractor,
+  Store,
+  Palette,
+  Truck,
+  HeartPulse,
+  GraduationCap,
+  Utensils,
+  HardHat,
+  MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../auth/useAuth';
 import { businessService } from '../../services/businessService';
-import { businessCategoryService } from '../../services/businessCategoryService';
-import { businessVerificationService } from '../../services/businessVerificationService';
 import { mediaService } from '../../services/mediaService';
-import { Business, BusinessType, BusinessCategory } from '../../types';
+import { Business } from '../../types';
 
 interface WizardProps {
   onComplete: (businessId: string) => void;
   onCancel: () => void;
+  initialData?: Partial<Business>;
+  businessId?: string;
 }
 
-export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) => {
-  const { user } = useAuth();
-  const [step, setStep] = useState(1);
-  const totalSteps = 9;
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [categories, setCategories] = useState<BusinessCategory[]>([]);
+const BUSINESS_TYPES = [
+  { id: 'Product Seller', label: 'Product Seller', icon: ShoppingCart, desc: 'Sell physical or digital products.' },
+  { id: 'Service Provider', label: 'Service Provider', icon: Wrench, desc: 'Offer skills or services to customers.' },
+  { id: 'Manufacturer', label: 'Manufacturer', icon: Factory, desc: 'Manufacture goods for wholesale or retail.' },
+  { id: 'Freelancer', label: 'Freelancer', icon: User, desc: 'Independent professional offering specialized skills.' },
+  { id: 'Professional', label: 'Professional', icon: Briefcase, desc: 'Consulting, accounting, legal, and more.' },
+  { id: 'Farmer / Agriculture', label: 'Farmer / Agriculture', icon: Tractor, desc: 'Agriculture, farming, and organic produce.' },
+  { id: 'Local Shop', label: 'Local Shop', icon: Store, desc: 'Retail store, grocery, or local boutique.' },
+  { id: 'Company', label: 'Company', icon: Building2, desc: 'Registered corporate entity or agency.' },
+  { id: 'Startup', label: 'Startup', icon: Zap, desc: 'Fast-growing tech or innovative business.' },
+  { id: 'NGO', label: 'NGO', icon: ShieldCheck, desc: 'Non-profit, charity, or social enterprise.' },
+  { id: 'Artist / Creator', label: 'Artist / Creator', icon: Palette, desc: 'Artists, musicians, creators, and crafters.' },
+  { id: 'Distributor', label: 'Distributor', icon: Truck, desc: 'Supply chain distribution and logistics.' },
+  { id: 'Wholesaler', label: 'Wholesaler', icon: Building2, desc: 'B2B seller of bulk goods and materials.' },
+  { id: 'Transport', label: 'Transport', icon: Truck, desc: 'Logistics, delivery, and transportation.' },
+  { id: 'Education', label: 'Education', icon: GraduationCap, desc: 'Schools, tutoring, and educational courses.' },
+  { id: 'Healthcare', label: 'Healthcare', icon: HeartPulse, desc: 'Medical professionals, clinics, and wellness.' },
+  { id: 'Hospitality', label: 'Hospitality', icon: Utensils, desc: 'Restaurants, cafes, hotels, and events.' },
+  { id: 'Construction', label: 'Construction', icon: HardHat, desc: 'Building, architecture, and contracting.' },
+  { id: 'Repair Services', label: 'Repair Services', icon: Wrench, desc: 'Electronics, automotive, and appliance repair.' },
+  { id: 'Other', label: 'Other', icon: MoreHorizontal, desc: 'Other types of businesses not listed.' }
+];
 
-  // Wizard State
-  const [formData, setFormData] = useState<Partial<Business>>({
-    businessType: 'Individual',
-    businessName: '',
-    legalName: '',
-    displayName: '',
-    industry: '',
-    category: '',
-    subcategory: '',
-    description: '',
-    email: user?.email || '',
-    phone: '',
-    alternatePhone: '',
-    website: '',
-    country: 'India', // Default for Pi Network prevalence
-    state: '',
-    city: '',
-    postalCode: '',
-    fullAddress: '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    currency: 'Pi',
-    language: 'English',
-    verificationStatus: 'Pending',
-    businessStatus: 'active',
+export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, initialData, businessId }) => {
+  const { user, profile } = useAuth();
+  const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<Partial<Business>>(() => {
+    if (initialData) {
+      return {
+        businessType: '',
+        businessName: '',
+        legalName: '',
+        displayName: '',
+        email: '',
+        phone: '',
+        country: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        fullAddress: '',
+        description: '',
+        profileData: {},
+        ...initialData
+      };
+    }
+    return {
+      businessType: '',
+      businessName: '',
+      legalName: '',
+      displayName: '',
+      email: '',
+      phone: '',
+      country: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      fullAddress: '',
+      description: '',
+      profileData: {}
+    };
   });
 
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (logoPreview) URL.revokeObjectURL(logoPreview);
-    };
-  }, [logoPreview]);
-
-  useEffect(() => {
-    return () => {
-      if (coverPreview) URL.revokeObjectURL(coverPreview);
-    };
-  }, [coverPreview]);
-
-  const [docs, setDocs] = useState<{ type: string; file: File | null; name: string }[]>([]);
+  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logoUrl || null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(initialData?.coverImageUrl || null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
-  const docInputRef = useRef<HTMLInputElement>(null);
-  const [activeDocType, setActiveDocType] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover' | 'document') => {
+  const totalSteps = 6;
+
+  const handleNext = () => {
+    if (step < totalSteps) setStep(step + 1);
+  };
+
+  const handleBack = () => {
+    if (step > 1) setStep(step - 1);
+    else onCancel();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleProfileDataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      profileData: {
+        ...(formData.profileData || {}),
+        [e.target.name]: e.target.value
+      }
+    });
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
     const file = e.target.files?.[0];
-    
-    if (!file) {
-      return;
-    }
-    
-    // Validate file
-    if (file.size > 10 * 1024 * 1024) {
-      console.error(`[BusinessWizard] File too large: ${file.size} bytes`);
-      setError('File size must be less than 10MB');
-      return;
-    }
-
-    if (!user) {
-      console.error('[BusinessWizard] User not authenticated for upload');
-      return;
-    }
-
-    try {
-      
-      // For images, show local preview immediately
-      if (type === 'logo' || type === 'cover') {
-        const previewUrl = URL.createObjectURL(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
         if (type === 'logo') {
-          setLogoPreview(previewUrl);
+          setLogoPreview(reader.result as string);
+          setFormData({ ...formData, logoUrl: reader.result as string }); 
+          // Note: In real app, we'd upload to Cloudinary/Firebase Storage, for this demo we'll just save the data URL temporarily
         } else {
-          setCoverPreview(previewUrl);
+          setCoverPreview(reader.result as string);
+          setFormData({ ...formData, coverImageUrl: reader.result as string });
         }
-      }
-
-      const asset = await mediaService.uploadMedia(file, user.uid, {
-        module: 'businesses',
-        onProgress: (progress: number) => {
-        }
-      });
-      
-      
-      if (type === 'logo') {
-        setFormData(prev => ({ ...prev, logoUrl: asset.downloadUrl, logoPublicId: asset.storagePath }));
-      } else if (type === 'cover') {
-        setFormData(prev => ({ ...prev, coverImageUrl: asset.downloadUrl, coverPublicId: asset.storagePath }));
-      } else if (type === 'document' && activeDocType) {
-        setDocs(prev => {
-          const filtered = prev.filter(d => d.type !== activeDocType);
-          return [...filtered, { type: activeDocType, file: null, name: asset.originalName, url: asset.downloadUrl } as any];
-        });
-      }
-    } catch (err) {
-      console.error(`[BusinessWizard] ${type} upload failed:`, err);
-      setError(`Failed to upload ${type}. Please try again.`);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      const cats = await businessCategoryService.getAllCategories();
-      setCategories(cats);
-    };
-    loadCategories();
-  }, []);
-
-  const handleNext = () => setStep(s => Math.min(s + 1, totalSteps));
-  const handleBack = () => setStep(s => Math.max(s - 1, 1));
-
   const handleSubmit = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     setIsSubmitting(true);
+    setError(null);
     try {
-      const businessId = await businessService.createBusiness(
-        user.uid,
-        user.displayName || 'Owner',
-        formData as any
-      );
-
-      // Upload docs (Simulated for this implementation as we don't have a real storage bucket setup yet)
-      // In a real app, we'd loop through `docs` and call businessVerificationService.uploadDocument
-
-      onComplete(businessId);
-    } catch (err) {
-      console.error('Failed to create business:', err);
-    } finally {
+      if (businessId) {
+        const { id, createdAt, updatedAt, createdBy, updatedBy, rating, reviewCount, followers, employeeCount, storeCount, ownerUid, ...updates } = formData;
+        await businessService.updateBusiness(businessId, user.uid, profile.displayName || user.email || 'User', updates);
+        onComplete(businessId);
+      } else {
+        const newBusinessId = await businessService.createBusiness(user.uid, profile.displayName || user.email || 'User', formData as Omit<Business, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'rating' | 'reviewCount' | 'followers' | 'employeeCount' | 'storeCount'>);
+        onComplete(newBusinessId);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || `Failed to ${businessId ? 'update' : 'create'} business`);
       setIsSubmitting(false);
     }
   };
 
-  const progress = (step / totalSteps) * 100;
+  const renderDynamicFields = () => {
+    const type = formData.businessType || '';
+    const pd = formData.profileData || {};
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-xl">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] shadow-2xl shadow-indigo-500/10 overflow-hidden flex flex-col max-h-[90vh] pb-safe"
-      >
-        {/* Progress Header */}
-        <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6 border-b border-slate-800">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
+    if (['Service Provider', 'Carpenter', 'Tailor', 'Doctor', 'Lawyer', 'Freelancer', 'Professional', 'Repair Services'].includes(type)) {
+      return (
+        <>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Skills / Expertise</label>
+            <input name="skills" value={pd.skills || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Plumbing, SEO, Consulting..." />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Experience (Years)</label>
+            <input type="number" name="experience" value={pd.experience || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. 5" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Service Area</label>
+            <input name="serviceArea" value={pd.serviceArea || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. City-wide, Global..." />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">Working Hours</label>
+              <input name="workingHours" value={pd.workingHours || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. 9 AM - 5 PM" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">Starting Price</label>
+              <input type="number" name="startingPrice" value={pd.startingPrice || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. 10" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Languages</label>
+            <input name="languages" value={pd.languages || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. English, Spanish..." />
+          </div>
+          <div className="flex flex-col gap-3 mt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-600 rounded-xl shrink-0">
-                <Building2 className="w-5 h-5 text-white" />
+              <input type="checkbox" name="homeVisit" checked={pd.homeVisit === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, homeVisit: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+              <label className="text-sm font-medium text-slate-300">Home Service</label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input type="checkbox" name="emergencyService" checked={pd.emergencyService === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, emergencyService: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+              <label className="text-sm font-medium text-slate-300">Emergency Service</label>
+            </div>
+          </div>
+        </>
+      );
+    }
+    
+    if (['Farmer', 'Agriculture / Farmer', 'Farmer / Agriculture'].includes(type)) {
+      return (
+        <>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Farm Name</label>
+            <input name="farmName" value={pd.farmName || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Green Valley Farms" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Crop Type</label>
+            <input name="cropType" value={pd.cropType || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Organic Wheat, Apples..." />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Harvest Season</label>
+            <input name="harvestSeason" value={pd.harvestSeason || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Fall, Summer..." />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Quantity Available</label>
+            <input name="quantity" value={pd.quantity || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. 500 kg" />
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <input type="checkbox" name="organic" checked={pd.organic === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, organic: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+            <label className="text-sm font-medium text-slate-300">Certified Organic</label>
+          </div>
+        </>
+      );
+    }
+
+    if (['Manufacturer', 'Distributor', 'Wholesaler', 'Company'].includes(type)) {
+      return (
+        <>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Factory Name</label>
+            <input name="factoryName" value={pd.factoryName || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Apex Manufacturing" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Production Capacity</label>
+            <input name="productionCapacity" value={pd.productionCapacity || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. 10,000 units/month" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Minimum Order Quantity (MOQ)</label>
+            <input name="moq" value={pd.moq || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. 500 pieces" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400">Factory Address</label>
+            <textarea name="factoryAddress" value={pd.factoryAddress || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" rows={2} placeholder="Physical address of the factory/warehouse" />
+          </div>
+          <div className="flex flex-col gap-3 mt-4">
+            <div className="flex items-center gap-3">
+              <input type="checkbox" name="sellsWholesale" checked={pd.sellsWholesale === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, sellsWholesale: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+              <label className="text-sm font-medium text-slate-300">Sells Wholesale / Bulk</label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input type="checkbox" name="sellsRetail" checked={pd.sellsRetail === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, sellsRetail: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+              <label className="text-sm font-medium text-slate-300">Sells Retail</label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input type="checkbox" name="exportReady" checked={pd.exportReady === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, exportReady: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+              <label className="text-sm font-medium text-slate-300">Export Ready</label>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (['Product Seller', 'Local Shop'].includes(type)) {
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">Store Name</label>
+              <input name="storeName" value={pd.storeName || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Tech World Store" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">Product Categories Sold</label>
+              <input name="productCategories" value={pd.productCategories || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Electronics, Clothing..." />
+            </div>
+            <div className="flex flex-col gap-3 mt-4">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" name="deliveryAvailable" checked={pd.deliveryAvailable === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, deliveryAvailable: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+                <label className="text-sm font-medium text-slate-300">Delivery Available</label>
               </div>
-              <div className="min-w-0">
-                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">Business Onboarding</h2>
-                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest truncate">Step {step} of {totalSteps}: {getStepTitle(step)}</p>
+              <div className="flex items-center gap-3">
+                <input type="checkbox" name="pickupAvailable" checked={pd.pickupAvailable === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, pickupAvailable: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+                <label className="text-sm font-medium text-slate-300">Pickup Available</label>
               </div>
             </div>
-            <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-all shrink-0">
-              <X className="w-5 h-5 text-slate-500" />
-            </button>
+          </>
+        );
+    }
+
+    if (['Artist', 'Artist / Creator', 'Potter'].includes(type)) {
+        return (
+          <>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">Art Medium / Niche</label>
+              <input name="artMedium" value={pd.artMedium || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="e.g. Digital Art, Ceramics, Music..." />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400">Portfolio Link</label>
+              <input name="portfolio" value={pd.portfolio || ''} onChange={handleProfileDataChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white" placeholder="https://..." />
+            </div>
+            <div className="flex items-center gap-3 mt-4">
+              <input type="checkbox" name="acceptsCommissions" checked={pd.acceptsCommissions === 'true'} onChange={(e) => setFormData({ ...formData, profileData: { ...pd, acceptsCommissions: e.target.checked ? 'true' : 'false' } })} className="w-4 h-4 bg-slate-900 border-slate-800 rounded text-indigo-600" />
+              <label className="text-sm font-medium text-slate-300">Accepts Custom Commissions</label>
+            </div>
+          </>
+        );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#030712]/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-[#090d16] border border-slate-800/80 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50">
+          <div>
+            <h2 className="text-lg font-bold text-white tracking-tight">Business Setup</h2>
+            <p className="text-xs text-slate-400">Step {step} of {totalSteps}</p>
           </div>
-          <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
-            <motion.div 
-              className="h-full bg-gradient-to-r from-indigo-600 to-violet-600"
-              initial={{ width: 0 }}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.4 }}
-            />
-          </div>
+          <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-slate-400 hover:text-white" />
+          </button>
         </div>
 
-        {/* Wizard Steps */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 sm:py-10 scrollbar-hide">
+        {/* Progress Bar */}
+        <div className="w-full h-1 bg-slate-900 shrink-0">
+          <div 
+            className="h-full bg-indigo-500 transition-all duration-300" 
+            style={{ width: `${(step / totalSteps) * 100}%` }}
+          />
+        </div>
+
+        {/* Content */}
+        <div className="p-6 sm:p-10 overflow-y-auto flex-1 custom-scrollbar">
+          {error && (
+            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
+              <Info className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-rose-200">{error}</p>
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
+              transition={{ duration: 0.2 }}
+              className="w-full"
             >
               {step === 1 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {BUSINESS_TYPES.map(type => (
-                    <button
-                      key={type.id}
-                      onClick={() => setFormData({ ...formData, businessType: type.id as BusinessType })}
-                      className={`p-6 rounded-2xl border text-left transition-all group ${
-                        formData.businessType === type.id 
-                          ? 'bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-500/20' 
-                          : 'bg-slate-950/50 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <type.icon className={`w-8 h-8 mb-4 ${formData.businessType === type.id ? 'text-white' : 'text-slate-500'}`} />
-                      <h4 className={`text-sm font-bold ${formData.businessType === type.id ? 'text-white' : 'text-slate-300'}`}>{type.label}</h4>
-                      <p className={`text-[10px] mt-1 leading-relaxed ${formData.businessType === type.id ? 'text-indigo-100' : 'text-slate-500'}`}>{type.desc}</p>
-                    </button>
-                  ))}
+                <div className="space-y-6">
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-white mb-2">What best describes your business?</h3>
+                    <p className="text-slate-400">Select the category that matches your primary operations.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                    {BUSINESS_TYPES.map((type) => (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, businessType: type.id })}
+                        aria-pressed={formData.businessType === type.id}
+                        className={`p-5 rounded-2xl border text-left transition-all flex flex-col gap-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          formData.businessType === type.id 
+                            ? 'bg-indigo-600/10 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.1)]' 
+                            : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className={`p-3 rounded-xl inline-flex w-fit ${formData.businessType === type.id ? 'bg-indigo-600/20 text-indigo-400' : 'bg-slate-800/80 text-slate-400'}`}>
+                          <type.icon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className={`text-base font-bold mb-1 ${formData.businessType === type.id ? 'text-indigo-300' : 'text-slate-200'}`}>
+                            {type.label}
+                          </p>
+                          <p className={`text-xs leading-relaxed ${formData.businessType === type.id ? 'text-indigo-200/70' : 'text-slate-500'}`}>
+                            {type.desc}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {step === 2 && (
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Business Public Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Acme Tech Solutions"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.businessName}
-                      onChange={e => setFormData({ ...formData, businessName: e.target.value, displayName: e.target.value })}
-                    />
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-white mb-2">Basic Information</h3>
+                    <p className="text-slate-400">Provide the core details of your business.</p>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Legal Entity Name (As per Documents)</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Acme Technologies Pvt Ltd"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.legalName}
-                      onChange={e => setFormData({ ...formData, legalName: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Business Description</label>
-                    <textarea 
-                      rows={4}
-                      placeholder="Tell us what your business does..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all resize-none"
-                      value={formData.description}
-                      onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Business Name *</label>
+                      <input 
+                        name="businessName" 
+                        value={formData.businessName} 
+                        onChange={handleChange} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" 
+                        placeholder="Public name of your business" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Legal Name</label>
+                        <input 
+                          name="legalName" 
+                          value={formData.legalName} 
+                          onChange={handleChange} 
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" 
+                          placeholder="Registered entity name" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Email</label>
+                        <input 
+                          type="email"
+                          name="email" 
+                          value={formData.email} 
+                          onChange={handleChange} 
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" 
+                          placeholder="business@example.com" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Phone Number</label>
+                      <input 
+                        name="phone" 
+                        value={formData.phone} 
+                        onChange={handleChange} 
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" 
+                        placeholder="+1 (555) 000-0000" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Brief Description</label>
+                      <textarea 
+                        name="description" 
+                        value={formData.description} 
+                        onChange={handleChange} 
+                        rows={3}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" 
+                        placeholder="What does your business do?" 
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
               {step === 3 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-                   <div className="col-span-full">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Full Registered Address</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.fullAddress}
-                      onChange={e => setFormData({ ...formData, fullAddress: e.target.value })}
-                    />
+                <div className="space-y-6 max-w-2xl mx-auto">
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-white mb-2">{formData.businessType} Details</h3>
+                    <p className="text-slate-400">Specific information for your business category.</p>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">City</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.city}
-                      onChange={e => setFormData({ ...formData, city: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Postal Code</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.postalCode}
-                      onChange={e => setFormData({ ...formData, postalCode: e.target.value })}
-                    />
+                  <div className="space-y-5 bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
+                    {renderDynamicFields()}
                   </div>
                 </div>
               )}
 
               {step === 4 && (
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  <div className="flex items-center gap-4 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl mb-4">
-                    <Mail className="w-5 h-5 text-indigo-400" />
-                    <p className="text-xs text-slate-400 font-medium">Verify your contact details for official communications.</p>
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-white mb-2">Location & Address</h3>
+                    <p className="text-slate-400">Where is your business located?</p>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Business Email Address</label>
-                    <input 
-                      type="email" 
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.email}
-                      onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Country *</label>
+                      <input name="country" value={formData.country} onChange={handleChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">State / Province</label>
+                      <input name="state" value={formData.state} onChange={handleChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">City *</label>
+                      <input name="city" value={formData.city} onChange={handleChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Postal Code</label>
+                      <input name="postalCode" value={formData.postalCode} onChange={handleChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Primary Phone Number</label>
-                    <input 
-                      type="tel" 
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.phone}
-                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    />
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Full Address</label>
+                    <textarea name="fullAddress" value={formData.fullAddress} onChange={handleChange} rows={2} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
                   </div>
                 </div>
               )}
 
               {step === 5 && (
-                <div className="space-y-8 max-w-3xl mx-auto">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {['Retail', 'IT', 'Manufacturing', 'Finance', 'Education', 'Healthcare', 'Agriculture', 'Logistics'].map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => setFormData({ ...formData, category: cat })}
-                        className={`py-3 px-4 rounded-xl border text-xs font-bold transition-all ${
-                          formData.category === cat 
-                            ? 'bg-indigo-600 border-indigo-500 text-white' 
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Industry Focus</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Artificial Intelligence, Real Estate Tech"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-all"
-                      value={formData.industry}
-                      onChange={e => setFormData({ ...formData, industry: e.target.value })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {step === 6 && (
-                <div className="space-y-6 max-w-2xl mx-auto">
-                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
-                    <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      Verification Documents
-                    </h4>
-                    <div className="space-y-4">
-                      {['GST Certificate', 'Company PAN', 'Trade License'].map(docType => (
-                        <div key={docType} className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl">
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-slate-500" />
-                            <span className="text-xs font-bold text-slate-300">{docType}</span>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              setActiveDocType(docType);
-                              docInputRef.current?.click();
-                            }}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] font-bold text-white transition-all"
-                          >
-                            <Upload className="w-3 h-3" /> 
-                            {docs.find(d => d.type === docType) ? 'Replace' : 'Upload'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <input 
-                    type="file"
-                    ref={docInputRef}
-                    className="hidden"
-                    onChange={(e) => handleFileSelect(e, 'document')}
-                  />
-                </div>
-              )}
-
-              {step === 7 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+                  <div className="text-center mb-4 md:col-span-2">
+                    <h3 className="text-2xl font-bold text-white mb-2">Brand Identity</h3>
+                    <p className="text-slate-400">Upload your logo and cover image.</p>
+                  </div>
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
-                    <input 
-                      type="file"
-                      ref={logoInputRef}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => handleFileSelect(e, 'logo')}
-                    />
+                    <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'logo')} />
                     <div 
-                      onClick={() => {
-                        logoInputRef.current?.click();
-                      }}
-                      className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
+                      onClick={() => logoInputRef.current?.click()}
+                      className="w-32 h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden mx-auto md:mx-0"
                     >
                       {logoPreview || formData.logoUrl ? (
                         <img src={logoPreview || formData.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
                       ) : (
                         <>
                           <ImageIcon className="w-6 h-6 text-slate-600 group-hover:text-indigo-400" />
-                          <span className="text-[10px] font-bold text-slate-600">Square SVG</span>
+                          <span className="text-[10px] font-bold text-slate-600">Square SVG/PNG</span>
                         </>
                       )}
                     </div>
                   </div>
                   <div className="space-y-4">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cover Image</label>
-                    <input 
-                      type="file"
-                      ref={coverInputRef}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={(e) => handleFileSelect(e, 'cover')}
-                    />
+                    <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'cover')} />
                     <div 
-                      onClick={() => {
-                        coverInputRef.current?.click();
-                      }}
+                      onClick={() => coverInputRef.current?.click()}
                       className="w-full h-32 bg-slate-950 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-500 transition-all group overflow-hidden"
                     >
                       {coverPreview || formData.coverImageUrl ? (
@@ -460,41 +572,41 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
                 </div>
               )}
 
-              {step === 8 && (
+              {step === 6 && (
                 <div className="space-y-6 max-w-2xl mx-auto">
                   <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">
-                    <div className="h-24 bg-gradient-to-r from-indigo-900 to-violet-900" />
+                    <div className="h-24 bg-gradient-to-r from-indigo-900 to-violet-900 relative">
+                       {coverPreview && <img src={coverPreview} className="w-full h-full object-cover opacity-50" />}
+                    </div>
                     <div className="px-8 pb-8 -mt-10">
-                      <div className="w-20 h-20 bg-slate-900 border-4 border-slate-950 rounded-2xl flex items-center justify-center mb-4">
-                        <Building2 className="w-8 h-8 text-indigo-400" />
+                      <div className="w-20 h-20 bg-slate-900 border-4 border-slate-950 rounded-2xl flex items-center justify-center mb-4 overflow-hidden relative">
+                        {logoPreview ? (
+                          <img src={logoPreview} className="w-full h-full object-cover" />
+                        ) : (
+                          <Building2 className="w-8 h-8 text-indigo-400" />
+                        )}
                       </div>
                       <h3 className="text-xl font-bold text-white">{formData.businessName || 'Business Name'}</h3>
-                      <p className="text-sm text-slate-500">{formData.businessType} • {formData.category}</p>
+                      <p className="text-sm text-slate-500">{formData.businessType || 'Type not set'} • {formData.city || 'City not set'}</p>
+                      
                       <div className="mt-6 grid grid-cols-2 gap-4">
                         <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
                           <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Legal Entity</p>
                           <p className="text-xs text-slate-300 font-medium">{formData.legalName || 'N/A'}</p>
                         </div>
                         <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                          <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Location</p>
-                          <p className="text-xs text-slate-300 font-medium">{formData.city || 'N/A'}</p>
+                          <p className="text-[10px] font-bold text-slate-600 uppercase mb-1">Contact</p>
+                          <p className="text-xs text-slate-300 font-medium">{formData.email || 'N/A'}</p>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {step === 9 && (
-                <div className="flex flex-col items-center justify-center text-center py-10 space-y-6">
-                  <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] flex items-center justify-center">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-white tracking-tight">Ready for Deployment</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto mt-2 leading-relaxed">
-                      Your business profile and verification documents are prepared. Click below to launch your identity on the Pi Business Market.
-                    </p>
+                      <div className="mt-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-start gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0" />
+                        <p className="text-sm text-indigo-200">
+                          {businessId ? 'Your changes are ready. Click save to update your business profile on the Pi Network.' : 'Your digital identity is ready. Click finalize to create your business profile on the Pi Network.'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -503,34 +615,33 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
         </div>
 
         {/* Footer Actions */}
-        <div className="px-4 sm:px-8 py-4 sm:py-6 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between shrink-0">
           <button
             onClick={handleBack}
-            disabled={step === 1 || isSubmitting}
-            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all disabled:opacity-0"
+            disabled={isSubmitting}
+            className="px-6 py-2.5 text-sm font-bold text-slate-400 hover:text-white transition-all"
           >
-            <ChevronLeft className="w-4 h-4" /> Back
+            {step === 1 ? 'Cancel' : 'Back'}
           </button>
           
           {step < totalSteps ? (
             <button
               onClick={handleNext}
-              className="flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 bg-white text-slate-950 rounded-xl font-bold hover:bg-slate-200 transition-all shadow-xl shadow-white/5 text-xs sm:text-sm"
+              disabled={step === 1 && !formData.businessType}
+              className="px-8 py-2.5 bg-white text-slate-950 rounded-xl font-bold hover:bg-slate-200 transition-all disabled:opacity-50"
             >
-              Continue <ChevronRight className="w-4 h-4" />
+              Continue
             </button>
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 sm:px-10 py-2.5 sm:py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50 text-xs sm:text-sm"
+              disabled={isSubmitting || !formData.businessName}
+              className="px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50 flex items-center gap-2"
             >
-              {isSubmitting ? (
-                <>Deploying...</>
-              ) : (
+              {isSubmitting ? (businessId ? 'Saving...' : 'Creating...') : (
                 <>
                   <Zap className="w-4 h-4" />
-                  Finalize
+                  {businessId ? 'Save Changes' : 'Finalize Business'}
                 </>
               )}
             </button>
@@ -540,29 +651,3 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel }) 
     </div>
   );
 };
-
-const getStepTitle = (step: number) => {
-  switch(step) {
-    case 1: return 'Business Entity Type';
-    case 2: return 'Basic Profile';
-    case 3: return 'Operational Address';
-    case 4: return 'Governance Contacts';
-    case 5: return 'Industry Classification';
-    case 6: return 'Regulatory Compliance';
-    case 7: return 'Brand Identity';
-    case 8: return 'Visual Review';
-    case 9: return 'Submission';
-    default: return '';
-  }
-};
-
-const BUSINESS_TYPES = [
-  { id: 'Individual', label: 'Individual', icon: User, desc: 'Single owner, no legal registration.' },
-  { id: 'Sole Proprietorship', label: 'Proprietorship', icon: Building2, desc: 'Regulated single-owner business.' },
-  { id: 'Partnership', label: 'Partnership', icon: Briefcase, desc: 'Multiple partners sharing liability.' },
-  { id: 'Private Limited', label: 'Pvt Ltd', icon: Zap, desc: 'Private corporation with limited liability.' },
-  { id: 'Public Limited', label: 'Public Ltd', icon: Building2, desc: 'Corporation with publicly traded shares.' },
-  { id: 'NGO', label: 'NGO / Trust', icon: ShieldCheck, desc: 'Non-profit or social enterprise.' },
-];
-
-export default BusinessWizard;

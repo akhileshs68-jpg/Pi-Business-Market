@@ -96,9 +96,9 @@ export const WarehouseDashboard: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
           {[
             { label: 'Nodes', value: warehouses.length, icon: WarehouseIcon, color: 'text-indigo-400' },
-            { label: 'Capacity', value: '85%', icon: Activity, color: 'text-emerald-400' },
-            { label: 'Shipments', value: '12', icon: Truck, color: 'text-amber-400' },
-            { label: 'Coverage', value: '1,240', icon: Box, color: 'text-blue-400' },
+            { label: 'Total Value', value: 'Live computation pending', icon: Activity, color: 'text-emerald-400' },
+            { label: 'Active Shipments', value: 'Live computation pending', icon: Truck, color: 'text-amber-400' },
+            { label: 'Items Stored', value: 'Live computation pending', icon: Box, color: 'text-blue-400' },
           ].map((stat, i) => (
             <div key={i} className="p-4 sm:p-6 bg-slate-900/50 border border-slate-800 rounded-2xl sm:rounded-3xl">
               <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
@@ -189,7 +189,7 @@ export const WarehouseDashboard: React.FC = () => {
                   <div className="flex items-center justify-between pt-6 border-t border-slate-800/50">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Enterprise Verified</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Verified Merchant</span>
                     </div>
                     <ChevronRight className="w-5 h-5 text-slate-700 group-hover:text-indigo-400 group-hover:translate-x-2 transition-all" />
                   </div>

@@ -21,7 +21,7 @@ import { checkoutService } from '../services/checkoutService';
 import { cartService } from '../services/cartService';
 import { orderService } from '../services/orderService';
 import { paymentService } from '../services/paymentService';
-import { PiSdkSim } from '../services/piSdk';
+import { piPaymentService } from '../services/piPaymentService';
 import { CheckoutSession, CartItem, Address, OrderItem, PaymentStatus, OrderStatus } from '../types';
 
 export const Checkout: React.FC = () => {
@@ -101,16 +101,19 @@ export const Checkout: React.FC = () => {
       // 3. Create Payment Intent
       const intent = await paymentService.createPaymentIntent(order);
 
-      // 4. Launch Pi SDK Payment
-      PiSdkSim.executePayment({
+      // 4. Launch Pi SDK Payment (U2A Payment Flow)
+      await piPaymentService.createPayment({
         amount: order.grandTotal,
         memo: `Order ${order.orderNumber} at Pi Business Market`,
         metadata: {
+          productType: 'MarketplaceOrder',
+          orderId: order.orderId,
           storeId: order.businessId,
           itemsCount: orderItems.length
         }
       }, {
         onReadyForServerApproval: (paymentId) => {
+          console.log('[Checkout] Server approved Pi payment:', paymentId);
         },
         onReadyForServerCompletion: async (paymentId, txid) => {
           try {
@@ -124,15 +127,16 @@ export const Checkout: React.FC = () => {
             // 7. Redirect to Success
             navigate(`/order-success/${orderId}`);
           } catch (err) {
-            console.error('Payment verification failed', err);
+            console.error('[Checkout] Payment verification failed:', err);
             setIsProcessing(false);
           }
         },
         onCancel: (paymentId) => {
+          console.log('[Checkout] Payment cancelled by user:', paymentId);
           setIsProcessing(false);
         },
         onError: (error, paymentId) => {
-          console.error('[Checkout] Pi SDK Error', error);
+          console.error('[Checkout] Pi SDK Error:', error, paymentId);
           setIsProcessing(false);
         }
       });

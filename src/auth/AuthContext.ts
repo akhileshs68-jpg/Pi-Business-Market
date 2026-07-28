@@ -3,6 +3,7 @@ import { User } from '../types';
 
 export interface AuthContextType {
   user: User | null;
+  profile: User | null;
   loading: boolean;
   error: string | null;
   login: () => Promise<User>;

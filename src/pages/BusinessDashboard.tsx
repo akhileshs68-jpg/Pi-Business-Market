@@ -85,16 +85,16 @@ export const BusinessDashboard: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pb-24 sm:pb-10">
         
-        {/* Enterprise Header */}
+        {/* Business Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 mb-8 sm:mb-12">
           <div>
             <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
               <div className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-indigo-600/10 border border-indigo-500/20 shadow-inner">
                 <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
               </div>
-              <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em]">Corporate Registry</p>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em]">Marketplace Registry</p>
             </div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">Enterprise Identities</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">Business Profiles</h1>
             <p className="text-slate-500 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base font-medium">Root control for all your marketplace operations.</p>
           </div>
           
@@ -103,14 +103,14 @@ export const BusinessDashboard: React.FC = () => {
             className="group flex items-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-indigo-600 text-white font-bold transition-all hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95"
           >
             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-            <span className="text-sm sm:text-base">Establish New Identity</span>
+            <span className="text-sm sm:text-base">Create Business Profile</span>
           </button>
         </div>
 
         {/* Global Context Rail */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
            {[
-            { label: 'Total Identities', val: businesses.length, icon: Building2, color: 'text-indigo-400' },
+            { label: 'Total Businesses', val: businesses.length, icon: Building2, color: 'text-indigo-400' },
             { label: 'Verified Status', val: businesses.filter(b => b.verificationStatus === 'Verified').length, icon: ShieldCheck, color: 'text-emerald-400' },
             { label: 'Active Personnel', val: businesses.reduce((acc, b) => acc + b.employeeCount, 0), icon: Zap, color: 'text-amber-400' },
             { label: 'System Health', val: 'Operational', icon: Globe, color: 'text-sky-400' },
@@ -171,7 +171,7 @@ export const BusinessDashboard: React.FC = () => {
                 activeTab === 'owned' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              Managed Identities
+              Managed Businesses
               {activeTab === 'owned' && (
                 <motion.div layoutId="activeTab" className="absolute -bottom-[25px] md:-bottom-[25px] left-0 right-0 h-1 bg-indigo-600 rounded-full" />
               )}
@@ -194,7 +194,7 @@ export const BusinessDashboard: React.FC = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input 
                 type="text" 
-                placeholder="Filter identity..." 
+                placeholder="Filter business..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full md:w-64 bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:border-indigo-500 outline-none transition-all shadow-inner"
@@ -206,7 +206,7 @@ export const BusinessDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Identities Grid */}
+        {/* Businesses Grid */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => (
@@ -245,16 +245,16 @@ export const BusinessDashboard: React.FC = () => {
             <div className="w-24 h-24 rounded-[2rem] bg-slate-900 border border-slate-800 flex items-center justify-center mb-8 shadow-inner">
               <Building2 className="w-10 h-10 text-slate-700" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-3">No Registered Identities</h2>
+            <h2 className="text-3xl font-bold text-white mb-3">No Registered Businesses</h2>
             <p className="text-slate-500 max-w-sm mb-10 font-medium">
-              You haven't established any business identities yet. Create one to start trading on the Pi Network.
+              You haven't created any business profiles yet. Create one to start trading on the Pi Network.
             </p>
             <button 
               onClick={() => setShowWizard(true)}
               className="flex items-center gap-2 px-10 py-4 rounded-2xl bg-white text-slate-950 font-extrabold hover:bg-slate-200 transition-all shadow-2xl shadow-white/10"
             >
               <Zap className="w-5 h-5" />
-              Launch Identity
+              Create Business
             </button>
           </motion.div>
         )}
@@ -272,7 +272,7 @@ export const BusinessDashboard: React.FC = () => {
               Network Healthy
             </div>
           </div>
-          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Enterprise Registry v1.0.4</p>
+          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Marketplace Registry v1.0.4</p>
         </div>
       </main>
 

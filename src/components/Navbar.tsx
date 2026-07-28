@@ -16,6 +16,7 @@ import {
   PlusCircle,
   Clock,
   User,
+  Home,
   Heart,
   Compass,
   CreditCard,
@@ -41,6 +42,8 @@ import { User as UserType, Notification } from '../types';
 import { PiSdkSim } from '../services/piSdk';
 import { PiBusinessMarketDB } from '../services/storage';
 import { CartDrawer } from './cart/CartDrawer';
+import { ROLES_CONFIG } from '../auth/authService';
+import { useNavigation } from '../hooks/useNavigation';
 
 import { NotificationCenter } from './NotificationCenter';
 
@@ -69,6 +72,51 @@ export default function Navbar({
   const [faucetLoading, setFaucetLoading] = useState(false);
 
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  const activeRoleStr = (currentUser as any)?.activeRole ? String((currentUser as any).activeRole).toLowerCase() : 'buyer';
+  const showWorkspace = ROLES_CONFIG[activeRoleStr]?.hasWorkspace || false;
+  const navItems = useNavigation(activeRoleStr);
+
+  const getIconComponent = (iconName: string) => {
+    const icons: Record<string, React.ComponentType<any>> = {
+      Home,
+      Search,
+      Compass,
+      ShoppingBag,
+      Briefcase,
+      Store,
+      Clock,
+      MessageSquare,
+      User,
+      LayoutDashboard,
+      ClipboardList,
+      CreditCard,
+      BarChart3,
+      ShieldAlert,
+      Terminal,
+      Truck,
+      Users,
+      Award,
+      BookOpen,
+      Sparkles
+    };
+    return icons[iconName] || Compass;
+  };
+
+  const getBottomNavItems = () => {
+    const homeItem = navItems.find(item => item.id === 'home');
+    const profileItem = navItems.find(item => item.id === 'profile');
+    
+    // Get up to 3 other items that are not home or profile
+    const middleItems = navItems.filter(item => item.id !== 'home' && item.id !== 'profile').slice(0, 3);
+    
+    const items = [];
+    if (homeItem) items.push(homeItem);
+    items.push(...middleItems);
+    if (profileItem) items.push(profileItem);
+    
+    return items;
+  };
 
   // Lock scroll, keyboard capture, and restore scroll position
   useEffect(() => {
@@ -182,168 +230,30 @@ export default function Navbar({
           
           {/* DESKTOP-ONLY LINKS CONTAINER */}
           <div className="hidden xl:flex items-center gap-3" id="nav_desktop_links">
-            {/* DASHBOARD NAV TRIGGER */}
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                currentView === 'dashboard'
-                  ? 'bg-slate-800 text-white border-slate-700 shadow-md shadow-slate-950/20'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Dashboard</span>
-            </button>
-
-            {/* DOCS PORTAL TRIGGER */}
-            <button
-              onClick={() => window.location.href = '/docs'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'docs'
-                  ? 'bg-emerald-600 text-white border-emerald-500/30 shadow-md shadow-emerald-500/10'
-                  : 'bg-emerald-950/50 border-emerald-800/60 text-emerald-300 hover:text-white hover:bg-emerald-900/80'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Docs</span>
-            </button>
-
-            {/* MESSAGING HUB TRIGGER */}
-            <button
-              onClick={() => onNavigate('inbox')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'inbox'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Inbox</span>
-            </button>
-
-            {/* UNIVERSAL SEARCH NAV TRIGGER */}
-            <button
-              onClick={() => onNavigate('discovery')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'discovery'
-                  ? 'bg-violet-600 text-white border-violet-500/30 shadow-md shadow-violet-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5 text-violet-400" />
-              <span>Market Search</span>
-            </button>
-
-            {/* BUSINESS DASHBOARD NAV TRIGGER */}
-            <button
-              onClick={() => onNavigate('business-dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'business-dashboard'
-                  ? 'bg-violet-600 text-white border-violet-500/30 shadow-md shadow-violet-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <Briefcase className="w-3.5 h-3.5 text-violet-400" />
-              <span>Businesses</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('merchant-analytics')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'merchant-analytics'
-                  ? 'bg-amber-600 text-white border-amber-500/30 shadow-md shadow-amber-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
-              <span>BI</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('admin-analytics')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'admin-analytics'
-                  ? 'bg-rose-600 text-white border-rose-500/30 shadow-md shadow-rose-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              <span>System</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('admin-console')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'admin-console'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Ops</span>
-            </button>
-
-            {/* STORE DASHBOARD NAV TRIGGER */}
-            <button
-              onClick={() => onNavigate('store-dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'store-dashboard'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Stores</span>
-            </button>
-
-            {/* MERCHANT ORDERS NAV TRIGGER */}
-            <button
-              onClick={() => onNavigate('business-orders')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'business-orders'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <ClipboardList className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Order Hub</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('business-payments')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'business-payments'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Finance Hub</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('logistics')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'logistics'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <Truck className="w-3.5 h-3.5 text-violet-400" />
-              <span>Logistics Hub</span>
-            </button>
-
-            <button
-              onClick={() => onNavigate('crm')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                currentView === 'crm'
-                  ? 'bg-indigo-600 text-white border-indigo-500/30 shadow-md shadow-indigo-500/10'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Customer 360</span>
-            </button>
+            {navItems.map((item) => {
+              const Icon = getIconComponent(item.iconName);
+              const isActive = currentView === item.view;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.view === 'docs') {
+                      window.location.href = '/docs';
+                    } else {
+                      onNavigate(item.view);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-violet-600 text-white border-violet-500/35 shadow-md shadow-violet-500/10'
+                      : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 text-violet-400" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* MOBILE TOGGLE (COMPACT CLASS FOR VIEWPORTS < XL) */}
@@ -543,137 +453,38 @@ export default function Navbar({
                 </div>
 
                 {/* Symmetrical Scrollable Sections */}
-                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
-                  {/* Category Section: Core Services */}
+                <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Core Marketplace</h4>
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{activeRoleStr.toUpperCase()} Navigation</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      <button 
-                        onClick={() => { onNavigate('marketplace'); setIsMobileMenuOpen(false); }} 
-                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'marketplace' ? 'bg-violet-600/10 border-violet-500/30 text-white shadow-lg shadow-violet-600/5' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
-                      >
-                        <Compass className="w-5 h-5 text-violet-400" />
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-black uppercase tracking-wider block">Browse</span>
-                          <span className="text-[9px] text-slate-500 block">Home feed</span>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => { onNavigate('discovery'); setIsMobileMenuOpen(false); }} 
-                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'discovery' ? 'bg-violet-600/10 border-violet-500/30 text-white shadow-lg shadow-violet-600/5' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
-                      >
-                        <Search className="w-5 h-5 text-violet-400" />
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-black uppercase tracking-wider block">Search</span>
-                          <span className="text-[9px] text-slate-500 block">Find products</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Category Section: Merchant Portal */}
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Merchant Ecosystem</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button 
-                        onClick={() => { onNavigate('business-dashboard'); setIsMobileMenuOpen(false); }} 
-                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'business-dashboard' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
-                      >
-                        <Briefcase className="w-5 h-5 text-indigo-400" />
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-black uppercase tracking-wider block">Businesses</span>
-                          <span className="text-[9px] text-slate-500 block">Overview</span>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => { onNavigate('store-dashboard'); setIsMobileMenuOpen(false); }} 
-                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'store-dashboard' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
-                      >
-                        <Store className="w-5 h-5 text-indigo-400" />
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-black uppercase tracking-wider block">Stores</span>
-                          <span className="text-[9px] text-slate-500 block">Manage storefronts</span>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => { onNavigate('business-orders'); setIsMobileMenuOpen(false); }} 
-                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'business-orders' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
-                      >
-                        <ClipboardList className="w-5 h-5 text-indigo-400" />
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-black uppercase tracking-wider block">Order Hub</span>
-                          <span className="text-[9px] text-slate-500 block">Fulfillment</span>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => { onNavigate('business-payments'); setIsMobileMenuOpen(false); }} 
-                        className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${currentView === 'business-payments' ? 'bg-indigo-600/10 border-indigo-500/30 text-white shadow-lg' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'}`}
-                      >
-                        <CreditCard className="w-5 h-5 text-emerald-400" />
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-black uppercase tracking-wider block">Finance</span>
-                          <span className="text-[9px] text-slate-500 block">Settlements</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Category Section: Analytics & Performance Ops */}
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Management & BI</h4>
-                    <div className="space-y-2">
-                      <button 
-                        onClick={() => { onNavigate('merchant-analytics'); setIsMobileMenuOpen(false); }} 
-                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm font-bold transition-all ${currentView === 'merchant-analytics' ? 'bg-amber-600/10 border-amber-500/30 text-white' : 'bg-slate-900/40 border-slate-900 hover:border-slate-800 text-slate-400 hover:text-white'}`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <BarChart3 className="w-4 h-4 text-amber-400" /> Merchant BI Analytics
-                        </span>
-                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600" />
-                      </button>
-
-                      <button 
-                        onClick={() => { onNavigate('admin-analytics'); setIsMobileMenuOpen(false); }} 
-                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm font-bold transition-all ${currentView === 'admin-analytics' ? 'bg-rose-600/10 border-rose-500/30 text-white' : 'bg-slate-900/40 border-slate-900 hover:border-slate-800 text-slate-400 hover:text-white'}`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <ShieldAlert className="w-4 h-4 text-rose-400" /> Platform System Health
-                        </span>
-                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600" />
-                      </button>
-
-                      <button 
-                        onClick={() => { onNavigate('admin-console'); setIsMobileMenuOpen(false); }} 
-                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left text-sm font-bold transition-all ${currentView === 'admin-console' ? 'bg-indigo-600/10 border-indigo-500/30 text-white' : 'bg-slate-900/40 border-slate-900 hover:border-slate-800 text-slate-400 hover:text-white'}`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <Terminal className="w-4 h-4 text-indigo-400" /> Admin Ops Console
-                        </span>
-                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Category Section: Document Resources */}
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Platform Resources</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button 
-                        onClick={() => { onNavigate('rewards'); setIsMobileMenuOpen(false); }} 
-                        className="flex items-center justify-center gap-2.5 p-3 rounded-xl border border-indigo-500/20 bg-indigo-600/5 text-indigo-400 text-xs font-black uppercase tracking-wider transition-all"
-                      >
-                        <Award className="w-4 h-4 text-indigo-400" /> Rewards Hub
-                      </button>
-                      <button 
-                        onClick={() => { window.location.href = '/docs'; setIsMobileMenuOpen(false); }} 
-                        className="flex items-center justify-center gap-2.5 p-3 rounded-xl border border-emerald-500/20 bg-emerald-600/5 text-emerald-400 text-xs font-black uppercase tracking-wider transition-all"
-                      >
-                        <BookOpen className="w-4 h-4 text-emerald-400" /> Document Root
-                      </button>
+                      {navItems.map((item) => {
+                        const Icon = getIconComponent(item.iconName);
+                        const isActive = currentView === item.view;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              if (item.view === 'docs') {
+                                window.location.href = '/docs';
+                              } else {
+                                onNavigate(item.view);
+                              }
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className={`flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all ${
+                              isActive
+                                ? 'bg-violet-600/10 border-violet-500/30 text-white shadow-lg shadow-violet-600/5'
+                                : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Icon className="w-5 h-5 text-violet-400" />
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-black uppercase tracking-wider block">{item.label}</span>
+                              <span className="text-[9px] text-slate-500 block">Navigate</span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -706,95 +517,36 @@ export default function Navbar({
     {/* MOBILE BOTTOM NAVIGATION BAR - PREMIUM GLASS DESIGN WITH ACTIVE GLOWS */}
     <nav className="fixed bottom-0 left-0 right-0 z-50 xl:hidden bg-[#080d19]/80 backdrop-blur-xl border-t border-slate-900 px-2 pb-safe shadow-[0_-8px_32px_0_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-around h-16 max-w-md mx-auto relative">
-        
-        {/* Market Tab */}
-        <button 
-          onClick={() => onNavigate('marketplace')}
-          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
-        >
-          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
-            <Compass className={`w-5 h-5 transition-all ${currentView === 'marketplace' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
-            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'marketplace' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Market</span>
-          </motion.div>
-          {currentView === 'marketplace' && (
-            <motion.div 
-              layoutId="active_bottom_tab_glow" 
-              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
-            />
-          )}
-        </button>
-
-        {/* Search Tab */}
-        <button 
-          onClick={() => onNavigate('discovery')}
-          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
-        >
-          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
-            <Search className={`w-5 h-5 transition-all ${currentView === 'discovery' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
-            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'discovery' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Search</span>
-          </motion.div>
-          {currentView === 'discovery' && (
-            <motion.div 
-              layoutId="active_bottom_tab_glow" 
-              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
-            />
-          )}
-        </button>
-
-        {/* Dashboard Tab */}
-        <button 
-          onClick={() => onNavigate('dashboard')}
-          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
-        >
-          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
-            <LayoutDashboard className={`w-5 h-5 transition-all ${currentView === 'dashboard' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
-            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'dashboard' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Dashboard</span>
-          </motion.div>
-          {currentView === 'dashboard' && (
-            <motion.div 
-              layoutId="active_bottom_tab_glow" 
-              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
-            />
-          )}
-        </button>
-
-        {/* Orders Tab with Notification Badge */}
-        <button 
-          onClick={() => onNavigate('orders')}
-          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
-        >
-          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center relative">
-            <Clock className={`w-5 h-5 transition-all ${currentView === 'orders' ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
-            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${currentView === 'orders' ? 'text-slate-200 font-black' : 'text-slate-500'}`}>Orders</span>
-            {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping" />
-            )}
-          </motion.div>
-          {currentView === 'orders' && (
-            <motion.div 
-              layoutId="active_bottom_tab_glow" 
-              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
-            />
-          )}
-        </button>
-
-        {/* More Tab */}
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
-        >
-          <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
-            <Menu className={`w-5 h-5 transition-all ${isMobileMenuOpen ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
-            <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${isMobileMenuOpen ? 'text-slate-200 font-black' : 'text-slate-500'}`}>More</span>
-          </motion.div>
-          {isMobileMenuOpen && (
-            <motion.div 
-              layoutId="active_bottom_tab_glow" 
-              className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
-            />
-          )}
-        </button>
-
+        {getBottomNavItems().map((item) => {
+          const Icon = getIconComponent(item.iconName);
+          const isActive = currentView === item.view;
+          return (
+            <button 
+              key={item.id}
+              onClick={() => {
+                if (item.view === 'docs') {
+                  window.location.href = '/docs';
+                } else {
+                  onNavigate(item.view);
+                }
+              }}
+              className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+            >
+              <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
+                <Icon className={`w-5 h-5 transition-all ${isActive ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
+                <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${isActive ? 'text-slate-200 font-black' : 'text-slate-500'}`}>
+                  {item.label}
+                </span>
+              </motion.div>
+              {isActive && (
+                <motion.div 
+                  layoutId="active_bottom_tab_glow" 
+                  className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
     </nav>
 

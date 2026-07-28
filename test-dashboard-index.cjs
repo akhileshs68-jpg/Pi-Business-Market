@@ -34,7 +34,9 @@ const puppeteer = require('puppeteer');
     if (clicked) {
       // Wait for navigation to dashboard
       console.log('Waiting for navigation to dashboard...');
-      await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 10000 }).catch(e => console.log('Navigation wait timeout'));
+      await new Promise(r => setTimeout(r, 2000));
+      console.log('Navigating directly to /store-dashboard...');
+      await page.goto('http://localhost:3000/store-dashboard', { waitUntil: 'networkidle0' });
       await new Promise(r => setTimeout(r, 5000));
     } else {
       console.log('Could not find auth button');

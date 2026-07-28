@@ -1,4 +1,4 @@
-const projectId = "straight-modem-gw1xt";
+const projectId = process.env.VITE_FIREBASE_PROJECT_ID || "";
 const dbId = "ai-studio-pibusinessmarket-77787f2f-7898-4843-8acf-68b0116d2c80";
 
 async function run() {

@@ -50,9 +50,12 @@ export const CustomerOrders: React.FC = () => {
 
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
-      case OrderStatus.COMPLETED: return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-      case OrderStatus.CANCELLED: return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-      case OrderStatus.PENDING_PAYMENT: return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+      case OrderStatus.COMPLETED: 
+      case OrderStatus.DELIVERED: return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+      case OrderStatus.CANCELLED: 
+      case OrderStatus.RETURNED: return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+      case OrderStatus.PENDING_PAYMENT: 
+      case OrderStatus.PAYMENT_VERIFIED: return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
       default: return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
     }
   };

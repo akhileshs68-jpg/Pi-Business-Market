@@ -110,7 +110,7 @@ export const CatalogManagement: React.FC = () => {
                 <h1 className="text-4xl font-black text-white tracking-tight">Catalog Engine</h1>
                 <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1 flex items-center gap-2">
                   <HardDrive className="w-3 h-3 text-violet-400" />
-                  Enterprise Category & Attribute Management
+                  Marketplace Categories & Features
                 </p>
               </div>
             </div>
@@ -157,14 +157,14 @@ export const CatalogManagement: React.FC = () => {
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-slate-800">
-                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Enterprise Utilities</h4>
+                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Marketplace Utilities</h4>
                   <button 
                     onClick={handleSeed}
                     disabled={seeding}
                     className="w-full flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs font-bold text-slate-400 hover:text-white hover:border-violet-500/50 transition-all"
                   >
                     {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                    Seed Enterprise Taxonomy
+                    Seed Marketplace Taxonomy
                   </button>
                 </div>
               </section>
