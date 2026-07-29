@@ -42,6 +42,7 @@ import { ReviewList } from '../components/ReviewList';
 import { ReviewForm } from '../components/ReviewForm';
 import { SearchIndexEntry, Product, Store } from '../types';
 import { ProductCard } from '../components/product/ProductCard';
+import { getProductImageUrl } from '../utils/imageUtils';
 
 export const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -474,7 +475,7 @@ export const ProductDetails: React.FC = () => {
         cartId: cart.cartId,
         productId: product.productId,
         name: `${product.productName} (${selectedSize} / ${selectedColor})`,
-        imageUrl: product.mainImage || product.imageUrls?.[0] || '',
+        imageUrl: getProductImageUrl(product),
         quantity,
         unitPrice: product.price || 0
       });
@@ -498,7 +499,7 @@ export const ProductDetails: React.FC = () => {
         cartId: cart.cartId,
         productId: product.productId,
         name: `${product.productName} (${selectedSize} / ${selectedColor})`,
-        imageUrl: product.mainImage || product.imageUrls?.[0] || '',
+        imageUrl: getProductImageUrl(product),
         quantity,
         unitPrice: product.price || 0
       });
@@ -594,11 +595,15 @@ export const ProductDetails: React.FC = () => {
     );
   }
 
-  const mainImageUrl = product.mainImage || (product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=60');
+  const mainImageUrl = getProductImageUrl(product);
+
+  const anyProduct = product as any;
+  const productImages = (product.imageUrls?.length > 0) ? product.imageUrls : 
+                        (anyProduct.images?.length > 0) ? anyProduct.images : null;
 
   // Build high end multi angle image views if only single main image exists
-  const generatedGallery = product.imageUrls && product.imageUrls.length > 1 
-    ? product.imageUrls 
+  const generatedGallery = productImages && productImages.length > 1 
+    ? productImages 
     : [
         mainImageUrl,
         // Add subtle styling crops to create multi-angle catalog view
@@ -781,7 +786,7 @@ export const ProductDetails: React.FC = () => {
 
             {/* Thumbnail Navigation */}
             <div className="grid grid-cols-4 gap-3 sm:gap-4">
-              {generatedGallery.map((img, idx) => (
+              {generatedGallery.map((img: string, idx: number) => (
                 <button
                   key={idx}
                   onClick={() => { setSelectedImageIndex(idx); setShowVideo(false); }}
@@ -1444,13 +1449,14 @@ const TrustBadge = ({ icon, label, sub }: any) => (
   </div>
 );
 
-const CarouselProductCard = ({ prod, badge, onClick }: any) => (
+const CarouselProductCard = ({ prod, badge, onClick }: any) => {
+  return (
   <div 
     onClick={() => onClick(prod)}
     className="min-w-[200px] sm:min-w-[240px] max-w-[240px] bg-slate-900/60 hover:bg-slate-900 border border-slate-855 hover:border-indigo-500/40 rounded-2xl p-4 flex flex-col group cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-lg shrink-0"
   >
     <div className="aspect-square bg-slate-950 rounded-xl overflow-hidden relative mb-3">
-      <img src={prod.mainImage} alt={prod.productName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
+      <img src={getProductImageUrl(prod)} alt={prod.productName || prod.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
       {badge && (
         <span className="absolute top-2 left-2 px-2 py-0.5 bg-indigo-600 text-white font-black text-[8px] uppercase tracking-wider rounded">
           {badge}
@@ -1464,4 +1470,5 @@ const CarouselProductCard = ({ prod, badge, onClick }: any) => (
       <span className="text-[9px] text-slate-500 font-bold">${(prod.price * 3.14).toFixed(1)} USD</span>
     </div>
   </div>
-);
+  );
+};

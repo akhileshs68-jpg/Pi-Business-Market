@@ -16,6 +16,10 @@ import {
   CheckCircle2, 
   Loader2,
   ShieldCheck,
+  Package,
+  ShoppingBag,
+  AlertCircle,
+  RefreshCcw
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/useAuth';
@@ -38,6 +42,11 @@ export const Checkout: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodId>('pi');
+  
+  const [paymentState, setPaymentState] = useState<'idle' | 'success' | 'recovery'>('idle');
+  const [completedOrder, setCompletedOrder] = useState<any>(null);
+  const [paymentTxId, setPaymentTxId] = useState<string>('');
+  const [recoveryError, setRecoveryError] = useState<string>('');
   const [address, setAddress] = useState<Address>({
     fullName: '',
     email: user?.email || '',
@@ -77,7 +86,7 @@ export const Checkout: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
-    if (!session || !user) return;
+    if (!session || !user || isProcessing) return;
     setIsProcessing(true);
     try {
       // 1. Map CartItems to OrderItems
@@ -96,75 +105,176 @@ export const Checkout: React.FC = () => {
         status: 'active'
       }));
 
-      // 2. Create the real Order (Status: PENDING_PAYMENT)
-      const orderId = await orderService.createFromSession({
-        ...session,
-        shippingAddress: address,
-        billingAddress: address 
-      }, orderItems);
-      const order = await orderService.getOrder(orderId);
-      if (!order) throw new Error('Order creation failed');
+      const grandTotal = session.grandTotal || items.reduce((acc, item) => acc + (item.subtotal || 0), 0) * 1.05;
+      const businessId = session.storeId || session.businessId || 'UNKNOWN';
 
       // 3. Create Transaction in Payment Engine
       const paymentId = await paymentService.createTransaction({
         buyerId: user.uid,
-        businessId: order.businessId,
-        orderId: order.orderId,
+        businessId: businessId,
+        orderId: session.sessionId,
         currency: 'Pi', // Or whatever currency is configured
         paymentMethod: selectedPaymentMethod,
-        amount: order.grandTotal
+        amount: grandTotal
       });
 
       if (selectedPaymentMethod === 'pi') {
         // 4. Launch Pi SDK Payment (U2A Payment Flow)
         await paymentService.processPiPayment(
           paymentId,
-          order.grandTotal,
-          `Order ${order.orderNumber} at Pi Business Market`,
+          grandTotal,
+          `Order at Pi Business Market`,
           {
             productType: 'MarketplaceOrder',
-            orderId: order.orderId,
-            storeId: order.businessId,
+            orderId: session.sessionId,
+            storeId: businessId,
             itemsCount: orderItems.length,
             transactionId: paymentId
           },
           async (txid) => {
-            // Success callback
-            await checkoutService.updateSession(session.sessionId, { status: 'completed' });
-            if (session.cartIds) {
-              for (const cid of session.cartIds) {
-                await cartService.clearCart(cid);
+            try {
+              // 1. Verify the payment on the server
+              await paymentService.updateTransactionStatus(paymentId, 'Completed', txid);
+              
+              // 2. Save the order in Firestore / 3. Update paymentStatus / 4. Update orderStatus
+              const orderId = await orderService.createFromSession({
+                ...session,
+                shippingAddress: address,
+                billingAddress: address,
+                paymentStatus: 'SUCCESS',
+                orderStatus: 'CONFIRMED',
+                paymentId: paymentId,
+                transactionId: txid,
+                amount: grandTotal,
+                timestamp: Date.now()
+              }, orderItems);
+              const order = await orderService.getOrder(orderId);
+              if (!order) throw new Error('Order creation failed');
+              
+              // 5. Clear the shopping cart
+              await checkoutService.updateSession(session.sessionId, { status: 'completed' });
+              if (session.cartIds) {
+                for (const cid of session.cartIds) {
+                  await cartService.clearCart(cid);
+                }
+              } else if (session.cartId) {
+                await cartService.clearCart(session.cartId);
               }
-            } else {
-              await cartService.clearCart(session.cartId);
+              
+              setCompletedOrder(order);
+              setPaymentTxId(txid);
+              setPaymentState('success');
+              
+              // 7. Show a success toast
+              const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
+              window.dispatchEvent(event);
+              
+              // 8. Automatically redirect to the Order Details page after 5 seconds
+              setTimeout(() => {
+                navigate(`/order-details/${orderId}`);
+              }, 5000);
+            } catch (err) {
+              setRecoveryError(err instanceof Error ? err.message : 'Payment processing failed after success.');
+              setPaymentState('recovery');
+              setIsProcessing(false);
             }
-            navigate(`/order-success/${orderId}`);
           },
           (err) => {
             // Error callback
-            console.error('[Checkout] Payment verification failed:', err);
+            console.error('[Checkout] Payment failed:', err);
+            setRecoveryError(typeof err === 'string' ? err : 'Payment failed');
+            setPaymentState('recovery');
             setIsProcessing(false);
           }
         );
       } else {
         // Handle future or alternative payment methods (e.g., BMT, UPI, Cash)
         await paymentService.updateTransactionStatus(paymentId, 'Completed', 'simulated_tx');
-        await orderService.updatePaymentStatus(order.orderId, 'Paid');
+        const orderId = await orderService.createFromSession({
+          ...session,
+          shippingAddress: address,
+          billingAddress: address,
+          paymentStatus: 'SUCCESS',
+          orderStatus: 'CONFIRMED',
+          paymentId: paymentId,
+          transactionId: 'simulated_tx',
+          amount: grandTotal,
+          timestamp: Date.now()
+        }, orderItems);
+        const order = await orderService.getOrder(orderId);
+        if (!order) throw new Error('Order creation failed');
         await checkoutService.updateSession(session.sessionId, { status: 'completed' });
         if (session.cartIds) {
           for (const cid of session.cartIds) {
             await cartService.clearCart(cid);
           }
-        } else {
+        } else if (session.cartId) {
           await cartService.clearCart(session.cartId);
         }
-        navigate(`/order-success/${orderId}`);
+        
+        setCompletedOrder(order);
+        setPaymentTxId('simulated_tx');
+        setPaymentState('success');
+        
+        const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
+        window.dispatchEvent(event);
+        
+        setTimeout(() => {
+          navigate(`/order-details/${orderId}`);
+        }, 5000);
       }
     } catch (err) {
       console.error('Order placement failed', err);
+      setRecoveryError(err instanceof Error ? err.message : 'Failed to initiate order checkout.');
+      setPaymentState('recovery');
       setIsProcessing(false);
     }
   };
+
+  if (paymentState === 'success' && completedOrder) {
+    return <PaymentSuccessScreen 
+      order={completedOrder} 
+      paymentTxId={paymentTxId} 
+      address={address} 
+      navigate={navigate} 
+    />;
+  }
+
+  if (paymentState === 'recovery') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center z-50">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-24 h-24 bg-rose-600/10 rounded-full flex items-center justify-center mb-8"
+        >
+          <AlertCircle className="w-12 h-12 text-rose-500" />
+        </motion.div>
+        
+        <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-4">
+          Payment <span className="text-rose-500">Failed</span>
+        </h1>
+        <p className="text-slate-500 max-w-sm mx-auto mb-12 font-medium">
+          {recoveryError || 'Something went wrong during payment processing. Please review and try again.'}
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+          <button 
+            onClick={() => { setPaymentState('idle'); setRecoveryError(''); }}
+            className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+          >
+            <RefreshCcw className="w-4 h-4" /> Try Again
+          </button>
+          <button 
+            onClick={() => navigate('/discovery')}
+            className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+          >
+             Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -399,3 +509,76 @@ const DeliveryOption: React.FC<DeliveryOptionProps> = ({ title, desc, price, act
     <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{desc}</p>
   </div>
 );
+
+const PaymentSuccessScreen = ({ order, paymentTxId, address, navigate }: any) => {
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center z-50">
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="w-24 h-24 bg-emerald-600/10 rounded-full flex items-center justify-center mb-8"
+      >
+        <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+      </motion.div>
+      
+      <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-4">
+        Payment <span className="text-emerald-500">Successful</span>
+      </h1>
+      <p className="text-slate-500 max-w-sm mx-auto mb-12 font-medium flex items-center justify-center gap-2">
+        <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+        Auto redirecting to order in {countdown}s...
+      </p>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 mb-12 w-full max-w-sm text-left">
+        <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-4">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Amount Paid</span>
+          <span className="text-sm font-black text-emerald-400 uppercase">{order.amount || order.grandTotal || 0} π</span>
+        </div>
+        <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-4">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Date & Time</span>
+          <span className="text-xs font-black text-white uppercase">{new Date(order.timestamp || Date.now()).toLocaleString()}</span>
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Order ID</span>
+          <span className="text-xs font-black text-white uppercase">{order.orderId || order.orderNumber || order.id || 'N/A'}</span>
+        </div>
+        <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-4">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Payment ID</span>
+          <span className="text-xs font-black text-white uppercase">{order.paymentId || paymentTxId || 'Simulated'}</span>
+        </div>
+        <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Shipping Address</span>
+          <span className="text-xs font-black text-white uppercase text-right max-w-[150px] truncate">{address?.street || ''}, {address?.city || ''}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Est. Delivery</span>
+          <span className="text-xs font-black text-indigo-400 uppercase">3-5 Business Days</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+        <button 
+          onClick={() => navigate(`/order-details/${order.orderId || order.id}`)}
+          className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+        >
+          <Package className="w-4 h-4" /> View Order
+        </button>
+        <button 
+          onClick={() => navigate('/discovery')}
+          className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+        >
+          <ShoppingBag className="w-4 h-4" /> Continue Shopping
+        </button>
+      </div>
+    </div>
+  );
+};

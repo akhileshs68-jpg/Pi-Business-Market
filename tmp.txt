@@ -1,0 +1,76 @@
+      const { paymentId, txid, metadata } = req.body;
+      if (!paymentId || !txid) {
+        return res.status(400).json({ error: "paymentId and txid are required" });
+      }
+
+      // 1. Verify idempotency using Firestore
+      if (metadata?.transactionId && getApps().length > 0) {
+        const paymentRef = getFirestore().collection('payments').doc(metadata.transactionId);
+        
+        try {
+          const result = await getFirestore().runTransaction(async (t) => {
+            const doc = await t.get(paymentRef);
+            if (!doc.exists) {
+              throw new Error("Transaction not found");
+            }
+            if (doc.data()?.status === 'Completed') {
+              throw new Error("Payment already completed");
+            }
+            
+            // Mark as completed
+            t.update(paymentRef, {
+              status: 'Completed',
+              transactionId: txid,
+              piPaymentId: paymentId,
+              updatedAt: FieldValue.serverTimestamp()
+            });
+
+            // Update order status if provided
+            if (metadata.orderId) {
+              const orderRef = getFirestore().collection('orders').doc(metadata.orderId);
+              t.update(orderRef, {
+                paymentStatus: 'Paid',
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            }
+            
+            return true;
+          });
+        } catch(err: any) {
+          if (err.message === "Payment already completed") {
+            return res.json({ success: true, message: "Payment already processed", paymentId, txid });
+          }
+          console.error("Transaction update failed", err);
+        }
+      }
+
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+      if (!apiKey) {
+        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
+        return res.json({
+          success: true,
+          message: "Payment completed in sandbox mode",
+          paymentId,
+          txid,
+        });
+      }
+
+      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+      const response = await axios.post(
+        `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+        { txid },
+        { headers: { Authorization: `Key ${apiKey}` } }
+      );
+      
+      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
+      res.json({ success: true, payment: response.data });
+    } catch (error: any) {
+      console.error("[Pi Payment Complete] Error completing payment:", error.response?.data || error.message);
+      
+      // Rollback to failed
+      if (req.body.metadata?.transactionId && getApps().length > 0) {
+        await getFirestore().collection('payments').doc(req.body.metadata.transactionId).update({
+          status: 'Failed',
+          updatedAt: FieldValue.serverTimestamp()
+        }).catch(console.error);
+      }

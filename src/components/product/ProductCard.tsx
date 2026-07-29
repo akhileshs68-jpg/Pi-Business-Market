@@ -45,6 +45,8 @@ import { productService } from '../../services/productService';
 import { BottomDrawer } from '../ui/BottomDrawer';
 import { ConfirmModal } from '../ui/ConfirmModal';
 
+import { getProductImageUrl } from '../../utils/imageUtils';
+
 interface ProductCardProps {
   product: Product;
   onEdit?: (product: Product) => void;
@@ -208,7 +210,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         cartId: cart.cartId,
         productId: product.productId,
         name: product.productName,
-        imageUrl: product.mainImage || (product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : ''),
+        imageUrl: getProductImageUrl(product),
         quantity: 1,
         unitPrice: product.price || 0
       });
@@ -237,7 +239,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         cartId: cart.cartId,
         productId: product.productId,
         name: product.productName,
-        imageUrl: product.mainImage || (product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : ''),
+        imageUrl: getProductImageUrl(product),
         quantity: 1,
         unitPrice: product.price || 0
       });
@@ -486,7 +488,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const isLowStock = product.stock <= 5 && product.stock > 0;
   const isOutOfStock = product.stock === 0;
 
-  const productImgUrl = product.mainImage || (product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : null) || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop&q=60';
+  const productImgUrl = getProductImageUrl(product);
 
   // Seed ratings and sales numbers deterministically to look real and premium
   const ratingSeed = 4.3 + (product.productId.charCodeAt(0) % 8) * 0.1;

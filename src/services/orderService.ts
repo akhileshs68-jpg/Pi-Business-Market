@@ -139,11 +139,15 @@ export const orderService = {
       subtotal: session.subtotal || 0,
       tax: session.tax || 0,
       shipping: session.shipping || 0,
-      orderStatus: 'PENDING_PAYMENT',
-      paymentStatus: 'pending',
+      orderStatus: session.orderStatus || 'PENDING_PAYMENT',
+      paymentStatus: session.paymentStatus || 'pending',
       currency: session.currency || 'Pi',
       shippingAddress: session.shippingAddress || null,
       billingAddress: session.billingAddress || null,
+      paymentId: session.paymentId || null,
+      transactionId: session.transactionId || null,
+      amount: session.amount || session.total || session.grandTotal || 0,
+      timestamp: session.timestamp || null,
       items
     };
 

@@ -56,40 +56,16 @@ export const authService = {
    * Initializes the Pi SDK exactly once
    */
   async initPi(): Promise<void> {
+    if (typeof window === 'undefined' || !window.Pi) {
+      return; 
+    }
+
     if (piInitPromise) return piInitPromise;
 
     piInitPromise = (async () => {
       try {
-        if (!window.Pi) {
-          return;
-        }
-
-        // Check if we are in a production Pi Browser environment
-        const isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
-        const isPreviewDomain = window.location.hostname.includes('run.app') || 
-                               window.location.hostname.includes('vercel.app') || 
-                               window.location.hostname.includes('localhost') ||
-                               window.location.hostname.includes('127.0.0.1');
-        
-        // ONLY use the real SDK if in Pi Browser AND NOT on a preview/dev domain
-        // Real SDK will ALWAYS timeout on run.app/vercel.app domains because they aren't registered in the Pi Portal
-        if (!isPiBrowser || isPreviewDomain) {
-          return;
-        }
-
-
-        // Guard against the 120s SDK hang with a strict 15s timeout
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Pi SDK init timeout - check domain whitelist')), 15000)
-        );
-
-        await Promise.race([
-          window.Pi.init({ version: "2.0", sandbox: true }),
-          timeoutPromise
-        ]);
-
+        await window.Pi.init({ version: "2.0", sandbox: true });
       } catch (err) {
-        piInitPromise = null; // Clear lock on failure to allow retry
         throw err;
       }
     })();

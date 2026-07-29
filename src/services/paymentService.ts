@@ -96,7 +96,7 @@ export const paymentService = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
           });
-          if (!res.ok) throw new Error('Server completion failed');
+          if (!res.ok) throw new Error('Verification Failed');
           
           // Server handles Completed state
           onSuccess(txid);
@@ -109,7 +109,7 @@ export const paymentService = {
         } catch (err: any) {
           console.error(err);
           await this.updateTransactionStatus(paymentId, 'Failed');
-          onError(err.message || 'Payment completion failed');
+          onError('Verification Failed');
         }
       },
       onCancel: async (piPaymentId: string) => {

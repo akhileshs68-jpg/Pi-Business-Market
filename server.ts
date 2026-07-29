@@ -152,7 +152,24 @@ async function startServer() {
         return res.status(400).json({ error: "paymentId and txid are required" });
       }
 
-      // 1. Verify idempotency using Firestore
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+      let paymentData = null;
+
+      // 1. Verify payment with Pi Network BEFORE updating Firestore
+      if (!apiKey) {
+        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
+      } else {
+        console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+        const response = await axios.post(
+          `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+          { txid },
+          { headers: { Authorization: `Key ${apiKey}` } }
+        );
+        paymentData = response.data;
+        console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
+      }
+
+      // 2. Verify idempotency and update using Firestore
       if (metadata?.transactionId && getApps().length > 0) {
         const paymentRef = getFirestore().collection('payments').doc(metadata.transactionId);
         
@@ -187,32 +204,13 @@ async function startServer() {
           });
         } catch(err: any) {
           if (err.message === "Payment already completed") {
-            return res.json({ success: true, message: "Payment already processed", paymentId, txid });
+            return res.json({ success: true, message: "Payment already processed", paymentId, txid, payment: paymentData });
           }
           console.error("Transaction update failed", err);
         }
       }
 
-      const apiKey = process.env.PI_NETWORK_API_KEY;
-      if (!apiKey) {
-        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
-        return res.json({
-          success: true,
-          message: "Payment completed in sandbox mode",
-          paymentId,
-          txid,
-        });
-      }
-
-      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
-      const response = await axios.post(
-        `https://api.minepi.com/v2/payments/${paymentId}/complete`,
-        { txid },
-        { headers: { Authorization: `Key ${apiKey}` } }
-      );
-      
-      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
-      res.json({ success: true, payment: response.data });
+      res.json({ success: true, payment: paymentData || { message: "Sandbox completion" } });
     } catch (error: any) {
       console.error("[Pi Payment Complete] Error completing payment:", error.response?.data || error.message);
       

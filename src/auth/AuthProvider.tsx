@@ -15,6 +15,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     // Pre-initialize Pi SDK on mount
+    authService.initPi().catch((err) => {
+      console.error("[AuthProvider] Pi SDK init failed:", err);
+      if (isMounted) {
+        setError("Unable to connect to Pi Network. Please try again.");
+        setLoading(false);
+      }
+    });
     
     if (!isFirebaseConfigured()) {
       setError('Firebase configuration is missing. Authentication services are currently offline.');

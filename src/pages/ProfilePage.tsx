@@ -33,6 +33,7 @@ import {
   Palette
 } from 'lucide-react';
 import { RoleOnboardingLauncher } from '../components/profile/RoleOnboardingLauncher';
+import { WorkspaceTab } from '../components/profile/WorkspaceTab';
 import { ROLES_CONFIG, RoleConfig } from '../auth/authService';
 import { AddBusinessRoleDialog } from '../components/AddBusinessRoleDialog';
 import { orderService } from '../services/orderService';
@@ -411,111 +412,7 @@ export const ProfilePage: React.FC = () => {
           
           {/* 1. ACCOUNT & WORKSPACE TAB */}
           {activeTab === 'account' && (
-            <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Workspace Profile Management</h3>
-              
-              {/* Role info & swapper */}
-              <div className="p-4.5 bg-slate-950/60 rounded-2xl border border-slate-900/80 space-y-4">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Active Network Role</span>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-violet-600/15 border border-violet-500/20 text-xs font-black text-violet-400 capitalize rounded-lg">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                    {ROLES_CONFIG[activeRole]?.iconName} {ROLES_CONFIG[activeRole]?.label || activeRole}
-                  </div>
-                </div>
-
-                {roles.length > 1 && (
-                  <div className="space-y-2 pt-2 border-t border-slate-900/80">
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Swap Active Workspace</span>
-                    <div className="flex flex-wrap gap-2">
-                      {roles.map((rId) => {
-                        const rConfig = ROLES_CONFIG[rId];
-                        const isSelected = activeRole === rId;
-                        return (
-                          <button
-                            key={rId}
-                            onClick={() => handleSwitchActiveRole(rId)}
-                            disabled={saving}
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                              isSelected 
-                                ? 'bg-violet-600 text-white border-violet-500/30 shadow-md' 
-                                : 'bg-slate-900 border-slate-850 hover:border-slate-750 text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <span>{rConfig?.iconName || '👤'}</span>
-                            <span className="capitalize">{rConfig?.label || rId}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Direct Workspace Redirect */}
-              {isBusinessRoleActive && (
-                <div className="p-5 bg-gradient-to-br from-violet-950/15 to-indigo-950/5 border border-violet-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1 text-center sm:text-left">
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider">Business Management Desk</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Access catalog listings, customer bookings, inventory analytics, and payments.</p>
-                  </div>
-                  <button
-                    onClick={() => navigate('/dashboard')}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all duration-300 cursor-pointer shrink-0"
-                  >
-                    <LayoutDashboard className="w-3.5 h-3.5" />
-                    <span>My Workspace</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-
-              {/* Direct Store & Products Shortcuts for Sellers */}
-              {roles.includes('seller') && (
-                <div className="p-5 bg-slate-950/60 border border-slate-900 rounded-2xl space-y-4">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">My Store & Business Shortcuts</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      onClick={() => navigate('/store-dashboard')}
-                      className="flex items-center justify-between p-3.5 bg-slate-900 border border-slate-850 hover:border-violet-500/30 rounded-xl text-left transition-all cursor-pointer group"
-                    >
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-slate-200 group-hover:text-violet-400 transition-colors block">Store Dashboard</span>
-                        <span className="text-[9px] text-slate-500 block">Manage store metrics and orders</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-violet-400 transition-colors shrink-0" />
-                    </button>
-
-                    <button
-                      onClick={() => navigate('/catalog')}
-                      className="flex items-center justify-between p-3.5 bg-slate-900 border border-slate-850 hover:border-violet-500/30 rounded-xl text-left transition-all cursor-pointer group"
-                    >
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-slate-200 group-hover:text-violet-400 transition-colors block">My Products Catalog</span>
-                        <span className="text-[9px] text-slate-500 block">Create and edit store inventory</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-violet-400 transition-colors shrink-0" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Add role onboarding action */}
-              <div className="pt-4 border-t border-slate-900/60 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-300">Expand Your Business Network</h4>
-                  <p className="text-[10px] text-slate-500 max-w-sm leading-relaxed font-medium">Activate additional seller, service provider, farmer, manufacturer, or company workspace profiles to sell on the Pi Marketplace.</p>
-                </div>
-                <button
-                  onClick={() => setRoleSelectionOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-3 bg-slate-900 border border-slate-850 hover:border-violet-500/30 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 text-violet-400" />
-                  <span>Activate Business Role</span>
-                </button>
-              </div>
-
-            </div>
+            <WorkspaceTab />
           )}
 
           {/* 2. ORDERS / MY PURCHASES TAB */}

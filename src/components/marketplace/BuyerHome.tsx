@@ -26,6 +26,7 @@ import { User as UserType } from '../../types';
 import { cartService } from '../../services/cartService';
 import { collection, getDocs, query, limit } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
+import { getProductImageUrl } from '../../utils/imageUtils';
 
 interface BuyerHomeProps {
   user: UserType | null;
@@ -84,7 +85,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         seller: p.seller || p.storeName || p.providerName || 'Verified Merchant',
         rating: typeof p.rating === 'number' ? p.rating : (p.rating ? parseFloat(p.rating) : 4.8),
         reviews: typeof p.reviews === 'number' ? p.reviews : (p.reviewCount || Math.floor(Math.random() * 40) + 12),
-        image: p.image || p.imageUrl || p.coverImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+        image: getProductImageUrl(p),
         category: p.category || 'General',
         isBestDeal: !!p.isBestDeal || (oldPriceVal > priceVal),
         isTrending: p.isTrending !== undefined ? p.isTrending : true,
@@ -188,7 +189,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             seller: data.seller || data.storeName || 'Verified Merchant',
             rating: typeof data.rating === 'number' ? data.rating : (data.rating ? parseFloat(data.rating) : 4.8),
             reviews: typeof data.reviews === 'number' ? data.reviews : (data.reviewCount || Math.floor(Math.random() * 50) + 15),
-            image: data.imageUrl || data.image || data.coverImage || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+            image: getProductImageUrl(data),
             isBestDeal: !!data.isBestDeal || (data.price && data.oldPrice && parseFloat(data.price) < parseFloat(data.oldPrice)),
             isPiExclusive: data.isPiExclusive !== undefined ? data.isPiExclusive : true,
             isTrending: data.isTrending !== undefined ? data.isTrending : true,
@@ -325,7 +326,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         productId: product.id,
         name: product.title,
         quantity: 1,
-        imageUrl: product.image,
+        imageUrl: getProductImageUrl(product),
         unitPrice: product.price
       });
       showToast('Added to Cart Bag successfully!');
@@ -380,7 +381,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   };
 
   // Modular Premium Compact Product Card Component
-    const renderProductCard = (prod: any, isCarousel = false) => {
+  const renderProductCard = (prod: any, isCarousel = false) => {
     const isSaved = wishlist.includes(prod.id);
     const hasDiscount = prod.oldPrice && prod.oldPrice > prod.price;
     const discountPercent = hasDiscount ? Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100) : 0;
@@ -402,7 +403,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         {/* Compact Product Image Container */}
         <div className="relative w-full aspect-square overflow-hidden bg-slate-950 shrink-0">
           <div className="w-full h-full transform group-hover:scale-105 transition-transform duration-500 ease-out">
-            <LazyImage src={prod.image} alt={prod.title} />
+            <LazyImage src={getProductImageUrl(prod)} alt={prod.title || prod.productName} />
           </div>
           
           {/* Badges Overlay */}
@@ -826,7 +827,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             >
               <div className="flex gap-4">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 bg-slate-950 border border-slate-800">
-                  <img src={quickViewProduct.image} alt={quickViewProduct.title} className="w-full h-full object-cover" />
+                  <img src={getProductImageUrl(quickViewProduct)} alt={quickViewProduct.title || quickViewProduct.productName} className="w-full h-full object-cover" />
                 </div>
                 <div className="space-y-1.5 flex-1 min-w-0">
                   <span className="px-1.5 py-0.5 bg-violet-500/15 border border-violet-500/25 text-[7px] xs:text-[8px] font-black text-violet-400 rounded uppercase tracking-wider">
