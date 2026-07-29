@@ -49,6 +49,8 @@ declare global {
 }
 
 let piInitPromise: Promise<void> | null = null;
+let piAuthPromise: Promise<any> | null = null;
+let piAuthResult: any = null;
 let loginInProgressPromise: Promise<User> | null = null;
 
 export const authService = {
@@ -56,21 +58,72 @@ export const authService = {
    * Initializes the Pi SDK exactly once
    */
   async initPi(): Promise<void> {
-    if (typeof window === 'undefined' || !window.Pi) {
-      return; 
+    if (typeof window === 'undefined') return;
+    
+    if (window.Pi) {
+      if (piInitPromise) return piInitPromise;
+      piInitPromise = (async () => {
+        try {
+          console.log('[AuthService] Pi.init() called');
+          await window.Pi.init({ version: "2.0", sandbox: true });
+        } catch (err) {
+          console.error('[AuthService] Pi.init() failed, but continuing:', err);
+          // Don't throw, let the app attempt to continue
+        }
+      })();
+      return piInitPromise;
     }
 
-    if (piInitPromise) return piInitPromise;
+    // Wait for Pi SDK script to load
+    return new Promise((resolve, reject) => {
+      const checkPi = setInterval(() => {
+        if (window.Pi) {
+          clearInterval(checkPi);
+          this.initPi().then(resolve).catch(reject);
+        }
+      }, 500);
+      setTimeout(() => {
+        clearInterval(checkPi);
+        reject(new Error('Pi SDK load timeout'));
+      }, 10000);
+    });
+  },
 
-    piInitPromise = (async () => {
+  /**
+   * Authenticates the user with specific scopes, with caching
+   */
+  async authenticatePi(scopes: string[]): Promise<any> {
+    console.log('[AuthService] Pi.authenticate() called with scopes:', scopes);
+    
+    if (piAuthResult) {
+      console.log('[AuthService] Returning cached Pi Authentication response');
+      return piAuthResult;
+    }
+    
+    if (piAuthPromise) {
+      console.log('[AuthService] Returning existing Pi Authentication promise');
+      return piAuthPromise;
+    }
+
+    await this.initPi();
+    
+    piAuthPromise = (async () => {
       try {
-        await window.Pi.init({ version: "2.0", sandbox: true });
+        const onIncompletePaymentFound = async (payment: any) => {
+          console.log('[AuthService] Incomplete payment found during authentication:', payment);
+        };
+        
+        const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+        console.log('[AuthService] Pi Authentication response:', piAuth);
+        piAuthResult = piAuth;
+        return piAuth;
       } catch (err) {
+        console.error('[AuthService] Pi Authentication failed:', err);
+        piAuthPromise = null; // Allow retry on failure
         throw err;
       }
     })();
-
-    return piInitPromise;
+    return piAuthPromise;
   },
 
   /**
@@ -85,7 +138,7 @@ export const authService = {
       try {
         const auth = getFirebaseAuth();
         const db = getFirebaseDb();
-
+        
         const isPiBrowser = /PiBrowser/i.test(navigator.userAgent);
         const isPreviewDomain = window.location.hostname.includes('run.app') || 
                                window.location.hostname.includes('vercel.app') || 
@@ -97,23 +150,7 @@ export const authService = {
         // Use real SDK ONLY in production Pi Browser on registered domains
         if (isPiBrowser && !isPreviewDomain) {
           try {
-            await this.initPi();
-            const scopes = ['username', 'payments'];
-            const onIncompletePaymentFound = async (payment: any) => {
-              console.log('[AuthService] Incomplete payment found during authentication:', payment);
-              if (!payment) return;
-              try {
-                await fetch('/api/payments/incomplete', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ payment }),
-                });
-              } catch (err) {
-                console.error('[AuthService] Failed to complete in-flight payment:', err);
-              }
-            };
-
-            const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+            const piAuth = await this.authenticatePi(['username', 'payments']);
             const accessToken = piAuth.accessToken;
 
             const response = await fetch('/api/auth/pi', {

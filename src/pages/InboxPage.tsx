@@ -84,7 +84,7 @@ const InboxPage: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-slate-950 overflow-hidden" id="inbox-page">
+    <div className="flex h-[calc(100vh-128px)] bg-slate-950 overflow-hidden" id="inbox-page">
       {/* Sidebar - Conversation List */}
       <div className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-shrink-0 border-r border-slate-900 bg-slate-950`}>
         {conversations.length === 0 ? (

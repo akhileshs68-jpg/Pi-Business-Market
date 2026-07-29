@@ -22,14 +22,21 @@ interface OrderSummaryProps {
   deliveryType: DeliveryType;
   discountCode?: string;
   onApplyDiscount?: (code: string) => void;
+  selectedItemIds?: string[];
+  onToggleItem?: (itemId: string) => void;
 }
 
 export const OrderSummary: React.FC<OrderSummaryProps> = ({
   items,
   deliveryType,
   discountCode = '',
-  onApplyDiscount
+  onApplyDiscount,
+  selectedItemIds,
+  onToggleItem
 }) => {
+  const activeSelectedIds = selectedItemIds ?? items.map(item => item.itemId);
+  const handleToggle = onToggleItem ?? (() => {});
+
   const isServiceItem = (item: ExtendedCartItem) => {
     return item.type === 'service' || 
            item.serviceDate !== undefined || 
@@ -47,8 +54,9 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
            ));
   };
 
-  // 1. Calculations
-  const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
+  // 1. Calculations based on selection
+  const selectedItems = items.filter(item => activeSelectedIds.includes(item.itemId));
+  const subtotal = selectedItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
   
   // Delivery Charge
   let deliveryCharge = 0;
@@ -74,8 +82,18 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({
       <div className="space-y-4 max-h-[380px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent mb-6" id="summary_items_list">
         {items.map((item) => {
           const isService = isServiceItem(item);
+          const isSelected = activeSelectedIds.includes(item.itemId);
           return (
-            <div key={item.itemId} className="flex gap-4 p-3.5 bg-slate-950/45 border border-slate-850 rounded-2xl hover:border-slate-800/80 transition-all">
+            <div key={item.itemId} className={`flex gap-4 p-3.5 bg-slate-950/45 border rounded-2xl transition-all ${isSelected ? 'border-violet-500/50' : 'border-slate-850'}`}>
+              
+              {/* Checkbox */}
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => handleToggle(item.itemId)}
+                className="mt-1 accent-violet-500 h-4 w-4 rounded border-slate-700 cursor-pointer"
+              />
+
               {/* Product/Service Image */}
               <div className="w-14 h-14 bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shrink-0 flex items-center justify-center relative">
                 {item.imageUrl ? (

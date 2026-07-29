@@ -43,8 +43,15 @@ export const CheckoutPage: React.FC = () => {
   // Connect the Form and Summary together using shared state
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryType>('standard');
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethodType>('pi');
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 
-  // Success Overlay State
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItemIds(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderSummaryData, setOrderSummaryData] = useState<{
     customer: CustomerInfo;
@@ -120,6 +127,7 @@ export const CheckoutPage: React.FC = () => {
 
       setItems(allItems);
       setCartCount(allItems.length);
+      setSelectedItemIds(allItems.map(i => i.itemId));
     } catch (err) {
       console.error('Failed to load checkout details:', err);
     } finally {
@@ -138,16 +146,17 @@ export const CheckoutPage: React.FC = () => {
     try {
       const db = getFirebaseDb();
       const orderId = `ORD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const selectedItems = items.filter(item => selectedItemIds.length === 0 || selectedItemIds.includes(item.itemId));
       
       const newOrder: Order = {
         orderId,
         orderNumber: orderNo,
         userUid: user!.uid,
-        businessId: (items[0] as any)?.businessId || 'PI-CORP-001',
-        storeId: (items[0] as any)?.storeId || 'PI-STORE-001',
+        businessId: (selectedItems[0] as any)?.businessId || 'PI-CORP-001',
+        storeId: (selectedItems[0] as any)?.storeId || 'PI-STORE-001',
         currency: 'Pi',
-        subtotal: items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0),
-        discount: items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0) > 100 ? 5.00 : 0,
+        subtotal: selectedItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0),
+        discount: selectedItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0) > 100 ? 5.00 : 0,
         tax: 0,
         shipping: delivery === 'express' ? 2.50 : 0,
         grandTotal: totalAmount,
@@ -257,16 +266,17 @@ export const CheckoutPage: React.FC = () => {
     try {
       const db = getFirebaseDb();
       const orderId = `ORD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const selectedItems = items.filter(item => selectedItemIds.length === 0 || selectedItemIds.includes(item.itemId));
       
       const newOrder: Order = {
         orderId,
         orderNumber: orderNo,
         userUid: user!.uid,
-        businessId: (items[0] as any)?.businessId || 'PI-CORP-001',
-        storeId: (items[0] as any)?.storeId || 'PI-STORE-001',
+        businessId: (selectedItems[0] as any)?.businessId || 'PI-CORP-001',
+        storeId: (selectedItems[0] as any)?.storeId || 'PI-STORE-001',
         currency: 'Pi',
-        subtotal: items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0),
-        discount: items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0) > 100 ? 5.00 : 0,
+        subtotal: selectedItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0),
+        discount: selectedItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0) > 100 ? 5.00 : 0,
         tax: 0,
         shipping: delivery === 'express' ? 2.50 : 0,
         grandTotal: totalAmount,
@@ -364,8 +374,9 @@ export const CheckoutPage: React.FC = () => {
   ) => {
     setIsSubmitting(true);
     
-    // Calculate overall amount
-    const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
+    // Calculate overall amount based on selected items
+    const selectedItems = items.filter(item => selectedItemIds.length === 0 || selectedItemIds.includes(item.itemId));
+    const subtotal = selectedItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
     const deliveryFee = delivery === 'express' ? 2.50 : 0;
     const discount = subtotal > 100 ? 5.00 : 0;
     const totalAmount = subtotal + deliveryFee - discount;
@@ -415,7 +426,7 @@ export const CheckoutPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 relative overflow-hidden pb-16">
+    <div className="min-h-screen bg-slate-950 text-slate-200 relative overflow-hidden pb-28 sm:pb-28 lg:pb-28">
       {/* Visual background lights */}
       <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-indigo-600/5 via-transparent to-transparent pointer-events-none" />
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
@@ -482,6 +493,8 @@ export const CheckoutPage: React.FC = () => {
                 <OrderSummary 
                   items={items}
                   deliveryType={selectedDelivery}
+                  selectedItemIds={selectedItemIds}
+                  onToggleItem={toggleItemSelection}
                 />
               </div>
             </div>
@@ -622,7 +635,7 @@ export const CheckoutPage: React.FC = () => {
                     <div className="p-4 bg-slate-950/50 border border-slate-850 rounded-2xl text-xs space-y-2.5">
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-1.5 border-b border-slate-850/50">Summary</h3>
                       <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-                        {items.map((item, i) => (
+                        {items.filter(item => selectedItemIds.length === 0 || selectedItemIds.includes(item.itemId)).map((item, i) => (
                           <div key={i} className="flex justify-between items-center text-xs">
                             <span className="text-slate-400 truncate max-w-[280px] font-medium">
                               {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
@@ -646,7 +659,7 @@ export const CheckoutPage: React.FC = () => {
                       memo={`Checkout Payment for Order #${orderSummaryData.orderNo}`}
                       metadata={{
                         orderNo: orderSummaryData.orderNo,
-                        itemsCount: items.length,
+                        itemsCount: items.filter(item => selectedItemIds.length === 0 || selectedItemIds.includes(item.itemId)).length,
                         customerName: orderSummaryData.customer.fullName
                       }}
                       onSuccess={async (paymentId, txid) => {

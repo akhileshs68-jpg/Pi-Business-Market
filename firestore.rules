@@ -116,28 +116,128 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) || 
+        isAdmin()
+      );
     }
 
     match /banners/{bannerId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        isAdmin()
+      );
     }
+
     match /services/{serviceId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) || 
+        isAdmin()
+      );
     }
-    match /banners/{bannerId} {
-      allow read: if true;
-      allow write: if true;
-    }
-    match /services/{serviceId} {
-      allow read: if true;
-      allow write: if true;
-    }
+
     match /products/{productId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) || 
+        isAdmin()
+      );
+    }
+
+    match /carts/{cartId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /cartItems/{itemId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /wishlists/{wishlistId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() && (
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /shipments/{shipmentId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /packages/{packageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /trackingEvents/{eventId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /store_categories/{catId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /store_inventory_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+
+    match /variantGroups/{groupId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /variantOptions/{optionId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /productVariants/{variantId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /loyaltyTransactions/{txId} {
+      allow read: if isSignedIn() && (resource.data.userUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+    }
+
+    match /systemAnnouncements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // 4. Analytics & BI

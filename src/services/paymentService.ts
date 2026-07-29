@@ -1,8 +1,24 @@
 import { collection, doc, setDoc, getDoc, updateDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
 import { PaymentRecord, PaymentMethodId, PaymentStatusType } from '../types/payment';
 import { piPaymentService } from './piPaymentService';
 import { orderService } from './orderService';
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const auth = getFirebaseAuth();
+    if (auth && auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+  } catch (err) {
+    console.error('Error getting auth token:', err);
+  }
+  return headers;
+}
 
 export const paymentService = {
   
@@ -42,9 +58,10 @@ export const paymentService = {
 
   async updateTransactionStatus(paymentId: string, status: PaymentStatusType, txid?: string): Promise<void> {
     try {
+      const headers = await getAuthHeaders();
       await fetch('/api/payments/status', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ transactionId: paymentId, status, txid })
       });
     } catch(err) {
@@ -78,9 +95,10 @@ export const paymentService = {
     await piPaymentService.createPayment({ amount, memo, metadata }, {
       onReadyForServerApproval: async (piPaymentId: string) => {
         try {
+          const headers = await getAuthHeaders();
           const res = await fetch('/api/payments/approve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ paymentId: piPaymentId, metadata })
           });
           if (!res.ok) throw new Error('Server approval failed');
@@ -91,9 +109,10 @@ export const paymentService = {
       },
       onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
         try {
+          const headers = await getAuthHeaders();
           const res = await fetch('/api/payments/complete', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
           });
           if (!res.ok) throw new Error('Verification Failed');

@@ -31,17 +31,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Listen for Firebase Auth state changes
     const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
+      console.log('[AuthProvider] Auth state change:', firebaseUser?.uid);
       if (!isMounted) return;
       
       // If we are already processing a login (auto or manual), ignore state changes
       if (isProcessing.current) {
+        console.log('[AuthProvider] Ignoring state change, already processing');
         return;
       }
 
       try {
         if (firebaseUser) {
           isProcessing.current = true;
+          console.log('[AuthProvider] Fetching profile for:', firebaseUser.uid);
           const profile = await authService.getUserProfile(firebaseUser.uid);
+          console.log('[AuthProvider] Profile fetched:', profile);
           if (isMounted) {
             setUser(profile);
             setLoading(false);
@@ -49,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           isProcessing.current = false;
         } else {
+          console.log('[AuthProvider] No user');
           // If no user is logged in, we stay on the login screen
           // We do NOT attempt automatic Pi login here because Pi.authenticate requires a user gesture
           if (isInitialLoad.current) {
@@ -86,10 +91,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
+      console.log('[AuthProvider] Initiating Pi login');
       const loggedInUser = await authService.loginWithPi();
+      console.log('[AuthProvider] Pi login successful:', loggedInUser);
       setUser(loggedInUser);
       return loggedInUser;
     } catch (err: any) {
+      console.error('[AuthProvider] Pi login failed:', err);
       setError(err.message || 'Pi Authentication failed');
       throw err;
     } finally {

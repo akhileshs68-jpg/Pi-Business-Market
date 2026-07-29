@@ -26,7 +26,8 @@ export const getFirebaseApp = () => {
     };
 
     if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-      throw new Error('Firebase configuration is missing. Please use the Firebase setup tool in the AI Studio sidebar to provision your project or set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID environment variables.');
+      console.warn('Firebase configuration is missing. Authentication and database features will be disabled.');
+      return null as any;
     }
 
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();

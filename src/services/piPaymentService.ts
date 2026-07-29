@@ -29,8 +29,10 @@ export const piPaymentService = {
     isPaymentInProgress = true;
     
     try {
-      await authService.initPi();
-      
+      console.log('[PiPaymentService] Payment start. Authenticating for payments scope...');
+      await authService.authenticatePi(['payments']);
+      console.log('[PiPaymentService] Authenticated successfully with payments scope');
+
       if (typeof window !== 'undefined' && window.Pi) {
         console.log('[PiPaymentService] Launching Pi.createPayment...', paymentData);
         window.Pi.createPayment(

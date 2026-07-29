@@ -108,121 +108,88 @@ export const Checkout: React.FC = () => {
       const grandTotal = session.grandTotal || items.reduce((acc, item) => acc + (item.subtotal || 0), 0) * 1.05;
       const businessId = session.storeId || session.businessId || 'UNKNOWN';
 
+      if (selectedPaymentMethod !== 'pi') {
+        throw new Error('Only Pi payment is currently supported.');
+      }
+
       // 3. Create Transaction in Payment Engine
       const paymentId = await paymentService.createTransaction({
         buyerId: user.uid,
         businessId: businessId,
         orderId: session.sessionId,
         currency: 'Pi', // Or whatever currency is configured
-        paymentMethod: selectedPaymentMethod,
+        paymentMethod: 'pi',
         amount: grandTotal
       });
 
-      if (selectedPaymentMethod === 'pi') {
-        // 4. Launch Pi SDK Payment (U2A Payment Flow)
-        await paymentService.processPiPayment(
-          paymentId,
-          grandTotal,
-          `Order at Pi Business Market`,
-          {
-            productType: 'MarketplaceOrder',
-            orderId: session.sessionId,
-            storeId: businessId,
-            itemsCount: orderItems.length,
-            transactionId: paymentId
-          },
-          async (txid) => {
-            try {
-              // 1. Verify the payment on the server
-              await paymentService.updateTransactionStatus(paymentId, 'Completed', txid);
-              
-              // 2. Save the order in Firestore / 3. Update paymentStatus / 4. Update orderStatus
-              const orderId = await orderService.createFromSession({
-                ...session,
-                shippingAddress: address,
-                billingAddress: address,
-                paymentStatus: 'SUCCESS',
-                orderStatus: 'CONFIRMED',
-                paymentId: paymentId,
-                transactionId: txid,
-                amount: grandTotal,
-                timestamp: Date.now()
-              }, orderItems);
-              const order = await orderService.getOrder(orderId);
-              if (!order) throw new Error('Order creation failed');
-              
-              // 5. Clear the shopping cart
-              await checkoutService.updateSession(session.sessionId, { status: 'completed' });
-              if (session.cartIds) {
-                for (const cid of session.cartIds) {
-                  await cartService.clearCart(cid);
-                }
-              } else if (session.cartId) {
-                await cartService.clearCart(session.cartId);
+      // 4. Launch Pi SDK Payment (U2A Payment Flow)
+      await paymentService.processPiPayment(
+        paymentId,
+        grandTotal,
+        `Order at Pi Business Market`,
+        {
+          productType: 'MarketplaceOrder',
+          orderId: session.sessionId,
+          storeId: businessId,
+          itemsCount: orderItems.length,
+          transactionId: paymentId
+        },
+        async (txid) => {
+          try {
+            // 1. Verify the payment on the server
+            await paymentService.updateTransactionStatus(paymentId, 'Completed', txid);
+            
+            // 2. Save the order in Firestore / 3. Update paymentStatus / 4. Update orderStatus
+            const orderId = await orderService.createFromSession({
+              ...session,
+              shippingAddress: address,
+              billingAddress: address,
+              paymentStatus: 'SUCCESS',
+              orderStatus: 'CONFIRMED',
+              paymentId: paymentId,
+              transactionId: txid,
+              amount: grandTotal,
+              timestamp: Date.now()
+            }, orderItems);
+            const order = await orderService.getOrder(orderId);
+            if (!order) throw new Error('Order creation failed');
+            
+            // 5. Clear the shopping cart
+            await checkoutService.updateSession(session.sessionId, { status: 'completed' });
+            if (session.cartIds) {
+              for (const cid of session.cartIds) {
+                await cartService.clearCart(cid);
               }
-              
-              setCompletedOrder(order);
-              setPaymentTxId(txid);
-              setPaymentState('success');
-              
-              // 7. Show a success toast
-              const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
-              window.dispatchEvent(event);
-              
-              // 8. Automatically redirect to the Order Details page after 5 seconds
-              setTimeout(() => {
-                navigate(`/order-details/${orderId}`);
-              }, 5000);
-            } catch (err) {
-              setRecoveryError(err instanceof Error ? err.message : 'Payment processing failed after success.');
-              setPaymentState('recovery');
-              setIsProcessing(false);
+            } else if (session.cartId) {
+              await cartService.clearCart(session.cartId);
             }
-          },
-          (err) => {
-            // Error callback
-            console.error('[Checkout] Payment failed:', err);
-            setRecoveryError(typeof err === 'string' ? err : 'Payment failed');
+            
+            setCompletedOrder(order);
+            setPaymentTxId(txid);
+            setPaymentState('success');
+            
+            // 7. Show a success toast
+            const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
+            window.dispatchEvent(event);
+            
+            // 8. Automatically redirect to the Order Details page after 5 seconds
+            setTimeout(() => {
+              navigate(`/order-details/${orderId}`);
+            }, 5000);
+          } catch (err) {
+            setRecoveryError(err instanceof Error ? err.message : 'Payment processing failed after success.');
             setPaymentState('recovery');
             setIsProcessing(false);
           }
-        );
-      } else {
-        // Handle future or alternative payment methods (e.g., BMT, UPI, Cash)
-        await paymentService.updateTransactionStatus(paymentId, 'Completed', 'simulated_tx');
-        const orderId = await orderService.createFromSession({
-          ...session,
-          shippingAddress: address,
-          billingAddress: address,
-          paymentStatus: 'SUCCESS',
-          orderStatus: 'CONFIRMED',
-          paymentId: paymentId,
-          transactionId: 'simulated_tx',
-          amount: grandTotal,
-          timestamp: Date.now()
-        }, orderItems);
-        const order = await orderService.getOrder(orderId);
-        if (!order) throw new Error('Order creation failed');
-        await checkoutService.updateSession(session.sessionId, { status: 'completed' });
-        if (session.cartIds) {
-          for (const cid of session.cartIds) {
-            await cartService.clearCart(cid);
-          }
-        } else if (session.cartId) {
-          await cartService.clearCart(session.cartId);
+        },
+        (err) => {
+          // Error callback
+          console.error('[Checkout] Payment failed:', err);
+          setRecoveryError(typeof err === 'string' ? err : 'Payment failed');
+          setPaymentState('recovery');
+          setIsProcessing(false);
         }
-        
-        setCompletedOrder(order);
-        setPaymentTxId('simulated_tx');
-        setPaymentState('success');
-        
-        const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
-        window.dispatchEvent(event);
-        
-        setTimeout(() => {
-          navigate(`/order-details/${orderId}`);
-        }, 5000);
-      }
+      );
     } catch (err) {
       console.error('Order placement failed', err);
       setRecoveryError(err instanceof Error ? err.message : 'Failed to initiate order checkout.');

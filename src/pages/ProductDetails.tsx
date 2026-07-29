@@ -655,7 +655,7 @@ export const ProductDetails: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-24 sm:pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-28 sm:pb-28 lg:pb-28">
         {/* Premium Details-Page Top Sticky Bar */}
         <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-900/80 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 py-3.5 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Back button */}

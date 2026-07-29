@@ -79,7 +79,7 @@ export const CustomerOrders: React.FC = () => {
         onToggleCart={() => {}}
       />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-28 sm:pb-28 lg:pb-28">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <h1 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">My Orders</h1>

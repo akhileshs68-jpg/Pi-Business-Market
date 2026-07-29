@@ -477,7 +477,7 @@ export default function Navbar({
       className="fixed bottom-0 left-0 right-0 z-50 bg-[#080d19]/90 backdrop-blur-xl border-t border-slate-900 px-2 shadow-[0_-8px_32px_0_rgba(0,0,0,0.5)]"
       style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom))' }}
     >
-      <div className="flex items-center justify-around h-16 max-w-md mx-auto relative">
+      <div className="flex items-center justify-around h-16 max-w-md sm:max-w-lg md:max-w-xl mx-auto relative">
         {getBottomNavItems().map((item) => {
           const Icon = getIconComponent(item.iconName);
           const activeTabId = getActiveTab();

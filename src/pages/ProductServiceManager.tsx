@@ -87,7 +87,7 @@ export const ProductServiceManager: React.FC = () => {
       <div className="flex-1 flex w-full max-w-7xl mx-auto">
         <Sidebar activeRole={activeRole} />
         
-        <div className="flex-1 p-4 sm:p-8 pb-24 md:pb-12">
+        <div className="flex-1 p-4 sm:p-8 pb-28 md:pb-28 lg:pb-28">
           {isFormOpen ? (
             <div>
               <div className="mb-6">

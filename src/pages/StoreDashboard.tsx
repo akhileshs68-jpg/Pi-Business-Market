@@ -35,14 +35,20 @@ export const StoreDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
-    if (!user) return;
+    console.log('[StoreDashboard] fetchData called, user:', user?.uid);
+    if (!user) {
+      console.log('[StoreDashboard] No user, returning');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
+      console.log('[StoreDashboard] Fetching data for:', user.uid);
       const [storeData, businessData] = await Promise.all([
         storeService.getOwnedStores(user.uid),
         businessService.getMyBusinesses(user.uid)
       ]);
+      console.log('[StoreDashboard] Data fetched:', { storeData, businessData });
       setStores(storeData);
       setBusinesses(businessData);
     } catch (err: any) {

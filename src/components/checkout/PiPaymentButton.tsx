@@ -16,6 +16,23 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { piPaymentService, PiPaymentData } from '../../services/piPaymentService';
+import { getFirebaseAuth } from '../../firebase/config';
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const auth = getFirebaseAuth();
+    if (auth && auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+  } catch (err) {
+    console.error('Error getting auth token:', err);
+  }
+  return headers;
+}
 
 export type PiPaymentState = 'Idle' | 'Pending' | 'Approved' | 'Completed' | 'Cancelled' | 'Failed';
 
@@ -54,15 +71,59 @@ export const PiPaymentButton: React.FC<PiPaymentButtonProps> = ({
 
     try {
       await piPaymentService.createPayment(paymentData, {
-        onReadyForServerApproval: (paymentId) => {
+        onReadyForServerApproval: async (paymentId) => {
           console.log('[PiPaymentButton] Payment approved by blockchain/user, ID:', paymentId);
           setCurrentPaymentId(paymentId);
-          setPaymentState('Approved');
+          
+          try {
+            console.log(`[PiPaymentButton] Requesting server approval for payment ${paymentId}...`);
+            const headers = await getAuthHeaders();
+            const response = await fetch('/api/payments/approve', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ paymentId })
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(`Server approval failed: ${response.statusText} - ${JSON.stringify(errorData)}`);
+            }
+            
+            console.log(`[PiPaymentButton] Server approval successful for payment ${paymentId}`);
+            setPaymentState('Approved');
+          } catch (error: any) {
+            console.error('[PiPaymentButton] Detailed error during server approval:', error);
+            setPaymentState('Failed');
+            setErrorMessage(error.message || 'Payment approval failed on server.');
+            onError(error, paymentId);
+          }
         },
-        onReadyForServerCompletion: (paymentId, txid) => {
-          console.log('[PiPaymentButton] Payment completed, TxId:', txid);
-          setPaymentState('Completed');
-          onSuccess(paymentId, txid);
+        onReadyForServerCompletion: async (paymentId, txid) => {
+          console.log('[PiPaymentButton] Payment completed on blockchain, TxId:', txid);
+          
+          try {
+            console.log(`[PiPaymentButton] Requesting server completion for payment ${paymentId} with txid ${txid}...`);
+            const headers = await getAuthHeaders();
+            const response = await fetch('/api/payments/complete', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ paymentId, txid })
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(`Server completion failed: ${response.statusText} - ${JSON.stringify(errorData)}`);
+            }
+            
+            console.log(`[PiPaymentButton] Server completion successful for payment ${paymentId}`);
+            setPaymentState('Completed');
+            onSuccess(paymentId, txid);
+          } catch (error: any) {
+            console.error('[PiPaymentButton] Detailed error during server completion:', error);
+            setPaymentState('Failed');
+            setErrorMessage(error.message || 'Payment completion failed on server.');
+            onError(error, paymentId);
+          }
         },
         onCancel: (paymentId) => {
           console.log('[PiPaymentButton] Payment cancelled by user, ID:', paymentId);

@@ -119,7 +119,7 @@ export const JobMarketplace: React.FC = () => {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 pb-28 sm:pb-28 lg:pb-28">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
           {/* Sidebar Filters */}
           <div className="lg:col-span-1 space-y-8">

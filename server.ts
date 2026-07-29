@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import fs from "fs";
 import "dotenv/config";
 import express from "express";
@@ -32,6 +33,70 @@ if (process.env.VITE_FIREBASE_PROJECT_ID && !getApps().length) {
     projectId: process.env.VITE_FIREBASE_PROJECT_ID,
   });
 }
+
+/**
+ * Authentication Middleware for Payment API Protection
+ * Verifies Firebase ID token, checks for user revocation/disabled status,
+ * attaches user context, and logs security failures.
+ */
+const authenticatePaymentRequest = async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const endpoint = req.path;
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error(`[Security Failure] ${endpoint}: Missing or malformed Authorization header.`);
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[Security Warning] ${endpoint}: Proceeding in sandbox/development mode without token.`);
+      (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
+      return next();
+    }
+    return res.status(401).json({
+      error: "Unauthorized: Missing or malformed authentication token",
+    });
+  }
+
+  const token = authHeader.split('Bearer ')[1]?.trim();
+  if (!token) {
+    console.error(`[Security Failure] ${endpoint}: Empty Bearer token.`);
+    return res.status(401).json({
+      error: "Unauthorized: Empty authentication token",
+    });
+  }
+
+  try {
+    if (!getApps().length) {
+      console.error(`[Security Failure] ${endpoint}: Firebase Admin SDK uninitialized.`);
+      return res.status(500).json({ error: "Server authentication service uninitialized" });
+    }
+
+    const decodedToken = await getAuth().verifyIdToken(token);
+    
+    // Reject disabled users
+    const userRecord = await getAuth().getUser(decodedToken.uid);
+    if (userRecord.disabled) {
+      console.error(`[Security Failure] ${endpoint}: Account for ${decodedToken.uid} is disabled.`);
+      return res.status(403).json({ error: "Forbidden: Account is disabled" });
+    }
+
+    (req as any).user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      userRecord,
+    };
+
+    next();
+  } catch (error: any) {
+    console.error(`[Security Failure] ${endpoint}: Token verification failed - ${error.message}`);
+    return res.status(401).json({
+      error: "Unauthorized: Invalid, malformed, or expired authentication token",
+      details: error.message,
+    });
+  }
+};
 
 async function startServer() {
   const app = express();
@@ -84,16 +149,26 @@ async function startServer() {
   // =========================================================================
 
   // 1. Approve Payment Endpoint
-  app.post("/api/payments/approve", async (req, res) => {
+  app.post("/api/payments/approve", authenticatePaymentRequest, async (req, res) => {
     try {
       const { paymentId, metadata } = req.body;
       if (!paymentId) {
         return res.status(400).json({ error: "paymentId is required" });
       }
 
+      const isProduction = process.env.NODE_ENV === "production";
       const apiKey = process.env.PI_NETWORK_API_KEY;
-      if (!apiKey) {
-        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval.");
+      const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
+
+      if (isProduction && isMissingApiKey) {
+        console.error("[Security Alert] Payment approval rejected: PI_NETWORK_API_KEY is missing in production.");
+        return res.status(500).json({
+          error: "PI_NETWORK_API_KEY is not configured in production environment.",
+        });
+      }
+
+      if (isMissingApiKey) {
+        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval in development.");
         
         // Update firestore transaction to Processing in Sandbox Mode
         if (metadata?.transactionId && getApps().length > 0) {
@@ -113,8 +188,8 @@ async function startServer() {
           paymentId,
         });
       }
-
-      console.log(`[Pi Payment Approve] Requesting Pi server approval for payment ${paymentId}...`);
+      
+      console.log("[Pi Payment Approve] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/approve`,
         {},
@@ -145,20 +220,31 @@ async function startServer() {
     }
   });
 
-  app.post("/api/payments/complete", async (req, res) => {
+  app.post("/api/payments/complete", authenticatePaymentRequest, async (req, res) => {
     try {
       const { paymentId, txid, metadata } = req.body;
       if (!paymentId || !txid) {
         return res.status(400).json({ error: "paymentId and txid are required" });
       }
 
+      const isProduction = process.env.NODE_ENV === "production";
       const apiKey = process.env.PI_NETWORK_API_KEY;
+      const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
+
+      if (isProduction && isMissingApiKey) {
+        console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing in production.");
+        return res.status(500).json({
+          error: "PI_NETWORK_API_KEY is not configured in production environment.",
+        });
+      }
+
       let paymentData = null;
 
       // 1. Verify payment with Pi Network BEFORE updating Firestore
-      if (!apiKey) {
-        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion.");
+      if (isMissingApiKey) {
+        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion in development.");
       } else {
+        console.log("[Pi Payment Complete] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
         console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
         const response = await axios.post(
           `https://api.minepi.com/v2/payments/${paymentId}/complete`,
@@ -174,7 +260,7 @@ async function startServer() {
         const paymentRef = getFirestore().collection('payments').doc(metadata.transactionId);
         
         try {
-          const result = await getFirestore().runTransaction(async (t) => {
+          await getFirestore().runTransaction(async (t) => {
             const doc = await t.get(paymentRef);
             if (!doc.exists) {
               throw new Error("Transaction not found");
@@ -229,7 +315,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/payments/status", async (req, res) => {
+  app.post("/api/payments/status", authenticatePaymentRequest, async (req, res) => {
     try {
       const { transactionId, status } = req.body;
       if (!transactionId || !status) {
@@ -263,7 +349,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/payments/incomplete", async (req, res) => {
+  app.post("/api/payments/incomplete", authenticatePaymentRequest, async (req, res) => {
     try {
       const { payment } = req.body;
       if (!payment || !payment.identifier) {
@@ -272,23 +358,35 @@ async function startServer() {
           .json({ error: "Invalid incomplete payment payload" });
       }
 
+      const isProduction = process.env.NODE_ENV === "production";
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+      const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
+
+      if (isProduction && isMissingApiKey) {
+        console.error("[Security Alert] Incomplete payment processing rejected: PI_NETWORK_API_KEY is missing in production.");
+        return res.status(500).json({
+          error: "PI_NETWORK_API_KEY is not configured in production environment.",
+        });
+      }
+
       const paymentId = payment.identifier;
       const txid = payment.transaction?.txid;
-      const apiKey = process.env.PI_NETWORK_API_KEY;
 
       console.log(
         `[Pi Incomplete Payment] Handling incomplete payment ${paymentId}...`,
       );
 
-      if (!apiKey) {
+      if (isMissingApiKey) {
         console.warn(
-          "[Pi Incomplete Payment] PI_NETWORK_API_KEY not configured. Acknowledging for sandbox.",
+          "[Pi Incomplete Payment] PI_NETWORK_API_KEY not configured. Acknowledging for sandbox in development.",
         );
         return res.json({
           success: true,
           message: "Incomplete payment acknowledged in sandbox mode",
         });
       }
+      
+      console.log("[Pi Incomplete Payment] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
 
       const isApproved = payment.status?.developer_approved;
       const isCompleted = payment.status?.developer_completed;
