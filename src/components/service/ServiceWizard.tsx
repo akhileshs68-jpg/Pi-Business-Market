@@ -47,6 +47,8 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (!isOpen) return null;
+
   // Form State
   const [service, setService] = useState<Partial<Service>>({
     businessId,
@@ -105,8 +107,6 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
       setLoading(false);
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">

@@ -15,6 +15,7 @@ import {
   ArrowLeft, 
   CheckCircle2, 
   AlertCircle,
+  AlertTriangle,
   Loader2,
   X,
   Plus,

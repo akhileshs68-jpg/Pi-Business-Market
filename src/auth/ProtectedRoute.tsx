@@ -117,44 +117,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     profile.profileCompleted === true
   );
 
-  // If onboarding is not completed, redirect to /onboarding
-  if (!onboardingCompleted && location.pathname !== '/onboarding') {
-    console.log('[Auth Routing Diagnostics]', {
-      currentUrl: window.location.href,
-      authState: 'Authenticated',
-      profileExists,
-      onboardingCompleted: profile?.onboardingCompleted,
-      profileCompleted: profile?.profileCompleted,
-      businessExists: hasBusiness,
-      currentRoute: location.pathname,
-      isLegacyUser,
-      routeDecision: 'Redirect to /onboarding',
-      redirectSourceFile: 'src/auth/ProtectedRoute.tsx',
-      redirectSourceLine: 132
-    });
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  // If already onboarded, don't allow accessing /onboarding
-  if (onboardingCompleted && location.pathname === '/onboarding') {
-    console.log('[Auth Routing Diagnostics]', {
-      currentUrl: window.location.href,
-      authState: 'Authenticated',
-      profileExists,
-      onboardingCompleted: profile?.onboardingCompleted,
-      profileCompleted: profile?.profileCompleted,
-      businessExists: hasBusiness,
-      currentRoute: location.pathname,
-      isLegacyUser,
-      routeDecision: 'Already onboarded. Redirect to /dashboard',
-      redirectSourceFile: 'src/auth/ProtectedRoute.tsx',
-      redirectSourceLine: 153
-    });
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // Enforce Business and Store presence if onboarding is completed
-  if (onboardingCompleted && needsBizCheck) {
+  // Enforce Business and Store presence
+  if (needsBizCheck) {
     if (bizLoading) {
       return (
         <div className="flex items-center justify-center min-h-screen bg-slate-950">
