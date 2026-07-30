@@ -6,7 +6,6 @@ import { LoginPage } from './pages/LoginPage';
 import { MyWorkspace } from './pages/MyWorkspace';
 import { BusinessDashboard } from './pages/BusinessDashboard';
 import { StoreDashboard } from './pages/StoreDashboard';
-import { OrdersPage } from './pages/OrdersPage';
 import { BookingsPage } from './pages/BookingsPage';
 import { ProductServiceManager } from './pages/ProductServiceManager';
 import { CatalogManagement } from './pages/CatalogManagement';
@@ -101,14 +100,7 @@ function App() {
           {/* Universal Product & Service Manager */}
           
           {/* Universal Orders & Bookings */}
-          <Route 
-            path="/orders" 
-            element={
-              <ProtectedRoute>
-                <OrdersPage />
-              </ProtectedRoute>
-            } 
-          />
+
           <Route 
             path="/bookings" 
             element={

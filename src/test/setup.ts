@@ -36,8 +36,4 @@ vi.mock('firebase/firestore', () => ({
 
 // Mock Pi SDK
 vi.mock('../services/piSdk', () => ({
-  PiSdkSim: {
-    authenticate: vi.fn(),
-    createPayment: vi.fn(),
-  },
 }));

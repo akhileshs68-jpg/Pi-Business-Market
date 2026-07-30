@@ -81,7 +81,7 @@ export const PiPaymentButton: React.FC<PiPaymentButtonProps> = ({
             const response = await fetch('/api/payments/approve', {
               method: 'POST',
               headers,
-              body: JSON.stringify({ paymentId })
+              body: JSON.stringify({ paymentId, metadata })
             });
             
             if (!response.ok) {
@@ -107,7 +107,7 @@ export const PiPaymentButton: React.FC<PiPaymentButtonProps> = ({
             const response = await fetch('/api/payments/complete', {
               method: 'POST',
               headers,
-              body: JSON.stringify({ paymentId, txid })
+              body: JSON.stringify({ paymentId, txid, metadata })
             });
             
             if (!response.ok) {

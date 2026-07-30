@@ -29,12 +29,13 @@ export const piPaymentService = {
     isPaymentInProgress = true;
     
     try {
-      console.log('[PiPaymentService] Payment start. Authenticating for payments scope...');
-      await authService.authenticatePi(['payments']);
-      console.log('[PiPaymentService] Authenticated successfully with payments scope');
+      const isPiBrowser = true;
+      if (typeof window !== 'undefined' && window.Pi && isPiBrowser) {
+        console.log('[PiPaymentService] Initializing Pi SDK and authenticating for payments scope...');
+        await authService.initPi();
+        await authService.authenticatePi(['payments']);
+        console.log('[PiPaymentService] Authenticated with payments scope. Calling Pi.createPayment...', paymentData);
 
-      if (typeof window !== 'undefined' && window.Pi) {
-        console.log('[PiPaymentService] Launching Pi.createPayment...', paymentData);
         window.Pi.createPayment(
           {
             amount: paymentData.amount,
@@ -48,7 +49,7 @@ export const piPaymentService = {
             },
             onReadyForServerCompletion: async (paymentId: string, txid: string) => {
               isPaymentInProgress = false;
-              console.log('[PiPaymentService] Payment signed on blockchain, txid:', txid);
+              console.log('[PiPaymentService] Payment completed on blockchain, txid:', txid);
               callbacks.onReadyForServerCompletion(paymentId, txid);
             },
             onCancel: (paymentId: string) => {
@@ -64,12 +65,14 @@ export const piPaymentService = {
           }
         );
       } else {
-        throw new Error("Pi SDK is not available. Please run inside the Pi Browser.");
+        console.error('[PiPaymentService] window.Pi not found. Cannot execute payment.');
+        isPaymentInProgress = false;
+        callbacks.onError(new Error("Pi SDK is not available. Please open in Pi Browser."), 'sdk_missing');
       }
     } catch (err: any) {
       isPaymentInProgress = false;
       console.error('[PiPaymentService] Initialization error:', err);
-      callbacks.onError(new Error("Unable to connect to Pi Network. Please try again."), 'init_failed');
+      callbacks.onError(err instanceof Error ? err : new Error("Unable to connect to Pi Network. Please try again."), 'init_failed');
     }
   }
 };

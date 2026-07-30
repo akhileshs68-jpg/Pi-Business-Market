@@ -29,9 +29,12 @@ const upload = multer({
 });
 
 if (process.env.VITE_FIREBASE_PROJECT_ID && !getApps().length) {
+  const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
   initializeApp({
     projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    databaseId: databaseId,
   });
+  console.log(`[Firebase Admin] Initialized with Project ID: ${process.env.VITE_FIREBASE_PROJECT_ID}, Database ID: ${databaseId || "(default)"}`);
 }
 
 /**
@@ -110,6 +113,18 @@ async function startServer() {
       const { accessToken } = req.body;
       if (!accessToken) {
         return res.status(400).json({ error: "Access token is required" });
+      }
+
+      if (accessToken === "mock_token_123" && process.env.VITE_DEVELOPMENT_MODE === 'true') {
+        return res.json({
+          success: true,
+          user: {
+            uid: "user_active_pioneer",
+            username: "pi_pioneer_88",
+          },
+        });
+      } else if (accessToken === "mock_token_123") {
+         return res.status(403).json({ error: "Mock token not allowed in production." });
       }
 
       // Validate with Pi Network API
@@ -240,10 +255,13 @@ async function startServer() {
 
       let paymentData = null;
 
-      // 1. Verify payment with Pi Network BEFORE updating Firestore
-      if (isMissingApiKey) {
-        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox completion in development.");
+      if (process.env.VITE_DEVELOPMENT_MODE === 'true') {
+        console.warn("[Pi Payment Complete] Development Mode active. Simulating sandbox completion.");
       } else {
+        if (isMissingApiKey) {
+          console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing.");
+          return res.status(500).json({ error: "PI_NETWORK_API_KEY is not configured." });
+        }
         console.log("[Pi Payment Complete] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
         console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
         const response = await axios.post(
@@ -606,8 +624,9 @@ async function startServer() {
 
       const firebaseApp =
         getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-      const db = process.env.VITE_FIREBASE_DATABASE_ID 
-        ? getFirestore(firebaseApp, process.env.VITE_FIREBASE_DATABASE_ID)
+      const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+      const db = databaseId 
+        ? getFirestore(firebaseApp, databaseId)
         : getFirestore(firebaseApp);
 
       const storesRef = collection(db, "stores");
@@ -632,7 +651,7 @@ async function startServer() {
       firebase: {
         apiKey: process.env.VITE_FIREBASE_API_KEY,
         projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-        databaseId: process.env.VITE_FIREBASE_DATABASE_ID,
+        databaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID,
       },
     });
   });

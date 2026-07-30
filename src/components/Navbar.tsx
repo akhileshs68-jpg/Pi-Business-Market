@@ -40,8 +40,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserType, Notification } from '../types';
-import { PiSdkSim } from '../services/piSdk';
-import { PiBusinessMarketDB } from '../services/storage';
 import { CartDrawer } from './cart/CartDrawer';
 import { ROLES_CONFIG } from '../auth/authService';
 import { useNavigation } from '../hooks/useNavigation';

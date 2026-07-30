@@ -84,23 +84,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (): Promise<User> => {
-    if (isProcessing.current && user) return user;
-    if (isProcessing.current) throw new Error('Authentication already in progress');
+    console.log('[AuthProvider] login() called. current state:', { isProcessing: isProcessing.current, user: user?.uid });
+    if (isProcessing.current && user) {
+      console.log('[AuthProvider] login() already processing and user exists, returning current user');
+      return user;
+    }
+    if (isProcessing.current) {
+      console.log('[AuthProvider] login() already processing, throwing error');
+      throw new Error('Authentication already in progress');
+    }
     
     isProcessing.current = true;
     setLoading(true);
     setError(null);
     try {
-      console.log('[AuthProvider] Initiating Pi login');
+      console.log('[AuthProvider] Calling authService.loginWithPi()...');
       const loggedInUser = await authService.loginWithPi();
-      console.log('[AuthProvider] Pi login successful:', loggedInUser);
+      console.log('[AuthProvider] authService.loginWithPi() resolved:', loggedInUser?.uid);
       setUser(loggedInUser);
       return loggedInUser;
     } catch (err: any) {
-      console.error('[AuthProvider] Pi login failed:', err);
+      console.error('[AuthProvider] authService.loginWithPi() rejected:', err);
       setError(err.message || 'Pi Authentication failed');
       throw err;
     } finally {
+      console.log('[AuthProvider] login() finally block. Clearing loading states.');
       setLoading(false);
       isProcessing.current = false;
       isInitialLoad.current = false;

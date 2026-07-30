@@ -11,7 +11,7 @@ const app = initializeApp({
   messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.VITE_FIREBASE_APP_ID,
 });
-const db = initializeFirestore(app, {}, process.env.VITE_FIREBASE_DATABASE_ID);
+const db = initializeFirestore(app, { experimentalForceLongPolling: true }, process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID);
 
 async function check() {
   const b = await getDocs(collection(db, 'businesses'));
