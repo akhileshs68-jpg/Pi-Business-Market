@@ -552,10 +552,28 @@ export const authService = {
     try {
       const db = getFirebaseDb();
       const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, {
-        ...updates,
-        updatedAt: serverTimestamp()
+      const userSnap = await getDoc(userRef);
+      
+      const sanitizedUpdates: any = {};
+      Object.entries(updates).forEach(([k, v]) => {
+        if (v !== undefined) {
+          sanitizedUpdates[k] = v;
+        }
       });
+      
+      if (userSnap.exists()) {
+        await updateDoc(userRef, {
+          ...sanitizedUpdates,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await setDoc(userRef, {
+          ...sanitizedUpdates,
+          uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error('[AuthService] Update user profile failed:', error);
       throw error;

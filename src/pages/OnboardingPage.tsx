@@ -185,7 +185,7 @@ export const OnboardingPage: React.FC = () => {
         }
       );
 
-      // 2. Update user profile to active and mark profileCompleted
+      // 2. Update user profile to active and mark profileCompleted and onboardingCompleted
       await updateUser({
         fullName,
         displayName,
@@ -193,11 +193,12 @@ export const OnboardingPage: React.FC = () => {
         activeRole: 'seller', // default to active seller since they set up a business
         roles: [...(user.roles || []), 'seller', 'buyer'],
         profileCompleted: true,
+        onboardingCompleted: true,
         status: 'active'
       });
 
-      // 3. Navigate to create store
-      navigate('/create-store', { replace: true });
+      // 3. Navigate to dashboard
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       console.error('[Onboarding] Final Save failed:', err);
       setError(err.message || 'An error occurred while saving your profile. Please try again.');
