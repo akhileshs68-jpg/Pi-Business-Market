@@ -142,7 +142,7 @@ export const ProfilePage: React.FC = () => {
 
   // Core Models States
   const [orders, setOrders] = useState<Order[]>([]);
-  const [walletBalance, setWalletBalance] = useState<number>(100);
+  const [walletBalance, setWalletBalance] = useState<number>(300);
   const [wishlistItems, setWishlistItems] = useState<any[]>([]);
   const [faucetLoading, setFaucetLoading] = useState(false);
 
@@ -175,8 +175,8 @@ export const ProfilePage: React.FC = () => {
       if (storedBalance) {
         setWalletBalance(parseFloat(storedBalance));
       } else {
-        localStorage.setItem('pi_wallet_balance', '100');
-        setWalletBalance(100);
+        localStorage.setItem('pi_wallet_balance', '300');
+        setWalletBalance(300);
       }
 
       // 3. Load Wishlist Items

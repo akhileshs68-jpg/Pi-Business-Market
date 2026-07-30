@@ -215,40 +215,67 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
                   <h3 className="text-lg font-semibold text-white">Store Details</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Store Name</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Store Name *</label>
                       <input 
                         type="text" 
+                        required
                         value={formData.storeName}
-                        onChange={e => setFormData({ ...formData, storeName: e.target.value })}
+                        onChange={e => {
+                          const name = e.target.value;
+                          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                          setFormData({ ...formData, storeName: name, website: slug });
+                        }}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500"
                         placeholder="e.g. Patna Electronics Store"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Description</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Store URL (Custom Slug) *</label>
+                      <div className="flex rounded-xl overflow-hidden border border-slate-800 focus-within:border-indigo-500 bg-slate-950">
+                        <span className="bg-slate-900 px-4 py-3 text-xs text-slate-500 font-mono font-bold flex items-center select-none border-r border-slate-800 whitespace-nowrap">
+                          pibusiness.market/store/
+                        </span>
+                        <input 
+                          type="text" 
+                          required
+                          value={formData.website}
+                          onChange={e => setFormData({ ...formData, website: e.target.value.toLowerCase().replace(/[^a-z0-9\-]+/g, '') })}
+                          className="flex-1 bg-transparent px-4 py-3 text-white outline-none font-mono text-sm"
+                          placeholder="store-slug"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Description *</label>
                       <textarea 
                         rows={3}
+                        required
                         value={formData.description}
                         onChange={e => setFormData({ ...formData, description: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 resize-none"
+                        placeholder="Describe your store offerings and specialities..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email *</label>
                       <input 
                         type="email" 
+                        required
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500"
+                        placeholder="store@email.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone *</label>
                       <input 
                         type="tel" 
+                        required
                         value={formData.phone}
                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500"
+                        placeholder="+1 555-0199"
                       />
                     </div>
                   </div>

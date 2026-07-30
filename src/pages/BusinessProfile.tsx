@@ -21,6 +21,24 @@ export const BusinessProfile: React.FC = () => {
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (profileData) {
+        const isStorePath = window.location.pathname.includes('/store/');
+        if (isStorePath) {
+          (window as any).__currentStoreProfile = profileData;
+          (window as any).__currentBusinessProfile = null;
+        } else {
+          (window as any).__currentBusinessProfile = profileData;
+          (window as any).__currentStoreProfile = null;
+        }
+      } else {
+        (window as any).__currentStoreProfile = null;
+        (window as any).__currentBusinessProfile = null;
+      }
+    }
+  }, [profileData]);
+
+  useEffect(() => {
     const fetchStoreItems = async () => {
       if (!profileData?.ownerUid) return;
       try {
@@ -60,8 +78,23 @@ export const BusinessProfile: React.FC = () => {
       try {
         setLoading(true);
         if (id) {
+          const isStorePath = window.location.pathname.includes('/store/');
+          const primaryCollection = isStorePath ? 'stores' : 'businesses';
+
+          console.log('[BusinessProfile Runtime Trace]', {
+            receivedRouteParams: { id },
+            firestoreCollectionQueried: primaryCollection,
+            firestoreDocumentIdQueried: id,
+          });
+
           // Public view (or owner viewing their own via ID)
           const data = await businessProfileService.getProfileById(id);
+
+          console.log('[BusinessProfile Runtime Trace Result]', {
+            queryResult: data ? 'Document Found' : 'Document Not Found',
+            documentData: data
+          });
+
           if (data) {
             setProfileData(data);
           } else {
@@ -149,7 +182,7 @@ export const BusinessProfile: React.FC = () => {
         
         {/* Cover & Avatar Header */}
         <div className="relative rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 mb-8">
-          <div className="h-48 md:h-64 bg-gradient-to-tr from-violet-900/40 to-indigo-900/40 w-full object-cover">
+          <div className="aspect-[16/9] md:aspect-[3/1] bg-gradient-to-tr from-violet-900/40 to-indigo-900/40 w-full relative overflow-hidden">
             {profileData?.coverImageUrl && (
               <img src={profileData.coverImageUrl} alt="Cover" className="w-full h-full object-cover opacity-50" />
             )}
@@ -165,12 +198,12 @@ export const BusinessProfile: React.FC = () => {
             )}
           </div>
           
-          <div className="px-8 pb-8 pt-0 relative z-10 flex flex-col md:flex-row md:items-end gap-6 -mt-16">
-            <div className="w-32 h-32 rounded-2xl bg-slate-800 border-4 border-slate-950 flex items-center justify-center shadow-xl overflow-hidden shrink-0">
+          <div className="px-8 pb-8 pt-0 relative z-10 flex flex-col md:flex-row md:items-end gap-6 -mt-20 md:-mt-24">
+            <div className="w-[180px] h-[180px] md:w-[200px] md:h-[200px] rounded-2xl bg-slate-800 border-4 border-slate-950 flex items-center justify-center shadow-xl overflow-hidden shrink-0 aspect-square">
               {profileData?.logoUrl ? (
                 <img src={profileData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
               ) : (
-                <Briefcase className="w-12 h-12 text-slate-600" />
+                <Briefcase className="w-16 h-16 text-slate-600" />
               )}
             </div>
             <div className="flex-1 pb-2">

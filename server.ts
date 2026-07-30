@@ -32,10 +32,14 @@ if (process.env.VITE_FIREBASE_PROJECT_ID && !getApps().length) {
   const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
   initializeApp({
     projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    databaseId: databaseId,
   });
   console.log(`[Firebase Admin] Initialized with Project ID: ${process.env.VITE_FIREBASE_PROJECT_ID}, Database ID: ${databaseId || "(default)"}`);
 }
+
+const getDb = () => {
+  const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+  return databaseId ? getFirestore(databaseId) : getFirestore();
+};
 
 /**
  * Authentication Middleware for Payment API Protection
@@ -165,170 +169,168 @@ async function startServer() {
 
   // 1. Approve Payment Endpoint
   app.post("/api/payments/approve", authenticatePaymentRequest, async (req, res) => {
+    const runtimeLogs: string[] = [];
     try {
       const { paymentId, metadata } = req.body;
       if (!paymentId) {
         return res.status(400).json({ error: "paymentId is required" });
       }
 
-      const isProduction = process.env.NODE_ENV === "production";
+      runtimeLogs.push(`[Runtime Log] Payment approval request received for paymentId: ${paymentId}`);
+      console.log(`[Pi Payment Approve] Payment approval request for ID: ${paymentId}`);
+
       const apiKey = process.env.PI_NETWORK_API_KEY;
       const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
 
-      if (isProduction && isMissingApiKey) {
-        console.error("[Security Alert] Payment approval rejected: PI_NETWORK_API_KEY is missing in production.");
-        return res.status(500).json({
-          error: "PI_NETWORK_API_KEY is not configured in production environment.",
-        });
-      }
-
       if (isMissingApiKey) {
-        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is not configured in env. Simulating sandbox approval in development.");
-        
-        // Update firestore transaction to Processing in Sandbox Mode
-        if (metadata?.transactionId && getApps().length > 0) {
-          try {
-            await getFirestore().collection('payments').doc(metadata.transactionId).update({
-              status: 'Processing',
-              updatedAt: FieldValue.serverTimestamp()
-            });
-          } catch(err) {
-            console.error("Failed to update firestore", err);
-          }
-        }
-
-        return res.json({
-          success: true,
-          message: "Payment approved in sandbox mode",
-          paymentId,
+        runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
+        console.error("[Security Alert] Payment approval rejected: PI_NETWORK_API_KEY is missing.");
+        return res.status(500).json({
+          error: "PI_NETWORK_API_KEY is not configured.",
+          logs: runtimeLogs
         });
       }
+
+      console.log("[Pi Payment Approve] PI_NETWORK_API_KEY found. Sending approval POST...");
+      runtimeLogs.push("[Runtime Log] Sending approval POST to Pi Network API...");
       
-      console.log("[Pi Payment Approve] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/approve`,
         {},
         { headers: { Authorization: `Key ${apiKey}` } }
       );
       
-      // Update firestore transaction to Processing
-      if (metadata?.transactionId && getApps().length > 0) {
-        try {
-          await getFirestore().collection('payments').doc(metadata.transactionId).update({
-            status: 'Processing',
-            piPaymentId: paymentId,
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        } catch(err) {
-          console.error("Failed to update firestore", err);
-        }
-      }
-
       console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
-      res.json({ success: true, payment: response.data });
+      runtimeLogs.push(`[Runtime Log] Pi Network server approved payment: ${paymentId}`);
+      runtimeLogs.push(`[Runtime Log] Pi response data: ${JSON.stringify(response.data || {})}`);
+
+      res.json({ success: true, payment: response.data, logs: runtimeLogs });
     } catch (error: any) {
-      console.error("[Pi Payment Approve] Error approving payment:", error.response?.data || error.message);
+      const errorMsg = error.response?.data || error.message;
+      console.error("[Pi Payment Approve] Error approving payment:", errorMsg);
+      runtimeLogs.push(`[Runtime Log] Error approving payment: ${JSON.stringify(errorMsg)}`);
       res.status(500).json({
         error: "Failed to approve payment with Pi Network server",
-        details: error.response?.data || error.message,
+        details: errorMsg,
+        logs: runtimeLogs
       });
     }
   });
 
   app.post("/api/payments/complete", authenticatePaymentRequest, async (req, res) => {
+    const runtimeLogs: string[] = [];
     try {
       const { paymentId, txid, metadata } = req.body;
       if (!paymentId || !txid) {
         return res.status(400).json({ error: "paymentId and txid are required" });
       }
 
-      const isProduction = process.env.NODE_ENV === "production";
+      runtimeLogs.push(`[Runtime Log] Payment completion request received for paymentId: ${paymentId}`);
+      runtimeLogs.push(`[Runtime Log] User approval blockchain txid: ${txid}`);
+      console.log(`[Pi Payment Complete] Completion request for ID: ${paymentId}, TxID: ${txid}`);
+
+      // 1. Prevent duplicate payment processing
+      if (getApps().length > 0) {
+        const db = getDb();
+        const paymentDocId = `PAY_${paymentId}`;
+        const existingDoc = await db.collection('payments').doc(paymentDocId).get();
+        if (existingDoc.exists) {
+          const docData = existingDoc.data();
+          if (docData?.paymentStatus === 'completed') {
+            const msg = `Duplicate check: Payment ${paymentId} has already been completed.`;
+            console.warn(`[Pi Payment Complete] ${msg}`);
+            runtimeLogs.push(`[Runtime Log] ${msg}`);
+            runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
+            return res.json({
+              success: true,
+              message: "Payment already processed",
+              paymentId,
+              txid,
+              payment: docData,
+              logs: runtimeLogs
+            });
+          }
+        }
+      }
+
       const apiKey = process.env.PI_NETWORK_API_KEY;
       const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
 
-      if (isProduction && isMissingApiKey) {
-        console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing in production.");
+      if (isMissingApiKey) {
+        runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
+        console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing.");
         return res.status(500).json({
-          error: "PI_NETWORK_API_KEY is not configured in production environment.",
+          error: "PI_NETWORK_API_KEY is not configured.",
+          logs: runtimeLogs
         });
       }
 
-      let paymentData = null;
+      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+      runtimeLogs.push("[Runtime Log] POSTing to Pi Network API v2/payments/.../complete...");
+      
+      const response = await axios.post(
+        `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+        { txid },
+        { headers: { Authorization: `Key ${apiKey}` } }
+      );
+      const paymentData = response.data;
+      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId} with Pi Network Server`);
+      runtimeLogs.push(`[Runtime Log] Pi Network server response: verified & completed. ${JSON.stringify(paymentData || {})}`);
 
-      if (process.env.VITE_DEVELOPMENT_MODE === 'true') {
-        console.warn("[Pi Payment Complete] Development Mode active. Simulating sandbox completion.");
-      } else {
-        if (isMissingApiKey) {
-          console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing.");
-          return res.status(500).json({ error: "PI_NETWORK_API_KEY is not configured." });
-        }
-        console.log("[Pi Payment Complete] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
-        console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
-        const response = await axios.post(
-          `https://api.minepi.com/v2/payments/${paymentId}/complete`,
-          { txid },
-          { headers: { Authorization: `Key ${apiKey}` } }
-        );
-        paymentData = response.data;
-        console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId}`);
-      }
+      // 2. Save transaction in Firestore (only after successful verification)
+      if (getApps().length > 0) {
+        const db = getDb();
+        const paymentDocId = `PAY_${paymentId}`;
+        const paymentRef = db.collection('payments').doc(paymentDocId);
 
-      // 2. Verify idempotency and update using Firestore
-      if (metadata?.transactionId && getApps().length > 0) {
-        const paymentRef = getFirestore().collection('payments').doc(metadata.transactionId);
-        
-        try {
-          await getFirestore().runTransaction(async (t) => {
-            const doc = await t.get(paymentRef);
-            if (!doc.exists) {
-              throw new Error("Transaction not found");
-            }
-            if (doc.data()?.status === 'Completed') {
-              throw new Error("Payment already completed");
-            }
-            
-            // Mark as completed
-            t.update(paymentRef, {
-              status: 'Completed',
-              transactionId: txid,
-              piPaymentId: paymentId,
-              updatedAt: FieldValue.serverTimestamp()
-            });
+        const transactionData = {
+          paymentId,
+          txid,
+          uid: (req as any).user?.uid || metadata?.uid || "unknown_user",
+          businessId: metadata?.businessId || "PI-CORP-001",
+          storeId: metadata?.storeId || "PI-STORE-001",
+          amount: parseFloat(metadata?.amount || paymentData?.amount || 0),
+          memo: metadata?.memo || paymentData?.memo || `Payment for order #${metadata?.orderNo || "unknown"}`,
+          paymentStatus: "completed",
+          createdAt: FieldValue.serverTimestamp()
+        };
 
-            // Update order status if provided
-            if (metadata.orderId) {
-              const orderRef = getFirestore().collection('orders').doc(metadata.orderId);
-              t.update(orderRef, {
+        console.log(`[Pi Payment Complete] Writing secure payment transaction to Firestore: ${paymentDocId}`);
+        runtimeLogs.push(`[Runtime Log] Firestore transaction write started for doc: ${paymentDocId}`);
+        await paymentRef.set(transactionData);
+        runtimeLogs.push(`[Runtime Log] Firestore transaction write successfully saved`);
+
+        // Update corresponding order if metadata.orderNo is present
+        if (metadata?.orderNo) {
+          try {
+            const ordersRef = db.collection('orders');
+            const orderSnap = await ordersRef.where('orderNumber', '==', metadata.orderNo).get();
+            if (!orderSnap.empty) {
+              const orderDoc = orderSnap.docs[0];
+              await orderDoc.ref.update({
                 paymentStatus: 'Paid',
                 updatedAt: FieldValue.serverTimestamp()
               });
+              console.log(`[Pi Payment Complete] Updated order status to Paid in Firestore for order: ${metadata.orderNo}`);
+              runtimeLogs.push(`[Runtime Log] Updated order status to Paid in Firestore for order: ${metadata.orderNo}`);
             }
-            
-            return true;
-          });
-        } catch(err: any) {
-          if (err.message === "Payment already completed") {
-            return res.json({ success: true, message: "Payment already processed", paymentId, txid, payment: paymentData });
+          } catch (err: any) {
+            console.error("Failed to update order in Firestore:", err.message);
+            runtimeLogs.push(`[Runtime Log] Warning: Failed to update order status: ${err.message}`);
           }
-          console.error("Transaction update failed", err);
         }
       }
 
-      res.json({ success: true, payment: paymentData || { message: "Sandbox completion" } });
+      runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
+      res.json({ success: true, payment: paymentData, logs: runtimeLogs });
     } catch (error: any) {
-      console.error("[Pi Payment Complete] Error completing payment:", error.response?.data || error.message);
-      
-      // Rollback to failed
-      if (req.body.metadata?.transactionId && getApps().length > 0) {
-        await getFirestore().collection('payments').doc(req.body.metadata.transactionId).update({
-          status: 'Failed',
-          updatedAt: FieldValue.serverTimestamp()
-        }).catch(console.error);
-      }
-
+      const errorMsg = error.response?.data || error.message;
+      console.error("[Pi Payment Complete] Error completing payment:", errorMsg);
+      runtimeLogs.push(`[Runtime Log] Error completing payment: ${JSON.stringify(errorMsg)}`);
       res.status(500).json({
         error: "Failed to complete payment with Pi Network server",
-        details: error.response?.data || error.message,
+        details: errorMsg,
+        logs: runtimeLogs
       });
     }
   });
@@ -341,10 +343,10 @@ async function startServer() {
       }
 
       if (getApps().length > 0) {
-        const paymentRef = getFirestore().collection('payments').doc(transactionId);
+        const paymentRef = getDb().collection('payments').doc(transactionId);
         
         // Only allow changing from Pending/Processing to Cancelled/Failed
-        await getFirestore().runTransaction(async (t) => {
+        await getDb().runTransaction(async (t) => {
           const doc = await t.get(paymentRef);
           if (!doc.exists) throw new Error("Transaction not found");
           

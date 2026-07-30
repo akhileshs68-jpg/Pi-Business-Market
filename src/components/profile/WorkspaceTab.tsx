@@ -61,6 +61,58 @@ export const WorkspaceTab: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* CONTROL ACTIONS */}
+      <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-base font-bold text-white mb-1">Business Management Portal</h2>
+          <p className="text-slate-400 text-xs">Instantly configure, scale, and manage your commercial enterprise.</p>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <button 
+            onClick={() => navigate('/create-business')}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-violet-600/10 cursor-pointer"
+          >
+            <span>+ Create Business</span>
+          </button>
+          <button 
+            onClick={() => navigate('/create-store')}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-indigo-600/10 cursor-pointer"
+          >
+            <span>+ Create Store</span>
+          </button>
+          <button 
+            onClick={() => {
+              console.log('[Routing Diagnostic Trace]', {
+                buttonComponent: 'Add Product Button',
+                onClickHandler: '() => navigate("/store-dashboard")',
+                navigateDestination: '/store-dashboard',
+                routePath: '/store-dashboard',
+                renderedComponent: 'ProductServiceManager'
+              });
+              navigate('/store-dashboard');
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer"
+          >
+            <span>+ Add Product</span>
+          </button>
+          <button 
+            onClick={() => {
+              console.log('[Routing Diagnostic Trace]', {
+                buttonComponent: 'Add Service Button',
+                onClickHandler: '() => navigate("/services")',
+                navigateDestination: '/services',
+                routePath: '/services',
+                renderedComponent: 'ServiceManagement'
+              });
+              navigate('/services');
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer"
+          >
+            <span>+ Add Service</span>
+          </button>
+        </div>
+      </div>
+
       {/* SUMMARY */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
@@ -94,8 +146,16 @@ export const WorkspaceTab: React.FC = () => {
       <div className="space-y-4">
         <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-slate-800 pb-2">My Stores</h3>
         {stores.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
-            No stores found.
+          <div className="p-12 text-center text-slate-400 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed flex flex-col items-center justify-center gap-3">
+            <StoreIcon className="w-10 h-10 text-slate-600" />
+            <span className="font-bold text-sm text-white">Create Your First Store</span>
+            <p className="text-slate-500 text-xs max-w-xs">Setup a digital store inside your business to list and sell items.</p>
+            <button 
+              onClick={() => navigate('/create-store')}
+              className="mt-2 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 font-bold text-xs rounded-xl transition-colors border border-indigo-500/10 cursor-pointer"
+            >
+              + Create Store
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -128,7 +188,14 @@ export const WorkspaceTab: React.FC = () => {
                       <span>Products: <span className="font-bold text-white">{storeProducts.length}</span></span>
                     </div>
                     <div className="mt-auto flex gap-2">
-                      <button onClick={() => navigate(`/store/${store.storeId || anyStore.id}`)} className="flex-1 py-2 bg-violet-600/10 hover:bg-violet-600/20 text-violet-400 font-bold rounded-xl text-xs transition-colors">
+                      <button onClick={() => {
+                        const targetId = store.storeId || anyStore.id;
+                        console.log('[Dashboard Open Button Click Trace]', {
+                          dashboardOpenButtonId: targetId,
+                          storeName: store.storeName
+                        });
+                        navigate(`/store/${targetId}`);
+                      }} className="flex-1 py-2 bg-violet-600/10 hover:bg-violet-600/20 text-violet-400 font-bold rounded-xl text-xs transition-colors">
                         Open
                       </button>
                       <button onClick={() => navigate(`/store-dashboard`)} className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-colors">
@@ -147,8 +214,16 @@ export const WorkspaceTab: React.FC = () => {
       <div className="space-y-4">
         <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-slate-800 pb-2">My Products</h3>
         {products.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
-            No products found.
+          <div className="p-12 text-center text-slate-400 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed flex flex-col items-center justify-center gap-3">
+            <Package className="w-10 h-10 text-slate-600" />
+            <span className="font-bold text-sm text-white">Add Your First Product</span>
+            <p className="text-slate-500 text-xs max-w-xs">Start listing your inventory catalog to showcase to buyers.</p>
+            <button 
+              onClick={() => navigate('/store-dashboard')}
+              className="mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors border border-slate-700 cursor-pointer"
+            >
+              + Add Product
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

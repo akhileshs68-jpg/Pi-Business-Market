@@ -6,10 +6,32 @@ import { isFirebaseConfigured } from '../firebase/config';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isInitialLoad = React.useRef(true);
   const isProcessing = React.useRef(false);
+
+  const migrateProfileIfNeeded = async (profileObj: User): Promise<User> => {
+    const updates: Partial<User> = {};
+    if (profileObj.onboardingCompleted === undefined) {
+      updates.onboardingCompleted = true;
+    }
+    if (profileObj.profileCompleted === undefined) {
+      updates.profileCompleted = true;
+    }
+    if (Object.keys(updates).length > 0) {
+      console.log('[AuthProvider] Migrating existing legacy profile. Missing fields updates:', updates);
+      try {
+        await authService.updateUserProfile(profileObj.uid, updates);
+        return { ...profileObj, ...updates };
+      } catch (err) {
+        console.error('[AuthProvider] Migration database write failed:', err);
+        return { ...profileObj, ...updates };
+      }
+    }
+    return profileObj;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -44,10 +66,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (firebaseUser) {
           isProcessing.current = true;
           console.log('[AuthProvider] Fetching profile for:', firebaseUser.uid);
-          const profile = await authService.getUserProfile(firebaseUser.uid);
-          console.log('[AuthProvider] Profile fetched:', profile);
+          let fetchedProfile = await authService.getUserProfile(firebaseUser.uid);
+          console.log('[AuthProvider] Profile fetched:', fetchedProfile);
+          if (fetchedProfile) {
+            fetchedProfile = await migrateProfileIfNeeded(fetchedProfile);
+          }
           if (isMounted) {
-            setUser(profile);
+            setProfile(fetchedProfile);
+            if (fetchedProfile) {
+              setUser(fetchedProfile);
+            } else {
+              // Create skeleton/temp user object indicating authenticated but no profile doc
+              const username = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 5);
+              setUser({
+                uid: firebaseUser.uid,
+                piUid: 'google_' + firebaseUser.uid,
+                username,
+                displayName: firebaseUser.displayName || 'Pioneer',
+                roles: ['buyer'],
+                activeRole: 'buyer',
+                role: 'Buyer',
+                accountType: 'individual',
+                verified: false,
+                kycVerified: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
+                status: 'active',
+                profileCompleted: false,
+                onboardingCompleted: false
+              } as any);
+            }
             setLoading(false);
             isInitialLoad.current = false;
           }
@@ -58,11 +107,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // We do NOT attempt automatic Pi login here because Pi.authenticate requires a user gesture
           if (isInitialLoad.current) {
             if (isMounted) {
+              setUser(null);
+              setProfile(null);
               setLoading(false);
               isInitialLoad.current = false;
             }
           } else {
             setUser(null);
+            setProfile(null);
             setLoading(false);
           }
         }
@@ -99,9 +151,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       console.log('[AuthProvider] Calling authService.loginWithPi()...');
-      const loggedInUser = await authService.loginWithPi();
+      let loggedInUser = await authService.loginWithPi();
       console.log('[AuthProvider] authService.loginWithPi() resolved:', loggedInUser?.uid);
+      if (loggedInUser) {
+        loggedInUser = await migrateProfileIfNeeded(loggedInUser);
+      }
       setUser(loggedInUser);
+      setProfile(loggedInUser);
       return loggedInUser;
     } catch (err: any) {
       console.error('[AuthProvider] authService.loginWithPi() rejected:', err);
@@ -121,8 +177,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      const loggedInUser = await authService.loginWithGoogle();
+      let loggedInUser = await authService.loginWithGoogle();
+      if (loggedInUser) {
+        loggedInUser = await migrateProfileIfNeeded(loggedInUser);
+      }
       setUser(loggedInUser);
+      setProfile(loggedInUser);
       return loggedInUser;
     } catch (err: any) {
       setError(err.message || 'Google Authentication failed');
@@ -139,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authService.logout();
       setUser(null);
+      setProfile(null);
     } catch (err: any) {
       setError(err.message || 'Logout failed');
     } finally {
@@ -151,6 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await authService.updateUserProfile(user.uid, updates);
       setUser(prev => prev ? { ...prev, ...updates } : null);
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
     } catch (err: any) {
       setError(err.message || 'Update failed');
       throw err;
@@ -158,7 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile: user, loading, error, login, loginWithGoogle, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, profile, loading, error, login, loginWithGoogle, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

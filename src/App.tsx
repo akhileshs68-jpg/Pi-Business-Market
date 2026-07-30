@@ -11,6 +11,7 @@ import { ProductServiceManager } from './pages/ProductServiceManager';
 import { CatalogManagement } from './pages/CatalogManagement';
 import { WarehouseDashboard } from './pages/WarehouseDashboard';
 import { InventoryDashboard } from './pages/InventoryDashboard';
+import { ServiceManagement } from './pages/ServiceManagement';
 
 import { JobMarketplace } from './pages/JobMarketplace';
 import { EmployerDashboard } from './pages/EmployerDashboard';
@@ -36,6 +37,9 @@ import { BusinessProfile } from './pages/BusinessProfile';
 import DocumentationPortal from './pages/DocumentationPortal';
 import { ProfilePage } from './pages/ProfilePage';
 import { CartPage } from './pages/CartPage';
+import { OnboardingPage } from './pages/OnboardingPage';
+import { CreateBusinessPage } from './pages/CreateBusinessPage';
+import { CreateStorePage } from './pages/CreateStorePage';
 
 /**
  * Pi Business Market - Enterprise Entry Point
@@ -54,6 +58,30 @@ function App() {
           <Route path="/docs" element={<DocumentationPortal />} />
 
           {/* PROTECTED ROUTES */}
+          <Route 
+            path="/onboarding" 
+            element={
+              <ProtectedRoute>
+                <OnboardingPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/create-business" 
+            element={
+              <ProtectedRoute>
+                <CreateBusinessPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/create-store" 
+            element={
+              <ProtectedRoute>
+                <CreateStorePage />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/profile" 
             element={
@@ -100,7 +128,6 @@ function App() {
           {/* Universal Product & Service Manager */}
           
           {/* Universal Orders & Bookings */}
-
           <Route 
             path="/bookings" 
             element={
@@ -115,7 +142,7 @@ function App() {
             path="/services" 
             element={
               <ProtectedRoute>
-                <ProductServiceManager />
+                <ServiceManagement />
               </ProtectedRoute>
             } 
           />
@@ -140,7 +167,7 @@ function App() {
             path="/services" 
             element={
               <ProtectedRoute allowedRoles={['Service Provider']}>
-                <ProductServiceManager />
+                <ServiceManagement />
               </ProtectedRoute>
             } 
           />
@@ -330,8 +357,8 @@ function App() {
           />
 
           {/* REDIRECTS */}
-          <Route path="/" element={<Navigate to="/discovery" replace />} />
-          <Route path="*" element={<Navigate to="/discovery" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

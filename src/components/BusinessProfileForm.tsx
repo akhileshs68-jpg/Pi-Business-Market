@@ -75,9 +75,9 @@ export const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({ genera
         ) : f.type === 'image' ? (
           <div className="w-full">
             {value ? (
-              <div className={`w-full ${f.name === 'logoUrl' ? 'h-32 w-32' : 'h-32 w-full'} bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-800`}>
+              <div className={f.name === 'logoUrl' ? 'w-[180px] h-[180px] md:w-[200px] md:h-[200px] bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-800 aspect-square mx-auto md:mx-0' : 'w-full aspect-[16/9] md:aspect-[3/1] bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-800'}>
                 <img src={value} alt={f.label} className="w-full h-full object-cover" />
-                <button onClick={() => handleChange(f.name, '')} className="absolute top-2 right-2 p-1.5 bg-rose-500/90 hover:bg-rose-500 text-white rounded-lg backdrop-blur shadow-lg">
+                <button onClick={() => handleChange(f.name, '')} className="absolute top-2 right-2 p-1.5 bg-rose-500/90 hover:bg-rose-500 text-white rounded-lg backdrop-blur shadow-lg z-20">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -85,6 +85,8 @@ export const BusinessProfileForm: React.FC<BusinessProfileFormProps> = ({ genera
               <FileUpload
                 ownerUid={user?.uid || ''}
                 module="businesses"
+                businessId={initialData?.businessId || (initialData?.storeId ? undefined : initialData?.id)}
+                storeId={initialData?.storeId || (initialData?.storeId ? initialData?.id : undefined)}
                 label={`Upload ${f.label}`}
                 onUploadSuccess={(asset) => handleChange(f.name, asset.downloadUrl)}
               />

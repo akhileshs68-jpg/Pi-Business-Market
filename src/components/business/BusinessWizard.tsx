@@ -540,7 +540,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
                     <div className="w-full">
                       {formData.logoUrl ? (
-                        <div className="w-32 h-32 bg-slate-950 rounded-3xl overflow-hidden relative mx-auto md:mx-0 border border-slate-800">
+                        <div className="w-[180px] h-[180px] md:w-[200px] md:h-[200px] bg-slate-950 rounded-3xl overflow-hidden relative mx-auto md:mx-0 border border-slate-800 aspect-square">
                           <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
                           <button onClick={() => setFormData({...formData, logoUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
                             <X className="w-4 h-4" />
@@ -560,7 +560,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cover Image</label>
                     <div className="w-full">
                       {formData.coverImageUrl ? (
-                        <div className="w-full h-32 bg-slate-950 rounded-3xl overflow-hidden relative border border-slate-800">
+                        <div className="w-full aspect-[16/9] md:aspect-[3/1] bg-slate-950 rounded-3xl overflow-hidden relative border border-slate-800">
                           <img src={formData.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
                           <button onClick={() => setFormData({...formData, coverImageUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
                             <X className="w-4 h-4" />
@@ -579,18 +579,18 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                 </div>
               )}
 
-              {step === 6 && (
+               {step === 6 && (
                 <div className="space-y-6 max-w-2xl mx-auto">
                   <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">
-                    <div className="h-24 bg-gradient-to-r from-indigo-900 to-violet-900 relative">
+                    <div className="aspect-[3/1] bg-gradient-to-r from-indigo-900 to-violet-900 relative">
                        {coverPreview && <img src={coverPreview} className="w-full h-full object-cover opacity-50" />}
                     </div>
-                    <div className="px-8 pb-8 -mt-10">
-                      <div className="w-20 h-20 bg-slate-900 border-4 border-slate-950 rounded-2xl flex items-center justify-center mb-4 overflow-hidden relative">
+                    <div className="px-8 pb-8 -mt-12 md:-mt-16 relative z-10">
+                      <div className="w-24 h-24 md:w-32 md:h-32 bg-slate-900 border-4 border-slate-950 rounded-2xl flex items-center justify-center mb-4 overflow-hidden relative shrink-0 aspect-square">
                         {logoPreview ? (
                           <img src={logoPreview} className="w-full h-full object-cover" />
                         ) : (
-                          <Building2 className="w-8 h-8 text-indigo-400" />
+                          <Building2 className="w-10 h-10 text-indigo-400" />
                         )}
                       </div>
                       <h3 className="text-xl font-bold text-white">{formData.businessName || 'Business Name'}</h3>

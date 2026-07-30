@@ -4,7 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { Shield, Sparkles, AlertCircle, Chrome } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { user, login, loginWithGoogle, loading, error } = useAuth();
+  const { user, profile, login, loginWithGoogle, loading, error } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -12,19 +12,36 @@ export const LoginPage: React.FC = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
-      const from = (location.state as any)?.from?.pathname || '/discovery';
-      navigate(from, { replace: true });
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      const targetPath = from === '/login' ? '/dashboard' : from;
+      
+      console.log('[Auth Routing Diagnostics]', {
+        currentUrl: window.location.href,
+        authState: 'Authenticated',
+        profileExists: !!profile,
+        routeDecision: `Redirecting away from /login to target path: ${targetPath}`,
+        redirectSourceFile: 'src/pages/LoginPage.tsx',
+        redirectSourceLine: 21
+      });
+      
+      navigate(targetPath, { replace: true });
+    } else if (!user && !loading) {
+      console.log('[Auth Routing Diagnostics]', {
+        currentUrl: window.location.href,
+        authState: 'Unauthenticated',
+        profileExists: false,
+        routeDecision: 'Showing Login Page',
+        redirectSourceFile: 'src/pages/LoginPage.tsx',
+        redirectSourceLine: 30
+      });
     }
-  }, [user, loading, navigate, location]);
+  }, [user, loading, navigate, location, profile]);
 
   const handlePiLogin = async () => {
     try {
       setAuthError(null);
-      const loggedInUser = await login();
-      if (loggedInUser && loggedInUser.uid) {
-        const from = (location.state as any)?.from?.pathname || '/discovery';
-        navigate(from, { replace: true });
-      }
+      await login();
+      // No manual navigation here; the useEffect above will trigger as soon as 'user' updates.
     } catch (err: any) {
       setAuthError(err.message || 'Pi Authentication failed. Please try again.');
     }
@@ -33,11 +50,8 @@ export const LoginPage: React.FC = () => {
   const handleGoogleLogin = async () => {
     try {
       setAuthError(null);
-      const loggedInUser = await loginWithGoogle();
-      if (loggedInUser && loggedInUser.uid) {
-        const from = (location.state as any)?.from?.pathname || '/discovery';
-        navigate(from, { replace: true });
-      }
+      await loginWithGoogle();
+      // No manual navigation here; the useEffect above will trigger as soon as 'user' updates.
     } catch (err: any) {
       setAuthError(err.message || 'Google Authentication failed. Please try again.');
     }

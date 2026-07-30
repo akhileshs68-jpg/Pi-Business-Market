@@ -82,6 +82,54 @@ export const mediaService = {
 
     const db = getFirebaseDb();
     const mediaId = this.generateId();
+
+    // Determine businessId and storeId
+    let resolvedBusinessId = options.businessId;
+    let resolvedStoreId = options.storeId;
+
+    // 1. If options.businessId is not provided, attempt to resolve it from the global window objects if available
+    if (typeof window !== 'undefined') {
+      const globalStore = (window as any).__currentStoreProfile;
+      if (globalStore) {
+        if (!resolvedBusinessId) {
+          resolvedBusinessId = globalStore.businessId || (globalStore.storeId ? undefined : globalStore.id);
+        }
+        if (!resolvedStoreId) {
+          resolvedStoreId = globalStore.storeId || (globalStore.storeId ? globalStore.id : undefined);
+        }
+      }
+      
+      const globalBusiness = (window as any).__currentBusinessProfile;
+      if (globalBusiness && !resolvedBusinessId) {
+        resolvedBusinessId = globalBusiness.businessId || globalBusiness.id;
+      }
+    }
+
+    // 2. Fallback: If options.storeId exists but options.businessId doesn't, try to fetch the store to get its businessId!
+    if (!resolvedBusinessId && resolvedStoreId) {
+      try {
+        const storeDoc = await getDoc(doc(db, 'stores', resolvedStoreId));
+        if (storeDoc.exists()) {
+          resolvedBusinessId = storeDoc.data()?.businessId;
+        }
+      } catch (err) {
+        console.warn('[mediaService] Failed to resolve businessId from storeId:', err);
+      }
+    }
+
+    // 3. Check if we are in an editing/managing context where businessId MUST be present.
+    const businessRelatedModules: MediaModule[] = ['businesses', 'stores', 'products', 'services', 'jobs', 'documents'];
+    const isEditingOrManaging = typeof window !== 'undefined' && (
+      window.location.pathname.includes('/store/') || 
+      window.location.pathname.includes('/store-dashboard') ||
+      window.location.pathname.includes('/business/')
+    );
+
+    // If businessId cannot be resolved for business/store-related modules in editing context,
+    // stop the save operation and throw a validation error.
+    if (!resolvedBusinessId && businessRelatedModules.includes(options.module) && isEditingOrManaging) {
+      throw new Error('Business ID is required to upload media. Operation stopped.');
+    }
     
     // 1. Prepare Form Data for Backend
     const formData = new FormData();
@@ -110,11 +158,39 @@ export const mediaService = {
     }
 
     // 3. Prepare Metadata
+    const imageUrl = cloudinaryData.secure_url || cloudinaryData.secureUrl;
+    const publicId = cloudinaryData.public_id || cloudinaryData.publicId;
+    const ownerId = ownerUid;
+    const finalBusinessId = resolvedBusinessId || 'none';
+    const finalStoreId = resolvedStoreId || 'none';
+
+    // 5. Before every Firestore write print:
+    console.log('[Firestore Write Pre-Check]');
+    console.log('uid:', ownerUid);
+    console.log('businessId:', finalBusinessId);
+    console.log('storeId:', finalStoreId);
+    console.log('ownerId:', ownerId);
+    console.log('cloudinary.secure_url:', imageUrl);
+    console.log('cloudinary.public_id:', publicId);
+
+    // 6. Abort save if any required value is undefined
+    if (
+      ownerUid === undefined ||
+      finalBusinessId === undefined ||
+      finalStoreId === undefined ||
+      ownerId === undefined ||
+      imageUrl === undefined ||
+      publicId === undefined
+    ) {
+      console.error('[mediaService] Aborting Firestore write because a required value is undefined!');
+      throw new Error('Aborting Firestore write because a required value is undefined.');
+    }
+
     const asset: MediaAsset = {
       mediaId,
       ownerUid,
-      businessId: options.businessId,
-      storeId: options.storeId,
+      businessId: finalBusinessId,
+      storeId: finalStoreId,
       module: options.module,
       fileName: this.sanitizeFileName(file.name),
       originalName: file.name,
@@ -123,21 +199,52 @@ export const mediaService = {
       size: cloudinaryData.bytes || file.size,
       width: cloudinaryData.width,
       height: cloudinaryData.height,
-      storagePath: cloudinaryData.public_id || cloudinaryData.publicId, // Store Cloudinary public_id here
-      downloadUrl: cloudinaryData.secure_url || cloudinaryData.secureUrl,
-      thumbnailUrl: (cloudinaryData.secure_url || cloudinaryData.secureUrl).replace('/upload/', '/upload/c_thumb,w_200,h_200,g_face,q_auto,f_auto/'),
+      storagePath: publicId, // Store Cloudinary public_id here
+      downloadUrl: imageUrl,
+      thumbnailUrl: imageUrl.replace('/upload/', '/upload/c_thumb,w_200,h_200,g_face,q_auto,f_auto/'),
       status: 'active',
       visibility: options.visibility || 'public',
       uploadedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // 4. Save metadata to Firestore
-    await setDoc(doc(db, 'media', mediaId), {
+    // 4. Save metadata to Firestore (making sure we never write undefined and fields exist)
+    const rawPayload: Record<string, any> = {
       ...asset,
-      uploadedAt: serverTimestamp(),
+      imageUrl,
+      publicId,
+      ownerId,
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+    };
+
+    const sanitizedPayload: Record<string, any> = {};
+    Object.entries(rawPayload).forEach(([key, val]) => {
+      if (val !== undefined) {
+        sanitizedPayload[key] = val;
+      }
     });
+
+    console.log('[Media Upload Save Trace]', {
+      businessId: sanitizedPayload.businessId,
+      storeId: sanitizedPayload.storeId,
+      ownerId: sanitizedPayload.ownerId,
+      'documentRef.id': mediaId
+    });
+
+    // 8. If Firestore save fails, do NOT leave orphan Cloudinary assets. Delete the uploaded Cloudinary asset or report it.
+    try {
+      await setDoc(doc(db, 'media', mediaId), sanitizedPayload);
+    } catch (firestoreError: any) {
+      console.error('[mediaService] Firestore write failed! Initiating cleanup of orphan Cloudinary asset:', publicId);
+      try {
+        await axios.delete(`/api/upload/${encodeURIComponent(publicId)}`);
+        console.log('[mediaService] Successfully deleted orphan Cloudinary asset from backend.');
+      } catch (deleteError) {
+        console.error('[mediaService] Failed to clean up orphan Cloudinary asset from backend:', deleteError);
+      }
+      throw new Error(`Firestore save failed: ${firestoreError.message || String(firestoreError)}. Orphan Cloudinary asset was cleaned up.`);
+    }
 
     return asset;
   },

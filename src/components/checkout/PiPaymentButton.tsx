@@ -84,12 +84,21 @@ export const PiPaymentButton: React.FC<PiPaymentButtonProps> = ({
               body: JSON.stringify({ paymentId, metadata })
             });
             
+            const resData = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(`Server approval failed: ${response.statusText} - ${JSON.stringify(errorData)}`);
+              const errMsg = resData.error || response.statusText;
+              throw new Error(`Server approval failed: ${errMsg}`);
             }
             
-            console.log(`[PiPaymentButton] Server approval successful for payment ${paymentId}`);
+            console.group('--- Pi Payment Server Approval Runtime Logs ---');
+            if (resData.logs && Array.isArray(resData.logs)) {
+              resData.logs.forEach((log: string) => console.log(log));
+            } else {
+              console.log(`[PiPaymentButton] Server approval successful for payment ${paymentId}`);
+            }
+            console.groupEnd();
+
             setPaymentState('Approved');
           } catch (error: any) {
             console.error('[PiPaymentButton] Detailed error during server approval:', error);
@@ -110,12 +119,21 @@ export const PiPaymentButton: React.FC<PiPaymentButtonProps> = ({
               body: JSON.stringify({ paymentId, txid, metadata })
             });
             
+            const resData = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(`Server completion failed: ${response.statusText} - ${JSON.stringify(errorData)}`);
+              const errMsg = resData.error || response.statusText;
+              throw new Error(`Server completion failed: ${errMsg}`);
             }
             
-            console.log(`[PiPaymentButton] Server completion successful for payment ${paymentId}`);
+            console.group('--- Pi Payment Server Completion Runtime Logs ---');
+            if (resData.logs && Array.isArray(resData.logs)) {
+              resData.logs.forEach((log: string) => console.log(log));
+            } else {
+              console.log(`[PiPaymentButton] Server completion successful for payment ${paymentId}`);
+            }
+            console.groupEnd();
+
             setPaymentState('Completed');
             onSuccess(paymentId, txid);
           } catch (error: any) {

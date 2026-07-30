@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useActiveRole } from '../hooks/useActiveRole';
@@ -6,6 +6,7 @@ import { WORKSPACE_CONFIG } from '../config/workspaceConfig';
 import Navbar from '../components/Navbar';
 import { Shield, ArrowRight, Info, LogOut, ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
+import { businessService } from '../services/businessService';
 
 const ICON_MAP: Record<string, React.FC<any>> = {
   ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase
@@ -15,6 +16,37 @@ export const MyWorkspace: React.FC = () => {
   const { user, logout } = useAuth();
   const activeRole = useActiveRole();
   const navigate = useNavigate();
+
+  const [hasBusiness, setHasBusiness] = useState<boolean | null>(null);
+  const [bizLoading, setBizLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!user) {
+      setBizLoading(false);
+      return;
+    }
+
+    let active = true;
+    const checkBiz = async () => {
+      try {
+        const bizs = await businessService.getMyBusinesses(user.uid);
+        if (active) {
+          setHasBusiness(bizs.length > 0);
+          setBizLoading(false);
+        }
+      } catch (err) {
+        console.error("Error checking business in MyWorkspace:", err);
+        if (active) {
+          setHasBusiness(false);
+          setBizLoading(false);
+        }
+      }
+    };
+    checkBiz();
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   if (!user) return null;
 
@@ -50,7 +82,25 @@ export const MyWorkspace: React.FC = () => {
             </div>
           </div>
 
-          {isBuyer ? (
+          {bizLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-violet-500"></div>
+            </div>
+          ) : !hasBusiness ? (
+            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 text-center flex flex-col items-center justify-center space-y-4">
+              <Info className="w-12 h-12 text-slate-500" />
+              <h2 className="text-xl font-bold text-white">No Business Found</h2>
+              <p className="text-slate-400 max-w-md text-sm">
+                To manage inventory, sales, and stores, you first need to create a business.
+              </p>
+              <button
+                onClick={() => navigate('/create-business')}
+                className="mt-4 px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Create Your First Business
+              </button>
+            </div>
+          ) : isBuyer ? (
             <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 text-center flex flex-col items-center justify-center space-y-4">
               <Info className="w-12 h-12 text-slate-500" />
               <h2 className="text-xl font-bold text-white">No Business Modules</h2>

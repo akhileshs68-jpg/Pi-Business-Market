@@ -67,6 +67,8 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   const [currentStep, setCurrentStep] = useState<Step>('basic');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const hasCompletedRef = React.useRef(false);
 
   const [formData, setFormData] = useState<Omit<Product, 'productId' | 'createdAt' | 'updatedAt'>>({
     storeId,
@@ -161,14 +163,19 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting || hasCompletedRef.current) {
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
+    setSuccessToast(null);
     try {
       // Validate SKU and Slug uniqueness
       const isSkuUnique = await productService.isSkuUnique(storeId, formData.sku, initialProduct?.productId);
       if (!isSkuUnique) {
         setError('SKU already exists in this store.');
         setCurrentStep('inventory');
+        setIsSubmitting(false);
         return;
       }
 
@@ -176,6 +183,7 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
       if (!isSlugUnique) {
         setError('Product slug already exists.');
         setCurrentStep('basic');
+        setIsSubmitting(false);
         return;
       }
 
@@ -186,10 +194,18 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
       } else {
         productId = await productService.createProduct(formData);
       }
-      onComplete(productId);
+
+      setSuccessToast(initialProduct ? 'Product updated successfully!' : 'Product published successfully!');
+      setIsSubmitting(false);
+
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        setTimeout(() => {
+          onComplete(productId);
+        }, 1500);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to save product.');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -307,6 +323,17 @@ export const ProductWizard: React.FC<ProductWizardProps> = ({
             >
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               {error}
+            </motion.div>
+          )}
+
+          {successToast && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-400 text-sm"
+            >
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+              {successToast}
             </motion.div>
           )}
 

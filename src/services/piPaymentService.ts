@@ -32,8 +32,18 @@ export const piPaymentService = {
       const isPiBrowser = true;
       if (typeof window !== 'undefined' && window.Pi && isPiBrowser) {
         console.log('[PiPaymentService] Initializing Pi SDK and authenticating for payments scope...');
+        const isPreviewDomain = window.location.hostname.includes('run.app') || 
+                                window.location.hostname.includes('vercel.app') || 
+                                window.location.hostname.includes('localhost') ||
+                                window.location.hostname.includes('googleusercontent.com') ||
+                                window.location.hostname.includes('aistudio');
+
         await authService.initPi();
-        await authService.authenticatePi(['payments']);
+        try {
+          await authService.authenticatePi(['payments']);
+        } catch (err: any) {
+          throw err;
+        }
         console.log('[PiPaymentService] Authenticated with payments scope. Calling Pi.createPayment...', paymentData);
 
         window.Pi.createPayment(

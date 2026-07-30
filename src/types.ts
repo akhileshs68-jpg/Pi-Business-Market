@@ -41,6 +41,10 @@ export interface User {
   email?: string;
   ratingCount?: number;
   averageRating?: number;
+  profileCompleted?: boolean;
+  onboardingCompleted?: boolean;
+  fullName?: string;
+  businessCategory?: string;
 }
 
 export interface PiSession {

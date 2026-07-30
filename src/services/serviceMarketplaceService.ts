@@ -48,18 +48,19 @@ export const serviceMarketplaceService = {
     const db = getFirebaseDb();
     const q = query(
       collection(db, 'services'), 
-      where('businessId', '==', businessId),
-      where('status', '!=', 'deleted')
+      where('businessId', '==', businessId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
-      } as Service;
-    });
+    return snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
+        } as Service;
+      })
+      .filter(service => service.status !== 'deleted');
   },
 
   async updateService(serviceId: string, updates: Partial<Service>): Promise<void> {

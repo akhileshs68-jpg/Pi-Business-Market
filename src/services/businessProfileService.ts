@@ -38,11 +38,35 @@ export const businessProfileService = {
 
   async getProfileById(businessId: string) {
     const db = getFirebaseDb();
-    const docRef = doc(db, 'businesses', businessId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return { id: snap.id, ...snap.data() } as any;
+    
+    // Determine preferred collection based on pathname
+    const isStorePath = typeof window !== 'undefined' && window.location.pathname.includes('/store/');
+    const collectionsToTry = isStorePath ? ['stores', 'businesses'] : ['businesses', 'stores'];
+    
+    for (const collectionName of collectionsToTry) {
+      console.log(`[businessProfileService] Querying Firestore: collection="${collectionName}", documentId="${businessId}"`);
+      const docRef = doc(db, collectionName, businessId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        console.log(`[businessProfileService] Document found in collection "${collectionName}":`, data);
+        
+        // If it was found in "stores" collection, adapt store-specific fields for the profile UI
+        if (collectionName === 'stores') {
+          return {
+            id: snap.id,
+            businessName: data.storeName || data.businessName || 'Unnamed Store',
+            category: data.storeCategory || data.category || 'Store',
+            businessType: 'seller', // Store corresponds to 'seller' role config
+            ...data
+          } as any;
+        }
+        
+        return { id: snap.id, ...data } as any;
+      }
     }
+    
+    console.warn(`[businessProfileService] Document NOT found in any collection for id: ${businessId}`);
     return null;
   },
 
@@ -53,13 +77,48 @@ export const businessProfileService = {
     
     const docRef = doc(db, 'businesses', businessId);
     
-    const status = publish ? 'active' : ((profile as any)?.status || 'draft');
+    const status = publish ? 'published' : ((profile as any)?.status || 'draft');
+    const published = publish ? true : ((profile as any)?.published || false);
+
+    // Ensure all required fields exist and are never undefined
+    const imageUrl = data.logoUrl || data.imageUrl || (profile as any)?.logoUrl || (profile as any)?.imageUrl || 'none';
+    const publicId = data.logoPublicId || data.publicId || (profile as any)?.logoPublicId || (profile as any)?.publicId || 'none';
+    const finalBusinessId = businessId;
+    const finalStoreId = data.storeId || (profile as any)?.storeId || 'none';
+    const ownerId = ownerUid;
+
+    // Print Pre-Check Logs
+    console.log('[Firestore Business Write Pre-Check]');
+    console.log('uid:', ownerUid);
+    console.log('businessId:', finalBusinessId);
+    console.log('storeId:', finalStoreId);
+    console.log('ownerId:', ownerId);
+    console.log('cloudinary.secure_url:', imageUrl);
+    console.log('cloudinary.public_id:', publicId);
+
+    // Abort if any required value is undefined
+    if (
+      ownerUid === undefined ||
+      finalBusinessId === undefined ||
+      finalStoreId === undefined ||
+      ownerId === undefined ||
+      imageUrl === undefined ||
+      publicId === undefined
+    ) {
+      throw new Error('Aborting Firestore write: required field is undefined.');
+    }
 
     const updateData = {
       ownerUid,
       businessType: roleId,
       status,
+      published,
       updatedAt: serverTimestamp(),
+      imageUrl,
+      publicId,
+      ownerId,
+      businessId: finalBusinessId,
+      storeId: finalStoreId,
       ...data
     };
 

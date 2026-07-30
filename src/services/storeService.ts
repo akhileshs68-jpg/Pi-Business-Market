@@ -75,11 +75,45 @@ export const storeService = {
       }
     });
 
-    await setDoc(doc(db, 'stores', storeId), {
+    const imageUrl = sanitizedData.logoUrl || sanitizedData.imageUrl || 'none';
+    const publicId = sanitizedData.logoPublicId || sanitizedData.publicId || 'none';
+    const ownerId = sanitizedData.ownerUid || 'none';
+    const finalBusinessId = sanitizedData.businessId || 'none';
+    const finalStoreId = storeId;
+
+    console.log('[Firestore Store Write Pre-Check]');
+    console.log('uid:', ownerId);
+    console.log('businessId:', finalBusinessId);
+    console.log('storeId:', finalStoreId);
+    console.log('ownerId:', ownerId);
+    console.log('cloudinary.secure_url:', imageUrl);
+    console.log('cloudinary.public_id:', publicId);
+
+    if (
+      ownerId === undefined ||
+      finalBusinessId === undefined ||
+      finalStoreId === undefined ||
+      ownerId === undefined ||
+      imageUrl === undefined ||
+      publicId === undefined
+    ) {
+      throw new Error('Aborting Firestore write: required field is undefined.');
+    }
+
+    const docData = {
       ...sanitizedData,
+      published: true,
+      status: 'published',
+      imageUrl,
+      publicId,
+      ownerId,
+      businessId: finalBusinessId,
+      storeId: finalStoreId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    await setDoc(doc(db, 'stores', storeId), docData);
 
     return storeId;
   },
@@ -242,10 +276,50 @@ export const storeService = {
     const db = getFirebaseDb();
     const storeRef = doc(db, 'stores', storeId);
     
-    await updateDoc(storeRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
+    const sanitizedData: any = {};
+    Object.entries(updates).forEach(([key, val]) => {
+      if (val !== undefined) sanitizedData[key] = val;
     });
+
+    const docSnap = await getDoc(storeRef);
+    const existing = docSnap.exists() ? docSnap.data() : {};
+
+    const imageUrl = sanitizedData.logoUrl || sanitizedData.imageUrl || existing.logoUrl || existing.imageUrl || 'none';
+    const publicId = sanitizedData.logoPublicId || sanitizedData.publicId || existing.logoPublicId || existing.publicId || 'none';
+    const ownerId = sanitizedData.ownerUid || existing.ownerUid || existing.ownerId || 'none';
+    const finalBusinessId = sanitizedData.businessId || existing.businessId || 'none';
+    const finalStoreId = storeId;
+
+    console.log('[Firestore Store Update Pre-Check]');
+    console.log('uid:', ownerId);
+    console.log('businessId:', finalBusinessId);
+    console.log('storeId:', finalStoreId);
+    console.log('ownerId:', ownerId);
+    console.log('cloudinary.secure_url:', imageUrl);
+    console.log('cloudinary.public_id:', publicId);
+
+    if (
+      ownerId === undefined ||
+      finalBusinessId === undefined ||
+      finalStoreId === undefined ||
+      ownerId === undefined ||
+      imageUrl === undefined ||
+      publicId === undefined
+    ) {
+      throw new Error('Aborting Firestore write: required field is undefined.');
+    }
+
+    const docData = {
+      ...sanitizedData,
+      imageUrl,
+      publicId,
+      ownerId,
+      businessId: finalBusinessId,
+      storeId: finalStoreId,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(storeRef, docData);
   },
 
   /**

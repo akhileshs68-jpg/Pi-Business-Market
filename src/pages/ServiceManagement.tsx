@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { serviceMarketplaceService } from '../services/serviceMarketplaceService';
+import { businessService } from '../services/businessService';
 import { Service, ServicePricingType, ServiceLocationType } from '../types';
 import { ServiceWizard } from '../components/service/ServiceWizard';
 
@@ -39,15 +40,44 @@ export const ServiceManagement: React.FC = () => {
   const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [businessId] = useState('PI-CORP-001'); // Derived in production
+  const [businessId, setBusinessId] = useState('PI-CORP-001'); // Derived in production
   const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   useEffect(() => {
+    const resolveBusiness = async () => {
+      if (user?.uid) {
+        try {
+          const myBusinesses = await businessService.getMyBusinesses(user.uid);
+          if (myBusinesses && myBusinesses.length > 0) {
+            const bizId = myBusinesses[0].id;
+            if (bizId) {
+              setBusinessId(bizId);
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to resolve business ID dynamically', err);
+        }
+      }
+    };
+    resolveBusiness();
+  }, [user]);
+
+  useEffect(() => {
     fetchServices();
-  }, []);
+  }, [businessId]);
 
   const fetchServices = async () => {
     setLoading(true);
+    // Print complete query attributes as required
+    console.log('[Firestore Query Trace]', {
+      collection: 'services',
+      where: [
+        { field: 'businessId', op: '==', value: businessId }
+      ],
+      orderBy: 'None',
+      limit: 'None',
+      postQueryFilter: { field: 'status', op: '!=', value: 'deleted' }
+    });
     try {
       const data = await serviceMarketplaceService.getServices(businessId);
       setServices(data);
