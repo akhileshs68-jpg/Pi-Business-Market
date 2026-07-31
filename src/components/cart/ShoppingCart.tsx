@@ -24,7 +24,7 @@ import { motion } from 'motion/react';
 import { cartService } from '../../services/cartService';
 import { checkoutService } from '../../services/checkoutService';
 import { getFirebaseDb } from '../../firebase/config';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Cart, CartItem } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -52,44 +52,66 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  const cartIdsString = carts.map(c => c.cartId).sort().join(',');
+
   useEffect(() => {
-    if (userUid) {
-      loadCartData();
-    }
+    if (!userUid) return;
+    setLoading(true);
+    const db = getFirebaseDb();
+    
+    const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', userUid));
+    const unsubscribeCarts = onSnapshot(cartsQuery, (snapshot) => {
+      const fetchedCarts = snapshot.docs.map(doc => doc.data() as Cart);
+      setCarts(fetchedCarts);
+      if (fetchedCarts.length === 0) {
+        setItems([]);
+        setLoading(false);
+      }
+    }, (err) => {
+      console.error('Error listening to carts:', err);
+      setLoading(false);
+    });
+
+    return () => unsubscribeCarts();
   }, [userUid]);
 
-  const loadCartData = async () => {
-    setLoading(true);
-    try {
-      const db = getFirebaseDb();
-      // 1. Fetch all carts for the current user
-      const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', userUid));
-      const cartsSnapshot = await getDocs(cartsQuery);
-      const fetchedCarts = cartsSnapshot.docs.map(doc => doc.data() as Cart);
-      setCarts(fetchedCarts);
+  useEffect(() => {
+    if (!cartIdsString) return;
+    
+    const db = getFirebaseDb();
+    const cartIds = cartIdsString.split(',');
+    
+    // Subscribe to each cart's items
+    const unsubs: (() => void)[] = [];
+    let itemsMap = new Map<string, ExtendedCartItem[]>();
+    let loads = 0;
 
-      if (fetchedCarts.length > 0) {
-        // 2. Fetch all cart items across all these carts
-        const cartIds = fetchedCarts.map(c => c.cartId);
+    cartIds.forEach(cartId => {
+      const itemsQuery = query(collection(db, 'cartItems'), where('cartId', '==', cartId));
+      const unsub = onSnapshot(itemsQuery, (snapshot) => {
+        const cartItems = snapshot.docs.map(doc => doc.data() as ExtendedCartItem);
+        itemsMap.set(cartId, cartItems);
         
-        // Firestore 'in' query supports up to 10 elements, but we handle it safely
+        // Flatten
         const allItems: ExtendedCartItem[] = [];
-        for (const cartId of cartIds) {
-          const itemsQuery = query(collection(db, 'cartItems'), where('cartId', '==', cartId));
-          const itemsSnapshot = await getDocs(itemsQuery);
-          const cartItems = itemsSnapshot.docs.map(doc => doc.data() as ExtendedCartItem);
-          allItems.push(...cartItems);
+        for (const cid of cartIds) {
+          const cidItems = itemsMap.get(cid) || [];
+          allItems.push(...cidItems);
         }
         setItems(allItems);
-      } else {
-        setItems([]);
-      }
-    } catch (err) {
-      console.error('Error loading cart data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        
+        loads++;
+        if (loads >= cartIds.length) {
+          setLoading(false);
+        }
+      });
+      unsubs.push(unsub);
+    });
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
+  }, [cartIdsString]);
 
   const isServiceItem = (item: ExtendedCartItem) => {
     return item.type === 'service' || 
@@ -110,10 +132,14 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 
   const handleUpdateQuantity = async (item: ExtendedCartItem, newQty: number) => {
     if (newQty < 1) return;
+    if (item.stock !== undefined && newQty > item.stock) {
+      alert(`Only ${item.stock} items available in stock.`);
+      return;
+    }
     setActionLoading(item.itemId);
     try {
       await cartService.updateQuantity(item.itemId, item.cartId, newQty);
-      await loadCartData();
+      
       if (onCartUpdated) onCartUpdated();
     } catch (err) {
       console.error('Failed to update quantity:', err);
@@ -141,7 +167,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
     setActionLoading(item.itemId);
     try {
       await cartService.removeItem(item.itemId, item.cartId);
-      await loadCartData();
+      
       if (onCartUpdated) onCartUpdated();
     } catch (err) {
       console.error('Failed to remove item:', err);
@@ -160,7 +186,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
       // 2. Remove from cart
       await cartService.removeItem(item.itemId, item.cartId);
       
-      await loadCartData();
+      
       if (onItemMovedToWishlist) onItemMovedToWishlist();
       if (onCartUpdated) onCartUpdated();
     } catch (err) {
@@ -177,56 +203,10 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
       for (const cart of carts) {
         await cartService.clearCart(cart.cartId);
       }
-      await loadCartData();
+      
       if (onCartUpdated) onCartUpdated();
     } catch (err) {
       console.error('Failed to clear cart:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddDemoItems = async () => {
-    setLoading(true);
-    try {
-      const db = getFirebaseDb();
-      const mockBusinessId = 'demo_business_123';
-      const cart = await cartService.getOrCreateCart(userUid, mockBusinessId);
-
-      // Add a Product
-      await cartService.addToCart(cart.cartId, {
-        cartId: cart.cartId,
-        productId: 'demo_prod_1',
-        name: 'Enterprise Pi Laptop Pro',
-        imageUrl: 'https://images.unsplash.com/photo-1496181130204-755241524eab?auto=format&fit=crop&q=80&w=300',
-        quantity: 1,
-        unitPrice: 45.00
-      });
-
-      // Add a Service (customized)
-      const serviceId = 'demo_serv_1';
-      const itemRef = doc(db, 'cartItems', `${cart.cartId}_${serviceId}_base`);
-      await setDoc(itemRef, {
-        itemId: `${cart.cartId}_${serviceId}_base`,
-        cartId: cart.cartId,
-        productId: serviceId,
-        name: 'Pi Certified Smart Contract Audit',
-        imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=300',
-        quantity: 1,
-        unitPrice: 120.00,
-        subtotal: 120.00,
-        status: 'active',
-        type: 'service',
-        serviceDate: '2026-08-15',
-        serviceTime: '14:00',
-        sellerName: 'Antigravity Audits Ltd'
-      });
-
-      await cartService.recalculateCart(cart.cartId);
-      await loadCartData();
-      if (onCartUpdated) onCartUpdated();
-    } catch (err) {
-      console.error('Failed to add demo items:', err);
     } finally {
       setLoading(false);
     }
@@ -266,15 +246,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
             onClick={() => navigate('/discovery')}
             className="w-full py-3 px-6 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-violet-600/10 cursor-pointer"
           >
-            Browse Marketplace
-          </button>
-          
-          <button 
-            onClick={handleAddDemoItems}
-            className="w-full py-3 px-6 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all border border-slate-700/50 cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>Load Demo Items</span>
+            Continue Shopping
           </button>
         </div>
       </div>
@@ -345,9 +317,14 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                           </span>
                         </p>
                       </div>
-                      <p className="text-base font-black text-violet-400 shrink-0">
-                        {item.unitPrice} Pi
-                      </p>
+                      <div className="flex flex-col items-end shrink-0 text-right">
+                        <p className="text-base font-black text-violet-400">
+                          {item.unitPrice} Pi <span className="text-xs text-slate-500 font-normal">each</span>
+                        </p>
+                        <p className="text-sm font-bold text-slate-300 mt-0.5">
+                          Subtotal: {(item.unitPrice * item.quantity).toFixed(2)} Pi
+                        </p>
+                      </div>
                     </div>
 
                     {/* Service customization */}
@@ -430,8 +407,8 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                         </span>
                         <button 
                           onClick={() => handleUpdateQuantity(item, item.quantity + 1)}
-                          disabled={actionLoading === item.itemId}
-                          className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                          disabled={actionLoading === item.itemId || (item.stock !== undefined && item.quantity >= item.stock)}
+                          className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>

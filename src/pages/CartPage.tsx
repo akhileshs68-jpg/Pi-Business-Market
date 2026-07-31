@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getFirebaseDb } from '../firebase/config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate();
@@ -32,40 +32,58 @@ export const CartPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.uid) {
-      updateCounts();
-    }
+    if (!user?.uid) return;
+    const db = getFirebaseDb();
+    
+    // Wishlist snapshot
+    const wishlistQuery = query(collection(db, 'wishlists'), where('userUid', '==', user.uid));
+    const unsubWishlist = onSnapshot(wishlistQuery, (snapshot) => {
+      setWishlistCount(snapshot.size);
+    });
+
+    // Carts snapshot
+    const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', user.uid));
+    
+    let unsubsItems: (() => void)[] = [];
+    
+    const unsubCarts = onSnapshot(cartsQuery, (snapshot) => {
+      const cartDocs = snapshot.docs;
+      
+      // Cleanup previous items listeners
+      unsubsItems.forEach(u => u());
+      unsubsItems = [];
+      
+      if (cartDocs.length === 0) {
+        setCartCount(0);
+        return;
+      }
+      
+      const cartIds = cartDocs.map(doc => doc.id);
+      
+      let countsMap = new Map<string, number>();
+
+      cartIds.forEach(cartId => {
+        const itemsQuery = query(collection(db, 'cartItems'), where('cartId', '==', cartId));
+        const unsub = onSnapshot(itemsQuery, (itemsSnap) => {
+          countsMap.set(cartId, itemsSnap.size);
+          let total = 0;
+          for (const count of countsMap.values()) {
+            total += count;
+          }
+          setCartCount(total);
+        });
+        unsubsItems.push(unsub);
+      });
+    });
+
+    return () => {
+      unsubWishlist();
+      unsubCarts();
+      unsubsItems.forEach(u => u());
+    };
   }, [user]);
 
-  const updateCounts = async () => {
-    if (!user?.uid) return;
-    try {
-      const db = getFirebaseDb();
-      
-      // 1. Fetch Cart Items Count
-      const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', user.uid));
-      const cartsSnapshot = await getDocs(cartsQuery);
-      const cartDocs = cartsSnapshot.docs;
-      
-      let totalCartItemsCount = 0;
-      if (cartDocs.length > 0) {
-        const cartIds = cartDocs.map(doc => doc.id);
-        for (const cartId of cartIds) {
-          const itemsQuery = query(collection(db, 'cartItems'), where('cartId', '==', cartId));
-          const itemsSnapshot = await getDocs(itemsQuery);
-          totalCartItemsCount += itemsSnapshot.size;
-        }
-      }
-      setCartCount(totalCartItemsCount);
-
-      // 2. Fetch Wishlist Items Count
-      const wishlistQuery = query(collection(db, 'wishlists'), where('userUid', '==', user.uid));
-      const wishlistSnapshot = await getDocs(wishlistQuery);
-      setWishlistCount(wishlistSnapshot.size);
-    } catch (err) {
-      console.error('Failed to update cart/wishlist counts:', err);
-    }
-  };
+  const updateCounts = () => {};
 
   const showToast = (message: string) => {
     setToastMessage(message);

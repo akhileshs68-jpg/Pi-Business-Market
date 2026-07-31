@@ -1559,14 +1559,29 @@ export interface WishlistItem {
 }
 
 export interface CartItem {
-  itemId: string;
+  itemId: string; // Legacy ID
   cartId: string;
+  
+  // Required Cart Item fields for production shopping cart
+  id?: string;
+  userId?: string;
+  ownerId?: string;
+  businessId?: string;
+  storeId?: string;
   productId: string;
+  productName?: string;
+  imageUrl?: string;
+  price?: number;
+  currency?: string;
+  quantity: number;
+  stock?: number;
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Legacy mappings to avoid breaking checkout/routing
   variantId?: string;
   sku?: string;
   name: string;
-  imageUrl?: string;
-  quantity: number;
   unitPrice: number;
   subtotal: number;
   status: 'active' | 'out-of-stock' | 'price-changed';

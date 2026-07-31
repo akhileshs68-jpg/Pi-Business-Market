@@ -25,9 +25,10 @@ export const cartService = {
   /**
    * CART MANAGEMENT
    */
-  async getOrCreateCart(userUid: string, businessId: string): Promise<Cart> {
+  async getOrCreateCart(userUid: string, businessId: string = 'unknown_business'): Promise<Cart> {
     const db = getFirebaseDb();
-    const cartId = `${userUid}_${businessId}`;
+    const safeBusinessId = businessId || 'unknown_business';
+    const cartId = `${userUid}_${safeBusinessId}`;
     const cartRef = doc(db, 'carts', cartId);
     const cartSnap = await getDoc(cartRef);
 
@@ -43,7 +44,7 @@ export const cartService = {
     const newCart: Cart = {
       cartId,
       userUid,
-      businessId,
+      businessId: safeBusinessId,
       currency: 'Pi',
       subtotal: 0,
       discount: 0,
@@ -78,20 +79,71 @@ export const cartService = {
     const itemSnap = await getDoc(itemRef);
 
     const subtotal = item.unitPrice * item.quantity;
+    
+    // Extract userId from cartId (format: userUid_businessId)
+    const userId = cartId.split('_')[0];
+
+    // Fetch product to get latest details and stock
+    const productRef = doc(db, 'products', item.productId);
+    const productSnap = await getDoc(productRef);
+    let ownerId = 'unknown';
+    let businessId = 'unknown';
+    let storeId = 'unknown';
+    let stock = 999;
+    
+    if (productSnap.exists()) {
+      const pData = productSnap.data();
+      ownerId = pData.ownerUid || 'unknown';
+      businessId = pData.businessId || 'unknown';
+      storeId = pData.storeId || 'unknown';
+      stock = pData.stock !== undefined ? pData.stock : 999;
+
+      if (pData.status === 'Deleted' || pData.status === 'draft' || pData.status === 'Inactive') {
+        throw new Error('This product is no longer available.');
+      }
+
+      if (storeId && storeId !== 'unknown' && storeId !== 'none' && storeId !== 'undefined') {
+        const storeSnap = await getDoc(doc(db, 'stores', storeId));
+        if (!storeSnap.exists()) {
+          throw new Error('This product is no longer available.');
+        }
+        const sData = storeSnap.data();
+        if (sData.status !== 'active' && sData.status !== 'published' && sData.status !== 'approved' && sData.status) {
+          throw new Error('This product is no longer available.');
+        }
+      } else {
+        throw new Error('This product is no longer available.');
+      }
+    } else {
+      throw new Error('This product is no longer available.');
+    }
 
     if (itemSnap.exists()) {
       const current = itemSnap.data() as CartItem;
       const newQuantity = current.quantity + item.quantity;
       await updateDoc(itemRef, {
         quantity: newQuantity,
-        subtotal: item.unitPrice * newQuantity
+        subtotal: item.unitPrice * newQuantity,
+        stock: stock,
+        updatedAt: new Date().toISOString()
       });
     } else {
       await setDoc(itemRef, {
         ...item,
         itemId,
+        id: itemId,
+        userId,
+        ownerId,
+        businessId,
+        storeId,
+        productName: item.name,
+        price: item.unitPrice,
+        currency: item.currency || 'Pi',
+        stock: stock,
         subtotal,
-        status: 'active'
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
     }
 

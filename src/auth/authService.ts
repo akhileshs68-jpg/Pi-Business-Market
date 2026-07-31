@@ -147,13 +147,7 @@ export const authService = {
         if (typeof window !== 'undefined' && window.Pi && isPiBrowser) {
           console.log('[AuthService] Initiating window.Pi.authenticate...');
           
-          // Wrap authenticate in a timeout to detect if it hangs forever
-          const authPromise = window.Pi.authenticate(scopes, onIncompletePaymentFound);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Pi.authenticate timed out after 20 seconds")), 20000)
-          );
-
-          const piAuth = await Promise.race([authPromise, timeoutPromise]);
+          const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
           
           console.log('[AuthService] Pi.authenticate resolved:', piAuth);
           piAuthResult = piAuth;

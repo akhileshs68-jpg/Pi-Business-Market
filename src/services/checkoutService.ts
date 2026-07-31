@@ -51,6 +51,9 @@ export const checkoutService = {
         const productSnap = await getDoc(doc(db, 'products', productId));
         if (productSnap.exists()) {
           const productData = productSnap.data();
+          if (productData.status === 'Deleted' || productData.status === 'draft' || productData.status === 'Inactive') {
+            throw new Error('This product is no longer available.');
+          }
           // Update Buy Now to read these values directly from the Product document
           storeId = productData.storeId;
           businessId = productData.businessId;
@@ -58,8 +61,26 @@ export const checkoutService = {
           if (productData.price !== undefined) {
             price = productData.price;
           }
+
+          if (storeId && storeId !== 'none' && storeId !== 'undefined') {
+            const storeSnap = await getDoc(doc(db, 'stores', storeId));
+            if (!storeSnap.exists()) {
+              throw new Error('This product is no longer available.');
+            }
+            const sData = storeSnap.data();
+            if (sData.status !== 'active' && sData.status !== 'published' && sData.status !== 'approved' && sData.status) {
+              throw new Error('This product is no longer available.');
+            }
+          } else {
+            throw new Error('This product is no longer available.');
+          }
+        } else {
+          throw new Error('This product is no longer available.');
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.message === 'This product is no longer available.') {
+          throw err;
+        }
         console.error('[checkoutService] Error fetching product data during checkout session creation:', err);
       }
     }

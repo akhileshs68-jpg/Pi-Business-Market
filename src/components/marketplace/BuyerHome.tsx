@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserType } from '../../types';
 import { cartService } from '../../services/cartService';
-import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, limit } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { getProductImageUrl } from '../../utils/imageUtils';
 
@@ -177,7 +177,33 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         // Seed first if collections are empty to ensure full-stack dynamic functionality
                 
         // Fetch products
-        const productsSnap = await getDocs(query(collection(db, 'products'), limit(30)));
+        const productsSnap = await getDocs(query(collection(db, 'products'), limit(50)));
+        
+        const storeIds = new Set<string>();
+        productsSnap.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.storeId && data.storeId !== 'none' && data.storeId !== 'undefined') {
+            storeIds.add(data.storeId);
+          }
+        });
+
+        const activeStores = new Set<string>();
+        if (storeIds.size > 0) {
+          await Promise.all(Array.from(storeIds).map(async (storeId) => {
+            try {
+              const storeSnap = await getDoc(doc(db, 'stores', storeId));
+              if (storeSnap.exists()) {
+                const sData = storeSnap.data();
+                if (sData.status === 'active' || sData.status === 'published' || sData.status === 'approved' || !sData.status) {
+                  activeStores.add(storeId);
+                }
+              }
+            } catch (e) {
+              console.warn('Could not fetch store', storeId, e);
+            }
+          }));
+        }
+
         const productsList = productsSnap.docs.map(doc => {
           const data = doc.data();
           return {
@@ -196,9 +222,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             isRecommended: data.isRecommended !== undefined ? data.isRecommended : true,
             category: data.category || 'Electronics',
             status: data.status || 'Active',
-            type: 'product'
+            type: 'product',
+            storeId: data.storeId
           };
-        }).filter(p => p.status !== 'Deleted');
+        }).filter(p => p.status !== 'Deleted' && p.status !== 'draft' && p.status !== 'Inactive' && p.storeId && activeStores.has(p.storeId));
 
         // Fetch services
         const servicesSnap = await getDocs(query(collection(db, 'services'), limit(15)));
@@ -321,8 +348,11 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
     e.stopPropagation();
     showToast(`Adding ${product.title} to Cart...`);
     try {
-      await cartService.addToCart(user?.uid || 'guest_user', {
-        cartId: user?.uid || 'guest_user',
+      const uId = user?.uid || 'guest_user';
+      const bId = product.businessId || product.storeId || 'unknown_business';
+      const cart = await cartService.getOrCreateCart(uId, bId);
+      await cartService.addToCart(cart.cartId, {
+        cartId: cart.cartId,
         productId: product.id,
         name: product.title,
         quantity: 1,
