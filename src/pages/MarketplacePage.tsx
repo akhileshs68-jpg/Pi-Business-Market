@@ -57,10 +57,12 @@ export const MarketplacePage: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>('relevant');
 
   const [recentSearches, setRecentSearches] = useState<string[]>(['Smartphones', 'Web Design', 'Senior Dev Jobs', 'Organic Coffee']);
+  const [visibleCount, setVisibleCount] = useState<number>(12);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (query) {
+        setVisibleCount(12);
         handleSearch();
       } else {
         setResults([]);
@@ -351,6 +353,7 @@ export const MarketplacePage: React.FC = () => {
                     {['product', 'business', 'store', 'service', 'job'].map(type => {
                       const typeResults = results.filter(r => r.entityType === type);
                       if (typeResults.length === 0) return null;
+                      const visibleTypeResults = typeResults.slice(0, visibleCount);
                       
                       return (
                         <div key={type} className="space-y-6">
@@ -363,7 +366,7 @@ export const MarketplacePage: React.FC = () => {
                             </span>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {typeResults.map((item) => (
+                            {visibleTypeResults.map((item) => (
                               <motion.div
                                 key={item.documentId}
                                 initial={{ opacity: 0, y: 20 }}
@@ -418,6 +421,17 @@ export const MarketplacePage: React.FC = () => {
                         </div>
                       );
                     })}
+
+                    {results.length > visibleCount && (
+                      <div className="flex justify-center pt-6">
+                        <button
+                          onClick={() => setVisibleCount(prev => prev + 12)}
+                          className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20"
+                        >
+                          Load More Results
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* Initial State - Discovery Cards */

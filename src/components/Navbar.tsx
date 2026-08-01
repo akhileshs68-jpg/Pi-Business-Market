@@ -61,7 +61,7 @@ interface NavbarProps {
   onSearchSubmit?: (val: string) => void;
 }
 
-export default function Navbar({
+function NavbarComponent({
   currentUser,
   currentView,
   onNavigate,
@@ -543,3 +543,5 @@ export default function Navbar({
     </header>
   );
 }
+
+export default React.memo(NavbarComponent);

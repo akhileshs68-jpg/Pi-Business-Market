@@ -20,33 +20,64 @@ export const BmpRewardsWallet = () => {
   const [error, setError] = useState('');
 
   const loadData = async () => {
+    setError('');
     try {
       const auth = getFirebaseAuth();
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-      const provider = paymentEngine.getProvider('bmp_rewards');
-      const bal = await provider.getBalance(user.uid);
-      setBalance(bal);
+      // 1. Get Balance (auto-creates wallet doc if missing)
+      try {
+        const provider = paymentEngine.getProvider('bmp_rewards');
+        const bal = await provider.getBalance(user.uid);
+        setBalance(bal || 0);
+      } catch (balErr) {
+        console.warn('Error loading balance:', balErr);
+      }
 
-      const userProf = await gamificationService.getUserProfile(user.uid);
-      setProfile(userProf);
+      // 2. Get Gamification Profile (auto-creates profile if missing)
+      try {
+        const userProf = await gamificationService.getUserProfile(user.uid);
+        setProfile(userProf);
+      } catch (profErr) {
+        console.warn('Error loading gamification profile:', profErr);
+      }
 
-      const db = getFirebaseDb();
-      const txQ = query(
-        collection(db, 'wallet_transactions'),
-        where('userId', '==', user.uid),
-        where('provider', '==', 'bmp_rewards'),
-        orderBy('createdAt', 'desc'),
-        limit(20)
-      );
-      
-      const snap = await getDocs(txQ);
-      const txs = snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
-      setTransactions(txs);
+      // 3. Query wallet_transactions safely (single field filter to avoid missing index errors)
+      try {
+        const db = getFirebaseDb();
+        const txQ = query(
+          collection(db, 'wallet_transactions'),
+          where('userId', '==', user.uid)
+        );
+        
+        const snap = await getDocs(txQ);
+        const allUserTxs = snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
+        
+        // Filter and sort in memory to guarantee zero composite index requirements
+        const filteredTxs = allUserTxs
+          .filter(tx => tx.provider === 'bmp_rewards' || tx.walletId === `${user.uid}_bmp_rewards`)
+          .sort((a, b) => {
+            const getTs = (val: any) => {
+              if (!val) return 0;
+              if (typeof val === 'object' && 'seconds' in val) return val.seconds * 1000;
+              if (typeof val === 'number') return val;
+              return new Date(val).getTime() || 0;
+            };
+            return getTs(b.createdAt) - getTs(a.createdAt);
+          })
+          .slice(0, 20);
+
+        setTransactions(filteredTxs);
+      } catch (txErr) {
+        console.warn('Error loading wallet transactions:', txErr);
+        setTransactions([]);
+      }
     } catch (err) {
-      console.error(err);
-      setError('Failed to load BMP wallet data');
+      console.error('Error in loadData:', err);
     } finally {
       setLoading(false);
     }

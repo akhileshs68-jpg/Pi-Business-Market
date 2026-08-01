@@ -168,20 +168,20 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   // Active items list
   const activeProducts = uniqueProducts;
 
-  // Real Firestore products fetch on mount
+  // Fast Firestore products fetch on mount (10 initial products + async background banners)
   useEffect(() => {
-    const fetchFirestoreData = async () => {
+    let isMounted = true;
+
+    const fetchInitialData = async () => {
       try {
         const db = getFirebaseDb();
-        
-        // Seed first if collections are empty to ensure full-stack dynamic functionality
-                
-        // Fetch products
-        const productsSnap = await getDocs(query(collection(db, 'products'), limit(50)));
+
+        // 1. Fetch initial 10 products for rapid startup (< 1.5s)
+        const productsSnap = await getDocs(query(collection(db, 'products'), limit(10)));
         
         const storeIds = new Set<string>();
-        productsSnap.docs.forEach(doc => {
-          const data = doc.data();
+        productsSnap.docs.forEach(docSnap => {
+          const data = docSnap.data();
           if (data.storeId && data.storeId !== 'none' && data.storeId !== 'undefined') {
             storeIds.add(data.storeId);
           }
@@ -204,10 +204,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           }));
         }
 
-        const productsList = productsSnap.docs.map(doc => {
-          const data = doc.data();
+        const initialProducts = productsSnap.docs.map(docSnap => {
+          const data = docSnap.data();
           return {
-            id: doc.id,
+            id: docSnap.id,
             title: data.productName || data.name || data.title || '',
             price: typeof data.price === 'string' ? parseFloat(data.price) : (data.price || 0),
             currency: data.currency || 'π',
@@ -227,12 +227,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           };
         }).filter(p => p.status !== 'Deleted' && p.status !== 'draft' && p.status !== 'Inactive' && p.storeId && activeStores.has(p.storeId));
 
-        // Fetch services
-        const servicesSnap = await getDocs(query(collection(db, 'services'), limit(15)));
-        const servicesList = servicesSnap.docs.map(doc => {
-          const data = doc.data();
+        // 2. Fetch services initial batch
+        const servicesSnap = await getDocs(query(collection(db, 'services'), limit(5)));
+        const initialServices = servicesSnap.docs.map(docSnap => {
+          const data = docSnap.data();
           return {
-            id: doc.id,
+            id: docSnap.id,
             title: data.serviceName || data.name || data.title || '',
             price: typeof data.price === 'string' ? parseFloat(data.price) : (data.price || 0),
             currency: data.currency || 'π',
@@ -251,35 +251,90 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           };
         }).filter(s => s.status !== 'Deleted');
 
-        const combined = [...productsList, ...servicesList];
-        setFirestoreProducts(combined);
+        if (isMounted) {
+          setFirestoreProducts([...initialProducts, ...initialServices]);
+          setLoadingReal(false); // Unblock home screen immediately
+        }
 
-        // Fetch banners
-        const bannersSnap = await getDocs(collection(db, 'banners'));
-        const bannersList = bannersSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            tag: data.tag || 'EXCLUSIVE DEAL',
-            title: data.title || 'Special Offer',
-            description: data.description || '',
-            badge: data.badge || 'Consensus Approved',
-            bgClass: data.bgClass || 'from-violet-900 via-indigo-950 to-slate-950',
-            image: data.imageUrl || data.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
-            targetRoute: data.targetRoute || `product/${doc.id}`,
-            status: data.status || 'active'
-          };
-        }).filter(b => b.status === 'active');
-        
-        setBanners(bannersList);
+        // 3. Load remaining products in background lazy task
+        setTimeout(async () => {
+          if (!isMounted) return;
+          try {
+            const moreProductsSnap = await getDocs(query(collection(db, 'products'), limit(50)));
+            const allProductsList = moreProductsSnap.docs.map(docSnap => {
+              const data = docSnap.data();
+              return {
+                id: docSnap.id,
+                title: data.productName || data.name || data.title || '',
+                price: typeof data.price === 'string' ? parseFloat(data.price) : (data.price || 0),
+                currency: data.currency || 'π',
+                oldPrice: typeof data.oldPrice === 'string' ? parseFloat(data.oldPrice) : (data.oldPrice || data.originalPrice || 0),
+                seller: data.seller || data.storeName || 'Verified Merchant',
+                rating: typeof data.rating === 'number' ? data.rating : (data.rating ? parseFloat(data.rating) : 4.8),
+                reviews: typeof data.reviews === 'number' ? data.reviews : (data.reviewCount || Math.floor(Math.random() * 50) + 15),
+                image: getProductImageUrl(data),
+                isBestDeal: !!data.isBestDeal || (data.price && data.oldPrice && parseFloat(data.price) < parseFloat(data.oldPrice)),
+                isPiExclusive: data.isPiExclusive !== undefined ? data.isPiExclusive : true,
+                isTrending: data.isTrending !== undefined ? data.isTrending : true,
+                isRecommended: data.isRecommended !== undefined ? data.isRecommended : true,
+                category: data.category || 'Electronics',
+                status: data.status || 'Active',
+                type: 'product',
+                storeId: data.storeId
+              };
+            }).filter(p => p.status !== 'Deleted' && p.status !== 'draft' && p.status !== 'Inactive');
+
+            if (isMounted) {
+              setFirestoreProducts(prev => {
+                const existingIds = new Set(prev.map(item => item.id));
+                const newItems = allProductsList.filter(item => !existingIds.has(item.id));
+                return [...prev, ...newItems];
+              });
+            }
+          } catch (err) {
+            console.warn('Background products load non-critical error:', err);
+          }
+        }, 100);
+
+        // 4. Fetch banners asynchronously non-blocking
+        setTimeout(async () => {
+          if (!isMounted) return;
+          try {
+            const bannersSnap = await getDocs(collection(db, 'banners'));
+            const bannersList = bannersSnap.docs.map(docSnap => {
+              const data = docSnap.data();
+              return {
+                id: docSnap.id,
+                tag: data.tag || 'EXCLUSIVE DEAL',
+                title: data.title || 'Special Offer',
+                description: data.description || '',
+                badge: data.badge || 'Consensus Approved',
+                bgClass: data.bgClass || 'from-violet-900 via-indigo-950 to-slate-950',
+                image: data.imageUrl || data.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+                targetRoute: data.targetRoute || `product/${docSnap.id}`,
+                status: data.status || 'active'
+              };
+            }).filter(b => b.status === 'active');
+
+            if (isMounted) {
+              setBanners(bannersList);
+            }
+          } catch (err) {
+            console.warn('Background banners load error:', err);
+          }
+        }, 50);
 
       } catch (err) {
-        console.error('Error loading Firestore products/services/banners:', err);
-      } finally {
-        setLoadingReal(false);
+        console.error('Error loading initial home data:', err);
+        if (isMounted) setLoadingReal(false);
       }
     };
-    fetchFirestoreData();
+
+    fetchInitialData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Sync Feed Products and HasMore with uniqueProducts

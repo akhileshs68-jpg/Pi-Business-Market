@@ -580,6 +580,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <img 
               src={productImgUrl} 
               alt={product.productName} 
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
               referrerPolicy="no-referrer"
             />
@@ -886,6 +888,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <img 
           src={productImgUrl} 
           alt={product.productName} 
+          loading="lazy"
+          decoding="async"
           onLoad={() => setIsImgLoaded(true)}
           className={`w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-105 ${isImgLoaded ? 'opacity-100' : 'opacity-0'}`}
           referrerPolicy="no-referrer"

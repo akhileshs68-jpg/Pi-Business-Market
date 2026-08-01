@@ -167,25 +167,31 @@ export const ProfilePage: React.FC = () => {
     }
   }, [user, navigate]);
 
-  // Load persistence states on mount
+  // Load persistence states conditionally per activeTab
   useEffect(() => {
-    if (user) {
-      // 1. Fetch Orders
-      fetchOrders();
+    if (!user) return;
 
-      // 2. Load Wallet Balance
-      const storedBalance = localStorage.getItem('bmp_wallet_balance');
-      if (storedBalance) {
-        setWalletBalance(parseFloat(storedBalance));
-      } else {
-        localStorage.setItem('bmp_wallet_balance', '300');
-        setWalletBalance(300);
-      }
-
-      // 3. Load Wishlist Items
-      loadWishlist();
+    // Load Wallet Balance for header
+    const storedBalance = localStorage.getItem('bmp_wallet_balance');
+    if (storedBalance) {
+      setWalletBalance(parseFloat(storedBalance));
+    } else {
+      localStorage.setItem('bmp_wallet_balance', '300');
+      setWalletBalance(300);
     }
   }, [user]);
+
+  // Lazy load tab-specific data
+  useEffect(() => {
+    if (!user) return;
+
+    if (activeTab === 'orders' && orders.length === 0 && !loadingOrders) {
+      fetchOrders();
+    }
+    if (activeTab === 'wishlist') {
+      loadWishlist();
+    }
+  }, [user, activeTab]);
 
   const loadWishlist = () => {
     const storedWish = localStorage.getItem('bmp_marketplace_wishlist');

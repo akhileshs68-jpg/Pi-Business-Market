@@ -57,15 +57,25 @@ export const CustomerRewards: React.FC = () => {
       const db = getFirebaseDb();
       const txQ = query(
         collection(db, 'wallet_transactions'),
-        where('userId', '==', user.uid),
-        where('provider', '==', 'bmp_rewards'),
-        orderBy('createdAt', 'desc'),
-        limit(15)
+        where('userId', '==', user.uid)
       );
       
       const snap = await getDocs(txQ);
-      const txs = snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
-      setTransactions(txs);
+      const allTxs = snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
+      const filteredTxs = allTxs
+        .filter(tx => tx.provider === 'bmp_rewards' || tx.walletId === `${user.uid}_bmp_rewards`)
+        .sort((a, b) => {
+          const getTs = (val: any) => {
+            if (!val) return 0;
+            if (typeof val === 'object' && 'seconds' in val) return val.seconds * 1000;
+            if (typeof val === 'number') return val;
+            return new Date(val).getTime() || 0;
+          };
+          return getTs(b.createdAt) - getTs(a.createdAt);
+        })
+        .slice(0, 15);
+
+      setTransactions(filteredTxs);
     } catch (err) {
       console.error('Failed to fetch rewards profile', err);
     } finally {

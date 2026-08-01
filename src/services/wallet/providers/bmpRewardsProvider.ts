@@ -13,6 +13,22 @@ export const bmpRewardsProvider: WalletProvider = {
     if (snap.exists()) {
       return snap.data().balance || 0;
     }
+
+    // Auto-create wallet document with defaults if it does not exist
+    try {
+      await setDoc(docRef, {
+        userId,
+        provider: this.id,
+        balance: 0,
+        lifetimeEarned: 0,
+        streak: 0,
+        level: 1,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Failed to auto-create default wallet doc:', err);
+    }
     return 0;
   },
 

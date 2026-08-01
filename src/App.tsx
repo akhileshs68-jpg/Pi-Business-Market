@@ -1,45 +1,55 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { ProtectedRoute } from './auth/ProtectedRoute';
-import { LoginPage } from './pages/LoginPage';
-import { MyWorkspace } from './pages/MyWorkspace';
-import { BusinessDashboard } from './pages/BusinessDashboard';
-import { StoreDashboard } from './pages/StoreDashboard';
-import { BookingsPage } from './pages/BookingsPage';
-import { CatalogManagement } from './pages/CatalogManagement';
-import { WarehouseDashboard } from './pages/WarehouseDashboard';
-import { InventoryDashboard } from './pages/InventoryDashboard';
-import { ServiceManagement } from './pages/ServiceManagement';
 
-import { JobMarketplace } from './pages/JobMarketplace';
-import { EmployerDashboard } from './pages/EmployerDashboard';
-import { HomePage } from './pages/HomePage';
-import { MarketplacePage } from './pages/MarketplacePage';
-import { Checkout } from './pages/Checkout';
-import { OrderSuccess } from './pages/OrderSuccess';
-import { ProductDetails } from './pages/ProductDetails';
-import { CustomerOrders } from './pages/CustomerOrders';
-import { OrderDetails } from './pages/OrderDetails';
-import { BusinessOrderDashboard } from './pages/BusinessOrderDashboard';
-import { MerchantPayments } from './pages/MerchantPayments';
-import { CustomerPayments } from './pages/CustomerPayments';
-import { FulfillmentCenter } from './pages/FulfillmentCenter';
-import { ShipmentDetails } from './pages/ShipmentDetails';
-import { MerchantCRM } from './pages/MerchantCRM';
-import { Customer360 } from './pages/Customer360';
-import { CustomerRewards } from './pages/CustomerRewards';
-import InboxPage from './pages/InboxPage';
-import MerchantAnalytics from './pages/MerchantAnalytics';
-import AdminAnalytics from './pages/AdminAnalytics';
-import AdminConsole from './pages/AdminConsole';
-import { BusinessProfile } from './pages/BusinessProfile';
-import DocumentationPortal from './pages/DocumentationPortal';
-import { ProfilePage } from './pages/ProfilePage';
-import { CartPage } from './pages/CartPage';
-import { OnboardingPage } from './pages/OnboardingPage';
-import { CreateBusinessPage } from './pages/CreateBusinessPage';
-import { CreateStorePage } from './pages/CreateStorePage';
+// Lazy loaded page components
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const MyWorkspace = lazy(() => import('./pages/MyWorkspace').then(m => ({ default: m.MyWorkspace })));
+const BusinessDashboard = lazy(() => import('./pages/BusinessDashboard').then(m => ({ default: m.BusinessDashboard })));
+const StoreDashboard = lazy(() => import('./pages/StoreDashboard').then(m => ({ default: m.StoreDashboard })));
+const BookingsPage = lazy(() => import('./pages/BookingsPage').then(m => ({ default: m.BookingsPage })));
+const CatalogManagement = lazy(() => import('./pages/CatalogManagement').then(m => ({ default: m.CatalogManagement })));
+const WarehouseDashboard = lazy(() => import('./pages/WarehouseDashboard').then(m => ({ default: m.WarehouseDashboard })));
+const InventoryDashboard = lazy(() => import('./pages/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
+const ServiceManagement = lazy(() => import('./pages/ServiceManagement').then(m => ({ default: m.ServiceManagement })));
+const JobMarketplace = lazy(() => import('./pages/JobMarketplace').then(m => ({ default: m.JobMarketplace })));
+const EmployerDashboard = lazy(() => import('./pages/EmployerDashboard').then(m => ({ default: m.EmployerDashboard })));
+const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
+const MarketplacePage = lazy(() => import('./pages/MarketplacePage').then(m => ({ default: m.MarketplacePage })));
+const Checkout = lazy(() => import('./pages/Checkout').then(m => ({ default: m.Checkout })));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess').then(m => ({ default: m.OrderSuccess })));
+const ProductDetails = lazy(() => import('./pages/ProductDetails').then(m => ({ default: m.ProductDetails })));
+const CustomerOrders = lazy(() => import('./pages/CustomerOrders').then(m => ({ default: m.CustomerOrders })));
+const OrderDetails = lazy(() => import('./pages/OrderDetails').then(m => ({ default: m.OrderDetails })));
+const BusinessOrderDashboard = lazy(() => import('./pages/BusinessOrderDashboard').then(m => ({ default: m.BusinessOrderDashboard })));
+const MerchantPayments = lazy(() => import('./pages/MerchantPayments').then(m => ({ default: m.MerchantPayments })));
+const CustomerPayments = lazy(() => import('./pages/CustomerPayments').then(m => ({ default: m.CustomerPayments })));
+const FulfillmentCenter = lazy(() => import('./pages/FulfillmentCenter').then(m => ({ default: m.FulfillmentCenter })));
+const ShipmentDetails = lazy(() => import('./pages/ShipmentDetails').then(m => ({ default: m.ShipmentDetails })));
+const MerchantCRM = lazy(() => import('./pages/MerchantCRM').then(m => ({ default: m.MerchantCRM })));
+const Customer360 = lazy(() => import('./pages/Customer360').then(m => ({ default: m.Customer360 })));
+const CustomerRewards = lazy(() => import('./pages/CustomerRewards').then(m => ({ default: m.CustomerRewards })));
+const InboxPage = lazy(() => import('./pages/InboxPage'));
+const MerchantAnalytics = lazy(() => import('./pages/MerchantAnalytics'));
+const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'));
+const AdminConsole = lazy(() => import('./pages/AdminConsole'));
+const BusinessProfile = lazy(() => import('./pages/BusinessProfile').then(m => ({ default: m.BusinessProfile })));
+const DocumentationPortal = lazy(() => import('./pages/DocumentationPortal'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const CartPage = lazy(() => import('./pages/CartPage').then(m => ({ default: m.CartPage })));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then(m => ({ default: m.OnboardingPage })));
+const CreateBusinessPage = lazy(() => import('./pages/CreateBusinessPage').then(m => ({ default: m.CreateBusinessPage })));
+const CreateStorePage = lazy(() => import('./pages/CreateStorePage').then(m => ({ default: m.CreateStorePage })));
+
+const LoadingFallback = () => (
+  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-200">
+    <div className="w-12 h-12 rounded-2xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center animate-pulse mb-3">
+      <span className="text-xl font-bold text-violet-400 font-mono">π</span>
+    </div>
+    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading Workspace...</div>
+  </div>
+);
 
 /**
  * Pi Business Market - Enterprise Entry Point
@@ -52,7 +62,8 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
           {/* PUBLIC ROUTES */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/docs" element={<DocumentationPortal />} />
@@ -378,6 +389,7 @@ function App() {
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
+        </Suspense>
       </AuthProvider>
     </Router>
   );
