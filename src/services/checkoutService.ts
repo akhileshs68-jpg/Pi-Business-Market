@@ -158,6 +158,7 @@ export const checkoutService = {
     const data = snap.data();
     return {
       ...data,
+      sessionId: snap.id,
       expiresAt: data.expiresAt instanceof Timestamp ? data.expiresAt.toDate().toISOString() : data.expiresAt
     } as CheckoutSession;
   },

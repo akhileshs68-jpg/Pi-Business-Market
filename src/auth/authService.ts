@@ -1,7 +1,7 @@
 import { 
   signInAnonymously, 
   signInWithPopup,
-  GoogleAuthProvider,
+  
   signOut, 
   onAuthStateChanged,
   User as FirebaseUser 
@@ -105,18 +105,30 @@ export const authService = {
   async authenticatePi(scopes: string[]): Promise<any> {
     console.log('[AuthService] Pi.authenticate() called with scopes:', scopes);
     
-    const includesPayments = scopes.includes('payments');
-
-    if (piAuthResult && !includesPayments) {
-      console.log('[AuthService] Returning cached Pi Authentication response');
+    if (piAuthResult) {
+      console.log('[PiAuth] Existing session detected');
+      console.log('[PiAuth] Reusing cached authentication');
       return piAuthResult;
     }
 
-    if (piAuthPromise && !includesPayments) {
+    try {
+      const cachedStr = sessionStorage.getItem('pi_auth_session');
+      if (cachedStr) {
+        piAuthResult = JSON.parse(cachedStr);
+        console.log('[PiAuth] Existing session detected');
+        console.log('[PiAuth] Reusing cached authentication');
+        return piAuthResult;
+      }
+    } catch (e) {
+      console.error('[AuthService] Failed to parse cached session', e);
+    }
+
+    if (piAuthPromise) {
       console.log('[AuthService] Returning existing Pi Authentication promise');
       return piAuthPromise;
     }
 
+    console.log('[PiAuth] Authentication required');
     await this.initPi();
     
     const onIncompletePaymentFound = async (payment: any) => {
@@ -143,18 +155,43 @@ export const authService = {
 
     piAuthPromise = (async () => {
       try {
-        const isPiBrowser = true;
-        if (typeof window !== 'undefined' && window.Pi && isPiBrowser) {
+        const isPiBrowser = typeof window !== 'undefined' && typeof window.Pi !== 'undefined';
+        if (isPiBrowser) {
           console.log('[AuthService] Initiating window.Pi.authenticate...');
           
-          const piAuth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+          const authenticateWithTimeout = new Promise<any>((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+              console.error('[AuthService] Pi.authenticate timeout reached after 120000ms');
+              reject(new Error("Pi.authenticate timed out after 120000ms"));
+            }, 120000);
+
+            console.log('[AuthService] window.Pi.authenticate() starting');
+            window.Pi.authenticate(scopes, onIncompletePaymentFound)
+              .then((result: any) => {
+                clearTimeout(timeoutId);
+                console.log('[AuthService] window.Pi.authenticate() resolved successfully');
+                resolve(result);
+              })
+              .catch((err: any) => {
+                clearTimeout(timeoutId);
+                console.error('[AuthService] window.Pi.authenticate() rejected:', err);
+                reject(err);
+              });
+          });
+
+          const piAuth = await authenticateWithTimeout;
           
           console.log('[AuthService] Pi.authenticate resolved:', piAuth);
           piAuthResult = piAuth;
+          try {
+            sessionStorage.setItem('pi_auth_session', JSON.stringify(piAuth));
+          } catch(e) {
+            console.error('[AuthService] Failed to save session', e);
+          }
           return piAuth;
         } else {
           console.error('[AuthService] Pi SDK missing or not in Pi Browser');
-          throw new Error("Pi SDK is not available. Please open in Pi Browser.");
+          throw new Error("Pi Payments are available only inside Pi Browser.");
         }
       } catch (err) {
         console.error('[AuthService] Pi.authenticate rejected:', err);
@@ -178,7 +215,7 @@ export const authService = {
 
     loginInProgressPromise = (async () => {
       try {
-        const isPiBrowser = true;
+        const isPiBrowser = typeof window !== 'undefined' && typeof window.Pi !== 'undefined';
         const isPreviewDomain = window.location.hostname.includes('run.app') || 
                                window.location.hostname.includes('vercel.app') || 
                                window.location.hostname.includes('localhost');
@@ -186,17 +223,18 @@ export const authService = {
         let piUid: string;
         let username: string;
 
-        // Use real SDK when running in Pi Browser
-        const hasPiSdk = typeof window !== 'undefined' && Boolean(window.Pi) && isPiBrowser;
-        if (hasPiSdk) {
+        // Use mock SDK when running in development or preview environments
+        if (isPreviewDomain) {
+          console.log('[AuthService] Running in preview/dev environment, using mock auth');
+          piUid = 'mock_pi_uid_123';
+          username = 'pi_pioneer_88'; // Defaulting to owner for testing
+        } else {
+          // Official Pi SDK Login
+          if (!isPiBrowser) {
+            throw new Error("Pi SDK is not available. Please open in Pi Browser.");
+          }
           try {
-            let piAuth;
-            if (import.meta.env.VITE_DEVELOPMENT_MODE === 'true') {
-               console.log('[AuthService] Running in DEVELOPMENT_MODE, using mock auth');
-               piAuth = { accessToken: "mock_token_123" };
-            } else {
-               piAuth = await this.authenticatePi(['username', 'payments']);
-            }
+            const piAuth = await this.authenticatePi(['username', 'payments']);
             const accessToken = piAuth.accessToken;
             console.log('[AuthService] Sending accessToken to backend /api/auth/pi...');
 
@@ -218,8 +256,6 @@ export const authService = {
             console.error('[AuthService] Real Pi SDK failed:', sdkErr);
             throw sdkErr;
           }
-        } else {
-          throw new Error("Pi SDK is not available. Please open in Pi Browser.");
         }
 
         // 4. Firebase Auth (to get a session)
@@ -291,14 +327,13 @@ export const authService = {
           const newUser: any = {
             uid: effectiveUid,
             piUid,
+            currentAnonymousUid: firebaseUid,
             username,
             displayName: isOwner ? 'Pi Pioneer 88' : username, 
             walletAddress: '',
             photoUrl: '', // Will be updated if Pi provides image later
             roles: isOwner ? ['buyer', 'seller', 'business_owner', 'owner', 'superadmin'] : ['buyer'],
-            activeRole: isOwner ? 'owner' : 'buyer',
-            // Keeping these for backwards compatibility with existing types
-            role: isOwner ? 'Super Admin' : 'Buyer', 
+            // Removed activeRole as it is no longer used
             accountType: isOwner ? 'business' : 'individual',
             verified: true,
             kycVerified: isOwner,
@@ -323,22 +358,19 @@ export const authService = {
             lastLogin: serverTimestamp(),
             updatedAt: serverTimestamp(),
             piUid,
-            username
+            username,
+            currentAnonymousUid: firebaseUid
           };
           
           if (isOwner) {
             const ownerRoles = ['buyer', 'seller', 'business_owner', 'owner', 'superadmin'];
             existingUserData.roles = ownerRoles;
-            existingUserData.role = 'Super Admin';
-            existingUserData.activeRole = 'owner';
             existingUserData.displayName = 'Pi Pioneer 88';
             existingUserData.accountType = 'business';
             
             updateData = {
               ...updateData,
               roles: ownerRoles,
-              role: 'Super Admin',
-              activeRole: 'owner',
               accountType: 'business',
               displayName: 'Pi Pioneer 88'
             };
@@ -350,7 +382,6 @@ export const authService = {
           return {
             ...existingUserData,
             roles: existingUserData.roles || ['buyer'],
-            activeRole: existingUserData.activeRole || 'buyer',
             uid: effectiveUid,
             piUid,
             username: isOwner ? 'pi_pioneer_88' : username,
@@ -383,11 +414,26 @@ export const authService = {
       const userSnap = await getDoc(userRef);
       console.log('[AuthService] Firestore getDoc finished. exists:', userSnap.exists());
       
+      let data: any = null;
+      let actualUid = uid;
+
       if (userSnap.exists()) {
-        const data = userSnap.data();
+        data = userSnap.data();
+      } else {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const usersCol = collection(db, 'users');
+        const fallbackQ = query(usersCol, where('currentAnonymousUid', '==', uid));
+        const fallbackSnap = await getDocs(fallbackQ);
+        if (!fallbackSnap.empty) {
+          data = fallbackSnap.docs[0].data();
+          actualUid = fallbackSnap.docs[0].id;
+        }
+      }
+
+      if (data) {
         return {
           ...data,
-          uid,
+          uid: actualUid,
           createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
           updatedAt: data.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
           lastLogin: data.lastLogin?.toDate?.()?.toISOString() || new Date().toISOString(),
@@ -397,117 +443,6 @@ export const authService = {
     } catch (error: any) {
       console.error('[AuthService] Get user profile failed:', error);
       return null;
-    }
-  },
-
-  /**
-   * Signs in with Google as a fallback or alternative
-   */
-  async loginWithGoogle(): Promise<User> {
-    try {
-      const auth = getFirebaseAuth();
-      const db = getFirebaseDb();
-      const provider = new GoogleAuthProvider();
-      
-      const userCredential = await signInWithPopup(auth, provider);
-      const firebaseUid = userCredential.user.uid;
-      const firebaseUser = userCredential.user;
-
-      const generatedUsername = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUid.slice(0, 5);
-      const isOwnerEmail = firebaseUser.email === 'pioneer@pi-consensus.net' || firebaseUser.email === 'akhileshs68@gmail.com';
-      const finalUsername = isOwnerEmail ? 'pi_pioneer_88' : generatedUsername;
-      const isOwner = finalUsername === 'pi_pioneer_88';
-      
-      const effectiveUid = isOwner ? 'user_active_pioneer' : firebaseUid;
-      const userRef = doc(db, 'users', effectiveUid);
-      const userSnap = await getDoc(userRef);
-      const now = new Date().toISOString();
-
-      if (!userSnap.exists()) {
-        const newUser: any = {
-          uid: effectiveUid,
-          piUid: 'google_' + firebaseUid,
-          username: finalUsername,
-          displayName: isOwner ? 'Pi Pioneer 88' : (firebaseUser.displayName || 'Enterprise User'),
-          walletAddress: '',
-          photoUrl: firebaseUser.photoURL || '',
-          roles: isOwner ? ['buyer', 'seller', 'business_owner', 'owner', 'superadmin'] : ['buyer'],
-          activeRole: isOwner ? 'owner' : 'buyer',
-          role: isOwner ? 'Super Admin' : 'Buyer',
-          accountType: isOwner ? 'business' : 'individual',
-          verified: true,
-          kycVerified: isOwner,
-          createdAt: now,
-          updatedAt: now,
-          lastLogin: now,
-          status: 'active'
-        };
-
-        await setDoc(userRef, {
-          ...newUser,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastLogin: serverTimestamp()
-        });
-
-        return newUser as User;
-      } else {
-        const data = userSnap.data();
-        const isOwnerEmail = firebaseUser.email === 'pioneer@pi-consensus.net' || firebaseUser.email === 'akhileshs68@gmail.com';
-        const isOwner = data.username === 'pi_pioneer_88' || isOwnerEmail;
-        
-        const ownerUpdate = isOwner ? {
-          roles: ['buyer', 'seller', 'business_owner', 'owner', 'superadmin'],
-          role: 'Super Admin',
-          activeRole: 'owner',
-          accountType: 'business',
-          displayName: 'Pi Pioneer 88',
-          username: 'pi_pioneer_88'
-        } : {};
-        
-        await updateDoc(userRef, {
-          lastLogin: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          ...ownerUpdate
-        });
-        
-        return {
-          ...data,
-          roles: isOwner ? ['buyer', 'seller', 'business_owner', 'owner', 'superadmin'] : (data.roles || ['buyer']),
-          activeRole: isOwner ? 'owner' : (data.activeRole || 'buyer'),
-          displayName: isOwner ? 'Pi Pioneer 88' : data.displayName,
-          username: isOwner ? 'pi_pioneer_88' : data.username,
-          uid: effectiveUid,
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || now,
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString() || now,
-          lastLogin: now,
-        } as User;
-      }
-    } catch (error: any) {
-      console.error("[AuthService] Google Login failed:", error);
-      if (import.meta.env.VITE_DEVELOPMENT_MODE === "true") {
-        const mockUid = "user_active_pioneer";
-        const now = new Date().toISOString();
-        return {
-          uid: mockUid,
-          piUid: "google_" + mockUid,
-          username: "pi_pioneer_88",
-          displayName: "Pi Pioneer 88",
-          walletAddress: "",
-          photoUrl: "",
-          roles: ["buyer", "seller", "business_owner", "owner", "superadmin"],
-          activeRole: "owner",
-          role: "Super Admin",
-          accountType: "business",
-          verified: true,
-          kycVerified: true,
-          createdAt: now,
-          updatedAt: now,
-          lastLogin: now,
-          status: "active"
-        } as User;
-      }
-      throw error;
     }
   },
 

@@ -230,7 +230,7 @@ export const BusinessDashboard: React.FC = () => {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onToggle={() => {}}
-                    onClick={(b) => navigate(`/business/${b.id}`)}
+                    onClick={(b) => navigate(`/seller-dashboard/${b.id}`)}
                   />
                 </motion.div>
               ))}
@@ -245,7 +245,7 @@ export const BusinessDashboard: React.FC = () => {
             <div className="w-24 h-24 rounded-[2rem] bg-slate-900 border border-slate-800 flex items-center justify-center mb-8 shadow-inner">
               <Building2 className="w-10 h-10 text-slate-700" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-3">No Registered Businesses</h2>
+            <h2 className="text-3xl font-bold text-white mb-3">You don't have a business yet.</h2>
             <p className="text-slate-500 max-w-sm mb-10 font-medium">
               You haven't created any business profiles yet. Create one to start trading on the Pi Network.
             </p>

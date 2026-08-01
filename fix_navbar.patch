@@ -1,0 +1,36 @@
+--- src/components/Navbar.tsx
++++ src/components/Navbar.tsx
+@@ -124,14 +124,13 @@
+     if (path === '/inbox') return 'inbox';
+-    if (path === '/profile') return 'profile';
++    if (path === '/profile') return 'account';
+     if (
+-      path.startsWith('/store-dashboard') || 
+-      path.startsWith('/dashboard') || 
+-      path.startsWith('/catalog') || 
+-      path.startsWith('/business-dashboard')
++      path.startsWith('/orders') || 
++      path.startsWith('/business-orders')
+     ) {
+-      return 'sell';
++      return 'orders';
+     }
+     if (path === '/discovery' || path === '/') {
+-      const hasQuery = searchQuery && searchQuery.trim() !== '';
+-      return hasQuery ? 'discover' : 'home';
++      return 'marketplace';
+     }
++    return 'home';
+   };
+@@ -481,5 +480,5 @@
+           const isActive = activeTabId === item.id;
+-          const isSell = item.id === 'sell';
++          const isSell = item.id === 'orders'; // We keep the center button styling for orders just to not break layout immediately, or marketplace?
+ 
+-          if (isSell) {
++          if (item.id === 'orders') {
+             return (
+@@ -489,4 +488,4 @@
+                 id="nav_bottom_sell_fab"
+               >
+                 <motion.div 

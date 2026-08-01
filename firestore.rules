@@ -61,7 +61,7 @@ service cloud.firestore {
                     isValidUser(incoming()) && 
                     incoming().uid == existing().uid &&
                     incoming().piUid == existing().piUid &&
-                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'walletAddress', 'updatedAt', 'lastLogin', 'role', 'accountType', 'activeRole', 'roles']);
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'walletAddress', 'updatedAt', 'lastLogin', 'role', 'accountType']);
     }
 
     // New Business Identity Rules
@@ -210,21 +210,6 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    match /categories/{catId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    match /attributeGroups/{groupId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    match /attributes/{attributeId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
     match /store_inventory_logs/{logId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -291,14 +276,6 @@ service cloud.firestore {
     match /maintenanceWindows/{windowId} {
       allow read: if true;
       allow write: if isAdmin();
-    }
-
-    match /checkoutSessions/{sessionId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /orderDrafts/{draftId} {
-      allow read, write: if isSignedIn();
     }
 
     // 6. Commerce & OMS

@@ -20,12 +20,12 @@ import { motion } from 'motion/react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { paymentService } from '../services/paymentService';
-import { Payment } from '../types';
+import { PaymentRecord } from '../types/payment';
 
 export const CustomerPayments: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([])
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,9 +40,7 @@ export const CustomerPayments: React.FC = () => {
       // For this foundation, we'll fetch payments by userUid
       // In a real app, paymentService would have a getCustomerPayments method
       // We'll simulate it by filtering or querying
-      const data = await paymentService.getBusinessPayments('PI-CORP-001'); 
-      // Filter for the current user
-      const userPayments = data.filter(p => p.payerUid === user!.uid);
+      const userPayments = await paymentService.getCustomerPayments(user!.uid);
       setPayments(userPayments);
     } catch (err) {
       console.error('Failed to fetch payments', err);
@@ -116,10 +114,10 @@ export const CustomerPayments: React.FC = () => {
                     <h3 className="text-xl font-black text-white uppercase tracking-tight">Paid {payment.amount} Pi</h3>
                     <div className="flex items-center gap-6">
                        <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-                        <Package className="w-3 h-3" /> Order {payment.orderId.slice(0, 8)}...
+                        <Package className="w-3 h-3" /> Order {(payment.orderId || payment.paymentId || '').slice(0, 8)}...
                       </p>
                       <p className="text-xs text-slate-500 font-medium">
-                        {new Date(payment.paidAt).toLocaleDateString()}
+                        {new Date(payment.updatedAt || payment.createdAt || Date.now()).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -129,7 +127,7 @@ export const CustomerPayments: React.FC = () => {
                       <Download className="w-5 h-5" />
                     </button>
                     <button 
-                      onClick={() => navigate(`/order-details/${payment.orderId}`)}
+                      onClick={() => navigate(`/order-details/${payment.orderId || ''}`)}
                       className="flex items-center gap-2 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20"
                     >
                       View Receipt <ExternalLink className="w-3 h-3" />

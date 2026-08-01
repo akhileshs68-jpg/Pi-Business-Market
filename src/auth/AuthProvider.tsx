@@ -171,29 +171,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithGoogle = async (): Promise<User> => {
-    if (isProcessing.current && user) return user;
-    isProcessing.current = true;
-    setLoading(true);
-    setError(null);
-    try {
-      let loggedInUser = await authService.loginWithGoogle();
-      if (loggedInUser) {
-        loggedInUser = await migrateProfileIfNeeded(loggedInUser);
-      }
-      setUser(loggedInUser);
-      setProfile(loggedInUser);
-      return loggedInUser;
-    } catch (err: any) {
-      setError(err.message || 'Google Authentication failed');
-      throw err;
-    } finally {
-      setLoading(false);
-      isProcessing.current = false;
-      isInitialLoad.current = false;
-    }
-  };
-
   const logout = async () => {
     setLoading(true);
     try {
@@ -220,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, error, login, loginWithGoogle, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, profile, loading, error, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

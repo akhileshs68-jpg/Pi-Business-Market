@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pi Business Market</title>
+    <script>
+      // The Pi SDK attempts to communicate with the Pi Browser via window.parent.postMessage
+      // using the target origin 'https://app-cdn.minepi.com'.
+      // When running locally outside the Pi Browser (e.g. in a standard browser tab where window.parent === window),
+      // this causes the browser to log a native "target origin provided does not match" warning.
+      // We intercept postMessage on localhost to suppress this unnecessary noise during development.
+      if (window.parent === window && window.location.hostname === 'localhost') {
+        const originalPostMessage = window.postMessage;
+        window.postMessage = function(message, targetOrigin, transfer) {
+          if (targetOrigin === 'https://app-cdn.minepi.com') return;
+          return originalPostMessage.apply(this, arguments);
+        };
+      }
+    </script>
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   </head>
   <body>

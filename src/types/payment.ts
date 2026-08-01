@@ -1,4 +1,4 @@
-export type PaymentMethodId = 'pi' | 'bmt' | 'upi' | 'bank' | 'cash' | 'card';
+export type PaymentMethodId = 'bmp_rewards' | 'pi_testnet' | 'bmp_token' | 'pi_mainnet' | 'pi' | 'bmt' | 'upi' | 'bank' | 'cash' | 'card';
 
 export interface PaymentProviderConfig {
   id: PaymentMethodId;
@@ -22,9 +22,12 @@ export type PaymentStatusType =
 export interface PaymentRecord {
   paymentId: string;
   transactionId?: string;
-  buyerId: string;
+  userId: string;
+  sellerId: string;
   businessId: string;
+  storeId: string;
   orderId?: string;
+  productIds?: string[];
   bookingId?: string;
   currency: string;
   paymentMethod: PaymentMethodId;

@@ -7,7 +7,6 @@ export interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: () => Promise<User>;
-  loginWithGoogle: () => Promise<User>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
 }

@@ -310,6 +310,18 @@ export interface Order {
   
   // Logistics
   logistics?: LogisticsDetails;
+
+  // Tracking & Timeline
+  acceptedAt?: string;
+  packedAt?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  trackingNumber?: string;
+  courierName?: string;
+  estimatedDelivery?: string;
+  currentStatus?: string;
+  activityLogs?: { timestamp: string; message: string }[];
+
   deliveryMethod?: DeliveryMethod;
   shipmentId?: string;
   
@@ -358,6 +370,8 @@ export interface Conversation {
   lastActivity: string;
   status: ConversationStatus;
   unreadCounts: Record<string, number>; // UID -> count
+  archivedBy?: string[];
+  deletedBy?: string[];
   createdAt: string;
   updatedAt: string;
 }

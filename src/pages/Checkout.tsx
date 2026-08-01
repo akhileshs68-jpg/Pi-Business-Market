@@ -27,7 +27,7 @@ import { checkoutService } from '../services/checkoutService';
 import { cartService } from '../services/cartService';
 import { orderService } from '../services/orderService';
 import { paymentService } from '../services/paymentService';
-import { piPaymentService } from '../services/piPaymentService';
+import { paymentEngine } from '../services/wallet/paymentEngine';
 import { CheckoutSession, CartItem, Address, OrderItem, PaymentStatus, OrderStatus } from '../types';
 
 export const Checkout: React.FC = () => {
@@ -41,7 +41,7 @@ export const Checkout: React.FC = () => {
   const [step, setStep] = useState<'shipping' | 'payment' | 'review'>('shipping');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodId>('pi');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethodId>('bmp_rewards');
   
   const [paymentState, setPaymentState] = useState<'idle' | 'success' | 'recovery'>('idle');
   const [completedOrder, setCompletedOrder] = useState<any>(null);
@@ -90,106 +90,96 @@ export const Checkout: React.FC = () => {
     setIsProcessing(true);
     try {
       // 1. Map CartItems to OrderItems
-      const orderItems: OrderItem[] = items.map(item => ({
-        itemId: '', 
-        orderId: '', 
-        productId: item.productId,
-        variantId: item.variantId,
-        sku: item.sku,
-        productName: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        subtotal: item.subtotal,
-        tax: item.subtotal * 0.05,
-        discount: 0,
-        status: 'active'
-      }));
+      const orderItems: OrderItem[] = items.map(item => {
+        const orderItem: any = {
+          itemId: '', 
+          orderId: '', 
+          productId: item.productId,
+          productName: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal: item.subtotal,
+          tax: item.subtotal * 0.05,
+          discount: 0,
+          status: 'active'
+        };
+        if (item.variantId) orderItem.variantId = item.variantId;
+        if (item.sku) orderItem.sku = item.sku;
+        return orderItem as OrderItem;
+      });
 
       const grandTotal = session.grandTotal || items.reduce((acc, item) => acc + (item.subtotal || 0), 0) * 1.05;
       const businessId = session.storeId || session.businessId || 'UNKNOWN';
 
-      if (selectedPaymentMethod !== 'pi') {
-        throw new Error('Only Pi payment is currently supported.');
+      if (selectedPaymentMethod !== 'bmp_rewards') {
+        throw new Error('Only BMP Rewards payment is currently supported.');
       }
 
-      // 3. Create Transaction in Payment Engine
+      
+      // 3. Process Wallet Payment
+      const buyerId = (session as any).userId || session.userUid || 'UNKNOWN';
+      const sellerId = session.storeId || session.businessId || 'UNKNOWN';
+      
+      const { txid } = await paymentEngine.processMarketplacePayment(
+        selectedPaymentMethod,
+        buyerId,
+        sellerId,
+        grandTotal,
+        session.sessionId
+      );
+
+      // 4. Create Transaction Record
       const paymentId = await paymentService.createTransaction({
-        buyerId: user.uid,
-        businessId: businessId,
+        userId: buyerId,
+        sellerId: sellerId,
+        businessId: sellerId,
+        storeId: sellerId,
         orderId: session.sessionId,
-        currency: 'Pi', // Or whatever currency is configured
-        paymentMethod: 'pi',
+        productIds: orderItems.map(i => i.productId),
+        currency: 'BMP',
+        paymentMethod: selectedPaymentMethod,
         amount: grandTotal
       });
 
-      // 4. Launch Pi SDK Payment (U2A Payment Flow)
-      await paymentService.processPiPayment(
-        paymentId,
-        grandTotal,
-        `Order at Pi Business Market`,
-        {
-          productType: 'MarketplaceOrder',
-          orderId: session.sessionId,
-          storeId: businessId,
-          itemsCount: orderItems.length,
-          transactionId: paymentId
-        },
-        async (txid) => {
-          try {
-            // 1. Verify the payment on the server
-            await paymentService.updateTransactionStatus(paymentId, 'Completed', txid);
-            
-            // 2. Save the order in Firestore / 3. Update paymentStatus / 4. Update orderStatus
-            const orderId = await orderService.createFromSession({
-              ...session,
-              shippingAddress: address,
-              billingAddress: address,
-              paymentStatus: 'SUCCESS',
-              orderStatus: 'CONFIRMED',
-              paymentId: paymentId,
-              transactionId: txid,
-              amount: grandTotal,
-              timestamp: Date.now()
-            }, orderItems);
-            const order = await orderService.getOrder(orderId);
-            if (!order) throw new Error('Order creation failed');
-            
-            // 5. Clear the shopping cart
-            await checkoutService.updateSession(session.sessionId, { status: 'completed' });
-            if (session.cartIds) {
-              for (const cid of session.cartIds) {
-                await cartService.clearCart(cid);
-              }
-            } else if (session.cartId) {
-              await cartService.clearCart(session.cartId);
-            }
-            
-            setCompletedOrder(order);
-            setPaymentTxId(txid);
-            setPaymentState('success');
-            
-            // 7. Show a success toast
-            const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
-            window.dispatchEvent(event);
-            
-            // 8. Automatically redirect to the Order Details page after 5 seconds
-            setTimeout(() => {
-              navigate(`/order-details/${orderId}`);
-            }, 5000);
-          } catch (err) {
-            setRecoveryError(err instanceof Error ? err.message : 'Payment processing failed after success.');
-            setPaymentState('recovery');
-            setIsProcessing(false);
-          }
-        },
-        (err) => {
-          // Error callback
-          console.error('[Checkout] Payment failed:', err);
-          setRecoveryError(typeof err === 'string' ? err : 'Payment failed');
-          setPaymentState('recovery');
-          setIsProcessing(false);
-        }
-      );
+      await paymentService.updateTransactionStatus(paymentId, 'Completed', txid);
+      await paymentService.recordPaymentHistory(paymentId);
+      
+      // 5. Save the order in Firestore
+      const orderId = await orderService.createFromSession({
+        ...session,
+        shippingAddress: address,
+        billingAddress: address,
+        paymentStatus: 'SUCCESS',
+        orderStatus: 'CONFIRMED',
+        paymentId: paymentId,
+        transactionId: txid,
+        amount: grandTotal,
+        currency: 'BMP',
+        timestamp: Date.now()
+      }, orderItems);
+
+      const order = await orderService.getOrder(orderId);
+      if (!order) throw new Error('Order creation failed');
+      
+      // 6. Clear the shopping cart
+      if (session.cartIds && session.cartIds.length > 0) {
+        await Promise.all(session.cartIds.map(async cid => {
+            await cartService.clearCart(cid);
+        }));
+      }
+
+      setCompletedOrder(order);
+      setPaymentTxId(txid);
+      setPaymentState('success');
+      setIsProcessing(false);
+      
+      const event = new CustomEvent('toast', { detail: { message: 'Payment Successful! Your order has been placed.', type: 'success' } });
+      window.dispatchEvent(event);
+      
+      setTimeout(() => {
+        navigate(`/order-details/${orderId}`);
+      }, 5000);
+
     } catch (err) {
       console.error('Order placement failed', err);
       setRecoveryError(err instanceof Error ? err.message : 'Failed to initiate order checkout.');
@@ -318,7 +308,7 @@ export const Checkout: React.FC = () => {
                     <DeliveryOption 
                       title="Standard Delivery" 
                       desc="3-5 Business Days" 
-                      price="10.00 Pi" 
+                      price="10.00 BMP" 
                       active={true}
                     />
                     <DeliveryOption 
@@ -376,7 +366,7 @@ export const Checkout: React.FC = () => {
                       <div>
                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Payment Method</h4>
                         <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                          {selectedPaymentMethod === 'pi' ? <p className="text-sm font-bold text-white">Pi Network Wallet</p> : <p className="text-sm font-bold text-white text-transform-capitalize">{selectedPaymentMethod}</p>}
+                          {selectedPaymentMethod === 'bmp_rewards' ? <p className="text-sm font-bold text-white">BMP Rewards Wallet</p> : <p className="text-sm font-bold text-white text-transform-capitalize">{selectedPaymentMethod}</p>}
                           <p className="text-xs text-slate-400">Secure Consensus Authorization</p>
                         </div>
                       </div>
@@ -411,7 +401,7 @@ export const Checkout: React.FC = () => {
                         Qty: {item.quantity} × {item.unitPrice}
                       </p>
                     </div>
-                    <p className="text-[10px] font-black text-white flex-shrink-0">{item.subtotal} Pi</p>
+                    <p className="text-[10px] font-black text-white flex-shrink-0">{item.subtotal} BMP</p>
                   </div>
                 ))}
               </div>
@@ -419,19 +409,19 @@ export const Checkout: React.FC = () => {
               <div className="space-y-4 pt-6 border-t border-slate-800">
                 <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <span>Subtotal</span>
-                  <span className="text-white">{session.subtotal} Pi</span>
+                  <span className="text-white">{session.subtotal} BMP</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <span>Shipping</span>
-                  <span className="text-white">{session.shipping} Pi</span>
+                  <span className="text-white">{session.shipping} BMP</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <span>Tax (5%)</span>
-                  <span className="text-white">{session.tax} Pi</span>
+                  <span className="text-white">{session.tax} BMP</span>
                 </div>
                 <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
                   <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest">Total</span>
-                  <span className="text-xl sm:text-2xl font-black text-white">{session.grandTotal} Pi</span>
+                  <span className="text-xl sm:text-2xl font-black text-white">{session.grandTotal} BMP</span>
                 </div>
               </div>
             </div>

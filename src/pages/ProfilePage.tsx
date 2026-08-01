@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import Navbar from '../components/Navbar';
+import { BmpRewardsWallet } from '../components/BmpRewardsWallet';
+import { paymentEngine } from '../services/wallet/paymentEngine';
 import { 
   User,
   ShoppingBag,
@@ -32,10 +34,10 @@ import {
   Laptop,
   Palette
 } from 'lucide-react';
-import { RoleOnboardingLauncher } from '../components/profile/RoleOnboardingLauncher';
-import { WorkspaceTab } from '../components/profile/WorkspaceTab';
-import { ROLES_CONFIG, RoleConfig } from '../auth/authService';
-import { AddBusinessRoleDialog } from '../components/AddBusinessRoleDialog';
+
+
+
+
 import { orderService } from '../services/orderService';
 import { Order, OrderStatus } from '../types';
 import { useTheme, ThemeType } from '../context/ThemeContext';
@@ -152,10 +154,6 @@ export const ProfilePage: React.FC = () => {
   const [consensusRate, setConsensusRate] = useState(true);
 
   // Modals / Onboarding State
-  const [roleSelectionOpen, setRoleSelectionOpen] = useState(false);
-  const [selectedRoleForOnboarding, setSelectedRoleForOnboarding] = useState<string | null>(null);
-  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
-  const [activeOnboardingRole, setActiveOnboardingRole] = useState<string | null>(null);
 
   // Route protection
   useEffect(() => {
@@ -171,11 +169,11 @@ export const ProfilePage: React.FC = () => {
       fetchOrders();
 
       // 2. Load Wallet Balance
-      const storedBalance = localStorage.getItem('pi_wallet_balance');
+      const storedBalance = localStorage.getItem('bmp_wallet_balance');
       if (storedBalance) {
         setWalletBalance(parseFloat(storedBalance));
       } else {
-        localStorage.setItem('pi_wallet_balance', '300');
+        localStorage.setItem('bmp_wallet_balance', '300');
         setWalletBalance(300);
       }
 
@@ -185,7 +183,7 @@ export const ProfilePage: React.FC = () => {
   }, [user]);
 
   const loadWishlist = () => {
-    const storedWish = localStorage.getItem('pi_marketplace_wishlist');
+    const storedWish = localStorage.getItem('bmp_marketplace_wishlist');
     if (storedWish) {
       const parsedIds: string[] = JSON.parse(storedWish);
       const filtered = ALL_PRODUCTS_DATABASE.filter(item => parsedIds.includes(item.id));
@@ -214,34 +212,12 @@ export const ProfilePage: React.FC = () => {
     ? (user as any).roles.map((r: string) => r.toLowerCase())
     : ['buyer'];
     
-  const activeRole: string = (user as any).activeRole 
-    ? String((user as any).activeRole).toLowerCase() 
-    : 'buyer';
-
-  const isBusinessRoleActive = ROLES_CONFIG[activeRole]?.hasWorkspace || false;
-
-  const displayWalletAddress = (user.walletAddress && !user.walletAddress.startsWith('pi_wallet_'))
+  
+  
+  const displayWalletAddress = (user.walletAddress && !user.walletAddress.startsWith('bmp_wallet_'))
     ? user.walletAddress
-    : 'pi_wallet_7787f2f_consensus_node_active_secured';
+    : 'bmp_wallet_7787f2f_consensus_node_active_secured';
 
-  // Switch active role
-  const handleSwitchActiveRole = async (roleId: string) => {
-    setSaving(true);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-    try {
-      await updateUser({
-        activeRole: roleId
-      } as any);
-      const label = ROLES_CONFIG[roleId]?.label || roleId.toUpperCase();
-      showTemporarySuccess(`Switched active workspace role to: ${label}`);
-    } catch (err: any) {
-      console.error('[ProfilePage] Error switching active role:', err);
-      setErrorMessage(err.message || 'Failed to switch active role.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   // Faucet balance sandbox claim
   const handleFaucetClaim = () => {
@@ -249,7 +225,7 @@ export const ProfilePage: React.FC = () => {
     setTimeout(() => {
       const newBal = walletBalance + 50;
       setWalletBalance(newBal);
-      localStorage.setItem('pi_wallet_balance', String(newBal));
+      localStorage.setItem('bmp_wallet_balance', String(newBal));
       setFaucetLoading(false);
       showTemporarySuccess('Successfully Mined +50 π Sandbox Testnet Faucet!');
     }, 1200);
@@ -257,11 +233,11 @@ export const ProfilePage: React.FC = () => {
 
   // Remove from wishlist helper
   const handleRemoveWishlistItem = (id: string) => {
-    const storedWish = localStorage.getItem('pi_marketplace_wishlist');
+    const storedWish = localStorage.getItem('bmp_marketplace_wishlist');
     if (storedWish) {
       const parsedIds: string[] = JSON.parse(storedWish);
       const updated = parsedIds.filter(item => item !== id);
-      localStorage.setItem('pi_marketplace_wishlist', JSON.stringify(updated));
+      localStorage.setItem('bmp_marketplace_wishlist', JSON.stringify(updated));
       loadWishlist();
       showTemporarySuccess('Removed from saved items');
     }
@@ -289,10 +265,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   // Unactivated roles
-  const unactivatedBusinessRoles: RoleConfig[] = Object.values(ROLES_CONFIG).filter(
-    (r: RoleConfig) => r.id !== 'buyer' && !roles.includes(r.id)
-  );
-
+  
   const getOrderStatusColor = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.COMPLETED: 
@@ -356,10 +329,10 @@ export const ProfilePage: React.FC = () => {
           <div className="flex flex-col items-center sm:items-end gap-1.5 font-mono text-center sm:text-right shrink-0">
             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Balance</span>
             <div className="text-xl sm:text-2xl font-black text-white leading-none">
-              {walletBalance.toFixed(2)} <span className="text-violet-400">π</span>
+              {walletBalance.toFixed(2)} <span className="text-amber-400">BMP</span>
             </div>
             <div className="text-[8px] text-slate-600 font-bold uppercase tracking-wider">
-              Est: ${(walletBalance * 314.159).toLocaleString(undefined, {maximumFractionDigits: 2})} USD
+              BMP Rewards Active
             </div>
           </div>
         </div>
@@ -367,9 +340,9 @@ export const ProfilePage: React.FC = () => {
         {/* PROFILE TAB NAVIGATION STRIP */}
         <div className="flex bg-slate-900/60 p-1 rounded-2xl border border-slate-900 overflow-x-auto scrollbar-none gap-1 mb-8">
           {[
-            { id: 'account', label: 'Account & Workspace', icon: User },
+            { id: 'account', label: 'Personal Info', icon: User },
             { id: 'orders', label: 'My Purchases', icon: Package },
-            { id: 'wallet', label: 'Pi Wallet', icon: Wallet },
+            { id: 'wallet', label: 'BMP Rewards', icon: Wallet },
             { id: 'wishlist', label: 'Saved Items', icon: Heart },
             { id: 'settings', label: 'Settings', icon: Settings }
           ].map((tab) => {
@@ -412,7 +385,35 @@ export const ProfilePage: React.FC = () => {
           
           {/* 1. ACCOUNT & WORKSPACE TAB */}
           {activeTab === 'account' && (
-            <WorkspaceTab />
+            <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
+               <div className="flex items-center justify-between">
+                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Personal Information</h3>
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Username</span>
+                    <p className="text-sm font-semibold text-white mt-1">{user.username}</p>
+                 </div>
+                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Display Name</span>
+                    <p className="text-sm font-semibold text-white mt-1">{user.displayName || 'Not Set'}</p>
+                 </div>
+                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Account Type</span>
+                    <p className="text-sm font-semibold text-white mt-1 capitalize">{user.accountType}</p>
+                 </div>
+                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Member Since</span>
+                    <p className="text-sm font-semibold text-white mt-1">{new Date(user.createdAt).toLocaleDateString()}</p>
+                 </div>
+                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 md:col-span-2">
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">BMP Rewards Address</span>
+                    <p className="text-xs font-mono text-slate-400 mt-1 break-all">
+                      {user.walletAddress && !user.walletAddress.startsWith('bmp_wallet_') ? user.walletAddress : 'bmp_wallet_7787f2f_consensus_node_active_secured'}
+                    </p>
+                 </div>
+               </div>
+            </div>
           )}
 
           {/* 2. ORDERS / MY PURCHASES TAB */}
@@ -485,72 +486,10 @@ export const ProfilePage: React.FC = () => {
           {/* 3. WALLET TAB */}
           {activeTab === 'wallet' && (
             <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Pi Sandbox Wallet</h3>
-
-              {/* Premium holographic-style Card design */}
-              <div className="bg-gradient-to-br from-violet-950 via-indigo-950 to-slate-950 rounded-2xl p-5 sm:p-6 text-white border border-violet-800/20 relative overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 translate-x-4 -translate-y-4 w-32 h-32 rounded-full bg-violet-600/10 blur-2xl pointer-events-none" />
-                <div className="absolute left-1/3 bottom-0 w-24 h-24 rounded-full bg-indigo-500/5 blur-xl pointer-events-none" />
-                
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-violet-400" />
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-300">Consensus Testnet Card</span>
-                  </div>
-                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">Verified Secured</span>
-                </div>
-
-                <div className="space-y-0.5 mb-6">
-                  <span className="text-[9px] text-violet-300 uppercase tracking-widest font-bold">Consensus Sandbox Balance</span>
-                  <div className="text-3xl font-mono font-black flex items-baseline gap-1 text-slate-100 leading-none">
-                    {walletBalance.toFixed(2)} <span className="text-amber-400 font-bold text-xl">π</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1 bg-slate-950/40 p-2.5 rounded-xl border border-slate-900/60 font-mono">
-                  <span className="text-[7px] text-slate-500 uppercase font-black block">Public Wallet Key Address</span>
-                  <p className="text-[9px] text-slate-300 select-all truncate">
-                    {displayWalletAddress}
-                  </p>
-                </div>
-              </div>
-
-              {/* Faucet Sandbox claim panel */}
-              <div className="p-4.5 bg-slate-950/60 border border-slate-900 rounded-2xl space-y-4">
-                <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-300">Sandbox Testnet Faucet Miner</h4>
-                  <p className="text-[10px] text-slate-500 leading-relaxed font-semibold">Mine sandbox mock Pi coins to test checkout ordering, payments, and shopping flow systems securely.</p>
-                </div>
-
-                <button
-                  onClick={handleFaucetClaim}
-                  disabled={faucetLoading}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-700 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer active:scale-95"
-                >
-                  {faucetLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <PlusCircle className="w-4 h-4" />
-                  )}
-                  <span>Claim +50 π Sandbox Coins</span>
-                </button>
-              </div>
-
-              {/* Mining Stats logs */}
-              <div className="grid grid-cols-2 gap-3.5 pt-2 font-mono text-[9px] text-slate-500 uppercase font-black">
-                <div className="p-3 bg-slate-950/40 border border-slate-900 rounded-xl flex flex-col gap-1">
-                  <span className="text-slate-600">Gas fee standard</span>
-                  <span className="text-slate-300">0.01 π</span>
-                </div>
-                <div className="p-3 bg-slate-950/40 border border-slate-900 rounded-xl flex flex-col gap-1">
-                  <span className="text-slate-600">Mining status</span>
-                  <span className="text-emerald-500">Online & Syncing</span>
-                </div>
-              </div>
-
+              <BmpRewardsWallet />
             </div>
           )}
-
+          
           {/* 4. WISHLIST TAB */}
           {activeTab === 'wishlist' && (
             <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
@@ -629,7 +568,7 @@ export const ProfilePage: React.FC = () => {
                   <div className="space-y-1">
                     <span className="text-xs font-bold text-slate-200 block">System Appearance</span>
                     <span className="text-[10px] text-slate-500 font-semibold block leading-normal">
-                      Customize how Pi Business Market looks on your device. Choose between Light, Dark, Pi Signature, or automatically sync with your operating system.
+                      Customize how Pi Business Market looks on your device. Choose between Light, Dark, BMP Signature, or automatically sync with your operating system.
                     </span>
                   </div>
 
@@ -638,7 +577,7 @@ export const ProfilePage: React.FC = () => {
                       { id: 'system', label: 'System (Auto)', icon: Laptop, desc: 'Sync with device' },
                       { id: 'dark', label: 'Dark Mode', icon: Moon, desc: 'Midnight canvas' },
                       { id: 'light', label: 'Light Mode', icon: Sun, desc: 'High contrast clean' },
-                      { id: 'pi-signature', label: 'Pi Signature', icon: Palette, desc: 'Royal gold & plum' }
+                      { id: 'pi-signature', label: 'BMP Signature', icon: Palette, desc: 'Royal gold & plum' }
                     ].map((t) => {
                       const Icon = t.icon;
                       const isSelected = theme === t.id;
@@ -736,91 +675,6 @@ export const ProfilePage: React.FC = () => {
 
       </main>
 
-      {/* 1. ROLE SELECTION DIALOG (MODAL) */}
-      {roleSelectionOpen && (
-        <AddBusinessRoleDialog
-          unactivatedRoles={unactivatedBusinessRoles}
-          onClose={() => setRoleSelectionOpen(false)}
-          onSelectRole={(roleId) => {
-            setSelectedRoleForOnboarding(roleId);
-            setShowConfirmationDialog(true);
-          }}
-        />
-      )}
-
-      {/* 2. CONFIRMATION DIALOG (MODAL) */}
-      {showConfirmationDialog && selectedRoleForOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"
-            onClick={() => setShowConfirmationDialog(false)}
-          />
-          <div className="bg-slate-900 border border-slate-850 p-6 rounded-3xl max-w-sm w-full relative z-10 shadow-2xl space-y-4">
-            <div className="space-y-2">
-              <h3 className="text-lg font-black text-white tracking-tight">
-                Become a {ROLES_CONFIG[selectedRoleForOnboarding]?.label}?
-              </h3>
-              <p className="text-slate-400 text-xs font-medium leading-relaxed">
-                Are you sure you want to activate the {ROLES_CONFIG[selectedRoleForOnboarding]?.label} role? This will launch the corresponding onboarding wizard.
-              </p>
-            </div>
-            <div className="flex gap-2 justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirmationDialog(false)}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowConfirmationDialog(false);
-                  setRoleSelectionOpen(false);
-                  setActiveOnboardingRole(selectedRoleForOnboarding);
-                }}
-                className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
-              >
-                Confirm & Onboard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. ONBOARDING LAUNCHER WIZARD OVERLAY */}
-      {activeOnboardingRole && (
-        <RoleOnboardingLauncher
-          role={getOnboardingRoleName(activeOnboardingRole)}
-          user={user}
-          onClose={() => {
-            setActiveOnboardingRole(null);
-            setSelectedRoleForOnboarding(null);
-          }}
-          onComplete={async () => {
-            const roleToActivate = activeOnboardingRole;
-            setActiveOnboardingRole(null);
-            setSelectedRoleForOnboarding(null);
-            
-            // Activate the selected role upon successful onboarding
-            setSaving(true);
-            try {
-              const updatedRoles = roles.includes(roleToActivate) ? roles : [...roles, roleToActivate];
-              await updateUser({
-                roles: updatedRoles,
-                activeRole: roleToActivate
-              } as any);
-              const label = ROLES_CONFIG[roleToActivate]?.label || roleToActivate.toUpperCase();
-              showTemporarySuccess(`Onboarding completed! Switched active role to: ${label}`);
-            } catch (err: any) {
-              console.error('[ProfilePage] Error completing onboarding activation:', err);
-              setErrorMessage('Onboarding succeeded, but we failed to activate the role on your profile.');
-            } finally {
-              setSaving(false);
-            }
-          }}
-        />
-      )}
     </div>
   );
 };

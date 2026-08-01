@@ -20,12 +20,20 @@ import {
   ShoppingBag,
   ExternalLink,
   ClipboardList,
-  MessageSquare
+  MessageSquare,
+  Store as StoreIcon,
+  Star,
+  MapPin as MapPinIcon,
+  RotateCcw,
+  Heart,
+  AlertTriangle,
+  Tag
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/useAuth';
 import { orderService } from '../services/orderService';
-import { Order, OrderItem, OrderTimelineEvent, OrderStatus, PaymentStatus, FulfillmentStatus } from '../types';
+import { Order, OrderItem, OrderTimelineEvent, OrderStatus, PaymentStatus, FulfillmentStatus, Store } from '../types';
+import { storeService } from '../services/storeService';
 import { ReviewForm } from '../components/ReviewForm';
 
 export const OrderDetails: React.FC = () => {
@@ -34,6 +42,7 @@ export const OrderDetails: React.FC = () => {
   const navigate = useNavigate();
   
   const [order, setOrder] = useState<Order | null>(null);
+  const [store, setStore] = useState<Store | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [timeline, setTimeline] = useState<OrderTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +110,10 @@ export const OrderDetails: React.FC = () => {
       const data = await orderService.getOrder(orderId!);
       if (data) {
         setOrder(data);
+        if (data.storeId || data.businessId) {
+          const s = await storeService.getStore(data.storeId || data.businessId);
+          setStore(s);
+        }
         const [orderItems, orderTimeline] = await Promise.all([
           orderService.getOrderItems(orderId!),
           orderService.getOrderTimeline(orderId!)
@@ -112,6 +125,18 @@ export const OrderDetails: React.FC = () => {
       console.error('Failed to fetch order data', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Date Not Available';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return 'Date Not Available';
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' • ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return 'Date Not Available';
     }
   };
 
@@ -168,7 +193,7 @@ export const OrderDetails: React.FC = () => {
                 {order.orderStatus.replace('_', ' ')}
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium">Placed on {new Date(order.createdAt).toLocaleString()}</p>
+            <p className="text-xs text-slate-500 font-medium">Placed on {formatDate(order.createdAt)}</p>
           </div>
 
           
@@ -186,8 +211,16 @@ export const OrderDetails: React.FC = () => {
               {order.orderStatus === OrderStatus.PACKED && (
                 <button onClick={() => setShowShipmentModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Truck className="w-3 h-3" /> Create Shipment</button>
               )}
-              {(order.orderStatus === OrderStatus.READY_FOR_PICKUP || order.orderStatus === OrderStatus.SHIPPED || order.orderStatus === OrderStatus.OUT_FOR_DELIVERY) && (
-                <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Navigation className="w-3 h-3" /> Track Shipment</button>
+                                          {(order.orderStatus === OrderStatus.READY_FOR_PICKUP || order.orderStatus === OrderStatus.SHIPPED || order.orderStatus === OrderStatus.OUT_FOR_DELIVERY || order.orderStatus === OrderStatus.DELIVERED) && (
+                <>
+                  <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Navigation className="w-3 h-3" /> Track Shipment</button>
+                  {order.orderStatus !== OrderStatus.SHIPPED && order.orderStatus !== OrderStatus.OUT_FOR_DELIVERY && order.orderStatus !== OrderStatus.DELIVERED && (
+                    <button onClick={() => handleUpdateStatus(OrderStatus.SHIPPED)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Shipped</button>
+                  )}
+                  {order.orderStatus !== OrderStatus.DELIVERED && (
+                    <button onClick={() => handleUpdateStatus(OrderStatus.COMPLETED)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Delivered</button>
+                  )}
+                </>
               )}
               <button onClick={handleChatAboutOrder} className="px-4 py-2 bg-indigo-600/15 border border-indigo-500/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
                 <MessageSquare className="w-3 h-3" /> Chat with Customer
@@ -214,37 +247,70 @@ export const OrderDetails: React.FC = () => {
           {/* Left Column: Details */}
           <div className="lg:col-span-2 space-y-8">
             {/* Order Items */}
-            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+                        <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
               <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 sm:mb-8 flex items-center gap-3">
-                <ClipboardList className="w-6 h-6 text-indigo-400" /> Line Items
+                <Package className="w-6 h-6 text-indigo-400" /> Products
               </h2>
               <div className="space-y-6">
                 {items.map((item) => (
-                  <div key={item.itemId} className="space-y-4">
-                    <div className="flex items-center gap-4 sm:gap-6">
-                      <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center shrink-0">
-                        <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700" />
+                  <div key={item.itemId} className="space-y-4 bg-slate-950/50 border border-slate-800/50 rounded-2xl p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
+                        {(item as any).imageUrl ? (
+                          <img src={(item as any).imageUrl} alt={item.productName} className="w-full h-full object-cover" />
+                        ) : (
+                          <ShoppingBag className="w-8 h-8 text-slate-700" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs sm:text-sm font-bold text-white uppercase truncate">{item.productName}</h4>
-                        <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">SKU: {item.sku || 'N/A'}</p>
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-1 sm:gap-2 shrink-0">
-                        <div>
-                          <p className="text-xs sm:text-sm font-black text-white">{item.subtotal} Pi</p>
-                          <p className="text-[9px] sm:text-[10px] font-bold text-slate-600 uppercase tracking-widest">{item.quantity} × {item.unitPrice}</p>
+                        <h4 className="text-sm sm:text-base font-bold text-white uppercase truncate mb-1">{item.productName}</h4>
+                        <div className="flex flex-wrap items-center gap-3 mb-2">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-900 px-2 py-1 rounded">SKU: {item.sku || 'N/A'}</span>
+                          {item.variantId && <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-800 px-2 py-1 rounded">Variant: {item.variantId}</span>}
                         </div>
-                        {order.orderStatus === OrderStatus.COMPLETED && !isMerchant && reviewingItemId !== item.itemId && (
+                        
+                        <div className="flex items-end justify-between mt-4">
+                           <div>
+                             <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Price per unit</p>
+                             <p className="text-sm font-bold text-white">{item.unitPrice.toFixed(2)} Pi</p>
+                           </div>
+                           <div className="text-center px-4">
+                             <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Qty</p>
+                             <p className="text-sm font-bold text-white">x{item.quantity}</p>
+                           </div>
+                           <div className="text-right">
+                             <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Total</p>
+                             <p className="text-base sm:text-lg font-black text-indigo-400">{item.subtotal.toFixed(2)} Pi</p>
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isMerchant && (
+                      <div className="pt-4 mt-4 border-t border-slate-800/50 flex flex-wrap gap-2">
+                         <button onClick={() => navigate(`/product/${item.productId}`)} className="flex-1 min-w-[120px] px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                           <ExternalLink className="w-3 h-3" /> View Product
+                         </button>
+                         <button onClick={() => navigate(`/product/${item.productId}`)} className="flex-1 min-w-[120px] px-3 py-2 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                           <RotateCcw className="w-3 h-3" /> Buy Again
+                         </button>
+                         <button className="px-3 py-2 bg-slate-900 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2" onClick={() => alert("Added to wishlist")}>
+                           <Heart className="w-3 h-3" />
+                         </button>
+                         <button className="px-3 py-2 bg-slate-900 hover:bg-amber-500/10 text-slate-400 hover:text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2" onClick={() => alert("Reported")}>
+                           <AlertTriangle className="w-3 h-3" />
+                         </button>
+                         
+                        {order.orderStatus === OrderStatus.COMPLETED && reviewingItemId !== item.itemId && (
                           <button 
                             onClick={() => setReviewingItemId(item.itemId)}
-                            className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"
+                            className="w-full sm:w-auto px-4 py-2 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all mt-2 sm:mt-0"
                           >
                             Review Item
                           </button>
                         )}
                       </div>
-                    </div>
-
+                    )}
                     {reviewingItemId === item.itemId && (
                       <div className="mt-4 animate-in slide-in-from-top-4 duration-300">
                         <ReviewForm 
@@ -255,7 +321,6 @@ export const OrderDetails: React.FC = () => {
                           onCancel={() => setReviewingItemId(null)}
                           onSuccess={() => {
                             setReviewingItemId(null);
-                            // Optionally show a success toast or message
                           }}
                         />
                       </div>
@@ -263,33 +328,151 @@ export const OrderDetails: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </section>
+
+                        <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                <CreditCard className="w-6 h-6 text-amber-400" /> Order Information
+              </h2>
               
-              <div className="mt-8 pt-8 border-t border-slate-800 space-y-4">
-                <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>Subtotal</span>
-                  <span className="text-white">{order.subtotal} Pi</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Order ID</p>
+                   <p className="text-sm font-bold text-white">{order.orderNumber}</p>
+                 </div>
+                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Order Date</p>
+                   <p className="text-sm font-bold text-white">{formatDate(order.createdAt)}</p>
+                 </div>
+                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Payment Method</p>
+                   <p className="text-sm font-bold text-white flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-400"/> BMP Rewards Wallet</p>
+                 </div>
+                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Payment Date</p>
+                   <p className="text-sm font-bold text-white">{formatDate(order.createdAt)}</p>
+                 </div>
+                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Transaction ID</p>
+                   <p className="text-sm font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded w-max">{order.checkoutSessionId || 'TXN_' + order.orderId.substring(0, 8)}</p>
+                 </div>
+                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Invoice Number</p>
+                   <p className="text-sm font-mono text-slate-300">INV-{order.orderNumber}</p>
+                 </div>
+              </div>
+            </section>
+
+                        {/* Price Breakdown */}
+            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                <Tag className="w-6 h-6 text-emerald-400" /> Price Breakdown
+              </h2>
+              
+              <div className="space-y-4">
+                <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
+                  <span>Product Subtotal</span>
+                  <span className="text-white">{order.subtotal.toFixed(2)} Pi</span>
                 </div>
-                <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>Shipping</span>
-                  <span className="text-white">{order.shipping} Pi</span>
+                <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
+                  <span>Shipping Charge</span>
+                  <span className="text-white">+{order.shipping.toFixed(2)} Pi</span>
                 </div>
-                <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  <span>Tax</span>
-                  <span className="text-white">{order.tax.toFixed(2)} Pi</span>
+                <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-400">
+                  <span>Discount</span>
+                  <span>-{order.discount?.toFixed(2) || '0.00'} Pi</span>
                 </div>
-                <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
-                  <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-widest">Grand Total</span>
-                  <span className="text-2xl sm:text-3xl font-black text-indigo-500">{order.grandTotal.toFixed(2)} Pi</span>
+                <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-400">
+                  <span>Coupon Discount</span>
+                  <span>-0.00 Pi</span>
+                </div>
+                <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400 border-b border-slate-800 pb-4">
+                  <span>Tax (GST/VAT)</span>
+                  <span className="text-white">+{order.tax.toFixed(2)} Pi</span>
+                </div>
+                
+                <div className="pt-2 flex justify-between items-end border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Grand Total</span>
+                    <span className="text-2xl sm:text-3xl font-black text-indigo-400">{order.grandTotal.toFixed(2)} Pi</span>
+                  </div>
+                  {order.paymentStatus === 'paid' && (
+                    <div className="text-right">
+                       <span className="inline-block px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded text-[9px] font-black uppercase tracking-widest">Paid via Wallet</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 space-y-3">
+                  <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
+                    <span>BMP Rewards Used</span>
+                    <span className="text-emerald-400">{(order as any).rewardsUsed?.toFixed(2) || '0.00'} Pi</span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
+                    <span>Wallet Balance Before Payment</span>
+                    <span className="text-white">{(order as any).walletBalanceBefore?.toFixed(2) || 'N/A'} Pi</span>
+                  </div>
+                  <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
+                    <span>Wallet Balance After Payment</span>
+                    <span className="text-white">{(order as any).walletBalanceAfter?.toFixed(2) || 'N/A'} Pi</span>
+                  </div>
                 </div>
               </div>
             </section>
 
+            {store && !isMerchant && (
+              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+                <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                  <StoreIcon className="w-5 h-5 text-amber-400" /> Seller Information
+                </h2>
+                
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                   <div className="w-20 h-20 bg-slate-950 border-2 border-slate-800 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                     {store.logoUrl ? (
+                       <img src={store.logoUrl} alt={store.storeName} className="w-full h-full object-cover" />
+                     ) : (
+                       <StoreIcon className="w-8 h-8 text-slate-700" />
+                     )}
+                   </div>
+                   
+                   <div className="flex-1 text-center sm:text-left space-y-2">
+                     <div className="flex items-center justify-center sm:justify-start gap-2">
+                       <h3 className="text-xl font-black text-white uppercase">{store.storeName}</h3>
+                       {store.verified && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                     </div>
+                     <p className="text-xs font-bold text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+                       <User className="w-3 h-3" /> Merchant: {'Verified Partner'}
+                     </p>
+                     
+                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-2">
+                        <span className="flex items-center gap-1 text-[10px] font-black text-amber-400 uppercase bg-amber-400/10 px-2 py-1 rounded">
+                          <Star className="w-3 h-3 fill-amber-400" /> {store.rating || 'New'} ({store.reviewCount || 0} reviews)
+                        </span>
+                        {(store.city || store.country) && (
+                          <span className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase bg-slate-800 px-2 py-1 rounded">
+                            <MapPinIcon className="w-3 h-3" /> {store.city} {store.country}
+                          </span>
+                        )}
+                     </div>
+                   </div>
+                   
+                   <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
+                     <button onClick={() => navigate(`/store/${store.storeId}`)} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                       Visit Store
+                     </button>
+                     <button onClick={handleChatAboutOrder} className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">
+                       Chat with Seller
+                     </button>
+                   </div>
+                </div>
+              </section>
+            )}
             {/* Logistics & Delivery */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+                            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
                 <div className="flex justify-between items-center mb-4 sm:mb-6">
                   <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-emerald-400" /> Delivery Details
+                    <Truck className="w-4 h-4 text-indigo-400" /> Shipping Details
                   </h3>
                   {order.shipmentId && (
                     <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-3 py-1.5 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2">
@@ -299,23 +482,52 @@ export const OrderDetails: React.FC = () => {
                 </div>
                 {order.shippingAddress ? (
                   <div className="space-y-4">
-                    <div>
-                      <p className="text-sm font-bold text-slate-200">{order.shippingAddress.fullName}</p>
-                      <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.street}</p>
-                      <p className="text-xs text-slate-400 font-medium">{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}</p>
-                    </div>
-                    {order.logistics && (
-                      <div className="pt-4 border-t border-slate-800/50 grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-[9px] text-slate-500 uppercase font-black">Courier</p>
-                          <p className="text-xs font-bold text-white">{order.logistics.courierName || 'Standard'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-slate-500 uppercase font-black">Tracking Number</p>
-                          <p className="text-xs font-mono text-emerald-400 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded">{order.logistics.trackingNumber || 'Pending'}</p>
-                        </div>
+                    <div className="grid grid-cols-2 gap-4 border-b border-slate-800/50 pb-4">
+                      <div>
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Recipient Name</p>
+                        <p className="text-xs font-bold text-slate-200">{order.shippingAddress.fullName}</p>
                       </div>
-                    )}
+                      <div>
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Phone Number</p>
+                        <p className="text-xs font-bold text-slate-200">{order.shippingAddress.phone || 'N/A'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="border-b border-slate-800/50 pb-4">
+                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Full Address</p>
+                      <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                        {order.shippingAddress.street}<br/>
+                        {order.shippingAddress.city}, {order.shippingAddress.state}<br/>
+                        PIN: {order.shippingAddress.postalCode}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Courier Partner</p>
+                        <p className="text-xs font-bold text-white">{order.logistics?.courierName || 'Standard'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Tracking Number</p>
+                        {order.logistics?.trackingNumber ? (
+                          <p className="text-xs font-mono text-emerald-400 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded">{order.logistics.trackingNumber}</p>
+                        ) : (
+                          <p className="text-xs font-bold text-slate-500">Pending</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Shipping Date</p>
+                        <p className="text-xs font-bold text-slate-300">{formatDate(order.shippedAt) || 'Pending'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Estimated Delivery</p>
+                        <p className="text-xs font-bold text-slate-300">{formatDate(order.estimatedDelivery) || 'Pending'}</p>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-slate-800/50">
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Current Status</p>
+                        <span className="px-2 py-1 bg-indigo-600/20 text-indigo-400 rounded text-[10px] font-black uppercase">{order.currentStatus || order.orderStatus}</span>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-[10px] sm:text-xs text-slate-600 italic">No address (Digital/Service)</p>
@@ -323,22 +535,30 @@ export const OrderDetails: React.FC = () => {
               </section>
 
 
-              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+                            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
                 <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-amber-400" /> Payment Info
                 </h3>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Method</span>
-                    <span className="text-xs font-bold text-white uppercase">Pi Wallet</span>
+                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Method</span>
+                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> BMP Rewards Wallet</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Status</span>
+                    <span className="text-xs font-bold text-emerald-400 uppercase">Success</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Transaction ID</span>
+                    <span className="text-xs font-mono text-slate-300 bg-slate-900 px-2 py-1 rounded">{order.checkoutSessionId || 'TXN_PENDING'}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Wallet Debit Amount</span>
+                    <span className="text-xs font-bold text-amber-400 uppercase">{order.grandTotal.toFixed(2)} Pi</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Status</span>
-                    <span className="text-xs font-bold text-amber-400 uppercase">{order.paymentStatus}</span>
-                  </div>
-                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-tight">Secured on Pi Mainnet</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Time</span>
+                    <span className="text-[10px] font-bold text-slate-400">{formatDate(order.createdAt)}</span>
                   </div>
                 </div>
               </section>
@@ -346,32 +566,77 @@ export const OrderDetails: React.FC = () => {
           </div>
 
           {/* Right Column: Timeline */}
-          <div className="lg:col-span-1">
-            <section className="sticky top-12 bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 sm:mb-8 flex items-center gap-3">
-                <Clock className="w-6 h-6 text-violet-400" /> Activity Log
+                    <div className="lg:col-span-1 space-y-8">
+            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                <Navigation className="w-5 h-5 text-indigo-400" /> Order Timeline
               </h2>
-              <div className="relative space-y-6 sm:space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
-                {timeline.map((event, i) => (
-                  <div key={event.eventId} className="relative pl-10">
-                    <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-slate-900 flex items-center justify-center z-10 ${
-                      i === timeline.length - 1 ? 'bg-indigo-600 scale-125' : 'bg-slate-800'
+              
+              <div className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
+                {[
+                  { label: 'Order Placed', status: 'completed', time: order.createdAt },
+                  { label: 'Payment Successful', status: 'completed', time: order.createdAt },
+                  { label: 'Seller Accepted', status: order.acceptedAt ? 'completed' : (order.orderStatus === OrderStatus.NEW_ORDER ? 'current' : 'pending'), time: order.acceptedAt },
+                  { label: 'Packed', status: order.packedAt ? 'completed' : (order.acceptedAt && !order.packedAt ? 'current' : 'pending'), time: order.packedAt },
+                  { label: 'Shipped', status: order.shippedAt ? 'completed' : (order.packedAt && !order.shippedAt ? 'current' : 'pending'), time: order.shippedAt },
+                  { label: 'Out for Delivery', status: order.currentStatus === 'out_for_delivery' || order.deliveredAt ? 'completed' : (order.shippedAt && !order.deliveredAt ? 'current' : 'pending'), time: null },
+                  { label: 'Delivered', status: order.deliveredAt ? 'completed' : 'pending', time: order.deliveredAt }
+                ].map((step, i) => (
+                  <div key={i} className="relative pl-10">
+                    <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-slate-950 flex items-center justify-center z-10 ${
+                      step.status === 'completed' ? 'bg-emerald-500' :
+                      step.status === 'current' ? 'bg-amber-400 scale-110 shadow-[0_0_10px_rgba(251,191,36,0.5)]' :
+                      'bg-slate-800'
                     }`}>
-                      {i === timeline.length - 1 && <CheckCircle2 className="w-3 h-3 text-white" />}
+                      {step.status === 'completed' && <CheckCircle2 className="w-3 h-3 text-slate-950" />}
                     </div>
-                    <div className="space-y-1">
-                      <p className={`text-[11px] sm:text-xs font-bold uppercase tracking-tight ${i === timeline.length - 1 ? 'text-white' : 'text-slate-400'}`}>
-                        {event.message}
+                    <div>
+                      <p className={`text-[11px] sm:text-xs font-bold uppercase tracking-tight ${
+                        step.status === 'completed' ? 'text-white' :
+                        step.status === 'current' ? 'text-amber-400' :
+                        'text-slate-500'
+                      }`}>
+                        {step.label}
                       </p>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                        <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">{new Date(event.createdAt).toLocaleString()}</span>
-                        <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">by {event.actorName}</span>
-                      </div>
+                      {step.time && <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{formatDate(step.time)}</p>}
                     </div>
                   </div>
                 ))}
               </div>
             </section>
+
+            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                <Clock className="w-5 h-5 text-violet-400" /> Activity Log
+              </h2>
+              
+              <div className="space-y-4">
+                {(order.activityLogs || []).map((log, i) => (
+                  <div key={i} className="border-b border-slate-800/50 pb-3 last:border-0 last:pb-0">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{formatDate(log.timestamp)}</p>
+                    <p className="text-xs font-medium text-slate-300">{log.message}</p>
+                  </div>
+                ))}
+                {(!order.activityLogs || order.activityLogs.length === 0) && timeline.map((event, i) => (
+                  <div key={i} className="border-b border-slate-800/50 pb-3 last:border-0 last:pb-0">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{formatDate(event.createdAt)}</p>
+                    <p className="text-xs font-medium text-slate-300">{event.message}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+            
+            {!isMerchant && (
+              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-4">Quick Actions</h3>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} disabled={!order.shipmentId} className="w-full px-4 py-3 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left">Track Shipment</button>
+                  <button onClick={handleChatAboutOrder} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-left">Chat with Merchant</button>
+                  <button onClick={() => window.print()} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-left">Download Invoice</button>
+                  <button onClick={() => alert("Issue raised")} className="w-full px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-left mt-2">Raise Issue</button>
+                </div>
+              </section>
+            )}
           </div>
         </div>
       

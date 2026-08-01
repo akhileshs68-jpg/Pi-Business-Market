@@ -74,7 +74,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isOwner = Boolean(user && (user.uid === product.ownerUid || user.uid === product.businessId));
+  const isOwner = Boolean(user && (user.uid === product.ownerUid || user.uid === (product.businessId || product.storeId || 'unknown_business')));
   const canManage = Boolean(user && isOwner && isMerchantView);
   
   const [showMenu, setShowMenu] = useState(false);
@@ -205,7 +205,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
     setIsAdding(true);
     try {
-      const cart = await cartService.getOrCreateCart(user.uid, product.businessId);
+      const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
@@ -234,7 +234,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
     setIsBuying(true);
     try {
-      const cart = await cartService.getOrCreateCart(user.uid, product.businessId);
+      const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
@@ -243,7 +243,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         quantity: 1,
         unitPrice: product.price || 0
       });
-      const updatedCart = await cartService.getOrCreateCart(user.uid, product.businessId);
+      const updatedCart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       const sessionId = await checkoutService.createSession(updatedCart, user.uid);
       navigate(`/checkout/${sessionId}`);
     } catch (err) {

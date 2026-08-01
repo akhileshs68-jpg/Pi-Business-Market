@@ -23,12 +23,14 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 export const paymentService = {
   
   async createTransaction(data: {
-    buyerId: string;
+    userId: string;
+    sellerId: string;
     businessId: string;
+    storeId: string;
     orderId?: string;
-    bookingId?: string;
+    productIds: string[];
     currency: string;
-    paymentMethod: PaymentMethodId;
+    paymentMethod: string;
     amount: number;
   }): Promise<string> {
     const db = getFirebaseDb();
@@ -46,18 +48,37 @@ export const paymentService = {
     
     const record = {
       paymentId,
-      ...data,
-      status: 'Pending' as PaymentStatusType,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      transactionId: '',
+      userId: data.userId,
+      sellerId: data.sellerId,
+      businessId: data.businessId,
+      storeId: data.storeId,
+      orderId: data.orderId || '',
+      productIds: data.productIds,
+      currency: data.currency || 'BMP',
+      amount: data.amount,
+      status: 'Pending',
+      paymentMethod: data.paymentMethod || 'pi',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
     await setDoc(paymentRef, record);
     return paymentId;
   },
 
-  async updateTransactionStatus(paymentId: string, status: PaymentStatusType, txid?: string): Promise<void> {
+  async updateTransactionStatus(paymentId: string, status: string, txid?: string): Promise<void> {
+    const db = getFirebaseDb();
     try {
+      const paymentRef = doc(db, 'payments', paymentId);
+      const updates = {
+        status,
+        updatedAt: new Date().toISOString(),
+        ...(txid ? { transactionId: txid } : {})
+      };
+      
+      await updateDoc(paymentRef, updates);
+
       const headers = await getAuthHeaders();
       await fetch('/api/payments/status', {
         method: 'POST',
@@ -68,11 +89,31 @@ export const paymentService = {
       console.error('Failed to update status', err);
     }
   },
+  async recordPaymentHistory(paymentId: string): Promise<void> {
+    try {
+      const payment = await this.getTransaction(paymentId);
+      if (!payment) return;
+      const db = getFirebaseDb();
+      const historyRef = doc(db, 'paymentHistory', paymentId);
+      await setDoc(historyRef, {
+        ...payment,
+        recordedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Failed to record payment history', err);
+    }
+  },
   async getBusinessPayments(businessId: string): Promise<any[]> {
-    return [];
+    const db = getFirebaseDb();
+    const q = query(collection(db, 'payments'), where('businessId', '==', businessId));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
   async getCustomerPayments(customerId: string): Promise<any[]> {
-    return [];
+    const db = getFirebaseDb();
+    const q = query(collection(db, 'payments'), where('userId', '==', customerId));
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
   async getTransaction(paymentId: string): Promise<PaymentRecord | null> {
@@ -147,8 +188,11 @@ export const paymentService = {
 (paymentService as any).createPaymentIntent = async function(params: any) {
   // Map old params to new system if possible
   const id = await this.createTransaction({
-    buyerId: params.payerUid,
+    userId: params.payerUid,
+    sellerId: params.payeeUid,
     businessId: params.payeeUid,
+    storeId: params.payeeUid,
+    productIds: [],
     orderId: params.orderId,
     currency: params.currency || 'Pi',
     paymentMethod: 'pi',

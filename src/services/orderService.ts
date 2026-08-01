@@ -1,15 +1,33 @@
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, arrayUnion, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { notificationService } from './notificationService';
 
 export const orderService = {
-  async createOrder(orderData: any): Promise<string> {
+      async createOrder(orderData: any): Promise<string> {
     const db = getFirebaseDb();
     const itemRef = doc(collection(db, 'orders'));
     const id = itemRef.id;
     
+    // Sanitize orderData
+    const sanitizedData: any = {};
+    Object.entries(orderData).forEach(([key, val]) => {
+      if (val !== undefined && !Number.isNaN(val)) {
+        if (key === 'items' && Array.isArray(val)) {
+          sanitizedData[key] = val.map(item => {
+            const cleanItem: any = {};
+            Object.entries(item).forEach(([k, v]) => {
+               if (v !== undefined && !Number.isNaN(v)) cleanItem[k] = v;
+            });
+            return cleanItem;
+          });
+        } else {
+          sanitizedData[key] = val;
+        }
+      }
+    });
+
     await setDoc(itemRef, {
-      ...orderData,
+      ...sanitizedData,
       id,
       type: 'order',
       createdAt: serverTimestamp(),
@@ -44,11 +62,17 @@ export const orderService = {
     const itemRef = doc(db, 'orders', id);
     const orderSnap = await getDoc(itemRef);
 
+    let updates: any = {
+      orderStatus: status,
+      currentStatus: status.toLowerCase(),
+      updatedAt: serverTimestamp(),
+    };
+
     if (orderSnap.exists()) {
       const order = orderSnap.data();
 
       // If cancelling, restore stock
-      if (status === 'Cancelled' && order.orderStatus !== 'Cancelled' && order.items) {
+      if (status === 'cancelled' && order.orderStatus !== 'Cancelled' && order.items) {
         for (const item of order.items) {
           if (item.productId) {
             const productRef = doc(db, 'products', item.productId);
@@ -61,26 +85,40 @@ export const orderService = {
           }
         }
       }
-    }
 
-    await updateDoc(itemRef, {
-      orderStatus: status,
-      updatedAt: serverTimestamp(),
-    });
+      // Handle timeline timestamps
+      if (status === 'accepted' || status === 'processing') updates.acceptedAt = serverTimestamp();
+      if (status === 'packed' || status === 'ready_for_pickup') updates.packedAt = serverTimestamp();
+      if (status === 'shipped') updates.shippedAt = serverTimestamp();
+      if (status === 'delivered' || status === 'completed') updates.deliveredAt = serverTimestamp();
 
-    if (orderSnap.exists()) {
-      const orderData = orderSnap.data();
+      // Log activity
+      let logMessage = `Order status updated to ${status}`;
+      if (status === 'accepted') logMessage = 'Seller Accepted';
+      if (status === 'packed') logMessage = 'Packed';
+      if (status === 'shipped') logMessage = 'Shipped';
+      if (status === 'delivered') logMessage = 'Delivered';
+
+      updates.activityLogs = arrayUnion({
+        timestamp: new Date().toISOString(),
+        message: logMessage
+      });
+      
+      await updateDoc(itemRef, updates);
+
       try {
         await notificationService.notify(
-          orderData.buyerId,
+          order.buyerId,
           'order_update',
           'Order Status Updated',
-          `Your order ${orderData.orderNumber || ''} is now ${status}.`,
+          `Your order ${order.orderNumber || ''} is now ${status}.`,
           { entityId: id, entityType: 'order', linkTo: `/order-details/${id}` }
         );
       } catch (e) {
         console.warn("Failed to notify buyer of status change", e);
       }
+    } else {
+      await updateDoc(itemRef, updates);
     }
   },
 
@@ -127,7 +165,7 @@ export const orderService = {
       return snap.docs[0].id;
     }
 
-    const orderData = {
+    const orderData: any = {
       sessionId: session.sessionId,
       orderNumber: 'ORD-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
       businessId: session.storeId || session.businessId || 'UNKNOWN',
@@ -142,14 +180,14 @@ export const orderService = {
       orderStatus: session.orderStatus || 'PENDING_PAYMENT',
       paymentStatus: session.paymentStatus || 'pending',
       currency: session.currency || 'Pi',
-      shippingAddress: session.shippingAddress || null,
-      billingAddress: session.billingAddress || null,
-      paymentId: session.paymentId || null,
-      transactionId: session.transactionId || null,
       amount: session.amount || session.total || session.grandTotal || 0,
-      timestamp: session.timestamp || null,
       items
     };
+    if (session.shippingAddress) orderData.shippingAddress = session.shippingAddress;
+    if (session.billingAddress) orderData.billingAddress = session.billingAddress;
+    if (session.paymentId) orderData.paymentId = session.paymentId;
+    if (session.transactionId) orderData.transactionId = session.transactionId;
+    if (session.timestamp) orderData.timestamp = session.timestamp;
 
     const id = await this.createOrder(orderData);
     
@@ -188,7 +226,7 @@ export const orderService = {
     await this.updateOrderStatus(orderId, status); // Backward compatibility
     
     // Also explicitly notify for Payment
-    if (status === 'Paid' || status === 'Completed') {
+    if (status === 'Paid' || status === 'completed') {
        try {
          const order = await this.getOrderById(orderId);
          if (order) {

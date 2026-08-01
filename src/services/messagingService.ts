@@ -18,7 +18,8 @@ import {
   serverTimestamp,
   Timestamp,
   increment,
-  runTransaction
+  runTransaction,
+  arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { 
@@ -192,7 +193,8 @@ export const messagingService = {
     );
 
     return onSnapshot(q, (snapshot) => {
-      const conversations = snapshot.docs.map(doc => this.mapDocToConversation(doc));
+      const conversations = snapshot.docs.map(doc => this.mapDocToConversation(doc))
+        .filter(conv => !(conv.deletedBy && conv.deletedBy.includes(userUid))); // Filter out deleted for this user
       callback(conversations);
     });
   },
@@ -208,6 +210,23 @@ export const messagingService = {
     return onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => this.mapDocToMessage(doc));
       callback(messages);
+    });
+  },
+
+
+  async archiveConversation(conversationId: string, userUid: string): Promise<void> {
+    const db = getFirebaseDb();
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      archivedBy: arrayUnion(userUid)
+    });
+  },
+
+  async deleteConversationForUser(conversationId: string, userUid: string): Promise<void> {
+    const db = getFirebaseDb();
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      deletedBy: arrayUnion(userUid)
     });
   },
 

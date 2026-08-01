@@ -6,7 +6,7 @@ import { Store, Business } from '../types';
 import { StoreWizard } from '../components/store/StoreWizard';
 import { StoreCard } from '../components/store/StoreCard';
 import { ReviewManagement } from '../components/ReviewManagement';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Plus, 
   ShoppingBag, 
@@ -24,13 +24,14 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export const StoreDashboard: React.FC = () => {
+  const { businessId } = useParams<{ businessId?: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stores, setStores] = useState<Store[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
-  const [filterBusiness, setFilterBusiness] = useState<string>('all');
+  const [filterBusiness, setFilterBusiness] = useState<string>(businessId || 'all');
   const [activeView, setActiveView] = useState<'stores' | 'reviews'>('stores');
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +93,7 @@ export const StoreDashboard: React.FC = () => {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate('/business-dashboard');
+      navigate('/business-center');
     }
   };
 
@@ -116,7 +117,7 @@ export const StoreDashboard: React.FC = () => {
             </button>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
               <button 
-                onClick={() => navigate('/business-dashboard')} 
+                onClick={() => navigate('/business-center')} 
                 className="text-slate-400 hover:text-white transition-colors"
               >
                 Business
@@ -285,7 +286,7 @@ export const StoreDashboard: React.FC = () => {
                 Create Store
               </button>
               <button 
-                onClick={() => navigate('/business-dashboard')}
+                onClick={() => navigate('/business-center')}
                 className="px-8 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 font-bold hover:bg-slate-800 transition-all"
               >
                 Return to Business

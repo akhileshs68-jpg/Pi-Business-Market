@@ -1,0 +1,89 @@
+--- src/pages/ProfilePage.tsx
++++ src/pages/ProfilePage.tsx
+@@ -34,9 +34,6 @@
+ } from 'lucide-react';
+ import { RoleOnboardingLauncher } from '../components/profile/RoleOnboardingLauncher';
+-import { WorkspaceTab } from '../components/profile/WorkspaceTab';
+-import { ROLES_CONFIG, RoleConfig } from '../auth/authService';
+-import { AddBusinessRoleDialog } from '../components/AddBusinessRoleDialog';
+ import { orderService } from '../services/orderService';
+ import { Order, OrderStatus } from '../types';
+ import { useTheme, ThemeType } from '../context/ThemeContext';
+@@ -213,29 +210,6 @@
+     return () => clearTimeout(timer);
+   };
+-  const activeRole: string = (user as any).activeRole 
+-    ? String((user as any).activeRole).toLowerCase() 
+-    : 'buyer';
+-
+-  const isBusinessRoleActive = ROLES_CONFIG[activeRole]?.hasWorkspace || false;
+-
+-  const displayWalletAddress = (user.walletAddress && !user.walletAddress.startsWith('pi_wallet_'))
+-    ? user.walletAddress
+-    : 'pi_wallet_7787f2f_consensus_node_active_secured';
+-
+-  // Switch active role
+-  const handleSwitchActiveRole = async (roleId: string) => {
+-    setSaving(true);
+-    setSuccessMessage(null);
+-    setErrorMessage(null);
+-    try {
+-      await updateUser({
+-        activeRole: roleId
+-      } as any);
+-      const label = ROLES_CONFIG[roleId]?.label || roleId.toUpperCase();
+-      showTemporarySuccess(`Switched active workspace role to: ${label}`);
+-    } catch (err: any) {
+-      console.error('[ProfilePage] Error switching active role:', err);
+-      setErrorMessage(err.message || 'Failed to switch active role.');
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
+@@ -288,9 +262,2 @@
+ 
+-  // Unactivated roles
+-  const unactivatedBusinessRoles: RoleConfig[] = Object.values(ROLES_CONFIG).filter(
+-    (r: RoleConfig) => r.id !== 'buyer' && !roles.includes(r.id)
+-  );
+-
+   const getOrderStatusColor = (status: OrderStatus) => {
+@@ -369,3 +336,3 @@
+         <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1.5 overflow-x-auto hide-scrollbar snap-x relative z-10 shadow-2xl">
+           {[
+-            { id: 'account', label: 'Account & Workspace', icon: User },
++            { id: 'account', label: 'Personal Info', icon: User },
+             { id: 'orders', label: 'My Purchases', icon: Package },
+@@ -413,3 +380,31 @@
+           {activeTab === 'account' && (
+-            <WorkspaceTab />
++            <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
++               <div className="flex items-center justify-between">
++                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Personal Information</h3>
++               </div>
++               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
++                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Username</span>
++                    <p className="text-sm font-semibold text-white mt-1">{user.username}</p>
++                 </div>
++                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
++                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Display Name</span>
++                    <p className="text-sm font-semibold text-white mt-1">{user.displayName || 'Not Set'}</p>
++                 </div>
++                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
++                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Account Type</span>
++                    <p className="text-sm font-semibold text-white mt-1 capitalize">{user.accountType}</p>
++                 </div>
++                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
++                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Member Since</span>
++                    <p className="text-sm font-semibold text-white mt-1">{new Date(user.createdAt).toLocaleDateString()}</p>
++                 </div>
++                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 md:col-span-2">
++                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Pi Wallet Address</span>
++                    <p className="text-xs font-mono text-slate-400 mt-1 break-all">
++                      {user.walletAddress && !user.walletAddress.startsWith('pi_wallet_') ? user.walletAddress : 'pi_wallet_7787f2f_consensus_node_active_secured'}
++                    </p>
++                 </div>
++               </div>
++            </div>
+           )}

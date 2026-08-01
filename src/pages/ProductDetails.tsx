@@ -116,7 +116,7 @@ export const ProductDetails: React.FC = () => {
     if (user && product) {
       const updateCartCount = async () => {
         try {
-          const cart = await cartService.getOrCreateCart(user.uid, product.businessId);
+          const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
           if (cart && cart.cartId) {
             const itemsKey = `cart_items_${cart.cartId}`;
             const localItems = localStorage.getItem(itemsKey);
@@ -246,13 +246,13 @@ export const ProductDetails: React.FC = () => {
       const similar = allProducts.filter(p => p.category === product.category);
       if (similar.length > 0) {
         setSimilarProducts(similar.slice(0, 6));
-      } else {
+      } else if (import.meta.env.VITE_DEVELOPMENT_MODE === 'true') {
         // Fallback demo items styled gorgeously
         setSimilarProducts([
           {
             productId: 'demo_sim_1',
             storeId: product.storeId || 'demo_store',
-            businessId: product.businessId,
+            businessId: (product.businessId || product.storeId || 'unknown_business'),
             ownerUid: '',
             sku: 'SIM-PRO-1',
             productName: `${product.productName.split(' ')[0]} Max Pro Edition`,
@@ -284,7 +284,7 @@ export const ProductDetails: React.FC = () => {
           {
             productId: 'demo_sim_2',
             storeId: product.storeId || 'demo_store',
-            businessId: product.businessId,
+            businessId: (product.businessId || product.storeId || 'unknown_business'),
             ownerUid: '',
             sku: 'SIM-PRO-2',
             productName: `Essential ${product.productName.split(' ')[0]} Accessory Kit`,
@@ -320,7 +320,7 @@ export const ProductDetails: React.FC = () => {
       const recommended = allProducts.filter(p => p.category !== product.category);
       if (recommended.length > 0) {
         setRecommendedProducts(recommended.slice(0, 6));
-      } else {
+      } else if (import.meta.env.VITE_DEVELOPMENT_MODE === 'true') {
         setRecommendedProducts([
           {
             productId: 'demo_rec_1',
@@ -393,7 +393,7 @@ export const ProductDetails: React.FC = () => {
       const sponsored = allProducts.filter(p => p.featured);
       if (sponsored.length > 0) {
         setSponsoredProducts(sponsored.slice(0, 4));
-      } else {
+      } else if (import.meta.env.VITE_DEVELOPMENT_MODE === 'true') {
         setSponsoredProducts([
           {
             productId: 'demo_spon_1',
@@ -470,7 +470,7 @@ export const ProductDetails: React.FC = () => {
     if (!product || !user) return;
     setIsAdding(true);
     try {
-      const cart = await cartService.getOrCreateCart(user.uid, product.businessId);
+      const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
@@ -494,7 +494,7 @@ export const ProductDetails: React.FC = () => {
     if (!product || !user) return;
     setIsBuying(true);
     try {
-      const cart = await cartService.getOrCreateCart(user.uid, product.businessId);
+      const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
@@ -504,7 +504,7 @@ export const ProductDetails: React.FC = () => {
         unitPrice: product.price || 0
       });
       
-      const updatedCart = await cartService.getOrCreateCart(user.uid, product.businessId);
+      const updatedCart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       const sessionId = await checkoutService.createSession(updatedCart, user.uid);
       triggerToast('Creating checkout session...');
       navigate(`/checkout/${sessionId}`);
@@ -520,7 +520,7 @@ export const ProductDetails: React.FC = () => {
     if (!product || !user) return;
     navigate('/inbox', { 
       state: { 
-        targetUid: product.businessId,
+        targetUid: (product.businessId || product.storeId || 'unknown_business'),
         targetName: store?.storeName || product.brand || product.productName,
         contextType: 'product',
         contextId: product.productId

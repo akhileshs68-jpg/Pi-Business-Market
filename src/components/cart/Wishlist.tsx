@@ -155,7 +155,7 @@ export const Wishlist: React.FC<WishlistProps> = ({
     setActionLoading(item.wishlistId);
     try {
       // 1. Get or create cart for the seller/business
-      const cart = await cartService.getOrCreateCart(userUid, item.businessId);
+      const cart = await cartService.getOrCreateCart(userUid, (item.businessId || 'unknown_business'));
 
       // 2. Add to cart
       if (item.entityType === 'service') {

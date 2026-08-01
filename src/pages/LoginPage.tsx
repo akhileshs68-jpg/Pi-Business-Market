@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
-import { Shield, Sparkles, AlertCircle, Chrome } from 'lucide-react';
+import { Shield, Sparkles, AlertCircle } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { user, profile, login, loginWithGoogle, loading, error } = useAuth();
+  const { user, profile, login, loading, error } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -12,8 +12,8 @@ export const LoginPage: React.FC = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      const targetPath = from === '/login' ? '/dashboard' : from;
+      const from = (location.state as any)?.from?.pathname || '/discovery';
+      const targetPath = from === '/login' ? '/discovery' : from;
       
       console.log('[Auth Routing Diagnostics]', {
         currentUrl: window.location.href,
@@ -47,16 +47,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    try {
-      setAuthError(null);
-      await loginWithGoogle();
-      // No manual navigation here; the useEffect above will trigger as soon as 'user' updates.
-    } catch (err: any) {
-      setAuthError(err.message || 'Google Authentication failed. Please try again.');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       {/* Background Glow */}
@@ -86,11 +76,6 @@ export const LoginPage: React.FC = () => {
                 <p className="text-sm text-red-200 font-medium leading-relaxed">
                   {error || authError}
                 </p>
-                {(error || authError)?.includes('Anonymous') && (
-                  <p className="text-xs text-red-300/80">
-                    Tip: You can use the Google login below as an alternative.
-                  </p>
-                )}
               </div>
             </div>
           )}
@@ -110,24 +95,6 @@ export const LoginPage: React.FC = () => {
                   <span>Authenticate with Pi SDK</span>
                 </>
               )}
-            </button>
-
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-800"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-slate-900 px-2 text-slate-500 font-bold tracking-widest">Or</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-3 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all duration-300 border border-slate-700 disabled:opacity-50"
-            >
-              <Chrome className="w-5 h-5" />
-              <span>Continue with Google</span>
             </button>
             
             <p className="text-center text-slate-500 text-xs mt-6 leading-relaxed">

@@ -100,18 +100,8 @@ export const BusinessProfile: React.FC = () => {
           } else {
             console.error("Profile not found");
           }
-        } else if (user) {
-          // No ID provided, try to load current user's profile for their active role
-          const activeRole = (user as any).activeRole ? String((user as any).activeRole).toLowerCase() : 'seller';
-          const data = await businessProfileService.getProfile(user.uid, activeRole);
-          if (data) {
-            setProfileData(data);
-            setIsEditing(true); // Default to edit mode if no ID was specified and it's theirs
-          } else {
-            // New profile for this role
-            setProfileData({ businessType: activeRole });
-            setIsEditing(true);
-          }
+        } else {
+          console.error("No ID provided for BusinessProfile");
         }
       } catch (err) {
         console.error("Error loading profile:", err);

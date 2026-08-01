@@ -39,7 +39,9 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../auth/useAuth';
 import { User as UserType, Notification } from '../types';
+import { PiBusinessMarketDB } from '../services/storage';
 import { CartDrawer } from './cart/CartDrawer';
 import { ROLES_CONFIG } from '../auth/authService';
 import { useNavigation } from '../hooks/useNavigation';
@@ -77,13 +79,12 @@ export default function Navbar({
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { logout } = useAuth();
   const [faucetLoading, setFaucetLoading] = useState(false);
 
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const activeRoleStr = (currentUser as any)?.activeRole ? String((currentUser as any).activeRole).toLowerCase() : 'buyer';
-  const showWorkspace = ROLES_CONFIG[activeRoleStr]?.hasWorkspace || false;
-  const navItems = useNavigation(activeRoleStr);
+  const navItems = useNavigation();
 
   const getIconComponent = (iconName: string) => {
     const icons: Record<string, React.ComponentType<any>> = {
@@ -113,31 +114,22 @@ export default function Navbar({
 
   const getBottomNavItems = () => {
     return [
-      { id: 'home', label: 'Home', iconName: 'Home', view: 'discovery' },
-      { id: 'discover', label: 'Discover', iconName: 'Compass', view: 'discovery' },
-      { id: 'sell', label: 'Sell', iconName: 'ShoppingBag', view: 'store-dashboard' },
+      { id: 'home', label: 'Home', iconName: 'Home', view: 'home' },
+      { id: 'marketplace', label: 'Marketplace', iconName: 'Store', view: 'discovery' },
+      { id: 'orders', label: 'Orders', iconName: 'Clock', view: 'orders' },
       { id: 'inbox', label: 'Inbox', iconName: 'MessageSquare', view: 'inbox' },
-      { id: 'profile', label: 'Profile', iconName: 'User', view: 'profile' }
+      { id: 'account', label: 'Profile', iconName: 'User', view: 'profile' }
     ];
   };
 
-  const getActiveTab = () => {
+    const getActiveTab = () => {
     const path = location.pathname;
     if (path === '/inbox') return 'inbox';
-    if (path === '/profile') return 'profile';
-    if (
-      path.startsWith('/store-dashboard') || 
-      path.startsWith('/dashboard') || 
-      path.startsWith('/catalog') || 
-      path.startsWith('/business-dashboard')
-    ) {
-      return 'sell';
-    }
-    if (path === '/discovery' || path === '/') {
-      const hasQuery = searchQuery && searchQuery.trim() !== '';
-      return hasQuery ? 'discover' : 'home';
-    }
-    
+    if (path === '/profile') return 'account';
+    if (path.startsWith('/orders') || path.startsWith('/business-orders')) return 'orders';
+    if (path.startsWith('/discovery')) return 'marketplace';
+    if (path === '/' || path === '/home') return 'home';
+
     // Fallbacks using currentView
     if (currentView === 'inbox') return 'inbox';
     if (currentView === 'profile') return 'profile';
@@ -413,7 +405,7 @@ export default function Navbar({
                   <div className="space-y-4">
                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Marketplace Navigation</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      {getBottomNavItems().map((item) => {
+                      {navItems.map((item) => {
                         const Icon = getIconComponent(item.iconName);
                         const isActive = currentView === item.view;
                         return (
@@ -457,11 +449,14 @@ export default function Navbar({
                     </div>
                   </div>
                   <button 
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="px-4 py-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:bg-slate-850"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      logout();
+                    }}
+                    className="px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:bg-rose-600"
                   >
-                    Close
-                </button>
+                    Logout
+                  </button>
               </div>
             </motion.div>
           </>
@@ -480,7 +475,7 @@ export default function Navbar({
           const Icon = getIconComponent(item.iconName);
           const activeTabId = getActiveTab();
           const isActive = activeTabId === item.id;
-          const isSell = item.id === 'sell';
+          const isSell = item.id === 'orders';
 
           if (isSell) {
             return (
@@ -510,7 +505,7 @@ export default function Navbar({
                 if (item.id === 'home') {
                   if (onSearchChange) onSearchChange('');
                   if (onSearchSubmit) onSearchSubmit('');
-                  onNavigate('discovery');
+                  onNavigate(item.view);
                 } else if (item.id === 'discover') {
                   onNavigate('discovery');
                 } else if (item.view === 'docs') {

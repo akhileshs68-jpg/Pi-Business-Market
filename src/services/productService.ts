@@ -358,14 +358,13 @@ export const productService = {
     await deleteDoc(doc(db, collectionName, id));
   },
 
-    async getItemsByOwner(ownerUid: string, roleId: string, type: 'product' | 'service') {
+    async getItemsByOwner(ownerUid: string, type: 'product' | 'service') {
     const db = getFirebaseDb();
     const collectionName = type === 'product' ? 'products' : 'services';
     
     let q = query(
       collection(db, collectionName),
-      where('ownerUid', '==', ownerUid),
-      where('roleId', '==', roleId)
+      where('ownerUid', '==', ownerUid)
     );
     let snapshot = await getDocs(q);
     
@@ -430,6 +429,25 @@ export const productService = {
   async createProduct(data: any) {
     return this.createItem({ ...data, type: 'product' });
   },
+  async updateStock(productId: string, quantityChange: number): Promise<void> {
+    const db = getFirebaseDb();
+    const productRef = doc(db, 'products', productId);
+    try {
+      const snap = await getDoc(productRef);
+      if (snap.exists()) {
+        const currentStock = snap.data().stock || 0;
+        const newStock = Math.max(0, currentStock + quantityChange); // Prevent negative stock
+        await updateDoc(productRef, {
+          stock: newStock,
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update stock for product', productId, err);
+      throw err;
+    }
+  },
+
   async updateProduct(id: string, data: any) {
     return this.updateItem(id, 'product', data);
   },

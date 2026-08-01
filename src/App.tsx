@@ -7,7 +7,6 @@ import { MyWorkspace } from './pages/MyWorkspace';
 import { BusinessDashboard } from './pages/BusinessDashboard';
 import { StoreDashboard } from './pages/StoreDashboard';
 import { BookingsPage } from './pages/BookingsPage';
-import { ProductServiceManager } from './pages/ProductServiceManager';
 import { CatalogManagement } from './pages/CatalogManagement';
 import { WarehouseDashboard } from './pages/WarehouseDashboard';
 import { InventoryDashboard } from './pages/InventoryDashboard';
@@ -15,7 +14,8 @@ import { ServiceManagement } from './pages/ServiceManagement';
 
 import { JobMarketplace } from './pages/JobMarketplace';
 import { EmployerDashboard } from './pages/EmployerDashboard';
-import { UniversalSearch } from './pages/UniversalSearch';
+import { HomePage } from './pages/HomePage';
+import { MarketplacePage } from './pages/MarketplacePage';
 import { Checkout } from './pages/Checkout';
 import { OrderSuccess } from './pages/OrderSuccess';
 import { ProductDetails } from './pages/ProductDetails';
@@ -101,15 +101,15 @@ function App() {
           <Route 
             path="/catalog" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <CatalogManagement />
               </ProtectedRoute>
             } 
           />
           <Route 
-            path="/business-dashboard" 
+            path="/business-center" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <BusinessDashboard />
               </ProtectedRoute>
             } 
@@ -137,7 +137,9 @@ function App() {
             } 
           />
 
-          <Route path="/store-dashboard" element={<ProtectedRoute><ProductServiceManager /></ProtectedRoute>} />
+          <Route path="/store-dashboard" element={<Navigate to="/seller-dashboard" replace />} />
+          <Route path="/seller-dashboard" element={<ProtectedRoute><StoreDashboard /></ProtectedRoute>} />
+          <Route path="/seller-dashboard/:businessId" element={<ProtectedRoute><StoreDashboard /></ProtectedRoute>} />
           <Route 
             path="/services" 
             element={
@@ -150,7 +152,7 @@ function App() {
           <Route 
             path="/warehouses" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <WarehouseDashboard />
               </ProtectedRoute>
             } 
@@ -158,7 +160,7 @@ function App() {
           <Route 
             path="/inventory" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <InventoryDashboard />
               </ProtectedRoute>
             } 
@@ -166,7 +168,7 @@ function App() {
           <Route 
             path="/services" 
             element={
-              <ProtectedRoute allowedRoles={['Service Provider']}>
+              <ProtectedRoute>
                 <ServiceManagement />
               </ProtectedRoute>
             } 
@@ -188,10 +190,18 @@ function App() {
             } 
           />
           <Route 
-            path="/discovery" 
+            path="/home" 
             element={
               <ProtectedRoute>
-                <UniversalSearch />
+                <HomePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/marketplace" 
+            element={
+              <ProtectedRoute>
+                <MarketplacePage />
               </ProtectedRoute>
             } 
           />
@@ -238,7 +248,7 @@ function App() {
           <Route 
             path="/business-orders" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <BusinessOrderDashboard />
               </ProtectedRoute>
             } 
@@ -246,7 +256,7 @@ function App() {
           <Route 
             path="/business-payments" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <MerchantPayments />
               </ProtectedRoute>
             } 
@@ -262,7 +272,7 @@ function App() {
           <Route 
             path="/logistics" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <FulfillmentCenter />
               </ProtectedRoute>
             } 
@@ -278,7 +288,7 @@ function App() {
           <Route 
             path="/crm" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <MerchantCRM />
               </ProtectedRoute>
             } 
@@ -286,7 +296,7 @@ function App() {
           <Route 
             path="/crm/customer/:customerId" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <Customer360 />
               </ProtectedRoute>
             } 
@@ -318,23 +328,23 @@ function App() {
           <Route 
             path="/store/:storeId/products" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
-                <ProductServiceManager />
+              <ProtectedRoute>
+                <StoreDashboard />
               </ProtectedRoute>
             } 
           />
           <Route 
             path="/store/:storeId" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
-                <ProductServiceManager />
+              <ProtectedRoute>
+                <StoreDashboard />
               </ProtectedRoute>
             } 
           />
           <Route 
             path="/merchant-analytics" 
             element={
-              <ProtectedRoute allowedRoles={['Seller']}>
+              <ProtectedRoute>
                 <MerchantAnalytics />
               </ProtectedRoute>
             } 
@@ -357,8 +367,8 @@ function App() {
           />
 
           {/* REDIRECTS */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

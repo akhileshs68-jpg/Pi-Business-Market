@@ -48,6 +48,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, currentUse
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
@@ -86,6 +87,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, currentUse
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isTyping]);
+
+
+  const handleArchive = async () => {
+    try {
+      await messagingService.archiveConversation(conversation.conversationId, currentUserUid);
+      setShowMenu(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await messagingService.deleteConversationForUser(conversation.conversationId, currentUserUid);
+      setShowMenu(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleSend = async (e?: React.FormEvent, customType: MessageType = 'text', customContent?: string, customMeta?: any) => {
     e?.preventDefault();
@@ -207,8 +227,53 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ conversation, currentUse
           >
             <ScreenShare className="w-4 h-4" />
           </button>
+
+          <div className="relative">
+            <button 
+              onClick={() => setShowMenu(!showMenu)}
+              title="Options" 
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-900/60 rounded-xl transition-all"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-1 z-50">
+                <button onClick={handleArchive} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white uppercase tracking-wider">
+                  Archive Chat
+                </button>
+                <button onClick={handleDelete} className="w-full text-left px-4 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 uppercase tracking-wider">
+                  Delete for Me
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      
+      {/* Context Panel (Product / Order) */}
+      {(conversation.productId || conversation.orderId) && (
+        <div className="bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-3 flex items-center justify-between z-10 shadow-sm cursor-pointer hover:bg-slate-800/80 transition-colors" onClick={() => conversation.productId ? navigate(`/product/${conversation.productId}`) : navigate(`/order/${conversation.orderId}`)}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden">
+              {conversation.productId ? <ShoppingBag className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
+            </div>
+            <div className="min-w-0">
+              <span className="font-black text-white text-[10px] uppercase tracking-widest block mb-0.5">
+                {conversation.productId ? 'Product Inquiry' : 'Order Support'}
+              </span>
+              <p className="text-xs font-medium text-slate-400 truncate">
+                {conversation.productId ? `ID: ${conversation.productId}` : `Order #: ${conversation.orderId}`}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 pl-4">
+            <span className="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
+              View <ExternalLink className="w-3 h-3" />
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Pinned Messages Panel */}
       {pinnedMessage && (

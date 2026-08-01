@@ -35,7 +35,7 @@ export const businessService = {
       
       await runTransaction(db, async (transaction) => {
         // 1. Create Business
-        transaction.set(businessRef, {
+        const newBiz: any = {
           ...businessData,
           id: businessId,
           ownerUid,
@@ -44,11 +44,17 @@ export const businessService = {
           followers: 0,
           employeeCount: 1,
           storeCount: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: actorName,
-          updatedBy: actorName
+        };
+        const sanitizedBiz: any = {};
+        Object.entries(newBiz).forEach(([k,v]) => {
+           if (v !== undefined) sanitizedBiz[k] = v;
         });
+        sanitizedBiz.createdAt = serverTimestamp();
+        sanitizedBiz.updatedAt = serverTimestamp();
+        sanitizedBiz.createdBy = actorName;
+        sanitizedBiz.updatedBy = actorName;
+        
+        transaction.set(businessRef, sanitizedBiz);
 
         // 2. Create Owner Member Record
         transaction.set(memberRef, {
