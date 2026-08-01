@@ -23,6 +23,8 @@ import { cartService } from '../../services/cartService';
 import { checkoutService } from '../../services/checkoutService';
 import { Cart, CartItem } from '../../types';
 import { useNavigate } from 'react-router-dom';
+import { getFirebaseDb } from '../../firebase/config';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -48,9 +50,37 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
     setLoading(true);
     try {
       const activeCart = await cartService.getOrCreateCart(userUid, businessId);
-      const cartItems = await cartService.getCartItems(activeCart.cartId);
-      setCart(activeCart);
-      setItems(cartItems);
+      let allItems = await cartService.getCartItems(activeCart.cartId);
+
+      // Also query other user carts if any exist
+      if (userUid) {
+        const db = getFirebaseDb();
+        const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', userUid));
+        const cartsSnap = await getDocs(cartsQuery);
+        
+        const itemPromises = cartsSnap.docs
+          .filter(d => d.id !== activeCart.cartId)
+          .map(d => cartService.getCartItems(d.id));
+
+        const extraItemsArrays = await Promise.all(itemPromises);
+        extraItemsArrays.forEach(arr => {
+          allItems = [...allItems, ...arr];
+        });
+      }
+
+      const subtotal = allItems.reduce((acc, it) => acc + (it.subtotal || (it.unitPrice * it.quantity)), 0);
+      const tax = subtotal * 0.05;
+      const shipping = subtotal > 0 ? 10 : 0;
+      const grandTotal = subtotal + tax + shipping;
+
+      setCart({
+        ...activeCart,
+        subtotal,
+        tax,
+        shipping,
+        grandTotal
+      });
+      setItems(allItems);
     } catch (err) {
       console.error('Failed to fetch cart', err);
     } finally {

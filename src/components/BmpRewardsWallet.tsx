@@ -4,20 +4,24 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Gift, History, Coins, ArrowUpRight, ArrowDownRight, ShieldCheck, Flame, ShoppingBag, Award, Users, Share2, Star } from 'lucide-react';
+import { Loader2, Gift, History, Coins, ArrowUpRight, ArrowDownRight, ShieldCheck, Flame, ShoppingBag, Award, Users, Share2, Star, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { paymentEngine } from '../services/wallet/paymentEngine';
 import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { WalletTransaction } from '../services/wallet/walletTypes';
 import { gamificationService, UserGamificationProfile } from '../services/gamificationService';
 import { DailyCheckInCard } from './rewards/DailyCheckInCard';
+import { UniversalShareModal } from './sharing/UniversalShareModal';
 
 export const BmpRewardsWallet = () => {
+  const navigate = useNavigate();
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [profile, setProfile] = useState<UserGamificationProfile | null>(null);
   const [error, setError] = useState('');
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const loadData = async () => {
     setError('');
@@ -46,7 +50,7 @@ export const BmpRewardsWallet = () => {
         console.warn('Error loading gamification profile:', profErr);
       }
 
-      // 3. Query wallet_transactions safely (single field filter to avoid missing index errors)
+      // 3. Query wallet_transactions safely
       try {
         const db = getFirebaseDb();
         const txQ = query(
@@ -57,7 +61,6 @@ export const BmpRewardsWallet = () => {
         const snap = await getDocs(txQ);
         const allUserTxs = snap.docs.map(d => ({ id: d.id, ...d.data() } as WalletTransaction));
         
-        // Filter and sort in memory to guarantee zero composite index requirements
         const filteredTxs = allUserTxs
           .filter(tx => tx.provider === 'bmp_rewards' || tx.walletId === `${user.uid}_bmp_rewards`)
           .sort((a, b) => {
@@ -143,51 +146,84 @@ export const BmpRewardsWallet = () => {
 
       {/* How to Earn BMP (Action-Based Verification) */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Award className="w-4 h-4 text-amber-400" />
-          <h4 className="text-xs font-black text-white uppercase tracking-widest">Verified Earning Methods</h4>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Award className="w-4 h-4 text-amber-400" />
+            <h4 className="text-xs font-black text-white uppercase tracking-widest">Action-Verified BMP Rewards</h4>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Click to Perform & Earn</span>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-xl">
-              <ShoppingBag className="w-4 h-4" />
+          {/* Marketplace Purchases Card */}
+          <button
+            onClick={() => navigate('/customer')}
+            className="p-3.5 bg-slate-950 hover:bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/40 rounded-2xl flex items-center justify-between gap-3 text-left transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-indigo-500/10 text-indigo-400 group-hover:scale-110 rounded-xl transition-all">
+                <ShoppingBag className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white uppercase">Marketplace Purchases</p>
+                <p className="text-[10px] font-medium text-emerald-400">10 BMP per 1 Pi Spent</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-black text-white uppercase">Marketplace Purchases</p>
-              <p className="text-[10px] font-medium text-emerald-400">10 BMP per 1 Pi Spent</p>
-            </div>
-          </div>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-600 group-hover:text-indigo-400 transition-all" />
+          </button>
 
-          <div className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-center gap-3">
-            <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl">
-              <Star className="w-4 h-4" />
+          {/* Verified Reviews Card */}
+          <button
+            onClick={() => navigate('/orders')}
+            className="p-3.5 bg-slate-950 hover:bg-slate-900/90 border border-slate-800/80 hover:border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 text-left transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500/10 text-amber-400 group-hover:scale-110 rounded-xl transition-all">
+                <Star className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white uppercase">Verified Reviews</p>
+                <p className="text-[10px] font-medium text-amber-400">+25 BMP per review</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-black text-white uppercase">Verified Reviews</p>
-              <p className="text-[10px] font-medium text-amber-400">+25 BMP per review</p>
-            </div>
-          </div>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-600 group-hover:text-amber-400 transition-all" />
+          </button>
 
-          <div className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-center gap-3">
-            <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl">
-              <Users className="w-4 h-4" />
+          {/* Friend Referral Card */}
+          <button
+            onClick={() => navigate('/rewards')}
+            className="p-3.5 bg-slate-950 hover:bg-slate-900/90 border border-slate-800/80 hover:border-blue-500/40 rounded-2xl flex items-center justify-between gap-3 text-left transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-500/10 text-blue-400 group-hover:scale-110 rounded-xl transition-all">
+                <Users className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white uppercase">Friend Referral</p>
+                <p className="text-[10px] font-medium text-blue-400">+100 BMP upon friend 1st order</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-black text-white uppercase">Friend Referral</p>
-              <p className="text-[10px] font-medium text-blue-400">+100 BMP upon friend 1st order</p>
-            </div>
-          </div>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-600 group-hover:text-blue-400 transition-all" />
+          </button>
 
-          <div className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl">
-              <Share2 className="w-4 h-4" />
+          {/* Social Share Card (CLICKABLE SHARE TRIGGER) */}
+          <button
+            onClick={() => setShareModalOpen(true)}
+            className="p-3.5 bg-gradient-to-r from-emerald-950/40 to-slate-950 hover:from-emerald-900/50 hover:to-slate-900 border border-emerald-500/30 hover:border-emerald-400/60 rounded-2xl flex items-center justify-between gap-3 text-left transition-all group shadow-lg"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-500/20 text-emerald-400 group-hover:scale-110 rounded-xl transition-all">
+                <Share2 className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-white uppercase flex items-center gap-1.5">
+                  Social Share <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-[9px]">Click to Share</span>
+                </p>
+                <p className="text-[10px] font-medium text-emerald-400">+15 BMP per verified share</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-black text-white uppercase">Social Share</p>
-              <p className="text-[10px] font-medium text-emerald-400">+15 BMP per share</p>
-            </div>
-          </div>
+            <Share2 className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+          </button>
         </div>
       </div>
 
@@ -225,6 +261,22 @@ export const BmpRewardsWallet = () => {
           </div>
         )}
       </div>
+
+      {/* Universal Share Modal */}
+      {profile && (
+        <UniversalShareModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          userId={profile.userId}
+          entityType="product"
+          entityId="PI-BUSINESS-MARKET"
+          entityName="Pi Business Market - Global Ecosystem"
+          onRewardEarned={() => {
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 };
+

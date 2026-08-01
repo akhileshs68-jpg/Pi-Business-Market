@@ -9,12 +9,13 @@ import { gamificationService, LeaderboardEntry } from '../../services/gamificati
 
 export const LeaderboardView: React.FC = () => {
   const [category, setCategory] = useState<'buyers' | 'sellers' | 'referrers' | 'reviewers' | 'streaks'>('buyers');
+  const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'monthly' | 'global'>('global');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchLeaderboard();
-  }, [category]);
+  }, [category, timeframe]);
 
   const fetchLeaderboard = async () => {
     setLoading(true);
@@ -46,8 +47,25 @@ export const LeaderboardView: React.FC = () => {
           <p className="text-xs text-slate-400 font-medium">Top active contributors in the Pi Business Market ecosystem</p>
         </div>
 
-        {/* Categories */}
-        <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+        {/* Timeframe & Category Selectors */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
+          {/* Timeframe Selector */}
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-black uppercase">
+            {(['daily', 'weekly', 'monthly', 'global'] as const).map(tf => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                className={`px-2.5 py-1 rounded-lg transition-all ${
+                  timeframe === tf ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
+
+          {/* Categories */}
+          <div className="flex flex-wrap gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
           {([
             { id: 'buyers', label: 'Top Buyers', icon: ShoppingBag },
             { id: 'sellers', label: 'Top Sellers', icon: Store },
@@ -72,6 +90,7 @@ export const LeaderboardView: React.FC = () => {
             );
           })}
         </div>
+      </div>
       </div>
 
       {loading ? (

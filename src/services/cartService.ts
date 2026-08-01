@@ -104,23 +104,20 @@ export const cartService = {
 
       if (storeId && storeId !== 'unknown' && storeId !== 'none' && storeId !== 'undefined') {
         const storeSnap = await getDoc(doc(db, 'stores', storeId));
-        if (!storeSnap.exists()) {
-          throw new Error('This product is no longer available.');
+        if (storeSnap.exists()) {
+          const sData = storeSnap.data();
+          if (sData.status !== 'active' && sData.status !== 'published' && sData.status !== 'approved' && sData.status) {
+            throw new Error('This product is no longer available.');
+          }
         }
-        const sData = storeSnap.data();
-        if (sData.status !== 'active' && sData.status !== 'published' && sData.status !== 'approved' && sData.status) {
-          throw new Error('This product is no longer available.');
-        }
-      } else {
-        throw new Error('This product is no longer available.');
       }
-    } else {
-      throw new Error('This product is no longer available.');
     }
+
+    const requestedQty = Math.max(1, Math.min(item.quantity || 1, stock));
 
     if (itemSnap.exists()) {
       const current = itemSnap.data() as CartItem;
-      const newQuantity = current.quantity + item.quantity;
+      const newQuantity = Math.min(current.quantity + requestedQty, stock);
       await updateDoc(itemRef, {
         quantity: newQuantity,
         subtotal: item.unitPrice * newQuantity,
@@ -139,8 +136,9 @@ export const cartService = {
         productName: item.name,
         price: item.unitPrice,
         currency: item.currency || 'Pi',
+        quantity: requestedQty,
         stock: stock,
-        subtotal,
+        subtotal: item.unitPrice * requestedQty,
         status: 'active',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -157,15 +155,55 @@ export const cartService = {
     
     if (itemSnap.exists()) {
       const data = itemSnap.data() as CartItem;
+      const maxStock = data.stock || 999;
       if (quantity <= 0) {
         await deleteDoc(itemRef);
       } else {
+        const safeQty = Math.min(quantity, maxStock);
         await updateDoc(itemRef, {
-          quantity,
-          subtotal: data.unitPrice * quantity
+          quantity: safeQty,
+          subtotal: data.unitPrice * safeQty,
+          updatedAt: new Date().toISOString()
         });
       }
       await this.recalculateCart(cartId);
+    }
+  },
+
+  /**
+   * Merge guest cart items into logged-in user cart
+   */
+  async mergeGuestCart(guestUid: string, userUid: string): Promise<void> {
+    if (!guestUid || !userUid || guestUid === userUid) return;
+    const db = getFirebaseDb();
+    try {
+      const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', guestUid));
+      const cartsSnap = await getDocs(cartsQuery);
+
+      for (const cDoc of cartsSnap.docs) {
+        const guestCart = cDoc.data() as Cart;
+        const guestItems = await this.getCartItems(guestCart.cartId);
+        
+        if (guestItems.length > 0) {
+          const userCart = await this.getOrCreateCart(userUid, guestCart.businessId);
+          for (const item of guestItems) {
+            await this.addToCart(userCart.cartId, {
+              cartId: userCart.cartId,
+              productId: item.productId,
+              name: item.name || item.productName || 'Product',
+              unitPrice: item.unitPrice || item.price || 0,
+              quantity: item.quantity,
+              currency: item.currency || 'Pi',
+              imageUrl: item.imageUrl,
+              variantId: item.variantId
+            });
+          }
+        }
+        await this.clearCart(guestCart.cartId);
+        await deleteDoc(cDoc.ref);
+      }
+    } catch (err) {
+      console.warn('Failed to merge guest cart:', err);
     }
   },
 

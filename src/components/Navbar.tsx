@@ -47,6 +47,9 @@ import { ROLES_CONFIG } from '../auth/authService';
 import { useNavigation } from '../hooks/useNavigation';
 
 import { NotificationCenter } from './NotificationCenter';
+import { getFirebaseDb } from '../firebase/config';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { bmpRewardsProvider } from '../services/wallet/providers/bmpRewardsProvider';
 
 interface NavbarProps {
   currentUser?: UserType | null;
@@ -79,8 +82,81 @@ function NavbarComponent({
   const [isWalletOpen, setIsWalletOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [realtimeCartCount, setRealtimeCartCount] = useState<number>(0);
+  const [realtimeWalletBalance, setRealtimeWalletBalance] = useState<number>(0);
   const { logout } = useAuth();
   const [faucetLoading, setFaucetLoading] = useState(false);
+
+  // Live BMP Wallet Balance Sync
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    let isMounted = true;
+    bmpRewardsProvider.getBalance(currentUser.uid).then(bal => {
+      if (isMounted) {
+        setRealtimeWalletBalance(bal);
+        if (onWalletUpdate && bal !== walletBalance) onWalletUpdate(bal);
+      }
+    }).catch(console.error);
+
+    return () => { isMounted = false; };
+  }, [currentUser?.uid]);
+
+  // Live Cart Count Listener
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setRealtimeCartCount(0);
+      return;
+    }
+
+    const db = getFirebaseDb();
+    const cartsQuery = query(collection(db, 'carts'), where('userUid', '==', currentUser.uid));
+    
+    let activeUnsubItems: (() => void)[] = [];
+
+    const unsubCarts = onSnapshot(cartsQuery, (snapshot) => {
+      activeUnsubItems.forEach(u => u());
+      activeUnsubItems = [];
+
+      const cartIds = snapshot.docs.map(d => d.id);
+      if (cartIds.length === 0) {
+        setRealtimeCartCount(0);
+        return;
+      }
+
+      let totalItems = 0;
+      let loadedCarts = 0;
+
+      cartIds.forEach(cid => {
+        const itemsQuery = query(collection(db, 'cartItems'), where('cartId', '==', cid));
+        const unsub = onSnapshot(itemsQuery, (itemSnap) => {
+          const qty = itemSnap.docs.reduce((acc, doc) => acc + (doc.data().quantity || 1), 0);
+          totalItems += qty;
+          loadedCarts++;
+          if (loadedCarts >= cartIds.length) {
+            setRealtimeCartCount(totalItems);
+          }
+        }, (err) => {
+          console.warn('Error listening to cart items:', err);
+        });
+        activeUnsubItems.push(unsub);
+      });
+    }, (err) => {
+      console.warn('Error listening to carts:', err);
+    });
+
+    const handleCartEvent = () => {
+      // Trigger forced sync if custom event fired
+    };
+    window.addEventListener('cartUpdated', handleCartEvent);
+
+    return () => {
+      unsubCarts();
+      activeUnsubItems.forEach(u => u());
+      window.removeEventListener('cartUpdated', handleCartEvent);
+    };
+  }, [currentUser?.uid]);
+
+  const displayCartCount = cartCount > 0 ? cartCount : realtimeCartCount;
 
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -296,9 +372,9 @@ function NavbarComponent({
             id="nav_cart_button"
           >
             <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            {cartCount > 0 && (
+            {displayCartCount > 0 && (
               <span className="text-[8px] sm:text-[10px] font-bold font-mono px-1 sm:px-1.5 py-0.5 bg-white text-violet-950 rounded-md">
-                {cartCount}
+                {displayCartCount}
               </span>
             )}
           </button>

@@ -9,7 +9,23 @@ export interface WalletTransaction {
   amount: number;
   balanceBefore: number;
   balanceAfter: number;
-  source: 'DAILY_REWARD' | 'LOGIN_REWARD' | 'REFERRAL' | 'SHARE' | 'CAMPAIGN' | 'CASHBACK' | 'ADMIN' | 'MARKETPLACE_ORDER' | 'REFUND';
+  source: 
+    | 'DAILY_REWARD' 
+    | 'LOGIN_REWARD' 
+    | 'REFERRAL' 
+    | 'SHARE' 
+    | 'CAMPAIGN' 
+    | 'CASHBACK' 
+    | 'ADMIN' 
+    | 'ADMIN_CREDIT'
+    | 'ADMIN_DEBIT'
+    | 'ADJUSTMENT'
+    | 'MARKETPLACE_ORDER' 
+    | 'PURCHASE'
+    | 'REFUND'
+    | 'MISSION_REWARD'
+    | 'REVIEW_REWARD'
+    | 'BALANCE_MIGRATION';
   referenceId?: string; // e.g., orderId
   description: string;
   createdAt: string;

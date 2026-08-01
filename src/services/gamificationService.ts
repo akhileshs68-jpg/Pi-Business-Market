@@ -46,8 +46,8 @@ export interface Mission {
   description: string;
   rewardBmp: number;
   targetCount: number;
-  type: 'daily' | 'weekly' | 'one_time';
-  category: 'view' | 'wishlist' | 'order' | 'review' | 'share' | 'profile' | 'refer';
+  type: 'daily' | 'weekly' | 'monthly' | 'seasonal' | 'festival' | 'pi_event' | 'one_time';
+  category: 'view' | 'wishlist' | 'order' | 'review' | 'share' | 'profile' | 'refer' | 'business';
 }
 
 export interface UserGamificationProfile {
@@ -95,35 +95,52 @@ export interface LeaderboardEntry {
 
 export const LEVELS_CONFIG: Record<number, { levelName: string; minBmp: number; maxBmp: number; multiplier: number; perks: string[] }> = {
   1: { levelName: 'Explorer', minBmp: 0, maxBmp: 99, multiplier: 1.0, perks: ['Base 1.0x Reward Earnings', 'Standard Marketplace Access'] },
-  2: { levelName: 'Trader', minBmp: 100, maxBmp: 499, multiplier: 1.05, perks: ['1.05x Reward Multiplier', 'Trader Badge Unlocked', 'Priority Order Notifications'] },
-  3: { levelName: 'Merchant', minBmp: 500, maxBmp: 1499, multiplier: 1.10, perks: ['1.10x Reward Multiplier', 'Store Highlight Badge', 'Discounted Checkout Fees'] },
-  4: { levelName: 'Professional', minBmp: 1500, maxBmp: 4999, multiplier: 1.20, perks: ['1.20x Reward Multiplier', 'Pro Seller Badge', 'Featured Marketplace Listing'] },
-  5: { levelName: 'Business Leader', minBmp: 5000, maxBmp: 14999, multiplier: 1.35, perks: ['1.35x Reward Multiplier', 'VIP Concierge Support', 'Top Banner Showcase'] },
-  6: { levelName: 'Marketplace Champion', minBmp: 15000, maxBmp: 9999999, multiplier: 1.50, perks: ['1.50x Reward Multiplier', 'Gold Champion Avatar Frame', 'Zero Commission Perk'] },
+  2: { levelName: 'Trader', minBmp: 100, maxBmp: 299, multiplier: 1.05, perks: ['1.05x Reward Multiplier', 'Trader Badge Unlocked', 'Priority Order Notifications'] },
+  3: { levelName: 'Merchant', minBmp: 300, maxBmp: 699, multiplier: 1.10, perks: ['1.10x Reward Multiplier', 'Store Highlight Badge', 'Discounted Checkout Fees'] },
+  4: { levelName: 'Verified Merchant', minBmp: 700, maxBmp: 1499, multiplier: 1.15, perks: ['1.15x Reward Multiplier', 'Verified Merchant Blue Tick', 'Escrow Priority Speedup'] },
+  5: { levelName: 'Business Leader', minBmp: 1500, maxBmp: 2999, multiplier: 1.25, perks: ['1.25x Reward Multiplier', 'Pro Seller Badge', 'Featured Marketplace Listing'] },
+  6: { levelName: 'Gold Merchant', minBmp: 3000, maxBmp: 5999, multiplier: 1.35, perks: ['1.35x Reward Multiplier', 'VIP Merchant Suite', 'Top Category Banner Placement'] },
+  7: { levelName: 'Diamond Merchant', minBmp: 6000, maxBmp: 11999, multiplier: 1.45, perks: ['1.45x Reward Multiplier', 'Diamond Badge', 'Zero Merchant Surcharge Promo'] },
+  8: { levelName: 'Pi Champion', minBmp: 12000, maxBmp: 24999, multiplier: 1.60, perks: ['1.60x Reward Multiplier', 'Gold Champion Frame', 'Global Ecosystem Ambassador'] },
+  9: { levelName: 'Community Builder', minBmp: 25000, maxBmp: 49999, multiplier: 1.75, perks: ['1.75x Reward Multiplier', 'Community Leader Rights', 'Special DAO Vote Power'] },
+  10: { levelName: 'Global Merchant', minBmp: 50000, maxBmp: 9999999, multiplier: 2.00, perks: ['2.00x Maximum Reward Multiplier', 'Global Pioneer Hall of Fame', 'Dedicated Account Manager'] },
 };
 
 export const BADGES_CATALOG: Record<string, BadgeInfo> = {
+  profile_completion: { id: 'profile_completion', name: 'Profile Master', description: '100% completed seller profile and verified contact details', iconName: 'UserCheck', color: 'text-sky-400', category: 'community' },
+  sales_100: { id: 'sales_100', name: '100 Sales Club', description: 'Achieved 100 verified merchant sales', iconName: 'TrendingUp', color: 'text-amber-400', category: 'seller' },
+  purchases_100: { id: 'purchases_100', name: '100 Purchases Club', description: 'Completed 100 verified purchases on Pi Business Market', iconName: 'ShoppingBag', color: 'text-indigo-400', category: 'buyer' },
+  top_seller: { id: 'top_seller', name: 'Top Seller', description: 'Achieved top merchant ranking in category', iconName: 'Crown', color: 'text-yellow-400', category: 'seller' },
+  trusted_seller: { id: 'trusted_seller', name: 'Trusted Seller', description: 'Maintained 4.8+ star rating with zero dispute losses', iconName: 'ShieldCheck', color: 'text-emerald-400', category: 'seller' },
+  verified_business: { id: 'verified_business', name: 'Verified Business', description: 'Completed official enterprise business document verification', iconName: 'BadgeCheck', color: 'text-blue-400', category: 'seller' },
+  community_hero: { id: 'community_hero', name: 'Community Hero', description: 'Submitted 15+ helpful community reviews and answers', iconName: 'Heart', color: 'text-rose-400', category: 'community' },
+  top_referrer: { id: 'top_referrer', name: 'Top Referrer', description: 'Successfully invited 10+ verified active Pioneers', iconName: 'Users', color: 'text-purple-400', category: 'referral' },
+  marketplace_pioneer: { id: 'marketplace_pioneer', name: 'Marketplace Pioneer', description: 'Joined Pi Business Market in the launch era', iconName: 'Sparkles', color: 'text-cyan-400', category: 'community' },
   verified_buyer: { id: 'verified_buyer', name: 'Verified Buyer', description: 'Completed first verified purchase on Pi Business Market', iconName: 'ShoppingBag', color: 'text-indigo-400', category: 'buyer' },
-  top_buyer: { id: 'top_buyer', name: 'Top Buyer', description: 'Completed 10+ verified purchases', iconName: 'Award', color: 'text-amber-400', category: 'buyer' },
-  verified_seller: { id: 'verified_seller', name: 'Verified Seller', description: 'Published a product and achieved first merchant sale', iconName: 'Store', color: 'text-emerald-400', category: 'seller' },
-  top_seller: { id: 'top_seller', name: 'Top Seller', description: 'Achieved 25+ sales on Pi Business Market', iconName: 'Crown', color: 'text-yellow-400', category: 'seller' },
-  premium_merchant: { id: 'premium_merchant', name: 'Premium Merchant', description: 'Reached 50+ sales with exceptional merchant score', iconName: 'ShieldCheck', color: 'text-purple-400', category: 'seller' },
   daily_streak_3: { id: 'daily_streak_3', name: '3-Day Streak', description: 'Maintained a 3-day continuous check-in streak', iconName: 'Flame', color: 'text-orange-400', category: 'streak' },
   daily_streak_7: { id: 'daily_streak_7', name: '7-Day Streak', description: 'Maintained a 7-day continuous check-in streak', iconName: 'Zap', color: 'text-amber-500', category: 'streak' },
   daily_streak_30: { id: 'daily_streak_30', name: '30-Day Master', description: 'Maintained a 30-day continuous check-in streak', iconName: 'Sparkles', color: 'text-cyan-400', category: 'streak' },
-  community_helper: { id: 'community_helper', name: 'Community Helper', description: 'Submitted 5+ verified product reviews', iconName: 'Heart', color: 'text-rose-400', category: 'community' },
-  referral_master: { id: 'referral_master', name: 'Referral Master', description: 'Successfully invited 3+ friends who completed purchases', iconName: 'Users', color: 'text-blue-400', category: 'referral' },
-  veteran: { id: 'veteran', name: 'Marketplace Veteran', description: 'Active member for 30+ days in the ecosystem', iconName: 'Clock', color: 'text-slate-300', category: 'community' },
 };
 
 export const MISSIONS_LIST: Mission[] = [
+  // Daily Missions
   { id: 'daily_visit', title: 'Daily Marketplace Visit', description: 'Visit the Pi Business Marketplace today', rewardBmp: 5, targetCount: 1, type: 'daily', category: 'view' },
   { id: 'daily_view_products', title: 'Product Explorer', description: 'Explore at least 5 different product listings', rewardBmp: 10, targetCount: 5, type: 'daily', category: 'view' },
   { id: 'daily_wishlist', title: 'Wishlist Curator', description: 'Add 1 item to your wishlist', rewardBmp: 10, targetCount: 1, type: 'daily', category: 'wishlist' },
-  { id: 'daily_share', title: 'Social Ambassador', description: 'Share a marketplace product with friends', rewardBmp: 15, targetCount: 1, type: 'daily', category: 'share' },
+  { id: 'daily_share', title: 'Social Ambassador', description: 'Share a marketplace listing with friends', rewardBmp: 15, targetCount: 1, type: 'daily', category: 'share' },
+  
+  // Weekly Missions
   { id: 'weekly_purchase', title: 'Marketplace Patron', description: 'Complete 1 order purchase this week', rewardBmp: 50, targetCount: 1, type: 'weekly', category: 'order' },
   { id: 'weekly_review', title: 'Trusted Reviewer', description: 'Submit 1 verified product review', rewardBmp: 30, targetCount: 1, type: 'weekly', category: 'review' },
   { id: 'weekly_refer', title: 'Growth Catalyst', description: 'Invite 1 friend who completes a purchase', rewardBmp: 100, targetCount: 1, type: 'weekly', category: 'refer' },
+
+  // Monthly Missions
+  { id: 'monthly_power_buyer', title: 'Monthly Power Buyer', description: 'Complete 5 verified orders in a month', rewardBmp: 200, targetCount: 5, type: 'monthly', category: 'order' },
+  { id: 'monthly_merchant_pro', title: 'Merchant Master', description: 'Fulfill 10 customer orders in a month', rewardBmp: 300, targetCount: 10, type: 'monthly', category: 'business' },
+
+  // Seasonal & Pi Network Event Missions
+  { id: 'pi_fest_2026', title: 'Pi Network Global Fest', description: 'Participate in Pi Ecosystem Trade Event', rewardBmp: 500, targetCount: 1, type: 'pi_event', category: 'order' },
+  { id: 'festival_summer', title: 'Summer Commerce Sprint', description: 'Publish 3 new products or services during summer sale', rewardBmp: 250, targetCount: 3, type: 'festival', category: 'business' }
 ];
 
 export const gamificationService = {
@@ -132,14 +149,14 @@ export const gamificationService = {
    */
   calculateLevel(lifetimeBmp: number): LevelInfo {
     let currentLvl = 1;
-    for (let lvl = 6; lvl >= 1; lvl--) {
-      if (lifetimeBmp >= LEVELS_CONFIG[lvl].minBmp) {
+    for (let lvl = 10; lvl >= 1; lvl--) {
+      if (LEVELS_CONFIG[lvl] && lifetimeBmp >= LEVELS_CONFIG[lvl].minBmp) {
         currentLvl = lvl;
         break;
       }
     }
 
-    const cfg = LEVELS_CONFIG[currentLvl];
+    const cfg = LEVELS_CONFIG[currentLvl] || LEVELS_CONFIG[1];
     const min = cfg.minBmp;
     const max = cfg.maxBmp;
     const range = max - min;
@@ -568,6 +585,60 @@ export const gamificationService = {
       'SHARE',
       `Product Share Reward (${platform})`,
       productId
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const newShares = (data.stats?.totalProductsShared || 0) + 1;
+      const newLifetime = (data.lifetimeBmp || 0) + rewardBmp;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        'stats.totalProductsShared': newShares,
+        'missionProgress.daily_share': increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return rewardBmp;
+  },
+
+  /**
+   * VERIFIED SHARE CLICK REWARD WITH ANTI-CHEAT & RATE LIMITING
+   */
+  async processVerifiedShareReward(userId: string, entityId: string, platform: string, shareId: string): Promise<number> {
+    const db = getFirebaseDb();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Anti-cheat rate limit: max 5 verified share click rewards per day
+    const sharesRef = collection(db, 'share_events');
+    const qShares = query(
+      sharesRef,
+      where('userId', '==', userId),
+      where('shareDate', '==', todayStr),
+      where('rewarded', '==', true)
+    );
+    const snapShares = await getDocs(qShares);
+
+    if (snapShares.size >= 5) {
+      console.warn('[Anti-Cheat] Daily verified share reward maxed out for user:', userId);
+      return 0;
+    }
+
+    const rewardBmp = 15;
+    await bmpRewardsProvider.credit(
+      userId,
+      rewardBmp,
+      'SHARE',
+      `Verified Share Engagement Reward (${platform})`,
+      entityId
     );
 
     const profileRef = doc(db, 'user_gamification', userId);

@@ -6,112 +6,137 @@
 import { 
   collection, 
   doc, 
-  setDoc, 
   getDocs, 
   query, 
   where, 
   orderBy, 
-  serverTimestamp, 
-  Timestamp,
-  writeBatch
+  limit, 
+  runTransaction, 
+  serverTimestamp 
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
-import { 
-  LedgerEntry, 
-  Payment, 
-  LedgerEntryType 
-} from '../types';
+import { WalletTransaction } from './wallet/walletTypes';
+import { bmpRewardsProvider } from './wallet/providers/bmpRewardsProvider';
+
+import { LedgerEntry } from '../types';
+
+export interface LedgerAuditResult {
+  userId: string;
+  recordedBalance: number;
+  calculatedBalance: number;
+  hasDiscrepancy: boolean;
+  discrepancyAmount: number;
+  transactionCount: number;
+}
+
+export interface BmpTokenConfig {
+  symbol: string;
+  network: string;
+  contractAddress?: string;
+  decimals: number;
+  isTokenized: boolean;
+}
+
+export const bmpTokenConfig: BmpTokenConfig = {
+  symbol: 'BMP',
+  network: 'Pi Network / Web3',
+  decimals: 18,
+  isTokenized: false, // Ready for future smart contract bridging
+};
 
 export const ledgerService = {
   /**
-   * RECORD PAYMENT TRANSACTION
-   * Creates an immutable ledger entry for a successful payment
+   * Fetch immutable transaction ledger history for a user
    */
-  async recordPayment(payment: Payment): Promise<string> {
+  async getLedgerHistory(userId: string, maxResults: number = 50): Promise<WalletTransaction[]> {
     const db = getFirebaseDb();
-    const ledgerId = `LEDG_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-    
-    const entry: LedgerEntry = {
-      ledgerId,
-      paymentId: payment.paymentId,
-      businessId: payment.payeeBusinessId,
-      entryType: 'sale',
-      debit: 0,
-      credit: payment.amount,
-      currency: payment.currency,
-      balanceImpact: payment.amount,
-      referenceType: 'order',
-      referenceId: payment.orderId,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      // Query without complex multi-field index requirements
+      const q = query(
+        collection(db, 'wallet_transactions'),
+        where('userId', '==', userId),
+        limit(maxResults)
+      );
+      const snap = await getDocs(q);
+      const txs = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.()?.toISOString() || d.data().createdAt || new Date().toISOString()
+      })) as WalletTransaction[];
 
-    await setDoc(doc(db, 'paymentLedger', ledgerId), {
-      ...entry,
-      createdAt: serverTimestamp()
-    });
-
-    return ledgerId;
+      // Client-side sort by date descending
+      return txs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (err) {
+      console.warn('Failed to fetch ledger history:', err);
+      return [];
+    }
   },
 
   /**
-   * RECORD REFUND TRANSACTION
+   * Audit user's ledger and recalculate exact balance from credits & debits
    */
-  async recordRefund(payment: Payment, refundAmount: number, refundId: string): Promise<string> {
+  async auditAndReconcile(userId: string): Promise<LedgerAuditResult> {
     const db = getFirebaseDb();
-    const ledgerId = `LEDG_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+    const currentRecorded = await bmpRewardsProvider.getBalance(userId);
     
-    const entry: LedgerEntry = {
-      ledgerId,
-      paymentId: payment.paymentId,
-      businessId: payment.payeeBusinessId,
-      entryType: 'refund',
-      debit: refundAmount,
-      credit: 0,
-      currency: payment.currency,
-      balanceImpact: -refundAmount,
-      referenceType: 'refund',
-      referenceId: refundId,
-      createdAt: new Date().toISOString()
+    const history = await this.getLedgerHistory(userId, 500);
+    
+    let calculated = 0;
+    for (const tx of history) {
+      if (tx.type === 'CREDIT') {
+        calculated += tx.amount;
+      } else if (tx.type === 'DEBIT') {
+        calculated -= tx.amount;
+      }
+    }
+
+    const discrepancyAmount = Math.abs(currentRecorded - calculated);
+    const hasDiscrepancy = discrepancyAmount > 0.01;
+
+    // Self-healing: if discrepancy exists, create an adjustment entry to restore balance integrity
+    if (hasDiscrepancy) {
+      console.info(`[Ledger] Reconciling discrepancy for user ${userId}: recorded=${currentRecorded}, calculated=${calculated}`);
+      if (calculated > currentRecorded) {
+        const diff = calculated - currentRecorded;
+        await bmpRewardsProvider.credit(userId, diff, 'ADJUSTMENT', 'Ledger Audit Reconciled Credit');
+      } else if (currentRecorded > calculated) {
+        const diff = currentRecorded - calculated;
+        await bmpRewardsProvider.debit(userId, diff, 'ADJUSTMENT', 'Ledger Audit Reconciled Debit');
+      }
+    }
+
+    return {
+      userId,
+      recordedBalance: currentRecorded,
+      calculatedBalance: calculated,
+      hasDiscrepancy,
+      discrepancyAmount,
+      transactionCount: history.length
     };
-
-    await setDoc(doc(db, 'paymentLedger', ledgerId), {
-      ...entry,
-      createdAt: serverTimestamp()
-    });
-
-    return ledgerId;
   },
 
   /**
-   * RETRIEVAL
+   * Fetch business-level ledger entries (for merchant accounting & financial reports)
    */
   async getBusinessLedger(businessId: string): Promise<LedgerEntry[]> {
     const db = getFirebaseDb();
-    const q = query(
-      collection(db, 'paymentLedger'),
-      where('businessId', '==', businessId)
-    );
-    
-    const snapshot = await getDocs(q);
-    const entries = snapshot.docs.map(doc => this.mapDocToLedger(doc));
-    return entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  },
+    try {
+      const q = query(
+        collection(db, 'ledger_entries'),
+        where('businessId', '==', businessId),
+        limit(100)
+      );
+      const snap = await getDocs(q);
+      const entries = snap.docs.map(d => ({
+        ledgerId: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.()?.toISOString() || d.data().createdAt || new Date().toISOString()
+      })) as LedgerEntry[];
 
-  async getCustomerLedger(customerUid: string): Promise<LedgerEntry[]> {
-    // Customers might want to see their own "spending ledger"
-    // Implementation depends on if we store customerUid in ledger entries
-    // For now, let's keep it merchant focused as per requirements
-    return [];
-  },
-
-  /**
-   * HELPERS
-   */
-  mapDocToLedger(doc: any): LedgerEntry {
-    const data = doc.data();
-    return {
-      ...data,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-    } as LedgerEntry;
+      return entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (err) {
+      console.warn('Failed to fetch business ledger:', err);
+      return [];
+    }
   }
 };

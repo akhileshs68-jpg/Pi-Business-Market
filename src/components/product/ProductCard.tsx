@@ -218,9 +218,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       triggerToast('Added to Shopping Bag!');
       setTimeout(() => setAdded(false), 2000);
       window.dispatchEvent(new Event('cartUpdated'));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add to cart', err);
-      triggerToast('Error adding to cart');
+      triggerToast(err?.message || 'Error adding to cart');
     } finally {
       setIsAdding(false);
     }
