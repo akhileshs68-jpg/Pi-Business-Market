@@ -120,6 +120,19 @@ export const reviewService = {
         `You submitted a ${review.rating}-star review for a ${review.entityType}.`,
         reviewId
       );
+
+      // Trigger BMP Gamification Reward for verified review
+      try {
+        const { gamificationService } = await import('./gamificationService');
+        await gamificationService.processReviewReward(
+          review.reviewerUid,
+          review.entityId,
+          review.orderId || 'ORDER_REVIEW',
+          reviewId
+        );
+      } catch (rewardErr) {
+        console.warn('BMP Review Reward processing failed', rewardErr);
+      }
     } catch (err) {
       console.error('CRM/Notification review tracking failed', err);
     }

@@ -32,7 +32,12 @@ import {
   Sun,
   Moon,
   Laptop,
-  Palette
+  Palette,
+  Briefcase,
+  Store,
+  ClipboardList,
+  Users,
+  BarChart3
 } from 'lucide-react';
 
 
@@ -126,7 +131,7 @@ const ALL_PRODUCTS_DATABASE = [
   }
 ];
 
-type ProfileTab = 'account' | 'orders' | 'wallet' | 'wishlist' | 'settings';
+type ProfileTab = 'account' | 'orders' | 'wallet' | 'wishlist' | 'settings' | 'business';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout, updateUser } = useAuth();
@@ -344,6 +349,7 @@ export const ProfilePage: React.FC = () => {
             { id: 'orders', label: 'My Purchases', icon: Package },
             { id: 'wallet', label: 'BMP Rewards', icon: Wallet },
             { id: 'wishlist', label: 'Saved Items', icon: Heart },
+            { id: 'business', label: 'Business Center', icon: Briefcase },
             { id: 'settings', label: 'Settings', icon: Settings }
           ].map((tab) => {
             const Icon = tab.icon;
@@ -385,34 +391,82 @@ export const ProfilePage: React.FC = () => {
           
           {/* 1. ACCOUNT & WORKSPACE TAB */}
           {activeTab === 'account' && (
-            <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
-               <div className="flex items-center justify-between">
-                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Personal Information</h3>
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Username</span>
-                    <p className="text-sm font-semibold text-white mt-1">{user.username}</p>
+            <div className="space-y-6">
+              <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
+                 <div className="flex items-center justify-between">
+                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Personal Information</h3>
                  </div>
-                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Display Name</span>
-                    <p className="text-sm font-semibold text-white mt-1">{user.displayName || 'Not Set'}</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Username</span>
+                      <p className="text-sm font-semibold text-white mt-1">{user.username}</p>
+                   </div>
+                   <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Display Name</span>
+                      <p className="text-sm font-semibold text-white mt-1">{user.displayName || 'Not Set'}</p>
+                   </div>
+                   <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Account Type</span>
+                      <p className="text-sm font-semibold text-white mt-1 capitalize">{user.accountType}</p>
+                   </div>
+                   <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Member Since</span>
+                      <p className="text-sm font-semibold text-white mt-1">{new Date(user.createdAt).toLocaleDateString()}</p>
+                   </div>
+                   <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 md:col-span-2">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">BMP Rewards Address</span>
+                      <p className="text-xs font-mono text-slate-400 mt-1 break-all">
+                        {user.walletAddress && !user.walletAddress.startsWith('bmp_wallet_') ? user.walletAddress : 'bmp_wallet_7787f2f_consensus_node_active_secured'}
+                      </p>
+                   </div>
                  </div>
-                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Account Type</span>
-                    <p className="text-sm font-semibold text-white mt-1 capitalize">{user.accountType}</p>
-                 </div>
-                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Member Since</span>
-                    <p className="text-sm font-semibold text-white mt-1">{new Date(user.createdAt).toLocaleDateString()}</p>
-                 </div>
-                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 md:col-span-2">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">BMP Rewards Address</span>
-                    <p className="text-xs font-mono text-slate-400 mt-1 break-all">
-                      {user.walletAddress && !user.walletAddress.startsWith('bmp_wallet_') ? user.walletAddress : 'bmp_wallet_7787f2f_consensus_node_active_secured'}
-                    </p>
-                 </div>
-               </div>
+              </div>
+
+              {/* Start Your Business Section */}
+              <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Start Your Business</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Become a verified merchant or service provider on Pi Business Market</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-violet-600/10 border border-violet-500/20 text-violet-400 text-[9px] font-black uppercase rounded-lg">Seller Ecosystem</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  <div 
+                    onClick={() => navigate('/create-business')}
+                    className="p-5 bg-gradient-to-br from-indigo-950/60 to-slate-950 border border-indigo-900/50 hover:border-indigo-500 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-extrabold text-white mb-1">➕ Register Business</h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">Establish your legal entity, shop structure, or company profile.</p>
+                  </div>
+
+                  <div 
+                    onClick={() => navigate('/create-store')}
+                    className="p-5 bg-gradient-to-br from-violet-950/60 to-slate-950 border border-violet-900/50 hover:border-violet-500 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400 mb-3 group-hover:bg-violet-600 group-hover:text-white transition-all">
+                      <Store className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-extrabold text-white mb-1">🏪 Open Store</h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">Launch an online storefront to list and sell products globally.</p>
+                  </div>
+
+                  <div 
+                    onClick={() => navigate('/service-management')}
+                    className="p-5 bg-gradient-to-br from-emerald-950/60 to-slate-950 border border-emerald-900/50 hover:border-emerald-500 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                      <Briefcase className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-extrabold text-white mb-1">🛠 Register Service</h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">Offer freelance skills, consultations, repairs, or professional services.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -553,6 +607,105 @@ export const ProfilePage: React.FC = () => {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 6. BUSINESS CENTER TAB */}
+          {activeTab === 'business' && (
+            <div className="space-y-6">
+              {/* Quick Business Registration CTA Header */}
+              <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Start Your Business</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Create a new business entity, store, or service profile</p>
+                  </div>
+                  <button 
+                    onClick={() => navigate('/business-dashboard')} 
+                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                  >
+                    Open Workspace ➔
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  <div 
+                    onClick={() => navigate('/create-business')}
+                    className="p-4 bg-slate-950/60 border border-slate-900 hover:border-indigo-500/50 rounded-2xl cursor-pointer transition-all hover:bg-slate-900 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold">
+                        <Plus className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">➕ Register Business</h4>
+                        <p className="text-[9px] text-slate-500">Legal business entity setup</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => navigate('/create-store')}
+                    className="p-4 bg-slate-950/60 border border-slate-900 hover:border-violet-500/50 rounded-2xl cursor-pointer transition-all hover:bg-slate-900 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-violet-600/20 text-violet-400 flex items-center justify-center font-bold">
+                        <Store className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">🏪 Open Store</h4>
+                        <p className="text-[9px] text-slate-500">Online storefront & products</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => navigate('/service-management')}
+                    className="p-4 bg-slate-950/60 border border-slate-900 hover:border-emerald-500/50 rounded-2xl cursor-pointer transition-all hover:bg-slate-900 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center font-bold">
+                        <Briefcase className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">🛠 Register Service</h4>
+                        <p className="text-[9px] text-slate-500">Services & appointment slots</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Operating System Workspace Modules */}
+              <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Business Operating System</h3>
+                  <span className="text-[9px] text-emerald-400 font-mono font-bold">● Active Workspace</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {[
+                    { label: 'My Business', path: '/business-profile', icon: Briefcase },
+                    { label: 'My Store', path: '/store-dashboard', icon: Store },
+                    { label: 'Products', path: '/catalog-management', icon: Package },
+                    { label: 'Services', path: '/service-management', icon: Briefcase },
+                    { label: 'Orders', path: '/business-orders', icon: ClipboardList },
+                    { label: 'Customers', path: '/customer-crm', icon: Users },
+                    { label: 'Analytics', path: '/merchant-analytics', icon: BarChart3 },
+                    { label: 'Business Wallet', path: '/merchant-payments', icon: Wallet },
+                    { label: 'Store Settings', path: '/store-dashboard', icon: Settings },
+                    { label: 'Verification', path: '/business-profile', icon: ShieldCheck },
+                  ].map((item) => (
+                    <button
+                      key={item.label}
+                      onClick={() => navigate(item.path)}
+                      className="p-4 bg-slate-950/40 border border-slate-900 hover:border-slate-800 rounded-2xl flex flex-col items-center gap-2 text-center cursor-pointer transition-all hover:bg-slate-900/60"
+                    >
+                      <item.icon className="w-5 h-5 text-violet-400" />
+                      <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

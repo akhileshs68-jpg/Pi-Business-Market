@@ -366,6 +366,14 @@ function App() {
             } 
           />
 
+          {/* Alias & Convenience Routes for Business OS */}
+          <Route path="/business-profile" element={<ProtectedRoute><BusinessProfile /></ProtectedRoute>} />
+          <Route path="/catalog-management" element={<Navigate to="/catalog" replace />} />
+          <Route path="/customer-crm" element={<Navigate to="/crm" replace />} />
+          <Route path="/merchant-payments" element={<Navigate to="/business-payments" replace />} />
+          <Route path="/business-dashboard" element={<Navigate to="/business-center" replace />} />
+          <Route path="/service-management" element={<Navigate to="/services" replace />} />
+
           {/* REDIRECTS */}
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="*" element={<Navigate to="/home" replace />} />

@@ -54,6 +54,19 @@ export const orderService = {
       console.warn("Failed to send order creation notifications", e);
     }
 
+    // Trigger BMP Gamification Purchase Reward
+    try {
+      const { gamificationService } = await import('./gamificationService');
+      await gamificationService.processOrderReward(
+        orderData.buyerId,
+        orderData.sellerId || orderData.businessId || 'PI-CORP-001',
+        id,
+        Number(orderData.grandTotal || orderData.totalAmount || 0)
+      );
+    } catch (rewardErr) {
+      console.warn("Failed to process BMP purchase reward", rewardErr);
+    }
+
     return id;
   },
 
