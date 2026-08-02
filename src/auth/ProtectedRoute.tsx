@@ -5,6 +5,7 @@ import { ShieldAlert, ArrowRight, UserCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { businessService } from '../services/businessService';
 import { storeService } from '../services/storeService';
+import { RoleResolver } from '../services/identity/RoleResolver';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,12 +15,14 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   allowedRoles 
-}) => {
+ }) => {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isOwner = user?.username === 'pi_pioneer_88';
+  const roleResolver = new RoleResolver(user);
+  const isSuperAdmin = roleResolver.isSuperAdmin();
+  const isOwner = isSuperAdmin || roleResolver.isBusinessOwner();
 
   const merchantRoutes = [
     '/dashboard',

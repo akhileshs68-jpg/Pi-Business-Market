@@ -486,4 +486,155 @@ export const BackupRecoveryPanel = () => {
   );
 };
 
+// 7. Ad Moderation & Sponsorship Control Panel
+export const AdModerationPanel = () => {
+  const { user } = useAuth();
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadCampaigns();
+  }, []);
+
+  const loadCampaigns = async () => {
+    setLoading(true);
+    try {
+      const { campaignService } = await import('../../services/campaignService');
+      const data = await campaignService.getAllCampaignsForAdmin();
+      setCampaigns(data);
+    } catch (e) {
+      console.warn('Error loading campaigns:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, status: any) => {
+    try {
+      const { campaignService } = await import('../../services/campaignService');
+      await campaignService.updateCampaignStatus(id, status, user?.uid || 'sys_admin');
+      await loadCampaigns();
+    } catch (e) {
+      alert('Failed to update campaign status');
+    }
+  };
+
+  const handleTogglePin = async (id: string, currentPin: boolean) => {
+    try {
+      const { campaignService } = await import('../../services/campaignService');
+      await campaignService.togglePinCampaign(id, !currentPin, user?.uid || 'sys_admin');
+      await loadCampaigns();
+    } catch (e) {
+      alert('Failed to pin campaign');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-pink-500/20 rounded-xl"><Megaphone className="w-6 h-6 text-pink-400" /></div>
+          <div>
+            <h3 className="text-xl font-bold text-white">Ad & Campaign Moderation</h3>
+            <p className="text-xs text-slate-400">Review merchant hero banners, sponsored campaigns & promotions</p>
+          </div>
+        </div>
+        <button
+          onClick={loadCampaigns}
+          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="p-8 text-center text-slate-400 text-xs font-mono">Loading campaign records...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {campaigns.map(camp => (
+            <div key={camp.id} className="p-5 bg-slate-900/60 border border-slate-800 rounded-2xl flex flex-col justify-between space-y-4">
+              <div className="flex items-start gap-3">
+                {camp.bannerImage && (
+                  <img src={camp.bannerImage} alt={camp.campaignTitle} className="w-20 h-14 rounded-xl object-cover border border-slate-800 shrink-0" referrerPolicy="no-referrer" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="px-2 py-0.5 bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[9px] font-bold rounded uppercase">
+                      {camp.campaignType}
+                    </span>
+                    <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase ${
+                      camp.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                      camp.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    }`}>
+                      {camp.status}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white truncate">{camp.campaignTitle}</h4>
+                  <p className="text-xs text-slate-400 truncate">{camp.businessName}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-xs">
+                <div>
+                  <div className="text-slate-500 text-[10px] uppercase font-bold">Impressions</div>
+                  <div className="font-mono text-white font-bold">{camp.impressions || 0}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500 text-[10px] uppercase font-bold">Clicks</div>
+                  <div className="font-mono text-white font-bold">{camp.clicks || 0}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500 text-[10px] uppercase font-bold">CTR</div>
+                  <div className="font-mono text-amber-400 font-bold">{camp.ctr || 0}%</div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs gap-2">
+                <button
+                  onClick={() => handleTogglePin(camp.id, camp.isPinned)}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all text-[10px] uppercase ${
+                    camp.isPinned ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {camp.isPinned ? '★ Pinned' : '☆ Pin to Top'}
+                </button>
+
+                <div className="flex items-center gap-1.5">
+                  {camp.status !== 'active' && (
+                    <button
+                      onClick={() => handleUpdateStatus(camp.id, 'active')}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-bold uppercase transition-all shadow"
+                    >
+                      Approve
+                    </button>
+                  )}
+                  {camp.status === 'active' && (
+                    <button
+                      onClick={() => handleUpdateStatus(camp.id, 'paused')}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-bold uppercase transition-all shadow"
+                    >
+                      Pause
+                    </button>
+                  )}
+                  {camp.status !== 'rejected' && (
+                    <button
+                      onClick={() => handleUpdateStatus(camp.id, 'rejected')}
+                      className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl text-[10px] font-bold uppercase transition-all"
+                    >
+                      Reject
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 

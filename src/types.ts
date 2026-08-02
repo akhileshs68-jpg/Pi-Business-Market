@@ -27,20 +27,11 @@ export interface User {
   displayName: string;
   walletAddress: string; // Pi wallet public key
   bmpWalletAddress?: string; // BMP Reward/Token Wallet Address
-  role: UserRole;
-  accountType: 'individual' | 'business' | 'enterprise';
-  verified: boolean;     // Pi verification checkmark
-  kycVerified: boolean;
-  createdAt: string;     // ISO string
-  updatedAt: string;     // ISO string
-  lastLogin: string;     // ISO string
+  platformRole: string; // From identityTypes SystemRole
+  businessRole?: string; // From identityTypes BusinessRole
+  storeRole?: string;    // From identityTypes BusinessRole
   status: AccountStatus;
-  photoUrl?: string;
-  activeRole?: string;
-  roles?: (UserRole | string)[];
-  ownedBusinessIds?: string[];
-  managedStoreIds?: string[];
-  primaryBusinessId?: string;
+  permissions: string[]; // From identityTypes Permission
   
   // Backward compatibility fields
   email?: string;
@@ -50,6 +41,16 @@ export interface User {
   onboardingCompleted?: boolean;
   fullName?: string;
   businessCategory?: string;
+  role?: string;
+  roles?: string[];
+  activeRole?: string;
+  accountType?: string;
+  photoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastLogin?: string;
+  verified?: boolean;
+  kycVerified?: boolean;
 }
 
 export interface PiSession {
@@ -1286,6 +1287,7 @@ export interface Category {
   name: string;
   slug: string;
   description: string;
+  type?: string;
   icon?: string;
   coverImageUrl?: string;
   coverPublicId?: string;
@@ -1739,6 +1741,7 @@ export interface CheckoutSession {
   deliveryMethod?: 'shipping' | 'pickup';
   couponCodes: string[];
   notes?: string;
+  customerNotes?: string;
   currency: string;
   subtotal: number;
   discount: number;

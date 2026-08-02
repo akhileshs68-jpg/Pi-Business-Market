@@ -60,6 +60,7 @@ export const Checkout: React.FC = () => {
   const [selectedAddrId, setSelectedAddrId] = useState<string>('def_addr_1');
   const [sameAsBilling, setSameAsBilling] = useState<boolean>(true);
   const [deliveryMethod, setDeliveryMethod] = useState<'shipping' | 'pickup'>('shipping');
+  const [customerNotes, setCustomerNotes] = useState<string>('');
 
   const [shippingAddress, setShippingAddress] = useState<Address>({
     fullName: user?.displayName || 'Pi Pioneer',
@@ -201,7 +202,8 @@ export const Checkout: React.FC = () => {
             sellerId: session.sellerId,
             businessId: session.businessId,
             storeId: session.storeId,
-            walletAddress: user.walletAddress || ''
+            walletAddress: user.walletAddress || '',
+            notes: customerNotes
           }
         );
 
@@ -209,19 +211,8 @@ export const Checkout: React.FC = () => {
           throw new Error(verification.errorMessage || 'Pi Testnet transaction verification failed.');
         }
         txid = verification.transactionId;
-      } else if (selectedPaymentMethod === 'bmp_rewards') {
-        // Execute Wallet Payment via BMP Rewards
-        const sellerId = session.storeId || session.businessId || 'UNKNOWN';
-        const res = await paymentEngine.processMarketplacePayment(
-          selectedPaymentMethod,
-          buyerId,
-          sellerId,
-          grandTotal,
-          session.sessionId
-        );
-        txid = res.txid;
       } else {
-        throw new Error(`Selected payment method (${selectedPaymentMethod}) is not currently active.`);
+        throw new Error('Pi Testnet Pi is the ONLY active payment currency. BMP is for loyalty rewards only.');
       }
 
       // Finalize Order Creation & Reward Engine in Firestore
@@ -229,11 +220,12 @@ export const Checkout: React.FC = () => {
       const orderId = await EnterpriseCheckoutEngine.finalizeOrderAndProcessRewards({
         session,
         address: finalAddress,
-        paymentMethod: selectedPaymentMethod,
+        paymentMethod: 'pi_testnet',
         transactionId: txid,
         grandTotal,
         orderItems,
-        userUid: buyerId
+        userUid: buyerId,
+        customerNotes: customerNotes || undefined
       });
 
       // Fetch created order to present in confirmation screen
@@ -477,6 +469,20 @@ export const Checkout: React.FC = () => {
                       onClick={() => setDeliveryMethod('pickup')}
                     />
                   </div>
+                </section>
+
+                {/* Order Notes / Special Instructions */}
+                <section className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 sm:p-8">
+                  <h2 className="text-lg font-black text-white uppercase tracking-tight mb-4 flex items-center gap-3">
+                    <Bookmark className="w-5 h-5 text-indigo-400" /> Order Notes / Special Instructions
+                  </h2>
+                  <textarea
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    placeholder="Enter delivery instructions, gate codes, or special service requests..."
+                    rows={3}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+                  />
                 </section>
 
                 <button 

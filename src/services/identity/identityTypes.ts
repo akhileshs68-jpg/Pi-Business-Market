@@ -5,10 +5,12 @@
 
 export type SystemRole =
   | 'superadmin'
+  | 'super_admin'
   | 'platform_admin'
   | 'moderator'
   | 'merchant'
   | 'business_owner'
+  | 'owner'
   | 'seller'
   | 'buyer'
   | 'customer'

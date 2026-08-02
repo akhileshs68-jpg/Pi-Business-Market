@@ -20,6 +20,7 @@ export const MAIN_NAVIGATION: NavigationItem[] = [
   { id: 'wallet', label: 'Wallet', iconName: 'Wallet', view: 'wallet' },
   { id: 'account', label: 'My Account', iconName: 'User', view: 'profile' },
   { id: 'business', label: 'Business Center', iconName: 'Briefcase', view: 'business-center' },
+  { id: 'admin', label: 'Admin Console', iconName: 'ShieldAlert', view: 'admin-console' },
   { id: 'settings', label: 'Settings', iconName: 'Settings', view: 'settings' },
   { id: 'help', label: 'Help', iconName: 'HelpCircle', view: 'help' }
 ];

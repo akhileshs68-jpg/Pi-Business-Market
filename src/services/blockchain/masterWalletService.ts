@@ -5,13 +5,26 @@
  * synchronized and isolated.
  */
 
-import { WalletAccount } from './blockchainTypes';
+import { WalletAccount, MasterLedgerEntry, AssetType } from './blockchainTypes';
 import { piTestnetProvider } from './providers/PiTestnetProvider';
 import { bmpRewardProvider } from './providers/BmpRewardProvider';
 import { getFirebaseDb } from '../../firebase/config';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
+export type LoyaltyTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
 
 export class MasterWalletService {
+  /**
+   * Calculate customer loyalty tier based on lifetime earned BMP
+   */
+  public getLoyaltyTier(lifetimeBmp: number): LoyaltyTier {
+    if (lifetimeBmp >= 10000) return 'DIAMOND';
+    if (lifetimeBmp >= 5000) return 'PLATINUM';
+    if (lifetimeBmp >= 2000) return 'GOLD';
+    if (lifetimeBmp >= 500) return 'SILVER';
+    return 'BRONZE';
+  }
+
   /**
    * Get unified Master Wallet Account
    */
@@ -53,7 +66,7 @@ export class MasterWalletService {
       address: `pi_addr_${userId.substring(0, 10)}`,
       piTestnetBalance: piBalance,
       bmpRewardBalance: bmpRewardBalance,
-      bmpTokenBalance: 0, // Token balance mapped 1:1 in migration phase
+      bmpTokenBalance: 0, // Token balance mapped 1:1 in migration phase (feature flag controlled)
       merchantWalletBalance: businessBalance,
       businessWalletBalance: businessBalance,
       treasuryWalletBalance: 50000.0, // System treasury reserve
@@ -69,6 +82,31 @@ export class MasterWalletService {
   }
 
   /**
+   * Record immutable ledger entry for every transaction
+   */
+  public async recordLedgerEntry(entry: Omit<MasterLedgerEntry, 'entryId' | 'timestamp'>): Promise<string> {
+    const db = getFirebaseDb();
+    const entryId = `mled_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const fullEntry: MasterLedgerEntry = {
+      ...entry,
+      entryId,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      const ledgerRef = collection(db, 'master_ledger');
+      await addDoc(ledgerRef, {
+        ...fullEntry,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn('Failed to record master ledger entry:', e);
+    }
+
+    return entryId;
+  }
+
+  /**
    * Keep master wallet document synchronized
    */
   public async syncMasterWalletDoc(userId: string): Promise<WalletAccount> {
@@ -78,6 +116,7 @@ export class MasterWalletService {
 
     await setDoc(ref, {
       ...wallet,
+      loyaltyTier: this.getLoyaltyTier(wallet.lifetimeEarnedBmp),
       updatedAt: serverTimestamp()
     }, { merge: true });
 
@@ -86,3 +125,4 @@ export class MasterWalletService {
 }
 
 export const masterWalletService = new MasterWalletService();
+

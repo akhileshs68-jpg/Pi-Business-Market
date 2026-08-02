@@ -766,7 +766,48 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         </section>
       )}
 
-      {/* 2. SMART SEARCH BAR */}
+      {/* 2. QUICK ACTIONS BAR */}
+      <section id="quick_actions_bar" className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>Quick Navigation Shortcuts</span>
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-9 gap-2">
+          {[
+            { id: 'act_directory', label: 'Directory', icon: Users, color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', route: '/directory' },
+            { id: 'act_market', label: 'Products', icon: ShoppingBag, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', route: '/marketplace' },
+            { id: 'act_service', label: 'Services', icon: Wrench, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', route: '/services' },
+            { id: 'act_deals', label: 'Flash Deals', icon: Zap, color: 'text-rose-400 bg-rose-500/10 border-rose-500/20', action: () => {
+              const el = document.getElementById('flash_deals_section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            } },
+            { id: 'act_jobs', label: 'Job Board', icon: Briefcase, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', route: '/jobs' },
+            { id: 'act_biz', label: 'Register BIZ', icon: Building2, color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', route: '/create-business' },
+            { id: 'act_ads', label: 'Post Ads', icon: BarChart3, color: 'text-pink-400 bg-pink-500/10 border-pink-500/20', route: '/business-center' },
+            { id: 'act_rewards', label: 'BMP Wallet', icon: Coins, color: 'text-teal-400 bg-teal-500/10 border-teal-500/20', route: '/rewards' },
+            { id: 'act_community', label: 'Community', icon: Globe, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', route: '/community' }
+          ].map(act => (
+            <button
+              key={act.id}
+              onClick={() => {
+                if (act.action) act.action();
+                else if (act.route) onNavigate(act.route);
+              }}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition-all cursor-pointer group shadow"
+            >
+              <div className={`p-2 rounded-xl border ${act.color} group-hover:scale-110 transition-transform mb-1`}>
+                <act.icon className="w-4 h-4" />
+              </div>
+              <span className="text-[10px] font-bold text-slate-300 group-hover:text-white truncate max-w-full text-center">{act.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* 3. SMART SEARCH BAR */}
       <section id="smart_search_section" ref={searchContainerRef} className="relative z-30">
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 sm:p-3 shadow-2xl backdrop-blur-xl flex flex-col gap-2">
           

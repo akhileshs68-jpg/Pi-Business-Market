@@ -39,6 +39,8 @@ import {
   FileCheck,
   Wallet
 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { getFirebaseDb } from '../../firebase/config';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../auth/useAuth';
 import { businessService } from '../../services/businessService';
@@ -94,7 +96,7 @@ const BUSINESS_TYPES = [
 ];
 
 export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, initialData, businessId }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, updateUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<Business> & {
@@ -181,6 +183,78 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
   const totalSteps = 6;
 
   const handleNext = () => {
+    setError(null);
+
+    if (step === 1) {
+      if (!formData.businessType) {
+        setError('Business Type is required.');
+        return;
+      }
+    }
+
+    if (step === 2) {
+      if (!formData.businessName || formData.businessName.trim() === '') {
+        setError('Business Name is required.');
+        return;
+      }
+      if (!formData.legalName || formData.legalName.trim() === '') {
+        setError('Legal Name is required.');
+        return;
+      }
+      if (!formData.email || formData.email.trim() === '') {
+        setError('Contact Email is required.');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      if (!formData.phone || formData.phone.trim() === '') {
+        setError('Phone Number is required.');
+        return;
+      }
+    }
+
+    if (step === 3) {
+      if (!formData.category || formData.category.trim() === '') {
+        setError('Business Category is required.');
+        return;
+      }
+      // Validate dynamic fields from config
+      const config = BusinessRegistrationEngine.getFormConfigForType(formData.businessType || 'Retail Shop');
+      if (config?.customFields) {
+        for (const field of config.customFields) {
+          if (field.required) {
+            const val = (formData.profileData as any)?.[field.id];
+            if (val === undefined || val === null || val === '') {
+              setError(`Field '${field.label}' is required.`);
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    if (step === 4) {
+      if (!formData.fullAddress || formData.fullAddress.trim() === '') {
+        setError('Full Address is required.');
+        return;
+      }
+      if (!formData.country || formData.country.trim() === '') {
+        setError('Country is required.');
+        return;
+      }
+      if (!formData.state || formData.state.trim() === '') {
+        setError('State / Province is required.');
+        return;
+      }
+      if (!formData.city || formData.city.trim() === '') {
+        setError('City is required.');
+        return;
+      }
+    }
+
     if (step < totalSteps) setStep(step + 1);
   };
 
@@ -226,6 +300,38 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
         } catch (e) {}
         onComplete(businessId);
       } else {
+        // Validation check
+        if (!formData.businessType) {
+          throw new Error('Business Type is required.');
+        }
+        if (!formData.businessName || formData.businessName.trim() === '') {
+          throw new Error('Business Name is required.');
+        }
+        if (!formData.legalName || formData.legalName.trim() === '') {
+          throw new Error('Legal Name is required.');
+        }
+        if (!formData.email || formData.email.trim() === '') {
+          throw new Error('Contact Email is required.');
+        }
+        if (!formData.phone || formData.phone.trim() === '') {
+          throw new Error('Phone Number is required.');
+        }
+        if (!formData.category || formData.category.trim() === '') {
+          throw new Error('Business Category is required.');
+        }
+        if (!formData.fullAddress || formData.fullAddress.trim() === '') {
+          throw new Error('Full Address is required.');
+        }
+        if (!formData.country || formData.country.trim() === '') {
+          throw new Error('Country is required.');
+        }
+        if (!formData.state || formData.state.trim() === '') {
+          throw new Error('State / Province is required.');
+        }
+        if (!formData.city || formData.city.trim() === '') {
+          throw new Error('City is required.');
+        }
+
         // Universal Registration Engine Call
         const config = BusinessRegistrationEngine.getFormConfigForType(formData.businessType || 'Retail Shop');
         const res = await BusinessRegistrationEngine.registerBusiness({
@@ -260,6 +366,24 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
             pickupAvailable: true
           } : undefined
         });
+
+        // Fetch fresh user data from firestore to get exact values set by engine
+        try {
+          if (updateUser) {
+            const db = getFirebaseDb();
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              await updateUser({
+                ...userData,
+                profileCompleted: true,
+                onboardingCompleted: true
+              });
+            }
+          }
+        } catch (syncErr) {
+          console.error('Failed to sync user context in BusinessWizard:', syncErr);
+        }
 
         try {
           localStorage.removeItem('pi_business_wizard_draft');
@@ -532,7 +656,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Legal Name</label>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Legal Name *</label>
                         <input 
                           name="legalName" 
                           value={formData.legalName} 
@@ -542,7 +666,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Email</label>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Contact Email *</label>
                         <input 
                           type="email"
                           name="email" 
@@ -554,7 +678,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Phone Number</label>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Phone Number *</label>
                       <input 
                         name="phone" 
                         value={formData.phone} 
@@ -585,6 +709,24 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                     <p className="text-slate-400">Specific information for your business category.</p>
                   </div>
                   <div className="space-y-5 bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
+                    <div className="space-y-2 mb-6 border-b border-slate-800 pb-6">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Business Category *</label>
+                      <select
+                        name="category"
+                        value={formData.category || ''}
+                        onChange={handleChange}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">-- Select Category --</option>
+                        <option value="retail_wholesale">Retail & Wholesale</option>
+                        <option value="professional_services">Professional Services</option>
+                        <option value="organizations_institutions">Organizations & Institutions</option>
+                        <option value="service_industries">Service Industries</option>
+                        <option value="agriculture_production">Agriculture & Production</option>
+                        <option value="technology_creative">Technology & Creative</option>
+                      </select>
+                      <p className="text-[10px] text-slate-500">Must map to a primary category type for compliance.</p>
+                    </div>
                     {renderDynamicFields()}
                   </div>
                 </div>
@@ -602,7 +744,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                       <input name="country" value={formData.country} onChange={handleChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">State / Province</label>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">State / Province *</label>
                       <input name="state" value={formData.state} onChange={handleChange} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
                     </div>
                     <div className="space-y-2">
@@ -615,7 +757,7 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Full Address</label>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Full Address *</label>
                     <textarea name="fullAddress" value={formData.fullAddress} onChange={handleChange} rows={2} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white" />
                   </div>
                 </div>

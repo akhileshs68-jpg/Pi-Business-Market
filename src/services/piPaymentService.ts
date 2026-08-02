@@ -33,25 +33,9 @@ export const piPaymentService = {
       const isPiBrowser = typeof window !== 'undefined' && typeof window.Pi !== 'undefined';
       
       if (isPiBrowser) {
-        const isPreviewDomain = window.location.hostname.includes('run.app') || 
-                                window.location.hostname.includes('vercel.app') || 
-                                window.location.hostname.includes('localhost') ||
-                                window.location.hostname.includes('googleusercontent.com') ||
-                                window.location.hostname.includes('aistudio');
-
-        const cachedStr = sessionStorage.getItem('pi_auth_session');
-        if (cachedStr) {
-          console.log('[PiPayment] Using existing Pi session');
-        } else {
-          console.log('[PiPaymentService] Initializing Pi SDK and authenticating for payments scope...');
-          await authService.initPi();
-          try {
-            await authService.authenticatePi(['payments']);
-          } catch (err: any) {
-            throw err;
-          }
-          console.log('[PiPaymentService] Authenticated with payments scope.');
-        }
+        console.log('[PiPaymentService] Ensuring authenticated for payments scope...');
+        await authService.initPi();
+        await authService.authenticatePi(['payments']);
 
         console.log('[PiPayment] Calling createPayment()');
         window.Pi.createPayment(

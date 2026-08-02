@@ -69,9 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         if (firebaseUser) {
           isProcessing.current = true;
-          console.log('[AuthProvider] Fetching profile for:', firebaseUser.uid);
-          let fetchedProfile = await authService.getUserProfile(firebaseUser.uid);
-          console.log('[AuthProvider] Profile fetched:', fetchedProfile);
+          console.log('[DEBUG] [AuthProvider] Authenticated UID:', firebaseUser.uid);
+          const lastPiUid = localStorage.getItem('last_pi_uid');
+          const lastResolvedUid = localStorage.getItem('last_resolved_uid');
+          let fetchedProfile = await authService.getUserProfile(firebaseUser.uid, lastPiUid || undefined, lastResolvedUid || undefined);
+          console.log('[DEBUG] [AuthProvider] Profile fetched:', fetchedProfile);
           if (fetchedProfile) {
             fetchedProfile = await migrateProfileIfNeeded(fetchedProfile);
           }

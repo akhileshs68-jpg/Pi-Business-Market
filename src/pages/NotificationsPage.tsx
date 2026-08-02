@@ -39,6 +39,7 @@ import { notificationService } from '../services/notificationService';
 import { Notification, EnterpriseNotificationType, NotificationPriority, NotificationPreference, UserRole } from '../types';
 import { useAuth } from '../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { RoleResolver } from '../services/identity/RoleResolver';
 
 export const NotificationsPage: React.FC = () => {
   const { user } = useAuth();
@@ -86,7 +87,8 @@ export const NotificationsPage: React.FC = () => {
     return () => unsubscribe();
   }, [user]);
 
-  const isAdminOrMerchant = user?.role === 'Admin' || user?.role === 'Super Admin' || user?.role === 'Business Owner' || user?.role === 'Seller';
+  const roleResolver = new RoleResolver(user);
+  const isAdminOrMerchant = roleResolver.isSuperAdmin() || roleResolver.isPlatformAdmin() || roleResolver.isBusinessOwner() || roleResolver.isSeller();
 
   // Actions
   const handleMarkRead = async (id: string) => {

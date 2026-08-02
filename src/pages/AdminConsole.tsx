@@ -14,23 +14,32 @@ import { useNavigate } from 'react-router-dom';
 import { adminService } from '../services/adminService';
 import { PlatformSettings, FeatureFlag, AuditLog } from '../types';
 import { useAuth } from '../auth/useAuth';
+import { RoleResolver } from '../services/identity/RoleResolver';
 import Navbar from '../components/Navbar';
 import { BlockchainAdminDashboard } from '../components/admin/BlockchainAdminDashboard';
 import { 
   DashboardPanel, UserManagementPanel, BusinessManagementPanel, StoreManagementPanel,
   ProductManagementPanel, ServiceManagementPanel, OrderAnalyticsPanel, PaymentAnalyticsPanel,
   BmpAnalyticsPanel, CommunityAnalyticsPanel, MarketingAnalyticsPanel, SystemHealthPanel,
-  SecurityCenterPanel, BackupRecoveryPanel
+  SecurityCenterPanel, BackupRecoveryPanel, AdModerationPanel
 } from '../components/admin/MissionControlPanels';
 
 type AdminTab = 
   | 'dashboard' | 'users' | 'businesses' | 'stores' | 'products' | 'services'
-  | 'orders' | 'payments' | 'bmp' | 'community' | 'marketing' | 'blockchain' 
+  | 'orders' | 'payments' | 'bmp' | 'community' | 'marketing' | 'ad_moderation' | 'blockchain' 
   | 'health' | 'flags' | 'security' | 'backup' | 'governance' | 'settings';
 
 export const AdminConsole: React.FC = () => {
   const { user } = useAuth();
+  const roleResolver = new RoleResolver(user);
+  const isSuperAdmin = roleResolver.isSuperAdmin();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isSuperAdmin) {
+      navigate('/home');
+    }
+  }, [isSuperAdmin, navigate]);
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -113,6 +122,7 @@ export const AdminConsole: React.FC = () => {
         { id: 'payments', label: 'Payments', icon: CreditCard },
         { id: 'bmp', label: 'BMP Rewards', icon: Award },
         { id: 'marketing', label: 'Marketing', icon: Megaphone },
+        { id: 'ad_moderation', label: 'Ad Moderation', icon: Flag },
         { id: 'community', label: 'Community', icon: MessageSquare },
       ]
     },
@@ -228,6 +238,7 @@ export const AdminConsole: React.FC = () => {
               {activeTab === 'bmp' && <BmpAnalyticsPanel />}
               {activeTab === 'community' && <CommunityAnalyticsPanel />}
               {activeTab === 'marketing' && <MarketingAnalyticsPanel />}
+              {activeTab === 'ad_moderation' && <AdModerationPanel />}
               {activeTab === 'blockchain' && <BlockchainAdminDashboard />}
               {activeTab === 'health' && <SystemHealthPanel />}
               {activeTab === 'security' && <SecurityCenterPanel />}

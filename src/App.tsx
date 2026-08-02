@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { BusinessProvider } from './context/BusinessContext';
 
 // Lazy loaded page components
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -44,6 +45,7 @@ const CreateBusinessPage = lazy(() => import('./pages/CreateBusinessPage').then(
 const CreateStorePage = lazy(() => import('./pages/CreateStorePage').then(m => ({ default: m.CreateStorePage })));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
 const CommunityHub = lazy(() => import('./pages/CommunityHub').then(m => ({ default: m.CommunityHub })));
+const DirectoryPage = lazy(() => import('./pages/DirectoryPage').then(m => ({ default: m.DirectoryPage })));
 
 const LoadingFallback = () => (
   <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-200">
@@ -65,8 +67,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
+        <BusinessProvider>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
           {/* PUBLIC ROUTES */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/docs" element={<DocumentationPortal />} />
@@ -411,6 +414,14 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/directory" 
+            element={
+              <ProtectedRoute>
+                <DirectoryPage />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Alias & Convenience Routes for Business OS */}
           <Route path="/business-profile" element={<ProtectedRoute><BusinessProfile /></ProtectedRoute>} />
@@ -425,6 +436,7 @@ function App() {
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
         </Suspense>
+        </BusinessProvider>
       </AuthProvider>
     </Router>
   );

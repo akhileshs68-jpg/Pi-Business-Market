@@ -107,13 +107,48 @@ export const PiInAppPaymentModal: React.FC<PiInAppPaymentModalProps> = ({
           metadata
         },
         {
-          onReadyForServerApproval: (paymentId) => {
-            console.log('[InAppModal] Payment approved by server:', paymentId);
-            setPaymentStatus('completing');
-            setStatusMessage('Server approved. Signing transaction on Pi Network blockchain...');
+          onReadyForServerApproval: async (paymentId) => {
+            try {
+              console.log('[InAppModal] Payment Ready for Server Approval:', paymentId);
+              setPaymentStatus('completing');
+              setStatusMessage('Requesting server approval...');
+              
+              // We hit the approval endpoint IMMEDIATELY without auth token to prevent timeouts
+              const res = await fetch('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, metadata })
+              });
+              
+              if (!res.ok) {
+                console.error('InAppModal Server approval returned error');
+              }
+              
+              setStatusMessage('Server approved. Signing transaction on Pi Network blockchain...');
+            } catch (err) {
+              console.error('Approval failed:', err);
+            }
           },
-          onReadyForServerCompletion: (paymentId, txid) => {
+          onReadyForServerCompletion: async (paymentId, txid) => {
             console.log('[InAppModal] Payment completed:', paymentId, txid);
+            
+            try {
+              const authModule = await import('../../firebase/config');
+              const auth = authModule.getFirebaseAuth();
+              const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+              
+              await fetch('/api/payments/complete', {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ paymentId, txid, metadata })
+              });
+            } catch (err) {
+              console.error('Completion call failed', err);
+            }
+
             setPaymentStatus('success');
             setLastTxid(txid);
             setStatusMessage('Payment successfully confirmed on Pi Network Mainnet!');

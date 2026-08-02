@@ -35,7 +35,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
-import { useActiveRole } from '../hooks/useActiveRole';
+import { RoleResolver } from '../services/identity/RoleResolver';
 import { paymentEngine } from '../services/wallet/paymentEngine';
 import { masterWalletService } from '../services/blockchain/masterWalletService';
 import { masterLedgerService } from '../services/blockchain/masterLedgerService';
@@ -47,7 +47,7 @@ import { MasterLedgerEntry, WalletAccount } from '../services/blockchain/blockch
 
 export const WalletPage: React.FC = () => {
   const { user } = useAuth();
-  const activeRole = useActiveRole();
+  const roleResolver = new RoleResolver(user);
   const navigate = useNavigate();
 
   // Loading States

@@ -36,6 +36,21 @@ import { auditService } from '../../services/auditService';
 import { analyticsService } from '../../services/analyticsService';
 import { subscriptionService } from '../../services/blockchain/subscriptionService';
 
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const auth = getFirebaseAuth();
+    if (auth && auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch (err) {
+    console.error('Error getting auth token:', err);
+  }
+  return headers;
+}
+
 export const PAYMENT_METHOD_CONFIGS: EnterprisePaymentMethodConfig[] = [
   {
     id: 'pi_testnet',
@@ -245,8 +260,18 @@ export class EnterpriseCheckoutEngine {
           onReadyForServerApproval: async (piPaymentId: string) => {
             try {
               console.log('[EnterpriseCheckout] Pi Payment Server Approval:', piPaymentId);
-              // Call approval API endpoint or simulate server approval
-              await paymentService.updateTransactionStatus(paymentRecordId, 'Processing', piPaymentId);
+              // 1. CRITICAL: Call approval API endpoint IMMEDIATELY before Firestore to prevent timeout
+              // No auth headers needed for approve, saving critical time
+              const res = await fetch('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId: piPaymentId, metadata })
+              });
+              if (!res.ok) {
+                console.error('Server API returned non-ok status for approve.');
+              }
+              // 2. Fire-and-forget non-critical Firestore write (don't await it to save latency)
+              paymentService.updateTransactionStatus(paymentRecordId, 'Processing', piPaymentId).catch(console.error);
             } catch (err: any) {
               console.error('Server approval failure:', err);
             }
@@ -254,7 +279,17 @@ export class EnterpriseCheckoutEngine {
           onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
             try {
               console.log('[EnterpriseCheckout] Pi Payment Verified on Chain:', txid);
-              await paymentService.updateTransactionStatus(paymentRecordId, 'Completed', txid);
+              
+              // 1. Hit completion endpoint first
+              const headers = await getAuthHeaders();
+              const res = await fetch('/api/payments/complete', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
+              });
+              
+              // 2. Update status without awaiting
+              paymentService.updateTransactionStatus(paymentRecordId, 'Completed', txid).catch(console.error);
 
               resolve({
                 verified: true,
@@ -290,8 +325,9 @@ export class EnterpriseCheckoutEngine {
     grandTotal: number;
     orderItems: OrderItem[];
     userUid: string;
+    customerNotes?: string;
   }): Promise<string> {
-    const { session, address, paymentMethod, transactionId, grandTotal, orderItems, userUid } = params;
+    const { session, address, paymentMethod, transactionId, grandTotal, orderItems, userUid, customerNotes } = params;
     const db = getFirebaseDb();
 
     // 1. Idempotency Check: check if order for this transactionId or sessionId already exists
@@ -319,6 +355,7 @@ export class EnterpriseCheckoutEngine {
     // 3. Create Verified Order
     const orderId = await orderService.createFromSession({
       ...session,
+      customerNotes: customerNotes || session.customerNotes,
       shippingAddress: address,
       billingAddress: address,
       paymentStatus: 'SUCCESS',
@@ -330,7 +367,10 @@ export class EnterpriseCheckoutEngine {
       timestamp: Date.now()
     }, orderItems);
 
-    // 4. Update Pi Wallet, Master Ledger & Business Ledger
+    
+    // Fire-and-forget post-processing (Wallet sync, Ledgers, BMP Rewards, Analytics)
+    (async () => {
+// 4. Update Pi Wallet, Master Ledger & Business Ledger
     try {
       const sellerId = session.sellerId || session.businessId || 'PI-SELLER';
       if (paymentMethod === 'pi_testnet') {
@@ -485,6 +525,11 @@ export class EnterpriseCheckoutEngine {
     } catch (subErr) {
       console.error('[EnterpriseCheckout] Central subscription event publication failed:', subErr);
     }
+
+    
+    })().catch(err => {
+      console.error('[EnterpriseCheckout] Async Post-Processing Error:', err);
+    });
 
     return orderId;
   }

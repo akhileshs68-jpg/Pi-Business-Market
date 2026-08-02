@@ -30,6 +30,8 @@ const DEFAULT_CURRENT_USER: User = {
   createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   updatedAt: new Date().toISOString(),
   lastLogin: new Date().toISOString(),
+  platformRole: 'buyer',
+  permissions: [],
   status: 'active'
 };
 

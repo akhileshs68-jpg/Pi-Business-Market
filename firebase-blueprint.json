@@ -114,6 +114,29 @@
         "status": { "type": "string" }
       },
       "required": ["productId", "storeId", "businessId", "ownerUid", "productName", "productSlug", "status"]
+    },
+    "Campaign": {
+      "title": "Enterprise Advertisement Campaign",
+      "description": "Smart hero banner advertisement or promotional campaign",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "businessId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "bannerUrl": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "offerBadge": { "type": "string" },
+        "ctaText": { "type": "string" },
+        "ctaLink": { "type": "string" },
+        "priority": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "PAUSED", "SCHEDULED", "COMPLETED"] },
+        "impressions": { "type": "number" },
+        "clicks": { "type": "number text" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "businessId", "bannerUrl", "status"]
     }
   },
   "firestore": {

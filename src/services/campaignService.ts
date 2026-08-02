@@ -360,6 +360,114 @@ export class CampaignService {
   }
 
   /**
+   * Super Admin fetches all campaigns regardless of status for moderation
+   */
+  public async getAllCampaignsForAdmin(): Promise<Campaign[]> {
+    try {
+      const db = getFirebaseDb();
+      const q = query(collection(db, 'campaigns'));
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        return DEFAULT_BANNER_CAMPAIGNS;
+      }
+
+      return snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          merchantId: data.merchantId || '',
+          businessId: data.businessId || '',
+          businessName: data.businessName || 'Merchant Partner',
+          businessLogo: data.businessLogo,
+          storeId: data.storeId,
+          storeName: data.storeName,
+          campaignTitle: data.campaignTitle || data.title || 'Campaign',
+          shortDescription: data.shortDescription || data.description || '',
+          campaignType: data.campaignType || 'sponsored_ad',
+          bannerImage: data.bannerImage || data.imageUrl || data.image || '',
+          bgClass: data.bgClass || 'from-violet-950 via-indigo-900 to-slate-950',
+          targetRoute: data.targetRoute || '/marketplace',
+          offerBadge: data.offerBadge || 'Special Offer',
+          discountPercent: data.discountPercent || 0,
+          isVerified: data.isVerified ?? true,
+          isPinned: !!data.isPinned,
+          isFeatured: !!data.isFeatured,
+          status: data.status || 'pending',
+          startDate: data.startDate || new Date().toISOString(),
+          endDate: data.endDate,
+          ctaType: data.ctaType || 'shop_now',
+          impressions: data.impressions || 0,
+          clicks: data.clicks || 0,
+          ctr: data.ctr || 0,
+          budgetPi: data.budgetPi || 0,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString()
+        };
+      });
+    } catch (e) {
+      console.warn('Failed fetching campaigns for admin, returning default list:', e);
+      return DEFAULT_BANNER_CAMPAIGNS;
+    }
+  }
+
+  /**
+   * Merchant fetches their own campaigns
+   */
+  public async getCampaignsByMerchant(merchantId: string): Promise<Campaign[]> {
+    try {
+      const db = getFirebaseDb();
+      const q = query(
+        collection(db, 'campaigns'),
+        where('merchantId', '==', merchantId)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return [];
+
+      return snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          merchantId: data.merchantId || merchantId,
+          businessId: data.businessId || '',
+          businessName: data.businessName || 'Business',
+          campaignTitle: data.campaignTitle || '',
+          shortDescription: data.shortDescription || '',
+          campaignType: data.campaignType || 'sponsored_ad',
+          bannerImage: data.bannerImage || '',
+          targetRoute: data.targetRoute || '/marketplace',
+          status: data.status || 'pending',
+          startDate: data.startDate || new Date().toISOString(),
+          ctaType: data.ctaType || 'shop_now',
+          impressions: data.impressions || 0,
+          clicks: data.clicks || 0,
+          ctr: data.ctr || 0,
+          budgetPi: data.budgetPi || 0,
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString()
+        };
+      });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Track ad conversion (e.g. sale resulting from ad click)
+   */
+  public async trackConversion(campaignId: string): Promise<void> {
+    try {
+      const db = getFirebaseDb();
+      const ref = doc(db, 'campaigns', campaignId);
+      await updateDoc(ref, {
+        conversions: increment(1)
+      });
+    } catch (e) {
+      // Non-blocking
+    }
+  }
+
+  /**
    * Seed default campaigns into Firestore
    */
   private async seedDefaultCampaigns(): Promise<void> {

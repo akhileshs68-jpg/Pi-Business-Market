@@ -32,10 +32,19 @@ export class IdentityService {
   ): Promise<EnterpriseIdentity> {
     let identity = await identityRepository.getIdentityByUid(uid);
 
+    if (!identity && piUid) {
+      identity = await identityRepository.getIdentityByPiUid(piUid);
+    }
+
+    if (!identity && username) {
+      identity = await identityRepository.getIdentityByUsername(username);
+    }
+
+    const isOwner = username === 'pi_pioneer_88' || (identity && (identity.roles.includes('superadmin') || identity.roles.includes('super_admin')));
+
     if (!identity) {
-      const isOwner = username === 'pi_pioneer_88';
       const initialRoles: SystemRole[] = isOwner 
-        ? ['buyer', 'seller', 'business_owner', 'superadmin', 'merchant'] 
+        ? ['buyer', 'seller', 'business_owner', 'superadmin', 'merchant', 'owner'] 
         : ['buyer'];
 
       const now = new Date().toISOString();
@@ -63,8 +72,8 @@ export class IdentityService {
           isEmailVerified: false,
           isPhoneVerified: false,
           isPiVerified: true,
-          isKycVerified: isOwner,
-          isBusinessVerified: isOwner,
+          isKycVerified: !!isOwner,
+          isBusinessVerified: !!isOwner,
           trustScore: isOwner ? 98 : 50
         },
         createdAt: now,
@@ -74,6 +83,20 @@ export class IdentityService {
 
       await identityRepository.saveIdentity(identity);
       logger.audit('IdentityService', `Initialized Enterprise Identity for user ${uid}`, uid, { roles: initialRoles });
+    } else {
+      // Identity exists - update uid to current authenticated uid if different
+      if (identity.uid !== uid) {
+        identity.uid = uid;
+      }
+      if (isOwner && !identity.roles.includes('superadmin')) {
+        identity.roles = Array.from(new Set([...identity.roles, 'buyer', 'seller', 'business_owner', 'superadmin', 'merchant', 'owner']));
+        identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
+      }
+      await identityRepository.saveIdentity(identity);
+    }
+
+    if (!identity) {
+      throw new Error(`Failed to resolve identity for user ${uid}`);
     }
 
     // Attach active session

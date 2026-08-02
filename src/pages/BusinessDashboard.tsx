@@ -9,6 +9,7 @@ import { businessService } from '../services/businessService';
 import { Business } from '../types';
 import { BusinessWizard } from '../components/business/BusinessWizard';
 import { BusinessCard } from '../components/business/BusinessCard';
+import { useBusiness } from '../context/BusinessContext';
 import { 
   Building2, 
   Plus, 
@@ -32,39 +33,48 @@ const BusinessHub = lazy(() => import('../components/business/BusinessHub').then
 export const BusinessDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { 
+    businesses, 
+    currentBusiness, 
+    setCurrentBusinessId, 
+    refreshWorkspace, 
+    isWorkspaceReady 
+  } = useBusiness();
+
   const [showWizard, setShowWizard] = useState(false);
   const [activeTab, setActiveTab] = useState<'owned' | 'collaborations'>('owned');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
 
-  const fetchBusinesses = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const data = await businessService.getMyBusinesses(user.uid);
-      setBusinesses(data);
-    } catch (error) {
-      console.error('Failed to fetch businesses:', error);
-    } finally {
-      setLoading(false);
+  const loading = !isWorkspaceReady;
+
+  // Symmetrical sync of local selection with context
+  useEffect(() => {
+    if (currentBusiness) {
+      setSelectedBusiness(currentBusiness);
+    } else {
+      setSelectedBusiness(null);
     }
+  }, [currentBusiness]);
+
+  const handleSelectBusiness = (business: Business) => {
+    setSelectedBusiness(business);
+    setCurrentBusinessId(business.id);
   };
 
-  useEffect(() => {
-    fetchBusinesses();
-  }, [user]);
+  const handleBackToRegistry = () => {
+    setSelectedBusiness(null);
+    setCurrentBusinessId(null);
+  };
 
   const handleEdit = (business: Business) => {
     navigate(`/business/${business.id}/settings`);
   };
 
   const handleDelete = async (id: string) => {
-    // Soft delete logic would go here
     if (window.confirm('Are you sure you want to archive this business identity?')) {
       await businessService.updateBusiness(id, user!.uid, user!.displayName || 'Admin', { businessStatus: 'archived' });
-      fetchBusinesses();
+      await refreshWorkspace();
     }
   };
 
@@ -129,7 +139,7 @@ export const BusinessDashboard: React.FC = () => {
 
         {selectedBusiness ? (
           <Suspense fallback={<div className="text-white text-center py-20">Loading Dashboard...</div>}>
-            <BusinessHub business={selectedBusiness} onBack={() => setSelectedBusiness(null)} />
+            <BusinessHub business={selectedBusiness} onBack={handleBackToRegistry} />
           </Suspense>
         ) : (
           <>
@@ -238,7 +248,7 @@ export const BusinessDashboard: React.FC = () => {
                         onEdit={handleEdit}
                         onDelete={handleDelete}
                         onToggle={() => {}}
-                        onClick={(b) => setSelectedBusiness(b)}
+                        onClick={handleSelectBusiness}
                       />
                     </motion.div>
                   ))}
@@ -289,9 +299,9 @@ export const BusinessDashboard: React.FC = () => {
       {/* Onboarding Wizard */}
       {showWizard && (
         <BusinessWizard 
-          onComplete={() => {
+          onComplete={async () => {
             setShowWizard(false);
-            fetchBusinesses();
+            await refreshWorkspace();
           }}
           onCancel={() => setShowWizard(false)}
         />

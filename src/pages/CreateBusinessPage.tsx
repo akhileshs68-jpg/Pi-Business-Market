@@ -27,22 +27,8 @@ export const CreateBusinessPage: React.FC = () => {
         <BusinessWizard
           onComplete={async (businessId) => {
             console.log('Business created:', businessId);
-            // Once the first business is successfully created:
-            // - update user profile, preserve existing fields, do NOT overwrite profile data
-            try {
-              if (updateUser) {
-                await updateUser({
-                  profileCompleted: true,
-                  onboardingCompleted: true,
-                  activeRole: 'seller',
-                  roles: Array.from(new Set([...(user.roles || []), 'seller', 'buyer']))
-                });
-              }
-            } catch (err) {
-              console.error('Failed to update user profile on business creation:', err);
-            }
-            // After Business creation, redirect to "Create Store"
-            navigate('/create-store', { replace: true });
+            // After Business creation, redirect to Business Center
+            navigate('/business-center', { replace: true });
           }}
           onCancel={() => {
             navigate(-1);

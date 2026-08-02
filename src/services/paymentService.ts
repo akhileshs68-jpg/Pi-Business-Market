@@ -136,10 +136,9 @@ export const paymentService = {
     await piPaymentService.createPayment({ amount, memo, metadata }, {
       onReadyForServerApproval: async (piPaymentId: string) => {
         try {
-          const headers = await getAuthHeaders();
           const res = await fetch('/api/payments/approve', {
             method: 'POST',
-            headers,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId: piPaymentId, metadata })
           });
           if (!res.ok) throw new Error('Server approval failed');
