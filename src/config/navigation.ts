@@ -16,6 +16,7 @@ export const MAIN_NAVIGATION: NavigationItem[] = [
   { id: 'orders', label: 'Orders', iconName: 'Clock', view: 'orders' },
   { id: 'wishlist', label: 'Wishlist', iconName: 'Heart', view: 'wishlist' },
   { id: 'messages', label: 'Messages', iconName: 'MessageSquare', view: 'inbox' },
+  { id: 'community', label: 'Community Hub', iconName: 'Users', view: 'community' },
   { id: 'wallet', label: 'Wallet', iconName: 'Wallet', view: 'wallet' },
   { id: 'account', label: 'My Account', iconName: 'User', view: 'profile' },
   { id: 'business', label: 'Business Center', iconName: 'Briefcase', view: 'business-center' },

@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { bmpRewardsProvider } from './wallet/providers/bmpRewardsProvider';
+import { antiCheatEngine } from './rewards/antiCheatEngine';
 
 export interface LevelInfo {
   level: number;
@@ -272,7 +273,7 @@ export const gamificationService = {
   /**
    * DAILY CHECK-IN (Strict 24h & Anti-Fraud Timestamp Validation)
    */
-  async checkIn(userId: string): Promise<{
+  async checkIn(userId: string, telemetry: any = {}): Promise<{
     newBalance: number;
     streakCount: number;
     bmpEarned: number;
@@ -280,6 +281,9 @@ export const gamificationService = {
     newLevelName?: string;
     newBadges: string[];
   }> {
+    // Validate anti-cheat daily check-in rules
+    await antiCheatEngine.validateDailyCheckIn(userId, telemetry);
+
     const db = getFirebaseDb();
     const docRef = doc(db, 'user_gamification', userId);
 
@@ -382,6 +386,7 @@ export const gamificationService = {
         lastCheckInDate: todayStr,
         badges: existingBadges,
         stats,
+        lastFingerprint: telemetry.fingerprint || null,
         updatedAt: serverTimestamp()
       }, { merge: true });
     });
@@ -494,6 +499,401 @@ export const gamificationService = {
   },
 
   /**
+   * PROCESS VERIFIED MERCHANT SALE REWARD
+   */
+  async processVerifiedSaleReward(sellerId: string, buyerId: string, orderId: string, grandTotalPi: number): Promise<number> {
+    const db = getFirebaseDb();
+    
+    // Idempotency check in wallet_transactions
+    const qTx = query(
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', sellerId),
+      where('referenceId', '==', `SALE_${orderId}`),
+      where('source', '==', 'MARKETPLACE_ORDER')
+    );
+    const snapTx = await getDocs(qTx);
+    if (!snapTx.empty) return 0; // Already rewarded
+
+    // 5 BMP per 1 Pi of sale total (Minimum 10 BMP)
+    const baseReward = Math.max(10, Math.floor(grandTotalPi * 5));
+
+    // Credit merchant/seller wallet
+    await bmpRewardsProvider.credit(
+      sellerId,
+      baseReward,
+      'MARKETPLACE_ORDER',
+      `Verified Sale #${orderId.slice(0, 8)} Reward`,
+      `SALE_${orderId}`
+    );
+
+    // Update seller stats & milestones
+    const profileRef = doc(db, 'user_gamification', sellerId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      let data = snap.exists() ? snap.data() : null;
+
+      if (!data) {
+        // Create basic profile if it doesn't exist yet
+        const newReferralCode = this.generateReferralCode(sellerId);
+        data = {
+          userId: sellerId,
+          lifetimeBmp: 0,
+          level: 1,
+          levelName: 'Explorer',
+          streakCount: 0,
+          lastCheckInTime: 0,
+          lastCheckInDate: '',
+          referralCode: newReferralCode,
+          referredBy: null,
+          badges: [],
+          claimedMissions: [],
+          missionProgress: {},
+          stats: {
+            totalOrdersPlaced: 0,
+            totalSpentPi: 0,
+            totalReviewsSubmitted: 0,
+            totalProductsShared: 0,
+            totalFriendsReferred: 0,
+            totalSalesAsMerchant: 0,
+            productsPublished: 0,
+            accountCreatedTime: Date.now()
+          }
+        };
+      }
+
+      const currentSales = (data.stats?.totalSalesAsMerchant || 0) + 1;
+      const existingBadges = data.badges || [];
+
+      let achievementBonus = 0;
+      if (currentSales === 1) achievementBonus += 100; // First verified sale bonus
+      if (currentSales === 10) achievementBonus += 250;
+      if (currentSales === 50) achievementBonus += 1000;
+      if (currentSales === 100) achievementBonus += 2500;
+
+      if (currentSales >= 1 && !existingBadges.includes('verified_seller')) {
+        existingBadges.push('verified_seller');
+      }
+      if (currentSales >= 25 && !existingBadges.includes('top_seller')) {
+        existingBadges.push('top_seller');
+      }
+
+      const totalEarned = baseReward + achievementBonus;
+      const newLifetime = (data.lifetimeBmp || 0) + totalEarned;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.set(profileRef, {
+        userId: sellerId,
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        badges: existingBadges,
+        'stats.totalSalesAsMerchant': currentSales,
+        'missionProgress.weekly_sale': increment(1),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      if (achievementBonus > 0) {
+        await bmpRewardsProvider.credit(
+          sellerId,
+          achievementBonus,
+          'CAMPAIGN',
+          `Merchant Sales Milestone Bonus (${currentSales} Sales)`,
+          `SALE_MILESTONE_${orderId}`
+        );
+      }
+    });
+
+    return baseReward;
+  },
+
+  /**
+   * PROCESS VERIFIED SERVICE REVIEW REWARD
+   */
+  async processServiceReviewReward(userId: string, serviceId: string, orderId: string, reviewId: string): Promise<number> {
+    const db = getFirebaseDb();
+
+    // Idempotency check
+    const qTx = query(
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', userId),
+      where('referenceId', '==', `SRV_REV_${reviewId}`)
+    );
+    const snapTx = await getDocs(qTx);
+    if (!snapTx.empty) return 0;
+
+    const rewardBmp = 30; // 30 BMP for verified service review
+
+    await bmpRewardsProvider.credit(
+      userId,
+      rewardBmp,
+      'CAMPAIGN',
+      `Verified Service Review Reward`,
+      `SRV_REV_${reviewId}`
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const newCount = (data.stats?.totalReviewsSubmitted || 0) + 1;
+      const existingBadges = data.badges || [];
+
+      if (newCount >= 10 && !existingBadges.includes('service_expert')) {
+        existingBadges.push('service_expert');
+      }
+
+      const newLifetime = (data.lifetimeBmp || 0) + rewardBmp;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        badges: existingBadges,
+        'stats.totalReviewsSubmitted': newCount,
+        'missionProgress.weekly_review': increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return rewardBmp;
+  },
+
+  /**
+   * PROCESS VERIFIED BUSINESS REGISTRATION REWARD
+   */
+  async processBusinessRegistrationReward(userId: string, businessId: string): Promise<number> {
+    const db = getFirebaseDb();
+
+    // Idempotency check
+    const qTx = query(
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', userId),
+      where('referenceId', '==', `BIZ_REG_${businessId}`)
+    );
+    const snapTx = await getDocs(qTx);
+    if (!snapTx.empty) return 0;
+
+    const rewardBmp = 50; // 50 BMP on Registration
+
+    await bmpRewardsProvider.credit(
+      userId,
+      rewardBmp,
+      'CAMPAIGN',
+      `Business Profile Registration Reward`,
+      `BIZ_REG_${businessId}`
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const newLifetime = (data.lifetimeBmp || 0) + rewardBmp;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        'stats.productsPublished': increment(1),
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return rewardBmp;
+  },
+
+  /**
+   * PROCESS VERIFIED BUSINESS APPROVAL REWARD
+   */
+  async processBusinessApprovalReward(userId: string, businessId: string): Promise<number> {
+    const db = getFirebaseDb();
+
+    // Idempotency check
+    const qTx = query(
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', userId),
+      where('referenceId', '==', `BIZ_APP_${businessId}`)
+    );
+    const snapTx = await getDocs(qTx);
+    if (!snapTx.empty) return 0;
+
+    const rewardBmp = 200; // 200 BMP on official approval
+
+    await bmpRewardsProvider.credit(
+      userId,
+      rewardBmp,
+      'CAMPAIGN',
+      `Verified Business Official Approval Reward`,
+      `BIZ_APP_${businessId}`
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const existingBadges = data.badges || [];
+      if (!existingBadges.includes('verified_business')) {
+        existingBadges.push('verified_business');
+      }
+
+      const newLifetime = (data.lifetimeBmp || 0) + rewardBmp;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        badges: existingBadges,
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return rewardBmp;
+  },
+
+  /**
+   * PROCESS GENERAL CAMPAIGN REWARD
+   */
+  async processCampaignReward(userId: string, campaignId: string, amount: number, memo: string): Promise<number> {
+    const db = getFirebaseDb();
+
+    // Idempotency check
+    const qTx = query(
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', userId),
+      where('referenceId', '==', `CAMP_${campaignId}`)
+    );
+    const snapTx = await getDocs(qTx);
+    if (!snapTx.empty) return 0;
+
+    await bmpRewardsProvider.credit(
+      userId,
+      amount,
+      'CAMPAIGN',
+      memo,
+      `CAMP_${campaignId}`
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const newLifetime = (data.lifetimeBmp || 0) + amount;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return amount;
+  },
+
+  /**
+   * PROCESS FESTIVAL REWARD
+   */
+  async processFestivalReward(userId: string, eventId: string, amount: number, memo: string): Promise<number> {
+    const db = getFirebaseDb();
+
+    // Idempotency check
+    const qTx = query(
+      collection(db, 'wallet_transactions'),
+      where('userId', '==', userId),
+      where('referenceId', '==', `FEST_${eventId}`)
+    );
+    const snapTx = await getDocs(qTx);
+    if (!snapTx.empty) return 0;
+
+    await bmpRewardsProvider.credit(
+      userId,
+      amount,
+      'CAMPAIGN',
+      memo,
+      `FEST_${eventId}`
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const newLifetime = (data.lifetimeBmp || 0) + amount;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return amount;
+  },
+
+  /**
+   * PROCESS ADMIN PROMOTION REWARD
+   */
+  async processAdminPromotionReward(userId: string, amount: number, memo: string): Promise<number> {
+    const db = getFirebaseDb();
+    const referenceId = `ADMIN_PROMO_${Date.now()}`;
+
+    await bmpRewardsProvider.credit(
+      userId,
+      amount,
+      'ADJUSTMENT',
+      memo,
+      referenceId
+    );
+
+    const profileRef = doc(db, 'user_gamification', userId);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(profileRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const newLifetime = (data.lifetimeBmp || 0) + amount;
+      const levelInfo = this.calculateLevel(newLifetime);
+
+      transaction.update(profileRef, {
+        lifetimeBmp: newLifetime,
+        level: levelInfo.level,
+        levelName: levelInfo.levelName,
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    return amount;
+  },
+
+  /**
+   * STAKING ENGINE (Prepared for future activation)
+   */
+  async processStakingReward(userId: string, stakeAmount: number): Promise<never> {
+    throw new Error('Staking mechanism is prepared but currently disabled. BMP Token staking will be activated in the next Mainnet Phase.');
+  },
+
+  /**
+   * MISSION ARCHITECTURE (Prepared for future activation)
+   */
+  async processFutureMission(userId: string, missionId: string): Promise<never> {
+    throw new Error('Advanced missions are prepared but currently inactive. Wait for official system release.');
+  },
+
+  /**
    * PROCESS VERIFIED PRODUCT REVIEW REWARD
    */
   async processReviewReward(userId: string, productId: string, orderId: string, reviewId: string): Promise<number> {
@@ -551,33 +951,53 @@ export const gamificationService = {
   /**
    * REAL SOCIAL SHARING REWARD WITH ANTI-FRAUD
    */
-  async processShareReward(userId: string, productId: string, platform: string): Promise<number> {
+  async processShareReward(userId: string, productId: string, platform: string, telemetry: any = {}): Promise<number> {
     const db = getFirebaseDb();
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Anti-fraud: Rate limit - max 3 shares rewarded per day
-    const sharesRef = collection(db, 'share_events');
-    const qShares = query(
-      sharesRef,
-      where('userId', '==', userId),
-      where('shareDate', '==', todayStr)
-    );
-    const snapShares = await getDocs(qShares);
-
-    if (snapShares.size >= 3) {
-      throw new Error('Daily share reward limit reached (3/3). Shares are logged, but daily BMP bonus is maxed out today.');
+    // 1. Server Validation: Verify user exists and profile is active
+    if (!userId) {
+      throw new Error('Verification failed: Missing user ID.');
+    }
+    const profileRef = doc(db, 'user_gamification', userId);
+    const profileSnap = await getDoc(profileRef);
+    if (!profileSnap.exists()) {
+      throw new Error('Verification failed: Gamification profile not found.');
     }
 
-    // Log verified share event
+    // 2. Duplicate Detection: Check if user shared this exact entity to this exact platform within the last 10 minutes (replay/spam protection)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const sharesRef = collection(db, 'share_events');
+    const qDup = query(
+      sharesRef,
+      where('userId', '==', userId),
+      where('entityId', '==', productId),
+      where('platform', '==', platform),
+      where('createdAt', '>=', tenMinutesAgo)
+    );
+    const snapDup = await getDocs(qDup);
+    if (!snapDup.empty) {
+      await antiCheatEngine.logViolation(userId, 'SHARE_REPLAY_ATTEMPT', `Duplicate share of entity ${productId} to ${platform} within 10 mins.`, telemetry, 'WARNING');
+      throw new Error('Duplicate share action detected too quickly. Please wait before sharing this item to the same platform again.');
+    }
+
+    // 3. Daily Limit Validation
+    await antiCheatEngine.validateSocialShare(userId, telemetry);
+
+    // 4. Log verified share event
     const shareDocRef = doc(sharesRef);
     await setDoc(shareDocRef, {
       userId,
-      productId,
+      entityId: productId,
+      productId, // backward compatibility
       platform,
       shareDate: todayStr,
+      rewarded: true,
+      rewardBmpAmount: 15,
       createdAt: serverTimestamp()
     });
 
+    // 5. Reward Engine: Credit the master ledger/wallet atomically
     const rewardBmp = 15;
     await bmpRewardsProvider.credit(
       userId,
@@ -587,7 +1007,7 @@ export const gamificationService = {
       productId
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    // 6. Update stats, level, and weekly milestones
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -607,17 +1027,45 @@ export const gamificationService = {
       });
     });
 
+    // 7. Send notification
+    try {
+      const { notificationService } = await import('./notificationService');
+      await notificationService.notify(
+        userId,
+        'loyalty_reward',
+        'Share Reward Confirmed! 🚀',
+        `Earned +${rewardBmp} BMP for promoting on ${platform}. Keep sharing to earn more!`,
+        { entityType: 'share', entityId: productId }
+      );
+    } catch (err) {
+      console.warn('Failed to send share reward notification:', err);
+    }
+
     return rewardBmp;
   },
 
   /**
    * VERIFIED SHARE CLICK REWARD WITH ANTI-CHEAT & RATE LIMITING
    */
-  async processVerifiedShareReward(userId: string, entityId: string, platform: string, shareId: string): Promise<number> {
+  async processVerifiedShareReward(userId: string, entityId: string, platform: string, shareId: string, telemetry: any = {}): Promise<number> {
     const db = getFirebaseDb();
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Anti-cheat rate limit: max 5 verified share click rewards per day
+    // 1. Server Validation
+    if (!userId) {
+      console.warn('[Anti-Cheat] Missing user ID for verified share reward.');
+      return 0;
+    }
+
+    // 2. Duplicate detection: Check if this shareId was already rewarded
+    const shareDocRef = doc(db, 'share_events', shareId);
+    const shareSnap = await getDoc(shareDocRef);
+    if (shareSnap.exists() && shareSnap.data().rewarded) {
+      console.warn('[Anti-Cheat] Share click already rewarded for shareId:', shareId);
+      return 0;
+    }
+
+    // 3. Daily Limit Validation (max 5 verified click rewards per day)
     const sharesRef = collection(db, 'share_events');
     const qShares = query(
       sharesRef,
@@ -628,10 +1076,11 @@ export const gamificationService = {
     const snapShares = await getDocs(qShares);
 
     if (snapShares.size >= 5) {
-      console.warn('[Anti-Cheat] Daily verified share reward maxed out for user:', userId);
+      console.warn('[Anti-Cheat] Daily verified share click reward cap reached (5/5) for user:', userId);
       return 0;
     }
 
+    // 4. Reward Engine: Credit the master ledger/wallet atomically
     const rewardBmp = 15;
     await bmpRewardsProvider.credit(
       userId,
@@ -641,6 +1090,7 @@ export const gamificationService = {
       entityId
     );
 
+    // 5. Update user profile stats & level
     const profileRef = doc(db, 'user_gamification', userId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
@@ -660,6 +1110,20 @@ export const gamificationService = {
         updatedAt: serverTimestamp()
       });
     });
+
+    // 6. Send notification
+    try {
+      const { notificationService } = await import('./notificationService');
+      await notificationService.notify(
+        userId,
+        'loyalty_reward',
+        'Viral Reach Reward! 🔥',
+        `Your shared link was visited on ${platform}! Earned +${rewardBmp} BMP.`,
+        { entityType: 'share_click', entityId }
+      );
+    } catch (err) {
+      console.warn('Failed to send verified share reward notification:', err);
+    }
 
     return rewardBmp;
   },

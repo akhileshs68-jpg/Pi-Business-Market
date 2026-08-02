@@ -35,11 +35,15 @@ import {
   GraduationCap,
   Utensils,
   HardHat,
-  MoreHorizontal
+  MoreHorizontal,
+  FileCheck,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../../auth/useAuth';
 import { businessService } from '../../services/businessService';
+import { BusinessRegistrationEngine } from '../../services/businessRegistrationEngine';
+import { UniversalBusinessCategory } from '../../core/business/universalBusinessTypes';
 import { mediaService } from '../../services/mediaService';
 import { Business } from '../../types';
 import { FileUpload } from '../product/FileUpload';
@@ -93,7 +97,13 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
   const { user, profile } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<Partial<Business>>(() => {
+  const [formData, setFormData] = useState<Partial<Business> & {
+    gstNumber?: string;
+    panNumber?: string;
+    piWalletAddress?: string;
+    bmpWalletAddress?: string;
+    documents?: Record<string, string>;
+  }>(() => {
     if (initialData) {
       return {
         businessType: '',
@@ -108,9 +118,26 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
         postalCode: '',
         fullAddress: '',
         description: '',
+        gstNumber: '',
+        panNumber: '',
+        piWalletAddress: '',
+        bmpWalletAddress: '',
+        documents: {},
         profileData: {},
         ...initialData
       };
+    }
+    // Try restoring draft from localStorage
+    try {
+      const saved = localStorage.getItem('pi_business_wizard_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.formData && !businessId) {
+          return parsed.formData;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load business registration draft:', e);
     }
     return {
       businessType: '',
@@ -125,12 +152,28 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
       postalCode: '',
       fullAddress: '',
       description: '',
+      gstNumber: '',
+      panNumber: '',
+      piWalletAddress: '',
+      bmpWalletAddress: '',
+      documents: {},
       profileData: {}
     };
   });
 
-  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logoUrl || null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(initialData?.coverImageUrl || null);
+  // Save draft auto-save effect
+  useEffect(() => {
+    if (!businessId) {
+      try {
+        localStorage.setItem('pi_business_wizard_draft', JSON.stringify({ step, formData }));
+      } catch (e) {
+        // ignore draft save error
+      }
+    }
+  }, [formData, step, businessId]);
+
+  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logoUrl || formData.logoUrl || null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(initialData?.coverImageUrl || formData.coverImageUrl || null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -160,22 +203,14 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
     });
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'logo') {
-          setLogoPreview(reader.result as string);
-          setFormData({ ...formData, logoUrl: reader.result as string }); 
-          // Note: In real app, we'd upload to Cloudinary/Firebase Storage, for this demo we'll just save the data URL temporarily
-        } else {
-          setCoverPreview(reader.result as string);
-          setFormData({ ...formData, coverImageUrl: reader.result as string });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleDocumentChange = (docKey: string, url: string) => {
+    setFormData({
+      ...formData,
+      documents: {
+        ...(formData.documents || {}),
+        [docKey]: url
+      }
+    });
   };
 
   const handleSubmit = async () => {
@@ -186,10 +221,51 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
       if (businessId) {
         const { id, createdAt, updatedAt, createdBy, updatedBy, rating, reviewCount, followers, employeeCount, storeCount, ownerUid, ...updates } = formData;
         await businessService.updateBusiness(businessId, user.uid, profile.displayName || user.email || 'User', updates);
+        try {
+          localStorage.removeItem('pi_business_wizard_draft');
+        } catch (e) {}
         onComplete(businessId);
       } else {
-        const newBusinessId = await businessService.createBusiness(user.uid, profile.displayName || user.email || 'User', formData as Omit<Business, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'rating' | 'reviewCount' | 'followers' | 'employeeCount' | 'storeCount'>);
-        onComplete(newBusinessId);
+        // Universal Registration Engine Call
+        const config = BusinessRegistrationEngine.getFormConfigForType(formData.businessType || 'Retail Shop');
+        const res = await BusinessRegistrationEngine.registerBusiness({
+          ownerUid: user.uid,
+          ownerName: profile.displayName || user.email || 'User',
+          businessName: formData.businessName || '',
+          legalName: formData.legalName || formData.businessName || '',
+          businessCategory: (formData.category || config.category || 'retail_wholesale') as UniversalBusinessCategory,
+          businessType: formData.businessType || 'Retail Shop',
+          description: formData.description || '',
+          email: formData.email || user.email || '',
+          phone: formData.phone || '',
+          address: formData.fullAddress || '',
+          city: formData.city || '',
+          state: formData.state || '',
+          country: formData.country || '',
+          postalCode: formData.postalCode || '',
+          gstNumber: formData.gstNumber || '',
+          panNumber: formData.panNumber || '',
+          logoUrl: formData.logoUrl || logoPreview || '',
+          coverImageUrl: formData.coverImageUrl || coverPreview || '',
+          piWalletAddress: formData.piWalletAddress || '',
+          bmpWalletAddress: formData.bmpWalletAddress || '',
+          dynamicFields: {
+            ...(formData.profileData || {}),
+            ...(formData.documents ? { uploadedDocuments: formData.documents } : {})
+          },
+          primaryStoreConfig: config.requiresStore ? {
+            storeName: `${formData.businessName || 'Business'} Outlet`,
+            storeType: 'Retail Outlet',
+            deliveryAvailable: true,
+            pickupAvailable: true
+          } : undefined
+        });
+
+        try {
+          localStorage.removeItem('pi_business_wizard_draft');
+        } catch (e) {}
+
+        onComplete(res.businessId);
       }
     } catch (err: any) {
       console.error(err);
@@ -546,49 +622,138 @@ export const BusinessWizard: React.FC<WizardProps> = ({ onComplete, onCancel, in
               )}
 
               {step === 5 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-                  <div className="text-center mb-4 md:col-span-2">
-                    <h3 className="text-2xl font-bold text-white mb-2">Brand Identity</h3>
-                    <p className="text-slate-400">Upload your logo and cover image.</p>
+                <div className="space-y-8 max-w-3xl mx-auto">
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-white mb-2">Brand, Verification & Wallet Mapping</h3>
+                    <p className="text-slate-400 text-sm">Upload branding assets, verification documents, and Pi Testnet wallet credentials.</p>
                   </div>
-                  <div className="space-y-4">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Business Logo</label>
-                    <div className="w-full">
-                      {formData.logoUrl ? (
-                        <div className="w-[180px] h-[180px] md:w-[200px] md:h-[200px] bg-slate-950 rounded-3xl overflow-hidden relative mx-auto md:mx-0 border border-slate-800 aspect-square">
-                          <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                          <button onClick={() => setFormData({...formData, logoUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <FileUpload
-                          ownerUid={user?.uid || ''}
-                          module="businesses"
-                          label="Upload Logo"
-                          onUploadSuccess={(asset) => setFormData({ ...formData, logoUrl: asset.downloadUrl })}
-                        />
-                      )}
+
+                  {/* Brand Assets */}
+                  <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <h4 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <Building2 className="w-4 h-4" /> Brand Identity
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Business Logo</label>
+                        {formData.logoUrl ? (
+                          <div className="w-[140px] h-[140px] bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-800">
+                            <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                            <button onClick={() => setFormData({...formData, logoUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <FileUpload
+                            ownerUid={user?.uid || ''}
+                            module="businesses"
+                            label="Upload Logo"
+                            onUploadSuccess={(asset) => setFormData({ ...formData, logoUrl: asset.downloadUrl })}
+                          />
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Cover Banner</label>
+                        {formData.coverImageUrl ? (
+                          <div className="w-full h-[140px] bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-800">
+                            <img src={formData.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                            <button onClick={() => setFormData({...formData, coverImageUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <FileUpload
+                            ownerUid={user?.uid || ''}
+                            module="businesses"
+                            label="Upload Cover"
+                            onUploadSuccess={(asset) => setFormData({ ...formData, coverImageUrl: asset.downloadUrl })}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cover Image</label>
-                    <div className="w-full">
-                      {formData.coverImageUrl ? (
-                        <div className="w-full aspect-[16/9] md:aspect-[3/1] bg-slate-950 rounded-3xl overflow-hidden relative border border-slate-800">
-                          <img src={formData.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
-                          <button onClick={() => setFormData({...formData, coverImageUrl: ''})} className="absolute top-2 right-2 p-1 bg-rose-500 text-white rounded-lg">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <FileUpload
-                          ownerUid={user?.uid || ''}
-                          module="businesses"
-                          label="Upload Cover"
-                          onUploadSuccess={(asset) => setFormData({ ...formData, coverImageUrl: asset.downloadUrl })}
+
+                  {/* Tax & Registration Info */}
+                  <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <h4 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <FileCheck className="w-4 h-4" /> Tax & Legal Identification
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">GSTIN / Tax ID</label>
+                        <input
+                          name="gstNumber"
+                          value={formData.gstNumber || ''}
+                          onChange={handleChange}
+                          placeholder="e.g. 22AAAAA0000A1Z5"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white"
                         />
-                      )}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">PAN / Legal Registration No</label>
+                        <input
+                          name="panNumber"
+                          value={formData.panNumber || ''}
+                          onChange={handleChange}
+                          placeholder="e.g. ABCDE1234F"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 space-y-3">
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Document Verification Uploads</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-400">Business License / Certificate</span>
+                          <FileUpload
+                            ownerUid={user?.uid || ''}
+                            module="documents"
+                            label="Upload Registration Doc"
+                            onUploadSuccess={(asset) => handleDocumentChange('businessLicense', asset.downloadUrl)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-400">GST / Tax Certificate</span>
+                          <FileUpload
+                            ownerUid={user?.uid || ''}
+                            module="documents"
+                            label="Upload Tax Doc"
+                            onUploadSuccess={(asset) => handleDocumentChange('gstCertificate', asset.downloadUrl)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Blockchain Ready Wallet Mappings */}
+                  <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <h4 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                      <Wallet className="w-4 h-4" /> Blockchain Wallet Mappings
+                    </h4>
+                    <p className="text-xs text-slate-400">Connect your Pi Testnet wallet and BMP rewards wallet for instant settlement and reward distribution.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pi Testnet Wallet Address</label>
+                        <input
+                          name="piWalletAddress"
+                          value={formData.piWalletAddress || ''}
+                          onChange={handleChange}
+                          placeholder="G..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono text-amber-300"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">BMP Reward Wallet Address</label>
+                        <input
+                          name="bmpWalletAddress"
+                          value={formData.bmpWalletAddress || ''}
+                          onChange={handleChange}
+                          placeholder="BMP..."
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono text-indigo-300"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

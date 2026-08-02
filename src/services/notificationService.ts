@@ -15,6 +15,7 @@ import {
   limit,
   onSnapshot,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   writeBatch
@@ -42,14 +43,23 @@ export const notificationService = {
       entityId?: string;
       priority?: NotificationPriority;
       linkTo?: string;
+      pinned?: boolean;
     }
   ): Promise<string> {
     const db = getFirebaseDb();
     const notificationId = `NOTIF_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
     const notificationRef = doc(db, 'notifications', notificationId);
 
-    // Check preferences before sending (future: logic to skip if muted)
-    // For now, we always record in-app notifications
+    // Retrieve user preferences
+    try {
+      const prefs = await this.getPreferences(recipientUid);
+      if (prefs.mutedTypes?.includes(type)) {
+        console.log(`Notification ${notificationId} of type ${type} is muted by user ${recipientUid}`);
+        return '';
+      }
+    } catch (e) {
+      console.warn('Could not load user notification preferences, falling back to delivery.', e);
+    }
 
     const newNotification: Notification = {
       notificationId,
@@ -62,6 +72,7 @@ export const notificationService = {
       priority: options?.priority || 'medium',
       status: 'unread',
       linkTo: options?.linkTo,
+      pinned: options?.pinned || false,
       createdAt: new Date().toISOString()
     };
 
@@ -75,7 +86,7 @@ export const notificationService = {
 
   /**
    * REAL-TIME NOTIFICATIONS
-   * Subscription for the Navbar bell and Inbox
+   * Subscription with priority-aware and stateful sorting
    */
   subscribeToNotifications(recipientUid: string, callback: (notifications: Notification[]) => void) {
     const db = getFirebaseDb();
@@ -89,12 +100,23 @@ export const notificationService = {
       const filteredAndSorted = notifications
         .filter(n => n.status !== 'dismissed')
         .sort((a, b) => {
-          if (a.status !== b.status) {
-            return a.status.localeCompare(b.status);
+          // 1. Pinned notifications on top
+          const aPinned = a.pinned ? 1 : 0;
+          const bPinned = b.pinned ? 1 : 0;
+          if (aPinned !== bPinned) {
+            return bPinned - aPinned;
           }
+
+          // 2. Unread notifications before read/archived
+          if (a.status !== b.status) {
+            if (a.status === 'unread' && b.status !== 'unread') return -1;
+            if (a.status !== 'unread' && b.status === 'unread') return 1;
+          }
+
+          // 3. Chronological descending
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         })
-        .slice(0, 50);
+        .slice(0, 100); // Expanded capacity from 50 to 100 for enterprise dashboard view
       callback(filteredAndSorted);
     });
   },
@@ -109,6 +131,38 @@ export const notificationService = {
       status: 'read',
       readAt: serverTimestamp()
     });
+  },
+
+  async archiveNotification(notificationId: string): Promise<void> {
+    const db = getFirebaseDb();
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      status: 'archived',
+      archivedAt: serverTimestamp()
+    });
+  },
+
+  async dismissNotification(notificationId: string): Promise<void> {
+    const db = getFirebaseDb();
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      status: 'dismissed',
+      dismissedAt: serverTimestamp()
+    });
+  },
+
+  async togglePinNotification(notificationId: string, pinned: boolean): Promise<void> {
+    const db = getFirebaseDb();
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      pinned
+    });
+  },
+
+  async deleteNotificationPermanently(notificationId: string): Promise<void> {
+    const db = getFirebaseDb();
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await deleteDoc(notificationRef);
   },
 
   async markAllAsRead(recipientUid: string): Promise<void> {
@@ -130,6 +184,65 @@ export const notificationService = {
     });
 
     await batch.commit();
+  },
+
+  /**
+   * BROADCAST AND TARGETED NOTIFICATIONS (ADMIN CONTROLS)
+   */
+  async broadcastNotification(
+    senderUid: string,
+    type: EnterpriseNotificationType,
+    title: string,
+    body: string,
+    options?: {
+      targetRole?: string; // 'All', 'Admin', 'Seller', 'Buyer', etc.
+      priority?: NotificationPriority;
+      linkTo?: string;
+      pinned?: boolean;
+    }
+  ): Promise<number> {
+    const db = getFirebaseDb();
+    const usersCol = collection(db, 'users');
+    let targetUids: string[] = [];
+
+    if (options?.targetRole && options.targetRole !== 'All') {
+      const q = query(usersCol, where('role', '==', options.targetRole));
+      const snap = await getDocs(q);
+      targetUids = snap.docs.map(d => d.id);
+    } else {
+      const snap = await getDocs(usersCol);
+      targetUids = snap.docs.map(d => d.id);
+    }
+
+    if (targetUids.length === 0) return 0;
+
+    const batchSize = 400;
+    for (let i = 0; i < targetUids.length; i += batchSize) {
+      const batch = writeBatch(db);
+      const chunk = targetUids.slice(i, i + batchSize);
+      
+      chunk.forEach(uid => {
+        const notificationId = `NOTIF_BCAST_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+        const ref = doc(db, 'notifications', notificationId);
+        batch.set(ref, {
+          notificationId,
+          recipientUid: uid,
+          type,
+          title,
+          body,
+          priority: options?.priority || 'medium',
+          status: 'unread',
+          linkTo: options?.linkTo,
+          pinned: options?.pinned || false,
+          createdAt: serverTimestamp(),
+          broadcastedBy: senderUid
+        });
+      });
+      
+      await batch.commit();
+    }
+
+    return targetUids.length;
   },
 
   /**

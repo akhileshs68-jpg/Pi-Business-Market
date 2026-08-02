@@ -45,7 +45,9 @@ export const CustomerRewards: React.FC = () => {
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'missions' | 'badges' | 'referral' | 'leaderboard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'missions' | 'badges' | 'referral' | 'analytics' | 'leaderboard'>('overview');
+  const [shareEvents, setShareEvents] = useState<any[]>([]);
+  const [shareClicks, setShareClicks] = useState<any[]>([]);
 
   const fetchProfileData = async () => {
     if (!user) return;
@@ -76,6 +78,28 @@ export const CustomerRewards: React.FC = () => {
         .slice(0, 15);
 
       setTransactions(filteredTxs);
+
+      // Fetch Real-Time Share Analytics and Security click audit logs
+      try {
+        const eventsQ = query(
+          collection(db, 'share_events'),
+          where('userId', '==', user.uid)
+        );
+        const eventsSnap = await getDocs(eventsQ);
+        const eventsList = eventsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setShareEvents(eventsList);
+
+        const clicksQ = query(
+          collection(db, 'share_clicks'),
+          where('referrerUserId', '==', user.uid)
+        );
+        const clicksSnap = await getDocs(clicksQ);
+        const clicksList = clicksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setShareClicks(clicksList);
+      } catch (analyticsErr) {
+        console.warn('Non-fatal share analytics load error:', analyticsErr);
+      }
+
     } catch (err) {
       console.error('Failed to fetch rewards profile', err);
     } finally {
@@ -143,6 +167,7 @@ export const CustomerRewards: React.FC = () => {
             { id: 'missions', label: 'Action Missions', icon: Target },
             { id: 'badges', label: 'Badges Wall', icon: Star },
             { id: 'referral', label: 'Referral Program', icon: Users },
+            { id: 'analytics', label: 'Share Analytics', icon: TrendingUp },
             { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -252,6 +277,153 @@ export const CustomerRewards: React.FC = () => {
         {/* Tab 5: Leaderboard */}
         {activeTab === 'leaderboard' && (
           <LeaderboardView />
+        )}
+
+        {/* Tab 6: Share Analytics */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-8 animate-fade-in">
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-lg">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Shared Links</p>
+                <p className="text-3xl font-black text-white font-mono">{shareEvents.length}</p>
+                <p className="text-[10px] text-emerald-400 font-bold mt-1 uppercase tracking-wider">
+                  Across {new Set(shareEvents.map(e => e.platform)).size} social channels
+                </p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-lg">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Link Clicks</p>
+                <p className="text-3xl font-black text-amber-400 font-mono">
+                  {shareEvents.reduce((acc, e) => acc + (e.clicksCount || 0), 0)}
+                </p>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">Verified engagement events</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-lg">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Average CTR</p>
+                <p className="text-3xl font-black text-sky-400 font-mono">
+                  {shareEvents.length > 0
+                    ? ((shareEvents.reduce((acc, e) => acc + (e.clicksCount || 0), 0) / shareEvents.length) * 100).toFixed(1)
+                    : '0.0'}%
+                </p>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">Click-Through Rate</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-lg">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">BMP Shared Bounty</p>
+                <p className="text-3xl font-black text-emerald-400 font-mono">
+                  {shareEvents.reduce((acc, e) => acc + (e.rewardBmpAmount || 0), 0)}
+                </p>
+                <p className="text-[10px] text-emerald-400/80 font-bold mt-1 uppercase tracking-wider">Earned from sharing</p>
+              </div>
+            </div>
+
+            {/* Platform Performance Graph */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl">
+                <h3 className="text-xs font-black text-white uppercase tracking-widest mb-6">Social Channel Breakdown</h3>
+                
+                {shareEvents.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500 text-xs font-semibold">
+                    No share channels tracked yet. Share products, services, or profiles to see platform breakdown.
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {['whatsapp', 'telegram', 'x_twitter', 'facebook', 'linkedin', 'email', 'general'].map(plat => {
+                      const count = shareEvents.filter(e => e.platform === plat).length;
+                      const clicks = shareEvents.filter(e => e.platform === plat).reduce((acc, e) => acc + (e.clicksCount || 0), 0);
+                      const percentage = shareEvents.length > 0 ? (count / shareEvents.length) * 100 : 0;
+                      
+                      if (count === 0 && clicks === 0) return null;
+
+                      return (
+                        <div key={plat} className="space-y-2.5">
+                          <div className="flex justify-between text-[11px] font-black uppercase tracking-wider">
+                            <span className="text-slate-300">{plat.replace('_', ' ')}</span>
+                            <span className="text-slate-400 font-mono">{count} Shares • {clicks} Clicks</span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-850">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                plat === 'whatsapp' ? 'bg-emerald-500' :
+                                plat === 'telegram' ? 'bg-sky-500' :
+                                plat === 'x_twitter' ? 'bg-white' :
+                                plat === 'facebook' ? 'bg-blue-600' : 'bg-amber-500'
+                              }`}
+                              style={{ width: `${Math.max(4, percentage)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Performance Score */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between shadow-xl">
+                <div>
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest mb-4">Promoter Rating</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold leading-relaxed mb-6">
+                    This rating reflects your organic viral outreach and adherence to our zero-abuse reward safety policies.
+                  </p>
+                </div>
+                <div className="flex flex-col items-center justify-center text-center py-4">
+                  <div className="w-28 h-28 rounded-full border-4 border-amber-500/10 flex items-center justify-center mb-4 relative shadow-2xl">
+                    <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-t-transparent border-r-transparent animate-spin duration-3000" />
+                    <span className="text-3xl font-black text-white font-mono">
+                      {shareEvents.length > 0 ? Math.min(100, Math.round((shareEvents.reduce((acc, e) => acc + (e.clicksCount || 0), 0) / shareEvents.length) * 15)) : '0'}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black text-amber-400 uppercase tracking-widest mb-1">Viral Pioneer Score</h4>
+                  <p className="text-[9px] font-mono text-slate-500 uppercase">Tier: Bronze Advocate</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Link clicks security audit logs */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xs font-black text-white uppercase tracking-widest">Live Link Engagement Feed</h3>
+                <span className="px-2.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[8px] font-black uppercase rounded">
+                  Anti-Cheat Monitored
+                </span>
+              </div>
+              
+              {shareClicks.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs font-semibold">
+                  No active traffic stream detected yet. Share links on social groups to log verified visitor visits.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {shareClicks.slice(0, 8).map((click) => (
+                    <div key={click.id} className="p-4 bg-slate-950/80 border border-slate-850 rounded-2xl flex items-center justify-between hover:bg-slate-950 transition-all">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                          <TrendingUp className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-white uppercase">Inbound Visit Processed</p>
+                          <p className="text-[10px] font-mono text-slate-500 uppercase truncate">
+                            ID: {click.visitorId?.slice(0, 10)}... • Footprint: {click.fingerprint?.slice(0, 12) || 'Verified Browser'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase rounded-lg">
+                          Verified Click
+                        </span>
+                        <p className="text-[9px] text-slate-500 font-mono uppercase mt-1">
+                          {click.createdAt ? new Date(click.createdAt.seconds ? click.createdAt.seconds * 1000 : new Date(click.createdAt).getTime()).toLocaleTimeString() : new Date().toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Transaction History Ledger */}

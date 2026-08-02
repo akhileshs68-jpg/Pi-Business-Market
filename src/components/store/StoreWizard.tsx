@@ -24,9 +24,15 @@ import { businessService } from '../../services/businessService';
 import { useAuth } from '../../auth/useAuth';
 import { MediaPickerModal } from '../product/MediaPickerModal';
 
+import { EnterpriseStoreEngine } from '../../core/store/enterpriseStoreEngine';
+
 const STORE_TYPES: StoreType[] = [
-  'Physical Store', 'Online Store', 'Hybrid Store', 'Service Center', 
-  'Restaurant', 'Hotel', 'Wholesale', 'Retail'
+  'Retail Store', 'Wholesale Store', 'Manufacturer Store', 'Distributor Store',
+  'Medical Store', 'Book Store', 'Electronics Store', 'Fashion Store',
+  'Furniture Store', 'Grocery Store', 'Agriculture Store', 'Restaurant',
+  'Hotel', 'Cafe', 'Salon', 'Gym', 'Travel Agency', 'Transport',
+  'Digital Store', 'Professional Office', 'NGO Office', 'Hospital',
+  'Clinic', 'School', 'College', 'Institute'
 ];
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -95,6 +101,15 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
         latitude: 0,
         longitude: 0,
         status: 'active'
+      });
+
+      // Enhance with Enterprise Store Profile & Search Index
+      await EnterpriseStoreEngine.updateEnterpriseProfile(newStoreId, {
+        storeType: formData.storeType,
+        storeCategory: formData.storeCategory,
+        verificationStatus: 'Approved',
+        isOpen: true,
+        vacationMode: false
       });
 
       onComplete(newStoreId);

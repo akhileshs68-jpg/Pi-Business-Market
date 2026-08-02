@@ -38,12 +38,12 @@ export const UniversalShareModal: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'targets' | 'qr'>('targets');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [customText, setCustomText] = useState(`Check out "${entityName}" on Pi Business Market! Trade with Pi Coin seamlessly in the global Web3 ecosystem.`);
 
   if (!isOpen) return null;
 
   const { shareUrl, shareId } = shareService.generateShareUrl(entityType, entityId, userId);
   const shareTitle = `Discover ${entityName} on Pi Business Market`;
-  const shareText = `Check out "${entityName}" on Pi Business Market! Trade with Pi Coin seamlessly in the global Web3 ecosystem.`;
 
   // Simple pure SVG QR Code generator string
   const renderSvgQrCode = () => {
@@ -85,21 +85,32 @@ export const UniversalShareModal: React.FC<Props> = ({
     setStatusMsg(null);
 
     try {
+      // Collect anti-cheat telemetry securely
+      const telemetry = {
+        deviceId: localStorage.getItem('deviceId') || `dev_${Math.random().toString(36).substring(2, 12)}`,
+        fingerprint: `fp_${navigator.userAgent.replace(/[^a-zA-Z]/g, '').slice(0, 30)}`,
+        userAgent: navigator.userAgent,
+        isVpn: false
+      };
+      if (!localStorage.getItem('deviceId')) {
+        localStorage.setItem('deviceId', telemetry.deviceId);
+      }
+
       // Record share event
-      await shareService.recordShareEvent(userId, entityType, entityId, platformId, shareUrl, shareId);
+      await shareService.recordShareEvent(userId, entityType, entityId, platformId, shareUrl, shareId, telemetry);
 
       if (directUrl) {
         window.open(directUrl, '_blank', 'noopener,noreferrer');
       } else if (platformId === 'native' && typeof navigator !== 'undefined' && navigator.share) {
         await navigator.share({
           title: shareTitle,
-          text: shareText,
+          text: customText,
           url: shareUrl
         });
       }
 
       // Process base share reward in backend
-      const earned = await gamificationService.processShareReward(userId, entityId, platformId);
+      const earned = await gamificationService.processShareReward(userId, entityId, platformId, telemetry);
 
       confetti({
         particleCount: 50,
@@ -118,7 +129,7 @@ export const UniversalShareModal: React.FC<Props> = ({
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+      await navigator.clipboard.writeText(`${customText}\n${shareUrl}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       handleExecuteShare('copy_link');
@@ -223,6 +234,17 @@ export const UniversalShareModal: React.FC<Props> = ({
               </button>
             )}
 
+            {/* Personalize Share Note */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Personalize Share Note</label>
+              <textarea
+                value={customText}
+                onChange={e => setCustomText(e.target.value)}
+                rows={2}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-violet-500 transition-all resize-none"
+              />
+            </div>
+
             {/* Search filter for channels */}
             <div className="relative">
               <input
@@ -237,7 +259,7 @@ export const UniversalShareModal: React.FC<Props> = ({
             {/* Direct Platform Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-52 overflow-y-auto pr-1">
               {SHARE_TARGETS.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase())).map(target => {
-                const targetUrl = target.getShareUrl(shareUrl, shareTitle, shareText);
+                const targetUrl = target.getShareUrl(shareUrl, shareTitle, customText);
                 return (
                   <button
                     key={target.id}

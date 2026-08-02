@@ -1,3 +1,4 @@
+import { aiEngineService } from '../services/aiEngineService';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -23,12 +24,18 @@ import {
   LayoutGrid,
   Zap,
   ArrowRight,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Heart,
+  Scale,
+  Award,
+  Store,
+  UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { searchService } from '../services/searchService';
+import { WishlistService } from '../services/wishlistService';
 import { RatingStars } from '../components/RatingStars';
 import { SearchIndexEntry, SearchEntityType } from '../types';
 
@@ -58,6 +65,20 @@ export const MarketplacePage: React.FC = () => {
 
   const [recentSearches, setRecentSearches] = useState<string[]>(['Smartphones', 'Web Design', 'Senior Dev Jobs', 'Organic Coffee']);
   const [visibleCount, setVisibleCount] = useState<number>(12);
+  const [wishlistIds, setWishlistIds] = useState<string[]>(() => WishlistService.getLocalWishlist());
+  const [compareIds, setCompareIds] = useState<string[]>(() => WishlistService.getLocalCompare());
+
+  const handleToggleWishlist = async (e: React.MouseEvent, entityId: string) => {
+    e.stopPropagation();
+    const isAdded = await WishlistService.toggleWishlist(entityId, user?.uid);
+    setWishlistIds(prev => isAdded ? [...prev, entityId] : prev.filter(id => id !== entityId));
+  };
+
+  const handleToggleCompare = (e: React.MouseEvent, entityId: string) => {
+    e.stopPropagation();
+    const res = WishlistService.toggleCompare(entityId);
+    setCompareIds(res.compareList);
+  };
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -82,7 +103,7 @@ export const MarketplacePage: React.FC = () => {
         if (isVerified !== undefined) filters.isVerified = isVerified;
       }
 
-      const { results: data } = await searchService.search(query, filters);
+      const { results: data } = await aiEngineService.smartSearch(query, filters, user?.uid);
       setResults(data);
       if (user) {
         await searchService.recordSearch(user.uid, query);
@@ -155,8 +176,9 @@ export const MarketplacePage: React.FC = () => {
                         { id: 'all', label: 'All', icon: LayoutGrid },
                         { id: 'product', label: 'Products', icon: ShoppingBag },
                         { id: 'service', label: 'Services', icon: Zap },
-                        { id: 'job', label: 'Jobs', icon: Briefcase },
                         { id: 'business', label: 'Businesses', icon: Building2 },
+                        { id: 'store', label: 'Stores', icon: Store },
+                        { id: 'job', label: 'Jobs', icon: Briefcase },
                       ].map((type) => (
                         <button
                           key={type.id}
@@ -388,6 +410,31 @@ export const MarketplacePage: React.FC = () => {
                                       )}
                                     </div>
                                     <h3 className="text-lg font-black text-white group-hover:text-violet-400 transition-colors uppercase tracking-tight truncate">{item.title}</h3>
+                                  </div>
+
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      title="Compare Item"
+                                      onClick={(e) => handleToggleCompare(e, item.entityId)}
+                                      className={`p-2 rounded-xl border transition-all ${
+                                        compareIds.includes(item.entityId)
+                                          ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400'
+                                          : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:text-slate-300'
+                                      }`}
+                                    >
+                                      <Scale className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      title="Wishlist"
+                                      onClick={(e) => handleToggleWishlist(e, item.entityId)}
+                                      className={`p-2 rounded-xl border transition-all ${
+                                        wishlistIds.includes(item.entityId)
+                                          ? 'bg-rose-600/20 border-rose-500 text-rose-400'
+                                          : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:text-slate-300'
+                                      }`}
+                                    >
+                                      <Heart className={`w-3.5 h-3.5 ${wishlistIds.includes(item.entityId) ? 'fill-rose-400' : ''}`} />
+                                    </button>
                                   </div>
                                 </div>
                                 

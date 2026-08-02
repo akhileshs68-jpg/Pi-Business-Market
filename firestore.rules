@@ -367,6 +367,34 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    match /community_posts/{postId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isAdmin());
+      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /campaigns/{campaignId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isAdmin());
+      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /advertisements/{adId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isAdmin());
+      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+    }
+
+    match /follows/{followId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
     match /reviewVotes/{voteId} {
       allow read: if true;
       allow write: if isSignedIn();

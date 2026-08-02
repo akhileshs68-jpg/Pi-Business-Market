@@ -1,13 +1,11 @@
 import { PaymentMethodId } from '../../types/payment';
 import { bmpRewardsProvider } from './providers/bmpRewardsProvider';
+import { piTestnetProvider } from './providers/piTestnetProvider';
 import { WalletProvider } from './walletTypes';
 
 const providers: Record<string, WalletProvider> = {
   bmp_rewards: bmpRewardsProvider,
-  // Future providers will be registered here
-  // pi_testnet: piTestnetProvider,
-  // bmp_token: bmpTokenProvider,
-  // pi_mainnet: piMainnetProvider,
+  pi_testnet: piTestnetProvider,
 };
 
 export const paymentEngine = {

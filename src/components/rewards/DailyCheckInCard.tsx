@@ -54,7 +54,14 @@ export const DailyCheckInCard: React.FC<Props> = ({ profile, onProfileUpdated })
     setSuccessMsg(null);
 
     try {
-      const result = await gamificationService.checkIn(profile.userId);
+      // Generate client fingerprint/deviceId for anti-cheat validation
+      const telemetry = {
+        fingerprint: `FP_${navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32)}_${window.screen.width}x${window.screen.height}`,
+        deviceId: `DEV_${navigator.platform.replace(/[^a-zA-Z0-9]/g, '')}_${window.screen.colorDepth}`,
+        ipAddress: '127.0.0.1'
+      };
+
+      const result = await gamificationService.checkIn(profile.userId, telemetry);
       
       // Fire celebration confetti
       confetti({

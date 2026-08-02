@@ -3,10 +3,14 @@ import { User } from '../types';
 import { authService } from './authService';
 import { AuthContext } from './AuthContext';
 import { isFirebaseConfigured } from '../firebase/config';
+import { EnterpriseIdentity, Permission } from '../services/identity/identityTypes';
+import { identityService } from '../services/identity/identityService';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
+  const [identity, setIdentity] = useState<EnterpriseIdentity | null>(null);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isInitialLoad = React.useRef(true);
@@ -97,25 +101,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 onboardingCompleted: false
               } as any);
             }
+
+            // Asynchronously resolve enterprise identity
+            identityService.resolveIdentity(
+              firebaseUser.uid,
+              fetchedProfile?.piUid || 'google_' + firebaseUser.uid,
+              fetchedProfile?.username || 'pioneer',
+              fetchedProfile?.displayName || firebaseUser.displayName || 'Pioneer'
+            ).then(entIdentity => {
+              if (isMounted) {
+                setIdentity(entIdentity);
+                setPermissions(entIdentity.permissions || []);
+              }
+            }).catch(e => {
+              console.error('[AuthProvider] Identity resolution error:', e);
+            });
+
             setLoading(false);
             isInitialLoad.current = false;
           }
           isProcessing.current = false;
         } else {
           console.log('[AuthProvider] No user');
-          // If no user is logged in, we stay on the login screen
-          // We do NOT attempt automatic Pi login here because Pi.authenticate requires a user gesture
-          if (isInitialLoad.current) {
-            if (isMounted) {
-              setUser(null);
-              setProfile(null);
-              setLoading(false);
-              isInitialLoad.current = false;
-            }
-          } else {
+          if (isMounted) {
             setUser(null);
             setProfile(null);
+            setIdentity(null);
+            setPermissions([]);
             setLoading(false);
+            isInitialLoad.current = false;
           }
         }
       } catch (err) {
@@ -197,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, error, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, profile, identity, permissions, loading, error, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

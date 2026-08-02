@@ -11,15 +11,12 @@ import {
   Truck, 
   CheckCircle2, 
   Clock, 
-  MapPin, 
   CreditCard,
   Loader2,
-  ChevronRight,
   ShieldCheck,
   User,
   ShoppingBag,
   ExternalLink,
-  ClipboardList,
   MessageSquare,
   Store as StoreIcon,
   Star,
@@ -27,14 +24,25 @@ import {
   RotateCcw,
   Heart,
   AlertTriangle,
-  Tag
+  Tag,
+  QrCode,
+  FileText,
+  DollarSign,
+  AlertCircle,
+  XCircle,
+  Copy,
+  Check
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { useAuth } from '../auth/useAuth';
 import { orderService } from '../services/orderService';
-import { Order, OrderItem, OrderTimelineEvent, OrderStatus, PaymentStatus, FulfillmentStatus, Store } from '../types';
+import { Order, OrderItem, OrderTimelineEvent, OrderStatus, Store } from '../types';
 import { storeService } from '../services/storeService';
 import { ReviewForm } from '../components/ReviewForm';
+import { billingService } from '../services/billingService';
+import { EnterpriseInvoiceModal } from '../components/billing/EnterpriseInvoiceModal';
+import { ProfessionalReceiptModal } from '../components/billing/ProfessionalReceiptModal';
+import { QRVerificationModal } from '../components/billing/QRVerificationModal';
+import { EnterpriseInvoice, ProfessionalReceipt } from '../types/billing';
 
 export const OrderDetails: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -51,51 +59,48 @@ export const OrderDetails: React.FC = () => {
   const [shipmentMethod, setShipmentMethod] = useState('');
   const [courierName, setCourierName] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+
+  // Refund & Dispute Modals
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundAmount, setRefundAmount] = useState<number | ''>('');
   
-  const handleCreateShipment = async () => {
-    if (!user || !order || !shipmentMethod) return;
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [copiedQr, setCopiedQr] = useState(false);
+
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyCode, setVerifyCode] = useState<string>('');
+  const [enterpriseInvoice, setEnterpriseInvoice] = useState<EnterpriseInvoice | null>(null);
+  const [professionalReceipt, setProfessionalReceipt] = useState<ProfessionalReceipt | null>(null);
+
+  const handleOpenInvoice = async () => {
+    if (!order) return;
     try {
-      const { shippingService } = await import('../services/shippingService');
-      const { ShippingMethod } = await import('../types');
-      
-      let method = ShippingMethod.STANDARD;
-      if (shipmentMethod === 'courier') method = ShippingMethod.COURIER;
-      if (shipmentMethod === 'local_delivery') method = ShippingMethod.LOCAL_DELIVERY;
-      if (shipmentMethod === 'self_delivery') method = ShippingMethod.SELF_DELIVERY;
-      if (shipmentMethod === 'store_pickup') method = ShippingMethod.STORE_PICKUP;
-      
-      const shipmentId = await shippingService.createShipment(order, method);
-      
-      // Update local tracking info
-      if (trackingNumber || courierName) {
-        const { getFirebaseDb } = await import('../firebase/config');
-        const { writeBatch, doc, serverTimestamp } = await import('firebase/firestore');
-        const db = getFirebaseDb();
-        const batch = writeBatch(db);
-        batch.update(doc(db, 'shipments', shipmentId), {
-          trackingNumber,
-          courierName,
-          updatedAt: serverTimestamp()
-        });
-        batch.update(doc(db, 'orders', order.orderId), {
-          shipmentId,
-          deliveryMethod: method,
-          'logistics.trackingNumber': trackingNumber,
-          'logistics.courierName': courierName,
-          updatedAt: serverTimestamp()
-        });
-        await batch.commit();
-      }
-      
-      setShowShipmentModal(false);
-      
-      // Refresh order
-      const { orderService } = await import('../services/orderService');
-      const updatedOrder = await orderService.getOrder(order.orderId);
-      if (updatedOrder) setOrder(updatedOrder);
-    } catch (err) {
-      console.error('Failed to create shipment', err);
+      const inv = await billingService.generateOrGetInvoice(order, null, store);
+      setEnterpriseInvoice(inv);
+      setShowInvoiceModal(true);
+    } catch (e) {
+      console.error('Invoice generation failed', e);
     }
+  };
+
+  const handleOpenReceipt = async () => {
+    if (!order) return;
+    try {
+      const rcp = await billingService.generateOrGetReceipt(order, store, null);
+      setProfessionalReceipt(rcp);
+      setShowReceiptModal(true);
+    } catch (e) {
+      console.error('Receipt generation failed', e);
+    }
+  };
+
+  const handleOpenVerify = (code?: string) => {
+    setVerifyCode(code || order?.qrVerificationCode || '');
+    setShowVerifyModal(true);
   };
 
   useEffect(() => {
@@ -118,7 +123,7 @@ export const OrderDetails: React.FC = () => {
           orderService.getOrderItems(orderId!),
           orderService.getOrderTimeline(orderId!)
         ]);
-        setItems(orderItems);
+        setItems(orderItems.length > 0 ? orderItems : (data.items || []));
         setTimeline(orderTimeline);
       }
     } catch (err) {
@@ -128,6 +133,49 @@ export const OrderDetails: React.FC = () => {
     }
   };
 
+  const handleCreateShipment = async () => {
+    if (!user || !order || !shipmentMethod) return;
+    try {
+      const { shippingService } = await import('../services/shippingService');
+      const { ShippingMethod } = await import('../types');
+      
+      let method = ShippingMethod.STANDARD;
+      if (shipmentMethod === 'courier') method = ShippingMethod.COURIER;
+      if (shipmentMethod === 'local_delivery') method = ShippingMethod.LOCAL_DELIVERY;
+      if (shipmentMethod === 'self_delivery') method = ShippingMethod.SELF_DELIVERY;
+      if (shipmentMethod === 'store_pickup') method = ShippingMethod.STORE_PICKUP;
+      
+      const shipmentId = await shippingService.createShipment(order, method);
+      
+      if (trackingNumber || courierName) {
+        const { getFirebaseDb } = await import('../firebase/config');
+        const { writeBatch, doc, serverTimestamp } = await import('firebase/firestore');
+        const db = getFirebaseDb();
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'shipments', shipmentId), {
+          trackingNumber,
+          courierName,
+          updatedAt: serverTimestamp()
+        });
+        batch.update(doc(db, 'orders', order.orderId), {
+          shipmentId,
+          deliveryMethod: method,
+          trackingNumber,
+          courierName,
+          'logistics.trackingNumber': trackingNumber,
+          'logistics.courierName': courierName,
+          updatedAt: serverTimestamp()
+        });
+        await batch.commit();
+      }
+
+      await orderService.updateOrderStatus(order.orderId, OrderStatus.SHIPPED, user.uid, 'seller', `Shipped via ${courierName || shipmentMethod}`);
+      setShowShipmentModal(false);
+      fetchOrderData();
+    } catch (err) {
+      console.error('Failed to create shipment', err);
+    }
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Date Not Available';
@@ -140,11 +188,11 @@ export const OrderDetails: React.FC = () => {
     }
   };
 
-  const isMerchant = user?.uid === order?.businessId; // Simplified check for foundation
+  const isMerchant = user?.uid === order?.businessId || user?.uid === order?.sellerId;
 
   const handleChatAboutOrder = () => {
     if (!order || !user) return;
-    const partnerId = isMerchant ? order.userUid : order.businessId;
+    const partnerId = isMerchant ? (order.userUid || order.buyerId) : (order.businessId || order.sellerId);
     const partnerName = isMerchant ? 'Customer' : 'Merchant';
     navigate('/inbox', { 
       state: { 
@@ -156,14 +204,65 @@ export const OrderDetails: React.FC = () => {
     });
   };
 
-  const handleUpdateStatus = async (status: OrderStatus) => {
+  const handleUpdateStatus = async (status: string, remarks?: string) => {
     if (!order || !user) return;
     try {
-      await orderService.updateOrderStatus(order.orderId, status, user.uid, 'Merchant');
+      const role = isMerchant ? 'seller' : 'buyer';
+      await orderService.updateOrderStatus(order.orderId, status, user.uid, role, remarks);
       fetchOrderData();
     } catch (err) {
       console.error('Status update failed', err);
     }
+  };
+
+  const handleRequestRefund = async () => {
+    if (!order || !user || !refundReason) return;
+    try {
+      const amt = typeof refundAmount === 'number' ? refundAmount : order.grandTotal;
+      await orderService.requestRefund(order.orderId, user.uid, refundReason, amt);
+      setShowRefundModal(false);
+      fetchOrderData();
+    } catch (err) {
+      console.error('Refund request failed', err);
+    }
+  };
+
+  const handleApproveRefund = async () => {
+    if (!order || !user) return;
+    try {
+      await orderService.approveRefund(order.orderId, user.uid);
+      fetchOrderData();
+    } catch (err) {
+      console.error('Approve refund failed', err);
+    }
+  };
+
+  const handleReleaseEscrow = async () => {
+    if (!order || !user) return;
+    try {
+      await orderService.releaseEscrow(order.orderId, user.uid);
+      fetchOrderData();
+    } catch (err) {
+      console.error('Release escrow failed', err);
+    }
+  };
+
+  const handleRaiseDispute = async () => {
+    if (!order || !user || !disputeReason) return;
+    try {
+      await orderService.raiseDispute(order.orderId, user.uid, disputeReason);
+      setShowDisputeModal(false);
+      fetchOrderData();
+    } catch (err) {
+      console.error('Dispute failed', err);
+    }
+  };
+
+  const handleCopyQr = () => {
+    if (!order?.qrVerificationCode) return;
+    navigator.clipboard.writeText(order.qrVerificationCode);
+    setCopiedQr(true);
+    setTimeout(() => setCopiedQr(false), 2000);
   };
 
   if (loading) {
@@ -176,6 +275,8 @@ export const OrderDetails: React.FC = () => {
   }
 
   if (!order) return null;
+
+  const currentStatusClean = (order.orderStatus || 'pending_payment').toLowerCase();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 py-8 sm:py-12">
@@ -190,70 +291,114 @@ export const OrderDetails: React.FC = () => {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter truncate">Order {order.orderNumber}</h1>
               <span className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
-                {order.orderStatus.replace('_', ' ')}
+                {order.orderStatus.replace(/_/g, ' ')}
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium">Placed on {formatDate(order.createdAt)}</p>
           </div>
 
-          
-                    {isMerchant && (
-            <div className="flex flex-wrap gap-2">
-              {order.orderStatus === OrderStatus.NEW_ORDER && (
-                <>
-                  <button onClick={() => handleUpdateStatus(OrderStatus.ACCEPTED)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Accept Order</button>
-                  <button onClick={() => handleUpdateStatus(OrderStatus.CANCELLED)} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Reject Order</button>
-                </>
-              )}
-              {order.orderStatus === OrderStatus.ACCEPTED && (
-                <button onClick={() => handleUpdateStatus(OrderStatus.PACKED)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Pack Order</button>
-              )}
-              {order.orderStatus === OrderStatus.PACKED && (
-                <button onClick={() => setShowShipmentModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Truck className="w-3 h-3" /> Create Shipment</button>
-              )}
-                                          {(order.orderStatus === OrderStatus.READY_FOR_PICKUP || order.orderStatus === OrderStatus.SHIPPED || order.orderStatus === OrderStatus.OUT_FOR_DELIVERY || order.orderStatus === OrderStatus.DELIVERED) && (
-                <>
-                  <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Navigation className="w-3 h-3" /> Track Shipment</button>
-                  {order.orderStatus !== OrderStatus.SHIPPED && order.orderStatus !== OrderStatus.OUT_FOR_DELIVERY && order.orderStatus !== OrderStatus.DELIVERED && (
-                    <button onClick={() => handleUpdateStatus(OrderStatus.SHIPPED)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Shipped</button>
-                  )}
-                  {order.orderStatus !== OrderStatus.DELIVERED && (
-                    <button onClick={() => handleUpdateStatus(OrderStatus.COMPLETED)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Delivered</button>
-                  )}
-                </>
-              )}
-              <button onClick={handleChatAboutOrder} className="px-4 py-2 bg-indigo-600/15 border border-indigo-500/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-                <MessageSquare className="w-3 h-3" /> Chat with Customer
-              </button>
-              <button onClick={() => window.print()} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-                <Printer className="w-3 h-3" /> Print Invoice
-              </button>
-            </div>
-          )}
-          {!isMerchant && (
-            <div className="flex gap-2">
-              <button onClick={handleChatAboutOrder} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-                <MessageSquare className="w-3 h-3" /> Chat with Merchant
-              </button>
-              <button onClick={() => window.print()} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-                <Printer className="w-3 h-3" /> Print Invoice
-              </button>
-            </div>
-          )}
-        </div>
+          {/* Action Button Strip */}
+          <div className="flex flex-wrap items-center gap-2">
+            {isMerchant ? (
+              <>
+                {(currentStatusClean === 'new_order' || currentStatusClean === 'payment_verified' || currentStatusClean === 'pending_payment') && (
+                  <>
+                    <button onClick={() => handleUpdateStatus(OrderStatus.ACCEPTED, 'Order accepted by merchant')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20">Accept Order</button>
+                    <button onClick={() => handleUpdateStatus(OrderStatus.REJECTED, 'Order rejected by merchant')} className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Reject Order</button>
+                  </>
+                )}
+                {currentStatusClean === 'accepted' && (
+                  <button onClick={() => handleUpdateStatus(OrderStatus.PREPARING, 'Items are being prepared')} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Preparing</button>
+                )}
+                {currentStatusClean === 'preparing' && (
+                  <button onClick={() => handleUpdateStatus(OrderStatus.PACKED, 'Order packed and sealed')} className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Packed</button>
+                )}
+                {currentStatusClean === 'packed' && (
+                  <button onClick={() => setShowShipmentModal(true)} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> Dispatch / Ship</button>
+                )}
+                {(currentStatusClean === 'shipped' || currentStatusClean === 'ready_for_dispatch') && (
+                  <button onClick={() => handleUpdateStatus(OrderStatus.OUT_FOR_DELIVERY, 'Out for local delivery')} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Out For Delivery</button>
+                )}
+                {(currentStatusClean === 'out_for_delivery' || currentStatusClean === 'shipped') && (
+                  <button onClick={() => handleUpdateStatus(OrderStatus.DELIVERED, 'Package delivered to recipient')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Delivered</button>
+                )}
+                {currentStatusClean === 'refund_requested' && (
+                  <button onClick={handleApproveRefund} className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Approve Refund</button>
+                )}
+                {order.escrowStatus === 'holding' && (
+                  <button onClick={handleReleaseEscrow} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-widest transition-all">Release Escrow</button>
+                )}
+              </>
+            ) : (
+              <>
+                {currentStatusClean === 'delivered' && (
+                  <>
+                    <button onClick={() => handleUpdateStatus(OrderStatus.COMPLETED, 'Order confirmed & completed by buyer')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20">Confirm Receipt</button>
+                    <button onClick={() => setShowRefundModal(true)} className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Request Refund</button>
+                  </>
+                )}
+                {['pending_payment', 'payment_verified', 'new_order', 'accepted'].includes(currentStatusClean) && (
+                  <button onClick={() => handleUpdateStatus(OrderStatus.CANCELLED, 'Cancelled by customer')} className="px-4 py-2.5 bg-rose-600/20 border border-rose-500/30 text-rose-400 hover:bg-rose-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Cancel Order</button>
+                )}
+                {currentStatusClean === 'completed' && (
+                  <button onClick={() => setShowRefundModal(true)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Request Refund / Return</button>
+                )}
+                <button onClick={() => setShowDisputeModal(true)} className="px-3 py-2 bg-rose-950/40 border border-rose-800/50 text-rose-400 hover:bg-rose-900/60 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Open Dispute
+                </button>
+              </>
+            )}
 
+            <button onClick={handleChatAboutOrder} className="px-3.5 py-2.5 bg-indigo-600/15 border border-indigo-500/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+              <MessageSquare className="w-3.5 h-3.5" /> Chat
+            </button>
+            <button onClick={handleOpenInvoice} className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+              <Printer className="w-3.5 h-3.5" /> Invoice
+            </button>
+            <button onClick={handleOpenReceipt} className="px-3.5 py-2.5 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5" /> Receipt
+            </button>
+            <button onClick={() => handleOpenVerify()} className="px-3.5 py-2.5 bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600 hover:text-white text-violet-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+              <QrCode className="w-3.5 h-3.5" /> Verify QR
+            </button>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Left Column: Details */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Order Items */}
-                        <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
+
+            {/* QR Verification Card */}
+            {order.qrVerificationCode && (
+              <section className="bg-gradient-to-r from-indigo-950/60 to-slate-900/80 border border-indigo-500/30 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-white p-2 rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
+                    <QrCode className="w-12 h-12 text-slate-950" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Store Pickup & Dispatch QR Token</span>
+                    <p className="text-sm font-mono font-bold text-white tracking-wider">{order.qrVerificationCode}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Present code to store clerk or delivery agent to verify exchange.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleCopyQr}
+                  className="px-4 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0"
+                >
+                  {copiedQr ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  {copiedQr ? 'Copied' : 'Copy QR Token'}
+                </button>
+              </section>
+            )}
+
+            {/* Products List */}
+            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
               <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 sm:mb-8 flex items-center gap-3">
-                <Package className="w-6 h-6 text-indigo-400" /> Products
+                <Package className="w-6 h-6 text-indigo-400" /> Order Products & Services ({items.length})
               </h2>
               <div className="space-y-6">
                 {items.map((item) => (
-                  <div key={item.itemId} className="space-y-4 bg-slate-950/50 border border-slate-800/50 rounded-2xl p-4 sm:p-6">
+                  <div key={item.itemId || item.productId} className="space-y-4 bg-slate-950/50 border border-slate-800/50 rounded-2xl p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
                       <div className="w-20 h-20 sm:w-24 sm:h-24 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
                         {(item as any).imageUrl ? (
@@ -267,6 +412,7 @@ export const OrderDetails: React.FC = () => {
                         <div className="flex flex-wrap items-center gap-3 mb-2">
                           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-900 px-2 py-1 rounded">SKU: {item.sku || 'N/A'}</span>
                           {item.variantId && <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-800 px-2 py-1 rounded">Variant: {item.variantId}</span>}
+                          {item.isService && <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded">Service</span>}
                         </div>
                         
                         <div className="flex items-end justify-between mt-4">
@@ -294,14 +440,8 @@ export const OrderDetails: React.FC = () => {
                          <button onClick={() => navigate(`/product/${item.productId}`)} className="flex-1 min-w-[120px] px-3 py-2 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
                            <RotateCcw className="w-3 h-3" /> Buy Again
                          </button>
-                         <button className="px-3 py-2 bg-slate-900 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2" onClick={() => alert("Added to wishlist")}>
-                           <Heart className="w-3 h-3" />
-                         </button>
-                         <button className="px-3 py-2 bg-slate-900 hover:bg-amber-500/10 text-slate-400 hover:text-amber-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2" onClick={() => alert("Reported")}>
-                           <AlertTriangle className="w-3 h-3" />
-                         </button>
                          
-                        {order.orderStatus === OrderStatus.COMPLETED && reviewingItemId !== item.itemId && (
+                        {(order.orderStatus === OrderStatus.COMPLETED || order.orderStatus === OrderStatus.DELIVERED) && reviewingItemId !== item.itemId && (
                           <button 
                             onClick={() => setReviewingItemId(item.itemId)}
                             className="w-full sm:w-auto px-4 py-2 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all mt-2 sm:mt-0"
@@ -312,16 +452,14 @@ export const OrderDetails: React.FC = () => {
                       </div>
                     )}
                     {reviewingItemId === item.itemId && (
-                      <div className="mt-4 animate-in slide-in-from-top-4 duration-300">
+                      <div className="mt-4">
                         <ReviewForm 
                           entityId={item.productId}
                           entityType="product"
                           businessId={order.businessId}
                           orderId={order.orderId}
                           onCancel={() => setReviewingItemId(null)}
-                          onSuccess={() => {
-                            setReviewingItemId(null);
-                          }}
+                          onSuccess={() => setReviewingItemId(null)}
                         />
                       </div>
                     )}
@@ -330,100 +468,56 @@ export const OrderDetails: React.FC = () => {
               </div>
             </section>
 
-                        <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
-              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <CreditCard className="w-6 h-6 text-amber-400" /> Order Information
-              </h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Order ID</p>
-                   <p className="text-sm font-bold text-white">{order.orderNumber}</p>
-                 </div>
-                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Order Date</p>
-                   <p className="text-sm font-bold text-white">{formatDate(order.createdAt)}</p>
-                 </div>
-                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Payment Method</p>
-                   <p className="text-sm font-bold text-white flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-400"/> BMP Rewards Wallet</p>
-                 </div>
-                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Payment Date</p>
-                   <p className="text-sm font-bold text-white">{formatDate(order.createdAt)}</p>
-                 </div>
-                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Transaction ID</p>
-                   <p className="text-sm font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded w-max">{order.checkoutSessionId || 'TXN_' + order.orderId.substring(0, 8)}</p>
-                 </div>
-                 <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Invoice Number</p>
-                   <p className="text-sm font-mono text-slate-300">INV-{order.orderNumber}</p>
-                 </div>
-              </div>
-            </section>
-
-                        {/* Price Breakdown */}
+            {/* Price Breakdown */}
             <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
               <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <Tag className="w-6 h-6 text-emerald-400" /> Price Breakdown
+                <Tag className="w-6 h-6 text-emerald-400" /> Financial Statement
               </h2>
               
               <div className="space-y-4">
                 <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
                   <span>Product Subtotal</span>
-                  <span className="text-white">{order.subtotal.toFixed(2)} Pi</span>
+                  <span className="text-white">{(order.subtotal || 0).toFixed(2)} Pi</span>
                 </div>
                 <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
                   <span>Shipping Charge</span>
-                  <span className="text-white">+{order.shipping.toFixed(2)} Pi</span>
+                  <span className="text-white">+{(order.shipping || 0).toFixed(2)} Pi</span>
                 </div>
                 <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-400">
-                  <span>Discount</span>
-                  <span>-{order.discount?.toFixed(2) || '0.00'} Pi</span>
-                </div>
-                <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-400">
-                  <span>Coupon Discount</span>
-                  <span>-0.00 Pi</span>
+                  <span>Discount Applied</span>
+                  <span>-{(order.discount || 0).toFixed(2)} Pi</span>
                 </div>
                 <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400 border-b border-slate-800 pb-4">
                   <span>Tax (GST/VAT)</span>
-                  <span className="text-white">+{order.tax.toFixed(2)} Pi</span>
+                  <span className="text-white">+{(order.tax || 0).toFixed(2)} Pi</span>
                 </div>
                 
                 <div className="pt-2 flex justify-between items-end border-b border-slate-800 pb-4">
                   <div>
                     <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Grand Total</span>
-                    <span className="text-2xl sm:text-3xl font-black text-indigo-400">{order.grandTotal.toFixed(2)} Pi</span>
+                    <span className="text-2xl sm:text-3xl font-black text-indigo-400">{(order.grandTotal || 0).toFixed(2)} Pi</span>
                   </div>
-                  {order.paymentStatus === 'paid' && (
-                    <div className="text-right">
-                       <span className="inline-block px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded text-[9px] font-black uppercase tracking-widest">Paid via Wallet</span>
-                    </div>
-                  )}
+                  <div className="text-right">
+                    <span className="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-black uppercase tracking-widest">
+                      Paid via {order.paymentStatus || 'Verified'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="pt-2 space-y-3">
-                  <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
-                    <span>BMP Rewards Used</span>
-                    <span className="text-emerald-400">{(order as any).rewardsUsed?.toFixed(2) || '0.00'} Pi</span>
+                {order.bmpRewardsEarned ? (
+                  <div className="pt-2 flex justify-between text-xs font-bold text-amber-400 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                    <span>BMP Loyalty Tokens Earned</span>
+                    <span>+{order.bmpRewardsEarned.toFixed(2)} BMP</span>
                   </div>
-                  <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
-                    <span>Wallet Balance Before Payment</span>
-                    <span className="text-white">{(order as any).walletBalanceBefore?.toFixed(2) || 'N/A'} Pi</span>
-                  </div>
-                  <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
-                    <span>Wallet Balance After Payment</span>
-                    <span className="text-white">{(order as any).walletBalanceAfter?.toFixed(2) || 'N/A'} Pi</span>
-                  </div>
-                </div>
+                ) : null}
               </div>
             </section>
 
+            {/* Seller Information */}
             {store && !isMerchant && (
               <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
                 <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                  <StoreIcon className="w-5 h-5 text-amber-400" /> Seller Information
+                  <StoreIcon className="w-5 h-5 text-amber-400" /> Seller Info
                 </h2>
                 
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
@@ -441,7 +535,7 @@ export const OrderDetails: React.FC = () => {
                        {store.verified && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                      </div>
                      <p className="text-xs font-bold text-slate-400 flex items-center justify-center sm:justify-start gap-1">
-                       <User className="w-3 h-3" /> Merchant: {'Verified Partner'}
+                       <User className="w-3 h-3" /> Partner Merchant
                      </p>
                      
                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-2">
@@ -461,126 +555,88 @@ export const OrderDetails: React.FC = () => {
                        Visit Store
                      </button>
                      <button onClick={handleChatAboutOrder} className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">
-                       Chat with Seller
+                       Chat
                      </button>
                    </div>
                 </div>
               </section>
             )}
-            {/* Logistics & Delivery */}
+
+            {/* Shipping & Delivery Address */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-                            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
                 <div className="flex justify-between items-center mb-4 sm:mb-6">
                   <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-indigo-400" /> Shipping Details
+                    <Truck className="w-4 h-4 text-indigo-400" /> Shipping Address
                   </h3>
-                  {order.shipmentId && (
-                    <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} className="px-3 py-1.5 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2">
-                      <Navigation className="w-3 h-3" /> Track
-                    </button>
-                  )}
                 </div>
                 {order.shippingAddress ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 border-b border-slate-800/50 pb-4">
-                      <div>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Recipient Name</p>
-                        <p className="text-xs font-bold text-slate-200">{order.shippingAddress.fullName}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Phone Number</p>
-                        <p className="text-xs font-bold text-slate-200">{order.shippingAddress.phone || 'N/A'}</p>
-                      </div>
+                    <div className="border-b border-slate-800/50 pb-4">
+                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Recipient Name</p>
+                      <p className="text-xs font-bold text-slate-200">{order.shippingAddress.fullName}</p>
+                      <p className="text-xs font-bold text-slate-400 mt-1">{order.shippingAddress.phone || 'N/A'}</p>
                     </div>
                     
-                    <div className="border-b border-slate-800/50 pb-4">
-                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Full Address</p>
+                    <div className="pb-2">
+                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Delivery Address</p>
                       <p className="text-xs text-slate-300 font-medium leading-relaxed">
                         {order.shippingAddress.street}<br/>
                         {order.shippingAddress.city}, {order.shippingAddress.state}<br/>
-                        PIN: {order.shippingAddress.postalCode}
+                        ZIP: {order.shippingAddress.postalCode}
                       </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Courier Partner</p>
-                        <p className="text-xs font-bold text-white">{order.logistics?.courierName || 'Standard'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Tracking Number</p>
-                        {order.logistics?.trackingNumber ? (
-                          <p className="text-xs font-mono text-emerald-400 bg-emerald-500/10 inline-block px-1.5 py-0.5 rounded">{order.logistics.trackingNumber}</p>
-                        ) : (
-                          <p className="text-xs font-bold text-slate-500">Pending</p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Shipping Date</p>
-                        <p className="text-xs font-bold text-slate-300">{formatDate(order.shippedAt) || 'Pending'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Estimated Delivery</p>
-                        <p className="text-xs font-bold text-slate-300">{formatDate(order.estimatedDelivery) || 'Pending'}</p>
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-slate-800/50">
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Current Status</p>
-                        <span className="px-2 py-1 bg-indigo-600/20 text-indigo-400 rounded text-[10px] font-black uppercase">{order.currentStatus || order.orderStatus}</span>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[10px] sm:text-xs text-slate-600 italic">No address (Digital/Service)</p>
+                  <p className="text-[10px] sm:text-xs text-slate-600 italic">No address required (Digital/Service)</p>
                 )}
               </section>
 
-
-                            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
+              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
                 <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-amber-400" /> Payment Info
+                  <CreditCard className="w-4 h-4 text-amber-400" /> Payment & Escrow
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Method</span>
-                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> BMP Rewards Wallet</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Method</span>
+                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Pi Testnet / BMP Wallet</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Status</span>
-                    <span className="text-xs font-bold text-emerald-400 uppercase">Success</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Verified</span>
+                    <span className="text-xs font-bold text-emerald-400 uppercase">Yes (Blockchain)</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Transaction ID</span>
-                    <span className="text-xs font-mono text-slate-300 bg-slate-900 px-2 py-1 rounded">{order.checkoutSessionId || 'TXN_PENDING'}</span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Wallet Debit Amount</span>
-                    <span className="text-xs font-bold text-amber-400 uppercase">{order.grandTotal.toFixed(2)} Pi</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Escrow Protection</span>
+                    <span className="text-xs font-bold text-amber-400 uppercase">{order.escrowStatus || 'Active (Holding)'}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Time</span>
-                    <span className="text-[10px] font-bold text-slate-400">{formatDate(order.createdAt)}</span>
+                    <span className="text-[10px] font-black text-slate-500 uppercase">TX Hash</span>
+                    <span className="text-xs font-mono text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded truncate max-w-[140px]">{order.paymentTxId || 'PI_TX_' + order.orderId.substring(0,6)}</span>
                   </div>
                 </div>
               </section>
             </div>
           </div>
 
-          {/* Right Column: Timeline */}
-                    <div className="lg:col-span-1 space-y-8">
+          {/* Right Column: Order Timeline */}
+          <div className="lg:col-span-1 space-y-8">
             <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
               <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <Navigation className="w-5 h-5 text-indigo-400" /> Order Timeline
+                <Navigation className="w-5 h-5 text-indigo-400" /> Order Lifecycle
               </h2>
               
               <div className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
                 {[
                   { label: 'Order Placed', status: 'completed', time: order.createdAt },
-                  { label: 'Payment Successful', status: 'completed', time: order.createdAt },
-                  { label: 'Seller Accepted', status: order.acceptedAt ? 'completed' : (order.orderStatus === OrderStatus.NEW_ORDER ? 'current' : 'pending'), time: order.acceptedAt },
-                  { label: 'Packed', status: order.packedAt ? 'completed' : (order.acceptedAt && !order.packedAt ? 'current' : 'pending'), time: order.packedAt },
-                  { label: 'Shipped', status: order.shippedAt ? 'completed' : (order.packedAt && !order.shippedAt ? 'current' : 'pending'), time: order.shippedAt },
-                  { label: 'Out for Delivery', status: order.currentStatus === 'out_for_delivery' || order.deliveredAt ? 'completed' : (order.shippedAt && !order.deliveredAt ? 'current' : 'pending'), time: null },
-                  { label: 'Delivered', status: order.deliveredAt ? 'completed' : 'pending', time: order.deliveredAt }
+                  { label: 'Payment Verified', status: order.paymentVerifiedAt ? 'completed' : 'completed', time: order.paymentVerifiedAt || order.createdAt },
+                  { label: 'Seller Accepted', status: order.acceptedAt ? 'completed' : (currentStatusClean === 'accepted' ? 'current' : 'pending'), time: order.acceptedAt },
+                  { label: 'Preparing Items', status: order.preparingAt ? 'completed' : (currentStatusClean === 'preparing' ? 'current' : 'pending'), time: order.preparingAt },
+                  { label: 'Packed & Sealed', status: order.packedAt ? 'completed' : (currentStatusClean === 'packed' ? 'current' : 'pending'), time: order.packedAt },
+                  { label: 'Ready For Dispatch', status: order.readyForDispatchAt ? 'completed' : (currentStatusClean === 'ready_for_dispatch' ? 'current' : 'pending'), time: order.readyForDispatchAt },
+                  { label: 'Shipped', status: order.shippedAt ? 'completed' : (currentStatusClean === 'shipped' ? 'current' : 'pending'), time: order.shippedAt },
+                  { label: 'Out for Delivery', status: order.outForDeliveryAt ? 'completed' : (currentStatusClean === 'out_for_delivery' ? 'current' : 'pending'), time: order.outForDeliveryAt },
+                  { label: 'Delivered', status: order.deliveredAt ? 'completed' : (currentStatusClean === 'delivered' ? 'current' : 'pending'), time: order.deliveredAt },
+                  { label: 'Completed', status: order.completedAt ? 'completed' : (currentStatusClean === 'completed' ? 'current' : 'pending'), time: order.completedAt }
                 ].map((step, i) => (
                   <div key={i} className="relative pl-10">
                     <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-slate-950 flex items-center justify-center z-10 ${
@@ -605,12 +661,13 @@ export const OrderDetails: React.FC = () => {
               </div>
             </section>
 
+            {/* Audit Log / Activity */}
             <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
               <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <Clock className="w-5 h-5 text-violet-400" /> Activity Log
+                <Clock className="w-5 h-5 text-violet-400" /> History Audit Log
               </h2>
               
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
                 {(order.activityLogs || []).map((log, i) => (
                   <div key={i} className="border-b border-slate-800/50 pb-3 last:border-0 last:pb-0">
                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{formatDate(log.timestamp)}</p>
@@ -625,89 +682,177 @@ export const OrderDetails: React.FC = () => {
                 ))}
               </div>
             </section>
-            
-            {!isMerchant && (
-              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-4">Quick Actions</h3>
-                <div className="flex flex-col gap-2">
-                  <button onClick={() => navigate(`/shipment/${order.shipmentId}`)} disabled={!order.shipmentId} className="w-full px-4 py-3 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed text-left">Track Shipment</button>
-                  <button onClick={handleChatAboutOrder} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-left">Chat with Merchant</button>
-                  <button onClick={() => window.print()} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-left">Download Invoice</button>
-                  <button onClick={() => alert("Issue raised")} className="w-full px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-left mt-2">Raise Issue</button>
-                </div>
-              </section>
-            )}
           </div>
         </div>
-      
-      {showShipmentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md">
-            <h2 className="text-xl font-black text-white uppercase tracking-tight mb-6">Create Shipment</h2>
-            
-            <div className="space-y-4 mb-8">
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Delivery Method</label>
-                <select 
-                  value={shipmentMethod}
-                  onChange={(e) => setShipmentMethod(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">Select Method</option>
-                  <option value="store_pickup">Store Pickup</option>
-                  <option value="self_delivery">Self Delivery</option>
-                  <option value="local_delivery">Local Delivery</option>
-                  <option value="courier">Courier Delivery</option>
-                </select>
+
+        {/* Shipment Creation Modal */}
+        {showShipmentModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md">
+              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-6">Create Shipment & Dispatch</h2>
+              
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Delivery Method</label>
+                  <select 
+                    value={shipmentMethod}
+                    onChange={(e) => setShipmentMethod(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">Select Method</option>
+                    <option value="store_pickup">Store Pickup</option>
+                    <option value="self_delivery">Self Delivery</option>
+                    <option value="local_delivery">Local Delivery</option>
+                    <option value="courier">Courier Partner</option>
+                  </select>
+                </div>
+                
+                {shipmentMethod === 'courier' && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Courier Partner Name</label>
+                      <input 
+                        type="text" 
+                        value={courierName}
+                        onChange={(e) => setCourierName(e.target.value)}
+                        placeholder="e.g. Shiprocket, BlueDart, DHL"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tracking Number</label>
+                      <input 
+                        type="text" 
+                        value={trackingNumber}
+                        onChange={(e) => setTrackingNumber(e.target.value)}
+                        placeholder="Waybill / Tracking ID"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
               
-              {shipmentMethod === 'courier' && (
-                <>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Courier Name</label>
-                    <input 
-                      type="text" 
-                      value={courierName}
-                      onChange={(e) => setCourierName(e.target.value)}
-                      placeholder="e.g. Shiprocket, Blue Dart"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tracking Number</label>
-                    <input 
-                      type="text" 
-                      value={trackingNumber}
-                      onChange={(e) => setTrackingNumber(e.target.value)}
-                      placeholder="Tracking ID"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-            
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowShipmentModal(false)}
-                className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleCreateShipment}
-                disabled={!shipmentMethod}
-                className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all"
-              >
-                Create
-              </button>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowShipmentModal(false)}
+                  className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleCreateShipment}
+                  disabled={!shipmentMethod}
+                  className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all"
+                >
+                  Dispatch
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Refund Request Modal */}
+        {showRefundModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md space-y-6">
+              <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-amber-400" /> Request Return / Refund
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Reason for Refund</label>
+                  <textarea 
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                    placeholder="Describe issue with product or order delivery..."
+                    rows={3}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-medium text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Requested Amount (Pi)</label>
+                  <input 
+                    type="number"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value ? Number(e.target.value) : '')}
+                    placeholder={`Max: ${order.grandTotal} Pi`}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button onClick={() => setShowRefundModal(false)} className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest">Cancel</button>
+                <button onClick={handleRequestRefund} disabled={!refundReason} className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest">Submit Request</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dispute Modal */}
+        {showDisputeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md space-y-6">
+              <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-500" /> Raise Order Dispute
+              </h2>
+              
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dispute Details</label>
+                <textarea 
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  placeholder="Explain transaction issue or non-delivery for platform mediation..."
+                  rows={4}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-medium text-white focus:outline-none focus:border-rose-500"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button onClick={() => setShowDisputeModal(false)} className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest">Cancel</button>
+                <button onClick={handleRaiseDispute} disabled={!disputeReason} className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest">Open Case</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enterprise Invoice Modal */}
+        {showInvoiceModal && enterpriseInvoice && (
+          <EnterpriseInvoiceModal 
+            invoice={enterpriseInvoice} 
+            onClose={() => setShowInvoiceModal(false)} 
+            onVerifyQr={(code) => {
+              setShowInvoiceModal(false);
+              handleOpenVerify(code);
+            }}
+          />
+        )}
+
+        {/* Professional Receipt Modal */}
+        {showReceiptModal && professionalReceipt && (
+          <ProfessionalReceiptModal 
+            receipt={professionalReceipt} 
+            onClose={() => setShowReceiptModal(false)} 
+            onVerifyQr={(code) => {
+              setShowReceiptModal(false);
+              handleOpenVerify(code);
+            }}
+          />
+        )}
+
+        {/* QR Verification Modal */}
+        {showVerifyModal && (
+          <QRVerificationModal 
+            initialCode={verifyCode} 
+            onClose={() => setShowVerifyModal(false)} 
+          />
+        )}
 
       </div>
     </div>
   );
 };
+
 export default OrderDetails;

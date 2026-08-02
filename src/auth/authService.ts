@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { User, UserRole } from '../types';
+import { identityService } from '../services/identity/identityService';
 
 export interface RoleConfig {
   id: string;
@@ -53,6 +54,40 @@ let piAuthResult: any = null;
 let loginInProgressPromise: Promise<User> | null = null;
 
 export const authService = {
+  async trackSession(userUid: string) {
+    try {
+      const db = getFirebaseDb();
+      const sessionId = 'SESS_' + Math.random().toString(36).substring(2, 12).toUpperCase();
+      const docRef = doc(db, 'securitySessions', sessionId);
+      await setDoc(docRef, {
+        sessionId,
+        userUid,
+        deviceInfo: navigator.userAgent,
+        ipAddress: '127.0.0.1', // Real implementation needs backend or proxy
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        status: 'active',
+        isMfaVerified: false
+      });
+      // Store in local storage for the client zero-trust validation
+      localStorage.setItem('active_security_session', sessionId);
+    } catch (e) {
+      console.error('Session tracking failed', e);
+    }
+  },
+  
+  async revokeSession(sessionId: string) {
+    try {
+      const db = getFirebaseDb();
+      const docRef = doc(db, 'securitySessions', sessionId);
+      await updateDoc(docRef, { status: 'revoked' });
+      localStorage.removeItem('active_security_session');
+    } catch (e) {
+      console.error('Session revocation failed', e);
+    }
+  },
+
   /**
    * Initializes the Pi SDK exactly once
    */
@@ -350,6 +385,11 @@ export const authService = {
             lastLogin: serverTimestamp()
           });
 
+          // Sync with Enterprise Identity Platform
+          identityService.resolveIdentity(effectiveUid, piUid, username, newUser.displayName).catch(err => {
+            console.error('[AuthService] Enterprise identity resolve error:', err);
+          });
+
           return newUser as User;
         } else {
           const isOwner = username === 'pi_pioneer_88';
@@ -378,6 +418,13 @@ export const authService = {
 
           // Update last login & owner enforcement
           await updateDoc(userRef, updateData);
+
+          const finalDisplayName = isOwner ? 'Pi Pioneer 88' : (existingUserData.displayName || username);
+
+          // Sync with Enterprise Identity Platform
+          identityService.resolveIdentity(effectiveUid, piUid, username, finalDisplayName).catch(err => {
+            console.error('[AuthService] Enterprise identity resolve error:', err);
+          });
           
           return {
             ...existingUserData,
@@ -385,7 +432,7 @@ export const authService = {
             uid: effectiveUid,
             piUid,
             username: isOwner ? 'pi_pioneer_88' : username,
-            displayName: isOwner ? 'Pi Pioneer 88' : (existingUserData.displayName || username),
+            displayName: finalDisplayName,
             createdAt: existingUserData.createdAt?.toDate?.()?.toISOString() || now,
             updatedAt: existingUserData.updatedAt?.toDate?.()?.toISOString() || now,
             lastLogin: now,

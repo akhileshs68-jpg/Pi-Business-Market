@@ -160,5 +160,30 @@ export const adminService = {
       announcement.announcementId,
       `System announcement published: ${announcement.title}`
     );
+  },
+
+  /**
+   * AUDIT LOGS
+   */
+  async getAuditLogs(limitCount: number = 50) {
+    return auditService.getAuditLogs({}, limitCount);
+  },
+
+  async updateFeatureFlag(flagId: string, updates: Partial<FeatureFlag>, actorUid: string) {
+    const db = getFirebaseDb();
+    const docRef = doc(db, 'featureFlags', flagId);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: serverTimestamp()
+    });
+    
+    await auditService.logAction(
+      actorUid,
+      actorUid, // fallback actorName
+      'UPDATE_FEATURE_FLAG',
+      'featureFlags',
+      flagId,
+      `Feature flag ${flagId} updated`
+    );
   }
 };

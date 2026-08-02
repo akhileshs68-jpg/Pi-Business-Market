@@ -37,6 +37,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { useAuth } from '../../auth/useAuth';
+import { EnterpriseServiceEngine } from '../../core/service/enterpriseServiceEngine';
 
 interface ServiceWizardProps {
   isOpen: boolean;
@@ -233,6 +234,28 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
       };
 
       await setDoc(doc(db, 'services', serviceId), serviceData);
+
+      // Re-index into Enterprise Universal Search Engine
+      await EnterpriseServiceEngine.saveService({
+        serviceId,
+        ownerUid: ownerId,
+        businessId: businessId || 'PI-CORP-001',
+        title: serviceName || 'Professional Service',
+        category,
+        subCategory,
+        description,
+        pricingType: priceType.toLowerCase() as any,
+        basePrice: Number(minPrice) || 0,
+        currency: 'π',
+        locationType: locationType.toLowerCase().includes('online') ? 'online' : 'on-site',
+        status: 'published',
+        visibility: 'public',
+        featured: true,
+        rating: 5.0,
+        mainImage: images[0] || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500',
+        imageUrls: images,
+        emergencyService
+      }, true, serviceId);
 
       onSuccess();
       onClose();

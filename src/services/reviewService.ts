@@ -20,6 +20,7 @@ import {
   runTransaction
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
+import { aiEngineService } from './aiEngineService';
 import { 
   Review, 
   ReputationScore, 
@@ -40,6 +41,15 @@ export const reviewService = {
   async submitReview(review: Omit<Review, 'reviewId' | 'status' | 'helpfulCount' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const db = getFirebaseDb();
     const reviewId = `REV_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+
+    // AI CONTENT MODERATION for Reviews
+    if (review.comment) {
+      const moderation = await aiEngineService.moderateContent(review.comment, 'review');
+      if (!moderation.isSafe) {
+        throw new Error('CONTENT_MODERATION: ' + moderation.reason);
+      }
+    }
+
     
     // Check for duplicate verified review
     if (review.orderId) {
@@ -124,12 +134,21 @@ export const reviewService = {
       // Trigger BMP Gamification Reward for verified review
       try {
         const { gamificationService } = await import('./gamificationService');
-        await gamificationService.processReviewReward(
-          review.reviewerUid,
-          review.entityId,
-          review.orderId || 'ORDER_REVIEW',
-          reviewId
-        );
+        if (review.entityType === 'service') {
+          await gamificationService.processServiceReviewReward(
+            review.reviewerUid,
+            review.entityId,
+            review.orderId || 'ORDER_REVIEW',
+            reviewId
+          );
+        } else {
+          await gamificationService.processReviewReward(
+            review.reviewerUid,
+            review.entityId,
+            review.orderId || 'ORDER_REVIEW',
+            reviewId
+          );
+        }
       } catch (rewardErr) {
         console.warn('BMP Review Reward processing failed', rewardErr);
       }

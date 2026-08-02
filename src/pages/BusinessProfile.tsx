@@ -242,10 +242,10 @@ export const BusinessProfile: React.FC = () => {
                 </p>
               </div>
 
-              {/* Role Specific Details */}
-              {roleConfig.specificFields.length > 0 && (
+              {/* Role Specific & Dynamic Details */}
+              {(roleConfig.specificFields.length > 0 || profileData?.profileData) && (
                 <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8">
-                  <h3 className="text-lg font-bold text-white mb-6 capitalize">{role} Details</h3>
+                  <h3 className="text-lg font-bold text-white mb-6 capitalize">{role} & Custom Credentials</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
                     {roleConfig.specificFields.map(f => {
                       if (profileData?.[f.name] === undefined || profileData?.[f.name] === '') return null;
@@ -263,6 +263,38 @@ export const BusinessProfile: React.FC = () => {
                               profileData[f.name]
                             )}
                           </div>
+                        </div>
+                      );
+                    })}
+
+                    {profileData?.gstNumber && (
+                      <div>
+                        <div className="text-xs font-bold text-slate-500 mb-1">GST / Tax Number</div>
+                        <div className="text-sm font-mono text-emerald-400">{profileData.gstNumber}</div>
+                      </div>
+                    )}
+
+                    {profileData?.panNumber && (
+                      <div>
+                        <div className="text-xs font-bold text-slate-500 mb-1">PAN / Tax ID</div>
+                        <div className="text-sm font-mono text-emerald-400">{profileData.panNumber}</div>
+                      </div>
+                    )}
+
+                    {profileData?.registrationNumber && (
+                      <div>
+                        <div className="text-xs font-bold text-slate-500 mb-1">Registration / License No.</div>
+                        <div className="text-sm font-mono text-violet-400">{profileData.registrationNumber}</div>
+                      </div>
+                    )}
+
+                    {/* Custom Dynamic Fields */}
+                    {profileData?.profileData && Object.entries(profileData.profileData).map(([key, val]) => {
+                      if (!val) return null;
+                      return (
+                        <div key={key}>
+                          <div className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">{key.replace(/([A-Z])/g, ' $1')}</div>
+                          <div className="text-sm font-medium text-white">{String(val)}</div>
                         </div>
                       );
                     })}

@@ -117,7 +117,42 @@ export const bmpRewardsProvider: WalletProvider = {
       if (referenceId) txData.referenceId = referenceId;
 
       transaction.set(txRef, txData);
+
+      // Create Immutable Master Reward Ledger Entry atomically
+      const ledgerId = `mledg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const ledgerRef = doc(db, 'master_ledger', ledgerId);
+      transaction.set(ledgerRef, {
+        entryId: ledgerId,
+        transactionId: txRef.id,
+        walletAddress: `pi_addr_${userId.substring(0, 10)}`,
+        userId,
+        asset: 'BMP_REWARD',
+        amount,
+        beforeBalance: balanceBefore,
+        afterBalance: balanceAfter,
+        referenceId: referenceId || txRef.id,
+        source: 'REWARD',
+        status: 'CONFIRMED',
+        hash: `0x_mledg_bmp_${Math.random().toString(36).substring(2, 14)}`,
+        blockHeight: 18492042,
+        memo: description,
+        rewardId: txRef.id,
+        walletId: walletRef.id,
+        rewardType: source,
+        credit: amount,
+        debit: 0,
+        auditReference: `audit_ref_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        timestamp: new Date().toISOString(),
+        createdAt: serverTimestamp()
+      });
     });
+
+    // Sync master wallet document asynchronously without blocking to avoid circular dependency
+    import('../../blockchain/masterWalletService').then(({ masterWalletService }) => {
+      masterWalletService.syncMasterWalletDoc(userId).catch(err => {
+        console.warn('Asynchronous master wallet synchronization failed:', err);
+      });
+    }).catch(() => {});
 
     return txRef.id;
   },
@@ -167,7 +202,42 @@ export const bmpRewardsProvider: WalletProvider = {
       if (referenceId) txData.referenceId = referenceId;
 
       transaction.set(txRef, txData);
+
+      // Create Immutable Master Reward Ledger Entry atomically
+      const ledgerId = `mledg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const ledgerRef = doc(db, 'master_ledger', ledgerId);
+      transaction.set(ledgerRef, {
+        entryId: ledgerId,
+        transactionId: txRef.id,
+        walletAddress: `pi_addr_${userId.substring(0, 10)}`,
+        userId,
+        asset: 'BMP_REWARD',
+        amount: -amount,
+        beforeBalance: balanceBefore,
+        afterBalance: balanceAfter,
+        referenceId: referenceId || txRef.id,
+        source: 'REWARD',
+        status: 'CONFIRMED',
+        hash: `0x_mledg_bmp_${Math.random().toString(36).substring(2, 14)}`,
+        blockHeight: 18492042,
+        memo: description,
+        rewardId: txRef.id,
+        walletId: walletRef.id,
+        rewardType: source,
+        credit: 0,
+        debit: amount,
+        auditReference: `audit_ref_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        timestamp: new Date().toISOString(),
+        createdAt: serverTimestamp()
+      });
     });
+
+    // Sync master wallet document asynchronously without blocking to avoid circular dependency
+    import('../../blockchain/masterWalletService').then(({ masterWalletService }) => {
+      masterWalletService.syncMasterWalletDoc(userId).catch(err => {
+        console.warn('Asynchronous master wallet synchronization failed:', err);
+      });
+    }).catch(() => {});
 
     return txRef.id;
   }

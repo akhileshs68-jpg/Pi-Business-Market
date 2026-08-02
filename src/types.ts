@@ -12,6 +12,7 @@ export type UserRole =
   | 'Seller'
   | 'Business Owner'
   | 'Service Provider'
+  | 'Professional'
   | 'Employer'
   | 'Job Seeker'
   | 'Admin'
@@ -25,6 +26,7 @@ export interface User {
   username: string;      // Pi Network username (e.g., 'pi_pioneer')
   displayName: string;
   walletAddress: string; // Pi wallet public key
+  bmpWalletAddress?: string; // BMP Reward/Token Wallet Address
   role: UserRole;
   accountType: 'individual' | 'business' | 'enterprise';
   verified: boolean;     // Pi verification checkmark
@@ -35,7 +37,10 @@ export interface User {
   status: AccountStatus;
   photoUrl?: string;
   activeRole?: string;
-  roles?: string[];
+  roles?: (UserRole | string)[];
+  ownedBusinessIds?: string[];
+  managedStoreIds?: string[];
+  primaryBusinessId?: string;
   
   // Backward compatibility fields
   email?: string;
@@ -194,20 +199,30 @@ export interface LegacyProductAttribute {
 // ==========================================
 
 export enum OrderStatus {
+  DRAFT = 'draft',
   PENDING_PAYMENT = 'pending_payment',
+  PAYMENT_PROCESSING = 'payment_processing',
   PAYMENT_VERIFIED = 'payment_verified',
+  CONFIRMED = 'confirmed',
   NEW_ORDER = 'new_order',
   ACCEPTED = 'accepted',
+  PREPARING = 'preparing',
   PACKED = 'packed',
+  READY_FOR_DISPATCH = 'ready_for_dispatch',
   READY_FOR_PICKUP = 'ready_for_pickup',
   SHIPPED = 'shipped',
   OUT_FOR_DELIVERY = 'out_for_delivery',
   DELIVERED = 'delivered',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
+  REJECTED = 'rejected',
   RETURNED = 'returned',
+  REFUND_REQUESTED = 'refund_requested',
+  REFUND_APPROVED = 'refund_approved',
   REFUND_PENDING = 'refund_pending',
-  REFUND_COMPLETED = 'refund_completed'
+  REFUND_COMPLETED = 'refund_completed',
+  ESCROW_RELEASED = 'escrow_released',
+  DISPUTED = 'disputed'
 }
 
 export enum PaymentStatus {
@@ -253,6 +268,11 @@ export interface OrderItem {
   tax: number;
   discount: number;
   status: string;
+  imageUrl?: string;
+  sellerName?: string;
+  storeName?: string;
+  businessName?: string;
+  isService?: boolean;
 }
 
 export interface OrderHistoryLog {
@@ -311,16 +331,54 @@ export interface Order {
   // Logistics
   logistics?: LogisticsDetails;
 
-  // Tracking & Timeline
+  // Order Enterprise Metadata
+  buyerId?: string;
+  sellerId?: string;
+  buyerName?: string;
+  sellerName?: string;
+  storeName?: string;
+  businessName?: string;
+  items?: OrderItem[];
+  bmpRewardsEarned?: number;
+  couponCode?: string;
+
+  // Lifecycle Timestamps
+  paymentVerifiedAt?: string;
+  confirmedAt?: string;
   acceptedAt?: string;
+  preparingAt?: string;
   packedAt?: string;
+  readyForDispatchAt?: string;
   shippedAt?: string;
+  outForDeliveryAt?: string;
   deliveredAt?: string;
+  completedAt?: string;
+  cancelledAt?: string;
+
+  // Return, Refund, Escrow & Dispute
+  refundAmount?: number;
+  refundReason?: string;
+  refundStatus?: string;
+  refundRequestedAt?: string;
+  refundApprovedAt?: string;
+  refundCompletedAt?: string;
+  rejectionReason?: string;
+  escrowStatus?: 'holding' | 'eligible' | 'released' | 'refunded';
+  escrowReleasedAt?: string;
+  disputeReason?: string;
+  disputeStatus?: 'none' | 'opened' | 'under_review' | 'resolved';
+  disputedAt?: string;
+
+  // Verification & Invoice
+  qrVerificationCode?: string;
+  invoiceUrl?: string;
+  receiptNumber?: string;
+
   trackingNumber?: string;
   courierName?: string;
   estimatedDelivery?: string;
   currentStatus?: string;
-  activityLogs?: { timestamp: string; message: string }[];
+  activityLogs?: { timestamp: string; message: string; actorUid?: string; role?: string }[];
 
   deliveryMethod?: DeliveryMethod;
   shipmentId?: string;
@@ -346,7 +404,7 @@ export interface Order {
 
 export type ConversationType = 'direct' | 'group' | 'business_customer' | 'system' | 'support' | 'order' | 'booking';
 export type ConversationStatus = 'active' | 'archived' | 'deleted' | 'blocked';
-export type MessageType = 'text' | 'image' | 'document' | 'system' | 'voice_placeholder' | 'product_share' | 'business_share' | 'location' | 'voice' | 'video' | 'pdf';
+export type MessageType = 'text' | 'image' | 'document' | 'system' | 'voice_placeholder' | 'product_share' | 'business_share' | 'location' | 'voice' | 'video' | 'pdf' | 'emoji' | 'product_card' | 'service_card' | 'business_card' | 'store_card' | 'order_ref' | 'invoice' | 'receipt' | 'qrcode';
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed' | 'deleted';
 
 export interface Conversation {
@@ -405,7 +463,12 @@ export type EnterpriseNotificationType =
   | 'system_alert'
   | 'business_announcement'
   | 'job_update'
-  | 'message_new';
+  | 'message_new'
+  | 'wallet_alert'
+  | 'marketplace_update'
+  | 'marketing_alert'
+  | 'security_alert'
+  | 'admin_notice';
 
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -418,8 +481,11 @@ export interface Notification {
   entityType?: string;
   entityId?: string;
   priority: NotificationPriority;
-  status: 'unread' | 'read' | 'dismissed';
+  status: 'unread' | 'read' | 'dismissed' | 'archived';
   readAt?: string;
+  archivedAt?: string;
+  dismissedAt?: string;
+  pinned?: boolean;
   createdAt: string;
   linkTo?: string; // App route
 }
@@ -590,7 +656,12 @@ export interface Business {
   panNumber?: string;
   registrationNumber?: string;
   taxNumber?: string;
-  walletAddress?: string;
+  licenseNumbers?: Array<{ type: string; number: string; expiryDate?: string }>;
+  walletAddress?: string; // Pi Wallet
+  bmpWalletAddress?: string; // BMP Wallet
+  bmpRewardsEnabled?: boolean;
+  socialLinks?: Record<string, string>;
+  dynamicFields?: Record<string, any>;
   country: string;
   state: string;
   district?: string;
@@ -712,6 +783,8 @@ export interface PlatformSettings {
   registrationPolicy: 'open' | 'invite_only' | 'restricted';
   businessVerificationRequired: boolean;
   maxStoragePerBusinessMb: number;
+  isMaintenanceMode?: boolean;
+  allowNewRegistrations?: boolean;
   updatedAt: string;
 }
 
@@ -834,7 +907,32 @@ export type StoreType =
   | 'Restaurant' 
   | 'Hotel' 
   | 'Wholesale' 
-  | 'Retail';
+  | 'Retail'
+  | 'Retail Store'
+  | 'Wholesale Store'
+  | 'Manufacturer Store'
+  | 'Distributor Store'
+  | 'Medical Store'
+  | 'Book Store'
+  | 'Electronics Store'
+  | 'Fashion Store'
+  | 'Furniture Store'
+  | 'Grocery Store'
+  | 'Agriculture Store'
+  | 'Cafe'
+  | 'Salon'
+  | 'Gym'
+  | 'Travel Agency'
+  | 'Transport'
+  | 'Digital Store'
+  | 'Professional Office'
+  | 'NGO Office'
+  | 'Hospital'
+  | 'Clinic'
+  | 'School'
+  | 'College'
+  | 'Institute'
+  | string;
 
 export type StoreStatus = 'active' | 'archived' | 'deleted' | 'pending';
 
@@ -1635,6 +1733,7 @@ export interface CheckoutSession {
   userUid: string;
   businessId?: string;
   storeId?: string;
+  sellerId?: string;
   billingAddress?: Address;
   shippingAddress?: Address;
   deliveryMethod?: 'shipping' | 'pickup';

@@ -83,6 +83,14 @@ export const businessService = {
         });
       });
 
+      // Trigger Business Registration BMP Reward
+      try {
+        const { gamificationService } = await import('./gamificationService');
+        await gamificationService.processBusinessRegistrationReward(ownerUid, businessId);
+      } catch (err) {
+        console.warn('Failed to trigger business registration reward:', err);
+      }
+
       return businessId;
     });
   },
@@ -149,6 +157,20 @@ export const businessService = {
         updatedAt: serverTimestamp(),
         updatedBy: actorName
       }, { merge: true });
+
+      // Trigger Business Approval Reward if verified or approved
+      if (updates.verificationStatus === 'Verified' || updates.verificationStatus === 'Approved') {
+        try {
+          const bizSnap = await getDoc(businessRef);
+          if (bizSnap.exists()) {
+            const bizData = bizSnap.data();
+            const { gamificationService } = await import('./gamificationService');
+            await gamificationService.processBusinessApprovalReward(bizData.ownerUid || actorUid, businessId);
+          }
+        } catch (rewardErr) {
+          console.warn('Failed to trigger business approval reward:', rewardErr);
+        }
+      }
 
       // Log update
       const logRef = doc(collection(db, 'businessAuditLogs'));

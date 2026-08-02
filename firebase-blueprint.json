@@ -10,9 +10,22 @@
         "username": { "type": "string", "description": "Pi Network Username" },
         "displayName": { "type": "string" },
         "walletAddress": { "type": "string" },
+        "bmpWalletAddress": { "type": "string" },
         "role": { 
           "type": "string", 
-          "enum": ["Buyer", "Seller", "Business Owner", "Service Provider", "Employer", "Job Seeker", "Admin", "Super Admin"] 
+          "enum": ["Buyer", "Seller", "Business Owner", "Service Provider", "Professional", "Employer", "Job Seeker", "Admin", "Super Admin"] 
+        },
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ownedBusinessIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "managedStoreIds": {
+          "type": "array",
+          "items": { "type": "string" }
         },
         "accountType": { 
           "type": "string", 
@@ -51,6 +64,13 @@
         "email": { "type": "string" },
         "phone": { "type": "string" },
         "website": { "type": "string" },
+        "gstNumber": { "type": "string" },
+        "panNumber": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "walletAddress": { "type": "string" },
+        "bmpWalletAddress": { "type": "string" },
+        "bmpRewardsEnabled": { "type": "boolean" },
+        "dynamicFields": { "type": "object" },
         "logo": { "type": "string" },
         "banner": { "type": "string" },
         "verified": { "type": "boolean" },

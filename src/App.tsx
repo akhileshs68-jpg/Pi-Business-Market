@@ -25,6 +25,7 @@ const OrderDetails = lazy(() => import('./pages/OrderDetails').then(m => ({ defa
 const BusinessOrderDashboard = lazy(() => import('./pages/BusinessOrderDashboard').then(m => ({ default: m.BusinessOrderDashboard })));
 const MerchantPayments = lazy(() => import('./pages/MerchantPayments').then(m => ({ default: m.MerchantPayments })));
 const CustomerPayments = lazy(() => import('./pages/CustomerPayments').then(m => ({ default: m.CustomerPayments })));
+const WalletPage = lazy(() => import('./pages/WalletPage').then(m => ({ default: m.WalletPage })));
 const FulfillmentCenter = lazy(() => import('./pages/FulfillmentCenter').then(m => ({ default: m.FulfillmentCenter })));
 const ShipmentDetails = lazy(() => import('./pages/ShipmentDetails').then(m => ({ default: m.ShipmentDetails })));
 const MerchantCRM = lazy(() => import('./pages/MerchantCRM').then(m => ({ default: m.MerchantCRM })));
@@ -41,6 +42,8 @@ const CartPage = lazy(() => import('./pages/CartPage').then(m => ({ default: m.C
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage').then(m => ({ default: m.OnboardingPage })));
 const CreateBusinessPage = lazy(() => import('./pages/CreateBusinessPage').then(m => ({ default: m.CreateBusinessPage })));
 const CreateStorePage = lazy(() => import('./pages/CreateStorePage').then(m => ({ default: m.CreateStorePage })));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
+const CommunityHub = lazy(() => import('./pages/CommunityHub').then(m => ({ default: m.CommunityHub })));
 
 const LoadingFallback = () => (
   <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-200">
@@ -281,6 +284,14 @@ function App() {
             } 
           />
           <Route 
+            path="/wallet" 
+            element={
+              <ProtectedRoute>
+                <WalletPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/logistics" 
             element={
               <ProtectedRoute>
@@ -373,6 +384,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminConsole />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/account/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/community" 
+            element={
+              <ProtectedRoute>
+                <CommunityHub />
               </ProtectedRoute>
             } 
           />

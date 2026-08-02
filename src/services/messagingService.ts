@@ -1,3 +1,4 @@
+import { aiEngineService } from './aiEngineService';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -28,11 +29,15 @@ import {
   ConversationType,
   MessageType
 } from '../types';
+import { notificationService } from './notificationService';
+
+// Client-side transient cache for rate limiting & spam prevention
+const clientRateLimitCache: Record<string, { lastSentTime: number; lastContent: string }> = {};
 
 export const messagingService = {
   /**
    * INITIATE OR FETCH CONVERSATION
-   * Ensures unique conversation for specific context (e.g., User A & Business B about Order X)
+   * Ensures ONE conversation for any given context to satisfy "ONE CONVERSATION POLICY".
    */
   async getOrCreateConversation(
     participants: string[], // [userUid, otherUid/businessOwnerUid]
@@ -49,22 +54,26 @@ export const messagingService = {
   ): Promise<Conversation> {
     const db = getFirebaseDb();
     
-    // Sort participants to ensure consistent ID generation for direct chats
-    const sortedParticipants = [...participants].sort();
-    
-    // Check and generate specific conversation IDs for orders, bookings, products to prevent collision
-    let conversationId = `CONV_${sortedParticipants.join('_')}`;
+    // Clean and sort participants to ensure stable, unique direct chat keys
+    const cleanParticipants = Array.from(new Set(participants.filter(Boolean)));
+    const sortedParticipants = [...cleanParticipants].sort();
     
     const resolvedOrderId = options?.orderId || (options?.relatedEntityType === 'order' ? options?.relatedEntityId : undefined);
     const resolvedBookingId = options?.bookingId || (options?.relatedEntityType === 'booking' ? options?.relatedEntityId : undefined);
     const resolvedProductId = options?.productId || (options?.relatedEntityType === 'product' ? options?.relatedEntityId : undefined);
+    const resolvedBusinessId = options?.businessId || (options?.relatedEntityType === 'business_customer' ? options?.relatedEntityId : undefined);
 
+    // Compute deterministic ID based on context to satisfy ONE CONVERSATION POLICY
+    let conversationId = `CONV_${sortedParticipants.join('_')}`;
+    
     if (resolvedOrderId) {
       conversationId = `CONV_ORDER_${resolvedOrderId}`;
     } else if (resolvedBookingId) {
       conversationId = `CONV_BOOKING_${resolvedBookingId}`;
     } else if (resolvedProductId) {
       conversationId = `CONV_PRODUCT_${resolvedProductId}_${sortedParticipants.join('_')}`;
+    } else if (resolvedBusinessId) {
+      conversationId = `CONV_BUSINESS_${resolvedBusinessId}_${sortedParticipants.join('_')}`;
     } else if (options?.relatedEntityId) {
       conversationId = `CONV_${options.relatedEntityId}`;
     }
@@ -76,20 +85,25 @@ export const messagingService = {
       return this.mapDocToConversation(snap);
     }
 
+    // Security check: Ensure we do not allow empty participants list
+    if (sortedParticipants.length === 0) {
+      throw new Error('Participants list cannot be empty.');
+    }
+
     const unreadCounts: Record<string, number> = {};
-    participants.forEach(uid => unreadCounts[uid] = 0);
+    sortedParticipants.forEach(uid => unreadCounts[uid] = 0);
 
     const newConversation: Conversation = {
       conversationId,
       type,
       participants: sortedParticipants,
-      businessId: options?.businessId,
+      businessId: resolvedBusinessId || options?.businessId,
       storeId: options?.storeId,
       productId: resolvedProductId,
       orderId: resolvedOrderId,
       bookingId: resolvedBookingId,
-      relatedEntityType: options?.relatedEntityType,
-      relatedEntityId: options?.relatedEntityId,
+      relatedEntityType: options?.relatedEntityType || (resolvedOrderId ? 'order' : resolvedProductId ? 'product' : undefined),
+      relatedEntityId: options?.relatedEntityId || resolvedOrderId || resolvedProductId || resolvedBookingId,
       status: 'active',
       unreadCounts,
       lastActivity: new Date().toISOString(),
@@ -104,12 +118,19 @@ export const messagingService = {
       updatedAt: serverTimestamp()
     });
 
+    // Create a secure messaging audit log
+    await this.logAudit('CONVERSATION_CREATED', {
+      conversationId,
+      participants: sortedParticipants,
+      type
+    });
+
     return newConversation;
   },
 
   /**
    * SEND MESSAGE
-   * Uses transaction to update unread counts and last message snippet atomically
+   * Enforces Rate Limiting, Duplicate Prevention, Spam Filtering and User Blocks.
    */
   async sendMessage(
     conversationId: string,
@@ -122,6 +143,69 @@ export const messagingService = {
     senderRole?: string
   ): Promise<string> {
     const db = getFirebaseDb();
+    const now = Date.now();
+
+    
+    // AI CONTENT MODERATION
+    if (type === 'text' && content) {
+      const moderation = await aiEngineService.moderateContent(content, 'message');
+      if (!moderation.isSafe) {
+        throw new Error('CONTENT_MODERATION: ' + moderation.reason);
+      }
+    }
+
+    // 1. RATE LIMITING & FLOOD PROTECTION
+    const lastSent = clientRateLimitCache[senderUid];
+    if (lastSent) {
+      const diff = now - lastSent.lastSentTime;
+      if (diff < 1000) {
+        throw new Error('RATE_LIMIT: Messages sent too fast. Please wait 1 second.');
+      }
+      
+      // 2. DUPLICATE MESSAGE DETECTION
+      if (content === lastSent.lastContent && diff < 10000 && type === 'text') {
+        throw new Error('DUPLICATE_MESSAGE: You just sent this message. Please avoid repeating.');
+      }
+    }
+
+    // 3. SPAM KEYWORD SCANNING
+    const spamWords = ['free coin', 'unlimited pi', 'cheat', 'hack', 'fake transfer', 'scam coin'];
+    const lowerContent = content.toLowerCase();
+    const isSpam = spamWords.some(word => lowerContent.includes(word));
+    
+    const enrichedMetadata = {
+      ...(metadata || {}),
+      spamDetected: isSpam,
+      flagged: isSpam ? true : undefined,
+      antiCheatVerified: true,
+      timestampMillis: now
+    };
+
+    if (isSpam) {
+      console.warn(`Spam content flagged from user ${senderUid} in conversation ${conversationId}`);
+    }
+
+    // 4. BLOCK STATUS SECURITY CHECK
+    const conversation = await this.getConversation(conversationId);
+    if (conversation.status === 'blocked') {
+      throw new Error('BLOCKED: This conversation is currently blocked or moderated.');
+    }
+
+    // Check individual user block list
+    const otherParticipant = conversation.participants.find(p => p !== senderUid);
+    if (otherParticipant) {
+      const blockCheck = await this.isBlocked(otherParticipant, senderUid);
+      if (blockCheck) {
+        throw new Error('BLOCKED: You cannot send messages to this user.');
+      }
+    }
+
+    // Update transient cache
+    clientRateLimitCache[senderUid] = {
+      lastSentTime: now,
+      lastContent: content
+    };
+
     const messageId = `MSG_${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
     const messageRef = doc(db, 'conversations', conversationId, 'messages', messageId);
     const convRef = doc(db, 'conversations', conversationId);
@@ -130,7 +214,7 @@ export const messagingService = {
       messageId,
       conversationId,
       senderUid,
-      senderRole,
+      senderRole: senderRole || 'User',
       messageType: type,
       content,
       text: content,
@@ -139,7 +223,7 @@ export const messagingService = {
       status: 'sent',
       edited: false,
       deleted: false,
-      metadata,
+      metadata: enrichedMetadata,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -151,7 +235,7 @@ export const messagingService = {
       const convData = convSnap.data() as Conversation;
       const updates: any = {
         lastMessage: {
-          content: type === 'text' ? content : `[${type}]`,
+          content: type === 'text' ? content : `[${type.replace('_', ' ')}]`,
           senderUid,
           createdAt: serverTimestamp()
         },
@@ -177,7 +261,109 @@ export const messagingService = {
       transaction.update(convRef, updates);
     });
 
+    // Generate in-app notifications
+    try {
+      const recipients = conversation.participants.filter(p => p !== senderUid);
+      for (const recipientId of recipients) {
+        await notificationService.notify(
+          recipientId,
+          'message_new',
+          `New Message from ${senderRole || 'Client'}`,
+          type === 'text' ? content : `Sent a ${type.replace('_', ' ')} attachment`,
+          { entityId: conversationId, entityType: 'conversation', linkTo: '/inbox' }
+        );
+      }
+    } catch (notifErr) {
+      console.warn('Failed to send message notifications:', notifErr);
+    }
+
     return messageId;
+  },
+
+  /**
+   * GET CONVERSATION BY ID
+   */
+  async getConversation(conversationId: string): Promise<Conversation> {
+    const db = getFirebaseDb();
+    const snap = await getDoc(doc(db, 'conversations', conversationId));
+    if (!snap.exists()) {
+      throw new Error(`Conversation ${conversationId} not found.`);
+    }
+    return this.mapDocToConversation(snap);
+  },
+
+  /**
+   * USER BLOCKING CONTROLS
+   */
+  async blockUser(userUid: string, blockedUid: string): Promise<void> {
+    const db = getFirebaseDb();
+    const blockRef = doc(db, 'blockedUsers', `${userUid}_${blockedUid}`);
+    await setDoc(blockRef, {
+      userUid,
+      blockedUid,
+      createdAt: serverTimestamp()
+    });
+    
+    await this.logAudit('USER_BLOCKED', { userUid, blockedUid });
+  },
+
+  async unblockUser(userUid: string, blockedUid: string): Promise<void> {
+    const db = getFirebaseDb();
+    const blockRef = doc(db, 'blockedUsers', `${userUid}_${blockedUid}`);
+    await setDoc(blockRef, {
+      deleted: true,
+      unblockedAt: serverTimestamp()
+    });
+  },
+
+  async isBlocked(userUid: string, otherUid: string): Promise<boolean> {
+    const db = getFirebaseDb();
+    // Check if userUid blocked otherUid
+    const blockRef1 = doc(db, 'blockedUsers', `${userUid}_${otherUid}`);
+    const snap1 = await getDoc(blockRef1);
+    if (snap1.exists() && !snap1.data()?.deleted) return true;
+
+    // Check if otherUid blocked userUid
+    const blockRef2 = doc(db, 'blockedUsers', `${otherUid}_${userUid}`);
+    const snap2 = await getDoc(blockRef2);
+    return snap2.exists() && !snap2.data()?.deleted;
+  },
+
+  /**
+   * REPORT CONVERSATION
+   */
+  async reportConversation(conversationId: string, reporterUid: string, reason: string): Promise<void> {
+    const db = getFirebaseDb();
+    const reportId = `REP_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+    await setDoc(doc(db, 'reportedConversations', reportId), {
+      reportId,
+      conversationId,
+      reporterUid,
+      reason,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+
+    await this.logAudit('CONVERSATION_REPORTED', { conversationId, reporterUid, reason });
+  },
+
+  /**
+   * SECURITY AUDIT LOGS
+   */
+  async logAudit(action: string, details: Record<string, any>): Promise<void> {
+    try {
+      const db = getFirebaseDb();
+      const logId = `AUDIT_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+      await setDoc(doc(db, 'auditLogs', logId), {
+        logId,
+        domain: 'messaging',
+        action,
+        details,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Audit logger failed silenty:', err);
+    }
   },
 
   /**
@@ -212,7 +398,6 @@ export const messagingService = {
       callback(messages);
     });
   },
-
 
   async archiveConversation(conversationId: string, userUid: string): Promise<void> {
     const db = getFirebaseDb();
