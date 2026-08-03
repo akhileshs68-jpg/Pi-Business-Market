@@ -198,6 +198,7 @@ export const Checkout: React.FC = () => {
           `Pi Market Order #${session.sessionId}`,
           session.sessionId,
           {
+            sessionId: session.sessionId,
             buyerId,
             sellerId: session.sellerId,
             businessId: session.businessId,

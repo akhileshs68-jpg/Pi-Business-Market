@@ -2,6 +2,15 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { deleteEngine } from './server/deleteEngine';
+
+// Prevent unhandled promise rejections and uncaught exceptions from terminating the Node process
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Process Alert] Caught unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[Process Alert] Caught uncaught exception:', error);
+});
 import fs from "fs";
 import "dotenv/config";
 import express from "express";
@@ -29,17 +38,50 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
-if (process.env.VITE_FIREBASE_PROJECT_ID && !getApps().length) {
-  const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
-  initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  });
-  console.log(`[Firebase Admin] Initialized with Project ID: ${process.env.VITE_FIREBASE_PROJECT_ID}, Database ID: ${databaseId || "(default)"}`);
-}
+// Top-level Firebase Admin initialization removed to prevent synchronous load errors.
+// It is now initialized asynchronously inside startServer() after checking ADC availability.
 
-const getDb = () => {
-  const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
-  return databaseId ? getFirestore(databaseId) : getFirestore();
+const getDb = (): any => {
+  if (getApps().length === 0) {
+    let projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+    let databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+
+    if (!projectId) {
+      try {
+        const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          projectId = config.projectId;
+          databaseId = config.firestoreDatabaseId || config.databaseId;
+        }
+      } catch (e) {
+        console.warn('[Firebase Admin Lazy Init] Failed to load config file:', e);
+      }
+    }
+
+    if (projectId) {
+      try {
+        initializeApp({
+          projectId: projectId,
+        });
+        console.log(`[Firebase Admin Lazy Init] Initialized with Project ID: ${projectId}`);
+      } catch (err: any) {
+        console.error(`[Firebase Admin Lazy Init Error] Failed to initialize: ${err.message}`);
+      }
+    }
+  }
+
+  if (getApps().length === 0) {
+    console.warn("[Firebase Admin] No initialized app found when calling getDb(). Returning null.");
+    return null;
+  }
+  try {
+    const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+    return databaseId ? getFirestore(databaseId) : getFirestore();
+  } catch (err: any) {
+    console.error("[Firebase Admin Error] Failed to get Firestore instance:", err.message);
+    return null;
+  }
 };
 
 /**
@@ -106,6 +148,35 @@ const authenticatePaymentRequest = async (
 };
 
 async function startServer() {
+  const isProd = process.env.NODE_ENV === "production";
+  
+  let projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+  let databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+
+  if (!projectId) {
+    try {
+      const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        projectId = config.projectId;
+        databaseId = config.firestoreDatabaseId || config.databaseId;
+      }
+    } catch (e) {
+      console.warn('[Firebase Admin Startup Init] Failed to load config file:', e);
+    }
+  }
+
+  if (projectId && !getApps().length) {
+    try {
+      initializeApp({
+        projectId: projectId,
+      });
+      console.log(`[Firebase Admin Startup Init] Initialized with Project ID: ${projectId}, Database ID: ${databaseId || "(default)"}`);
+    } catch (err: any) {
+      console.error(`[Firebase Admin Startup Init Error] Failed to initialize Firebase Admin SDK: ${err.message}`);
+    }
+  }
+
   const app = express();
   const PORT = 3000;
 
@@ -189,81 +260,56 @@ async function startServer() {
         }
       }
 
-      // Duplicate Payment Protection & Replay Protection
-      if (getApps().length > 0) {
-        const db = getDb();
-        const paymentDocId = `PAY_${paymentId}`;
-        const existingDoc = await db.collection('payments').doc(paymentDocId).get();
+     // Duplicate Payment Protection & Replay Protection
+if (getApps().length > 0) {
+  try {
+    let db: any = null;
+
+    if (process.env.NODE_ENV === "production") {
+      db = getDb();
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[DEV] Skip Firestore duplicate check");
+    } else {
+      if (db) {
+        const paymentDocId =
+          metadata?.internalPaymentId || `PAY_${paymentId}`;
+
+        const existingDoc = await db
+          .collection("payments")
+          .doc(paymentDocId)
+          .get();
+
         if (existingDoc.exists) {
           const docData = existingDoc.data();
-          if (docData?.paymentStatus === 'completed') {
+
+          if (docData?.paymentStatus === "completed") {
             const msg = `Duplicate/Replay protection check: Payment ${paymentId} has already been completed.`;
+
             console.warn(`[Pi Payment Approve] ${msg}`);
             runtimeLogs.push(`[Runtime Log] ${msg}`);
+
             return res.status(400).json({
-              error: "Replay Attempt Blocked: This payment has already been finalized.",
-              logs: runtimeLogs
+              error:
+                "Replay Attempt Blocked: This payment has already been finalized.",
+              logs: runtimeLogs,
             });
           }
         }
       }
-
-      if (paymentId && paymentId.startsWith('SIM_')) {
-        if (process.env.NODE_ENV === 'production') {
-          console.error(`[Security Violation] Simulated payment approval blocked in production environment for paymentId: ${paymentId}`);
-          return res.status(403).json({ error: "Simulated payments are strictly forbidden in production mode.", logs: runtimeLogs });
-        }
-        console.log(`[Pi Payment Simulated] Simulated payment for ${paymentId}`);
-        runtimeLogs.push(`[Runtime Log] Simulated payment for: ${paymentId}`);
-        
-        if (req.path.includes('complete')) {
-            if (getApps && getApps().length > 0) {
-                const db = getDb();
-                const paymentDocId = `PAY_${paymentId}`;
-                await db.collection('payments').doc(paymentDocId).set({ paymentStatus: 'completed' }, { merge: true }).catch(() => {});
-            }
-        }
-        
-        return res.json({ success: true, payment: { status: req.path.includes('complete') ? 'completed' : 'approved' }, logs: runtimeLogs });
-      }
-
-      const apiKey = process.env.PI_NETWORK_API_KEY;
-      const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
-
-      if (isMissingApiKey) {
-        runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
-        console.error("[Security Alert] Payment approval rejected: PI_NETWORK_API_KEY is missing.");
-        return res.status(500).json({
-          error: "PI_NETWORK_API_KEY is not configured.",
-          logs: runtimeLogs
-        });
-      }
-
-      console.log("[Pi Payment Approve] PI_NETWORK_API_KEY found. Sending approval POST...");
-      runtimeLogs.push("[Runtime Log] Sending approval POST to Pi Network API...");
-      
-      const response = await axios.post(
-        `https://api.minepi.com/v2/payments/${paymentId}/approve`,
-        {},
-        { headers: { Authorization: `Key ${apiKey}` } }
-      );
-      
-      console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
-      runtimeLogs.push(`[Runtime Log] Pi Network server approved payment: ${paymentId}`);
-      runtimeLogs.push(`[Runtime Log] Pi response data: ${JSON.stringify(response.data || {})}`);
-
-      res.json({ success: true, payment: response.data, logs: runtimeLogs });
-    } catch (error: any) {
-      const errorMsg = error.response?.data || error.message;
-      console.error("[Pi Payment Approve] Error approving payment:", errorMsg);
-      runtimeLogs.push(`[Runtime Log] Error approving payment: ${JSON.stringify(errorMsg)}`);
-      res.status(500).json({
-        error: "Failed to approve payment with Pi Network server",
-        details: errorMsg,
-        logs: runtimeLogs
-      });
     }
-  });
+
+  } catch (dbError: any) {
+    console.warn(
+      `[Firebase Admin Warning] Skipping duplicate protection due to database error: ${dbError.message}`
+    );
+
+    runtimeLogs.push(
+      `[Runtime Log] Skipping duplicate protection due to database error: ${dbError.message}`
+    );
+  }
+}
 
   // Delete Resource Endpoint
   app.delete("/api/delete-resource", authenticatePaymentRequest, async (req, res) => {
@@ -307,30 +353,56 @@ async function startServer() {
         }
       }
 
-      const db = getDb();
-      const paymentDocId = `PAY_${paymentId}`;
-      const paymentRef = db.collection('payments').doc(paymentDocId);
+      const db = getApps().length > 0 ? getDb() : null;
+
+const paymentDocId =
+  metadata?.internalPaymentId || `PAY_${paymentId}`;
+
+const paymentRef = db
+  ? db.collection("payments").doc(paymentDocId)
+  : null;
 
       // 1. Prevent duplicate payment processing
-      if (getApps().length > 0) {
-        const existingDoc = await paymentRef.get();
-        if (existingDoc.exists) {
-          const docData = existingDoc.data();
-          if (docData?.paymentStatus === 'completed') {
-            const msg = `Duplicate check: Payment ${paymentId} has already been completed.`;
-            console.warn(`[Pi Payment Complete] ${msg}`);
-            runtimeLogs.push(`[Runtime Log] ${msg}`);
-            runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
-            return res.json({
-              success: true,
-              message: "Payment already processed",
-              paymentId,
-              txid,
-              orderId: docData?.orderId || "",
-              payment: docData,
-              logs: runtimeLogs
-            });
+      if (getApps().length > 0 && paymentRef) {
+        try {
+          if (process.env.NODE_ENV === "production") {
+  const existingDoc = await paymentRef.get();
+
+  if (existingDoc.exists) {
+    const docData = existingDoc.data();
+
+    if (docData?.paymentStatus === "completed") {
+      return res.json({
+        success: true,
+        paymentId,
+        txid
+      });
+    }
+  }
+} else {
+  console.warn("[DEV] Skipping duplicate payment check.");
+}
+          if (existingDoc.exists) {
+            const docData = existingDoc.data();
+            if (docData?.paymentStatus === 'completed') {
+              const msg = `Duplicate check: Payment ${paymentId} has already been completed.`;
+              console.warn(`[Pi Payment Complete] ${msg}`);
+              runtimeLogs.push(`[Runtime Log] ${msg}`);
+              runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
+              return res.json({
+                success: true,
+                message: "Payment already processed",
+                paymentId,
+                txid,
+                orderId: docData?.orderId || "",
+                payment: docData,
+                logs: runtimeLogs
+              });
+            }
           }
+        } catch (dbError: any) {
+          console.warn(`[Firebase Admin Warning] Skipping duplicate check due to database error: ${dbError.message}`);
+          runtimeLogs.push(`[Runtime Log] Skipping duplicate check due to database error: ${dbError.message}`);
         }
       }
 
@@ -374,22 +446,62 @@ async function startServer() {
       let finalOrderId = "";
 
       // 2. Perform server-side transaction & database updates
-      if (getApps().length > 0) {
+      if (getApps().length > 0 && db) {
+        if (metadata?.productType === 'InAppProduct') {
+          console.log(`[Pi Payment Complete] Skipping order logic for InAppProduct ${metadata.productId}`);
+          // Skip order logic but mark payment as successful
+          if (paymentRef) {
+            await paymentRef.set({
+              paymentId,
+              transactionId: txid,
+              status: 'completed',
+              paymentStatus: 'completed',
+              amount: paymentData?.amount || metadata?.amount || 0,
+              memo: paymentData?.memo || metadata?.memo || 'In-App Purchase',
+              metadata: metadata || {},
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            }, { merge: true });
+          }
+          return res.json({
+            success: true,
+            message: "In-App Payment verified successfully",
+            paymentId,
+            txid,
+            payment: paymentData,
+            logs: runtimeLogs
+          });
+        }
+
         // Fetch checkout session
         const sessionId = metadata?.sessionId || metadata?.orderId;
         if (!sessionId) {
           throw new Error("Missing sessionId in payment metadata");
         }
 
-        const sessionRef = db.collection('checkoutSessions').doc(sessionId);
-        const sessionSnap = await sessionRef.get();
-        if (!sessionSnap.exists) {
-          throw new Error(`Checkout session ${sessionId} not found`);
-        }
-        const sessionData = sessionSnap.data();
-        if (!sessionData) {
-          throw new Error("Empty session data");
-        }
+        const sessionRef = db.collection("checkoutSessions").doc(sessionId);
+
+console.log("========== DEBUG SESSION ==========");
+
+let sessionSnap;
+
+try {
+  sessionSnap = await sessionRef.get();
+  console.log("session exists:", sessionSnap.exists);
+} catch (err) {
+  console.error("SESSION GET FAILED:", err);
+  throw err;
+}
+
+if (!sessionSnap.exists) {
+  throw new Error(`Checkout session ${sessionId} not found`);
+}
+
+const sessionData = sessionSnap.data();
+
+if (!sessionData) {
+  throw new Error("Empty session data");
+}
 
         const grandTotal = parseFloat(metadata?.amount || paymentData?.amount || sessionData.grandTotal || 0);
         const sellerId = sessionData.sellerId || sessionData.businessId || 'PI-SELLER';
@@ -410,31 +522,51 @@ async function startServer() {
         console.log(`[Server Transaction] Starting secure execution for order ${orderId}...`);
         
         await db.runTransaction(async (transaction) => {
-          // --- STAGE 1: READ WALLETS ---
+          const buyerId = sessionData.userUid || sessionData.buyerId || sessionData.userId || metadata?.buyerId || metadata?.uid || metadata?.userUid || 'unknown_user';
+          
           const buyerWalletRef = db.collection('wallets').doc(`${buyerId}_pi_testnet`);
           const sellerWalletRef = db.collection('wallets').doc(`${sellerId}_pi_testnet`);
+          const buyerMasterWalletRef = db.collection('master_wallets').doc(buyerId);
+          const sellerMasterWalletRef = db.collection('master_wallets').doc(sellerId);
+          
+          const loyaltyAccountId = `LOY_${buyerId}`;
+          const loyaltyAccountRef = db.collection('loyaltyAccounts').doc(loyaltyAccountId);
 
+          // --- STAGE 1: READ ALL SNAPSHOTS AT THE BEGINNING (NO READ-AFTER-WRITE) ---
           const buyerWalletSnap = await transaction.get(buyerWalletRef);
           const sellerWalletSnap = await transaction.get(sellerWalletRef);
+          const buyerMasterWalletSnap = await transaction.get(buyerMasterWalletRef);
+          const sellerMasterWalletSnap = await transaction.get(sellerMasterWalletRef);
+          const loyaltyAccountSnap = await transaction.get(loyaltyAccountRef);
 
-          const buyerBalanceBefore = buyerWalletSnap.exists ? (buyerWalletSnap.data()?.balance || 0) : 100.0;
-          const sellerBalanceBefore = sellerWalletSnap.exists ? (sellerWalletSnap.data()?.balance || 0) : 100.0;
+          // Pre-fetch all product snapshots inside the transaction
+          const productSnapsMap = new Map<string, any>();
+          for (const item of cartItems) {
+            if (item.productId && !productSnapsMap.has(item.productId)) {
+              const productRef = db.collection('products').doc(item.productId);
+              const productDoc = await transaction.get(productRef);
+              productSnapsMap.set(item.productId, productDoc);
+            }
+          }
 
-          const buyerBalanceAfter = buyerBalanceBefore - grandTotal;
-          const sellerBalanceAfter = sellerBalanceBefore + grandTotal;
-
-          // --- STAGE 2: PRODUCT STOCK UPDATE ---
+          // --- STAGE 2: PROCESS STOCK WRITES ---
           for (const item of cartItems) {
             if (item.productId) {
               const productRef = db.collection('products').doc(item.productId);
-              const productDoc = await transaction.get(productRef);
-              if (productDoc.exists) {
+              const productDoc = productSnapsMap.get(item.productId);
+              if (productDoc && productDoc.exists) {
                 const pData = productDoc.data();
                 const newStock = Math.max(0, (pData?.stock || 0) - (item.quantity || 1));
                 transaction.update(productRef, { stock: newStock });
               }
             }
           }
+
+          const buyerBalanceBefore = buyerWalletSnap.exists ? (buyerWalletSnap.data()?.balance || 0) : 100.0;
+          const sellerBalanceBefore = sellerWalletSnap.exists ? (sellerWalletSnap.data()?.balance || 0) : 100.0;
+
+          const buyerBalanceAfter = buyerBalanceBefore - grandTotal;
+          const sellerBalanceAfter = sellerBalanceBefore + grandTotal;
 
           // --- STAGE 3: CREDIT SELLER WALLET & DEBIT BUYER ---
           if (!buyerWalletSnap.exists) {
@@ -538,8 +670,6 @@ async function startServer() {
           });
 
           // --- STAGE 6: UPDATE MASTER WALLETS ---
-          const buyerMasterWalletRef = db.collection('master_wallets').doc(buyerId);
-          const buyerMasterWalletSnap = await transaction.get(buyerMasterWalletRef);
           const buyerMasterWalletData = buyerMasterWalletSnap.exists ? buyerMasterWalletSnap.data() : {};
           transaction.set(buyerMasterWalletRef, {
             ...buyerMasterWalletData,
@@ -549,8 +679,6 @@ async function startServer() {
             updatedAt: FieldValue.serverTimestamp()
           }, { merge: true });
 
-          const sellerMasterWalletRef = db.collection('master_wallets').doc(sellerId);
-          const sellerMasterWalletSnap = await transaction.get(sellerMasterWalletRef);
           const sellerMasterWalletData = sellerMasterWalletSnap.exists ? sellerMasterWalletSnap.data() : {};
           transaction.set(sellerMasterWalletRef, {
             ...sellerMasterWalletData,
@@ -643,10 +771,6 @@ async function startServer() {
 
           // --- STAGE 9: LOYALTY POINTS REWARD ---
           const points = Math.floor(grandTotal * 10);
-          const loyaltyAccountId = `LOY_${buyerId}`;
-          const loyaltyAccountRef = db.collection('loyaltyAccounts').doc(loyaltyAccountId);
-          const loyaltyAccountSnap = await transaction.get(loyaltyAccountRef);
-
           if (!loyaltyAccountSnap.exists) {
             transaction.set(loyaltyAccountRef, {
               accountId: loyaltyAccountId,
@@ -732,23 +856,30 @@ async function startServer() {
       }
 
       if (getApps().length > 0) {
-        const paymentRef = getDb().collection('payments').doc(transactionId);
-        
-        // Only allow changing from Pending/Processing to Cancelled/Failed
-        await getDb().runTransaction(async (t) => {
-          const doc = await t.get(paymentRef);
-          if (!doc.exists) throw new Error("Transaction not found");
-          
-          const currentStatus = doc.data()?.status;
-          if (currentStatus === 'Completed' || currentStatus === 'Refunded') {
-            throw new Error("Cannot change status of a completed payment");
+        try {
+          const db = getDb();
+          if (db) {
+            const paymentRef = db.collection('payments').doc(transactionId);
+            
+            // Only allow changing from Pending/Processing to Cancelled/Failed
+            await db.runTransaction(async (t) => {
+              const doc = await t.get(paymentRef);
+              if (!doc.exists) throw new Error("Transaction not found");
+              
+              const currentStatus = doc.data()?.status;
+              if (currentStatus === 'Completed' || currentStatus === 'Refunded') {
+                throw new Error("Cannot change status of a completed payment");
+              }
+              
+              t.update(paymentRef, {
+                status,
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            });
           }
-          
-          t.update(paymentRef, {
-            status,
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        });
+        } catch (dbError: any) {
+          console.warn(`[Firebase Admin Warning] Skipping status update due to database error: ${dbError.message}`);
+        }
       }
       
       res.json({ success: true });

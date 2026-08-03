@@ -145,10 +145,13 @@ export const paymentService = {
           } catch (authErr) {
             console.warn('[PaymentService] Auth header fallback for approve:', authErr);
           }
+          console.log("[DEBUG PAYMENT METADATA]", metadata);
+          const augmentedMetadata = { ...metadata };
+          if (!augmentedMetadata.sessionId && metadata.orderId) augmentedMetadata.sessionId = metadata.orderId;
           const res = await fetch('/api/payments/approve', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ paymentId: piPaymentId, metadata })
+            body: JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata })
           });
           const resText = await res.text();
           console.log('[PaymentService] Approve Response status:', res.status, 'body:', resText);
@@ -171,10 +174,12 @@ export const paymentService = {
           } catch (authErr) {
             console.warn('[PaymentService] Auth header fallback:', authErr);
           }
+          const augmentedMetadata = { ...metadata };
+          if (!augmentedMetadata.sessionId && metadata.orderId) augmentedMetadata.sessionId = metadata.orderId;
           const res = await fetch('/api/payments/complete', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
+            body: JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata })
           });
           const resText = await res.text();
           console.log('[PaymentService] Complete Response status:', res.status, 'body:', resText);

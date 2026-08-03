@@ -268,10 +268,11 @@ export class EnterpriseCheckoutEngine {
               } catch (authErr) {
                 console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
               }
+              const augmentedMetadata = { ...metadata, sessionId, paymentRecordId };
               const res = await fetch('/api/payments/approve', {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ paymentId: piPaymentId, metadata })
+                body: JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata })
               });
               const resText = await res.text();
               console.log('[EnterpriseCheckout] Approve Response status:', res.status, 'body:', resText);
@@ -305,10 +306,11 @@ export class EnterpriseCheckoutEngine {
               } catch (authErr) {
                 console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
               }
+              const augmentedMetadata = { ...metadata, sessionId, paymentRecordId };
               const res = await fetch('/api/payments/complete', {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
+                body: JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata })
               });
               const resText = await res.text();
               console.log('[EnterpriseCheckout] Complete Response status:', res.status, 'body:', resText);
@@ -394,7 +396,11 @@ export class EnterpriseCheckoutEngine {
     // Poll Firestore up to 12 times (6 seconds total) to let the server-side payment completion process the write securely
     let orderDocId = '';
     for (let attempt = 0; attempt < 12; attempt++) {
-      const existingQ = query(collection(db, 'orders'), where('paymentTxId', '==', transactionId));
+      const existingQ = query(
+        collection(db, 'orders'), 
+        where('paymentTxId', '==', transactionId),
+        where('userUid', '==', params.userUid)
+      );
       const existingSnap = await getDocs(existingQ);
       if (!existingSnap.empty) {
         orderDocId = existingSnap.docs[0].id;
