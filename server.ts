@@ -54,36 +54,40 @@ const authenticatePaymentRequest = async (
 ) => {
   const endpoint = req.path;
   const authHeader = req.headers.authorization;
+  const isProd = process.env.NODE_ENV === 'production';
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.error(`[Security Failure] ${endpoint}: Missing or malformed Authorization header.`);
-    if (true) { // AI Studio bypass for authentication in sandbox
-      console.warn(`[Security Warning] ${endpoint}: Proceeding in sandbox/development mode without token.`);
-      (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
-      return next();
+    if (isProd) {
+      console.error(`[Security Violation] ${endpoint}: Missing or malformed authorization header in production.`);
+      return res.status(401).json({ error: "Unauthorized: Missing authorization header." });
     }
-    return res.status(401).json({
-      error: "Unauthorized: Missing or malformed authentication token",
-    });
+    console.warn(`[Security Warning] ${endpoint}: Proceeding in sandbox/development mode without token.`);
+    (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
+    return next();
   }
 
   const token = authHeader.split('Bearer ')[1]?.trim();
   if (!token) {
-    console.error(`[Security Failure] ${endpoint}: Empty Bearer token.`);
-    return res.status(401).json({
-      error: "Unauthorized: Empty authentication token",
-    });
+    if (isProd) {
+      console.error(`[Security Violation] ${endpoint}: Empty bearer token in production.`);
+      return res.status(401).json({ error: "Unauthorized: Invalid bearer token." });
+    }
+    (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
+    return next();
   }
 
   try {
     if (!getApps().length) {
-      console.error(`[Security Failure] ${endpoint}: Firebase Admin SDK uninitialized.`);
-      return res.status(500).json({ error: "Server authentication service uninitialized" });
+      if (isProd) {
+        console.error(`[Security Violation] ${endpoint}: Firebase Admin SDK uninitialized in production.`);
+        return res.status(500).json({ error: "Internal Server Error: Security SDK uninitialized." });
+      }
+      console.warn(`[Security Notice] ${endpoint}: Firebase Admin SDK uninitialized. Proceeding with sandbox user.`);
+      (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
+      return next();
     }
 
     const decodedToken = await getAuth().verifyIdToken(token);
-    
-    // Removed getUser call to prevent network latency during critical payment operations
     (req as any).user = {
       uid: decodedToken.uid,
       email: decodedToken.email
@@ -91,11 +95,13 @@ const authenticatePaymentRequest = async (
 
     next();
   } catch (error: any) {
-    console.error(`[Security Failure] ${endpoint}: Token verification failed - ${error.message}`);
-    return res.status(401).json({
-      error: "Unauthorized: Invalid, malformed, or expired authentication token",
-      details: error.message,
-    });
+    if (isProd) {
+      console.error(`[Security Violation] ${endpoint}: Token verification failed in production - ${error.message}`);
+      return res.status(401).json({ error: `Unauthorized: Token verification failed: ${error.message}` });
+    }
+    console.warn(`[Security Notice] ${endpoint}: Token verification bypassed in dev mode - ${error.message}`);
+    (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
+    return next();
   }
 };
 
@@ -162,7 +168,7 @@ async function startServer() {
   // =========================================================================
 
   // 1. Approve Payment Endpoint
-  app.post("/api/payments/approve", async (req, res) => { // Removed auth middleware to prevent Pi timeout
+  app.post("/api/payments/approve", authenticatePaymentRequest, async (req, res) => {
     const runtimeLogs: string[] = [];
     try {
       const { paymentId, metadata } = req.body;
@@ -173,7 +179,40 @@ async function startServer() {
       runtimeLogs.push(`[Runtime Log] Payment approval request received for paymentId: ${paymentId}`);
       console.log(`[Pi Payment Approve] Payment approval request for ID: ${paymentId}`);
 
-            if (paymentId && paymentId.startsWith('SIM_')) {
+      // Authenticated User & Ownership check
+      const user = (req as any).user;
+      if (user && user.uid !== 'dev_user') {
+        const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid;
+        if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
+          console.error(`[Security Violation] User ${user.uid} tried to approve payment owned by ${expectedBuyerUid}`);
+          return res.status(403).json({ error: "Access Denied: Payment ownership mismatch.", logs: runtimeLogs });
+        }
+      }
+
+      // Duplicate Payment Protection & Replay Protection
+      if (getApps().length > 0) {
+        const db = getDb();
+        const paymentDocId = `PAY_${paymentId}`;
+        const existingDoc = await db.collection('payments').doc(paymentDocId).get();
+        if (existingDoc.exists) {
+          const docData = existingDoc.data();
+          if (docData?.paymentStatus === 'completed') {
+            const msg = `Duplicate/Replay protection check: Payment ${paymentId} has already been completed.`;
+            console.warn(`[Pi Payment Approve] ${msg}`);
+            runtimeLogs.push(`[Runtime Log] ${msg}`);
+            return res.status(400).json({
+              error: "Replay Attempt Blocked: This payment has already been finalized.",
+              logs: runtimeLogs
+            });
+          }
+        }
+      }
+
+      if (paymentId && paymentId.startsWith('SIM_')) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error(`[Security Violation] Simulated payment approval blocked in production environment for paymentId: ${paymentId}`);
+          return res.status(403).json({ error: "Simulated payments are strictly forbidden in production mode.", logs: runtimeLogs });
+        }
         console.log(`[Pi Payment Simulated] Simulated payment for ${paymentId}`);
         runtimeLogs.push(`[Runtime Log] Simulated payment for: ${paymentId}`);
         
@@ -257,11 +296,24 @@ async function startServer() {
       runtimeLogs.push(`[Runtime Log] User approval blockchain txid: ${txid}`);
       console.log(`[Pi Payment Complete] Completion request for ID: ${paymentId}, TxID: ${txid}`);
 
+      // 1. Authenticated User & Ownership check
+      const user = (req as any).user;
+      const buyerId = user?.uid || metadata?.buyerId || metadata?.uid || metadata?.userUid || "unknown_user";
+      if (user && user.uid !== 'dev_user') {
+        const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid || metadata?.buyerId;
+        if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
+          console.error(`[Security Violation] User ${user.uid} tried to complete payment owned by ${expectedBuyerUid}`);
+          return res.status(403).json({ error: "Access Denied: Payment ownership mismatch.", logs: runtimeLogs });
+        }
+      }
+
+      const db = getDb();
+      const paymentDocId = `PAY_${paymentId}`;
+      const paymentRef = db.collection('payments').doc(paymentDocId);
+
       // 1. Prevent duplicate payment processing
       if (getApps().length > 0) {
-        const db = getDb();
-        const paymentDocId = `PAY_${paymentId}`;
-        const existingDoc = await db.collection('payments').doc(paymentDocId).get();
+        const existingDoc = await paymentRef.get();
         if (existingDoc.exists) {
           const docData = existingDoc.data();
           if (docData?.paymentStatus === 'completed') {
@@ -274,6 +326,7 @@ async function startServer() {
               message: "Payment already processed",
               paymentId,
               txid,
+              orderId: docData?.orderId || "",
               payment: docData,
               logs: runtimeLogs
             });
@@ -281,91 +334,384 @@ async function startServer() {
         }
       }
 
-            if (paymentId && paymentId.startsWith('SIM_')) {
+      let paymentData: any = {};
+      const isSimulated = paymentId && paymentId.startsWith('SIM_');
+
+      if (isSimulated) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error(`[Security Violation] Simulated payment completion blocked in production environment for paymentId: ${paymentId}`);
+          return res.status(403).json({ error: "Simulated payments are strictly forbidden in production mode.", logs: runtimeLogs });
+        }
         console.log(`[Pi Payment Simulated] Simulated payment for ${paymentId}`);
         runtimeLogs.push(`[Runtime Log] Simulated payment for: ${paymentId}`);
-        
-        if (req.path.includes('complete')) {
-            if (getApps && getApps().length > 0) {
-                const db = getDb();
-                const paymentDocId = `PAY_${paymentId}`;
-                await db.collection('payments').doc(paymentDocId).set({ paymentStatus: 'completed' }, { merge: true }).catch(() => {});
-            }
+        paymentData = { amount: metadata?.amount || 0.1, memo: metadata?.memo || "Simulated payment", status: "completed" };
+      } else {
+        const apiKey = process.env.PI_NETWORK_API_KEY;
+        const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
+
+        if (isMissingApiKey) {
+          runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
+          console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing.");
+          return res.status(500).json({
+            error: "PI_NETWORK_API_KEY is not configured.",
+            logs: runtimeLogs
+          });
         }
+
+        console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+        runtimeLogs.push("[Runtime Log] POSTing to Pi Network API v2/payments/.../complete...");
         
-        return res.json({ success: true, payment: { status: req.path.includes('complete') ? 'completed' : 'approved' }, logs: runtimeLogs });
+        const response = await axios.post(
+          `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+          { txid },
+          { headers: { Authorization: `Key ${apiKey}` } }
+        );
+        paymentData = response.data;
+        console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId} with Pi Network Server`);
+        runtimeLogs.push(`[Runtime Log] Pi Network server response: verified & completed. ${JSON.stringify(paymentData || {})}`);
       }
 
-      const apiKey = process.env.PI_NETWORK_API_KEY;
-      const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
+      let finalOrderId = "";
 
-      if (isMissingApiKey) {
-        runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
-        console.error("[Security Alert] Payment completion rejected: PI_NETWORK_API_KEY is missing.");
-        return res.status(500).json({
-          error: "PI_NETWORK_API_KEY is not configured.",
-          logs: runtimeLogs
-        });
-      }
-
-      console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
-      runtimeLogs.push("[Runtime Log] POSTing to Pi Network API v2/payments/.../complete...");
-      
-      const response = await axios.post(
-        `https://api.minepi.com/v2/payments/${paymentId}/complete`,
-        { txid },
-        { headers: { Authorization: `Key ${apiKey}` } }
-      );
-      const paymentData = response.data;
-      console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId} with Pi Network Server`);
-      runtimeLogs.push(`[Runtime Log] Pi Network server response: verified & completed. ${JSON.stringify(paymentData || {})}`);
-
-      // 2. Save transaction in Firestore (only after successful verification)
+      // 2. Perform server-side transaction & database updates
       if (getApps().length > 0) {
-        const db = getDb();
-        const paymentDocId = `PAY_${paymentId}`;
-        const paymentRef = db.collection('payments').doc(paymentDocId);
-
-        const transactionData = {
-          paymentId,
-          txid,
-          uid: (req as any).user?.uid || metadata?.uid || "unknown_user",
-          businessId: metadata?.businessId || "PI-CORP-001",
-          storeId: metadata?.storeId || "PI-STORE-001",
-          amount: parseFloat(metadata?.amount || paymentData?.amount || 0),
-          memo: metadata?.memo || paymentData?.memo || `Payment for order #${metadata?.orderNo || "unknown"}`,
-          paymentStatus: "completed",
-          createdAt: FieldValue.serverTimestamp()
-        };
-
-        console.log(`[Pi Payment Complete] Writing secure payment transaction to Firestore: ${paymentDocId}`);
-        runtimeLogs.push(`[Runtime Log] Firestore transaction write started for doc: ${paymentDocId}`);
-        await paymentRef.set(transactionData);
-        runtimeLogs.push(`[Runtime Log] Firestore transaction write successfully saved`);
-
-        // Update corresponding order if metadata.orderNo is present - ASYNC
-        if (metadata?.orderNo) {
-          (async () => {
-            try {
-              const ordersRef = db.collection('orders');
-              const orderSnap = await ordersRef.where('orderNumber', '==', metadata.orderNo).get();
-              if (!orderSnap.empty) {
-                const orderDoc = orderSnap.docs[0];
-                await orderDoc.ref.update({
-                  paymentStatus: 'Paid',
-                  updatedAt: FieldValue.serverTimestamp()
-                });
-                console.log(`[Pi Payment Complete] Updated order status to Paid in Firestore for order: ${metadata.orderNo}`);
-              }
-            } catch (err: any) {
-              console.error("Failed to update order in Firestore asynchronously:", err.message);
-            }
-          })();
+        // Fetch checkout session
+        const sessionId = metadata?.sessionId || metadata?.orderId;
+        if (!sessionId) {
+          throw new Error("Missing sessionId in payment metadata");
         }
+
+        const sessionRef = db.collection('checkoutSessions').doc(sessionId);
+        const sessionSnap = await sessionRef.get();
+        if (!sessionSnap.exists) {
+          throw new Error(`Checkout session ${sessionId} not found`);
+        }
+        const sessionData = sessionSnap.data();
+        if (!sessionData) {
+          throw new Error("Empty session data");
+        }
+
+        const grandTotal = parseFloat(metadata?.amount || paymentData?.amount || sessionData.grandTotal || 0);
+        const sellerId = sessionData.sellerId || sessionData.businessId || 'PI-SELLER';
+
+        // Query cart items to get accurate item details
+        const cartIds = sessionData.cartIds || (sessionData.cartId ? [sessionData.cartId] : []);
+        let cartItems: any[] = [];
+        if (cartIds && cartIds.length > 0) {
+          const cartItemsSnap = await db.collection('cartItems')
+            .where('cartId', 'in', cartIds)
+            .get();
+          cartItems = cartItemsSnap.docs.map(d => ({ itemId: d.id, ...d.data() }));
+        }
+
+        const orderId = `ORD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        finalOrderId = orderId;
+
+        console.log(`[Server Transaction] Starting secure execution for order ${orderId}...`);
+        
+        await db.runTransaction(async (transaction) => {
+          // --- STAGE 1: READ WALLETS ---
+          const buyerWalletRef = db.collection('wallets').doc(`${buyerId}_pi_testnet`);
+          const sellerWalletRef = db.collection('wallets').doc(`${sellerId}_pi_testnet`);
+
+          const buyerWalletSnap = await transaction.get(buyerWalletRef);
+          const sellerWalletSnap = await transaction.get(sellerWalletRef);
+
+          const buyerBalanceBefore = buyerWalletSnap.exists ? (buyerWalletSnap.data()?.balance || 0) : 100.0;
+          const sellerBalanceBefore = sellerWalletSnap.exists ? (sellerWalletSnap.data()?.balance || 0) : 100.0;
+
+          const buyerBalanceAfter = buyerBalanceBefore - grandTotal;
+          const sellerBalanceAfter = sellerBalanceBefore + grandTotal;
+
+          // --- STAGE 2: PRODUCT STOCK UPDATE ---
+          for (const item of cartItems) {
+            if (item.productId) {
+              const productRef = db.collection('products').doc(item.productId);
+              const productDoc = await transaction.get(productRef);
+              if (productDoc.exists) {
+                const pData = productDoc.data();
+                const newStock = Math.max(0, (pData?.stock || 0) - (item.quantity || 1));
+                transaction.update(productRef, { stock: newStock });
+              }
+            }
+          }
+
+          // --- STAGE 3: CREDIT SELLER WALLET & DEBIT BUYER ---
+          if (!buyerWalletSnap.exists) {
+            transaction.set(buyerWalletRef, {
+              userId: buyerId,
+              provider: 'pi_testnet',
+              balance: buyerBalanceAfter,
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          } else {
+            transaction.update(buyerWalletRef, {
+              balance: buyerBalanceAfter,
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          }
+
+          if (!sellerWalletSnap.exists) {
+            transaction.set(sellerWalletRef, {
+              userId: sellerId,
+              provider: 'pi_testnet',
+              balance: sellerBalanceAfter,
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          } else {
+            transaction.update(sellerWalletRef, {
+              balance: sellerBalanceAfter,
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          }
+
+          // --- STAGE 4: WRITE WALLET TRANSACTIONS ---
+          const buyerTxRef = db.collection('wallet_transactions').doc();
+          transaction.set(buyerTxRef, {
+            walletId: buyerWalletRef.id,
+            userId: buyerId,
+            provider: 'pi_testnet',
+            type: 'DEBIT',
+            amount: grandTotal,
+            balanceBefore: buyerBalanceBefore,
+            balanceAfter: buyerBalanceAfter,
+            source: 'CHECKOUT',
+            description: `Payment debit for marketplace order #${orderId}`,
+            referenceId: orderId,
+            createdAt: FieldValue.serverTimestamp()
+          });
+
+          const sellerTxRef = db.collection('wallet_transactions').doc();
+          transaction.set(sellerTxRef, {
+            walletId: sellerWalletRef.id,
+            userId: sellerId,
+            provider: 'pi_testnet',
+            type: 'CREDIT',
+            amount: grandTotal,
+            balanceBefore: sellerBalanceBefore,
+            balanceAfter: sellerBalanceAfter,
+            source: 'CHECKOUT',
+            description: `Sale credit for marketplace order #${orderId}`,
+            referenceId: orderId,
+            createdAt: FieldValue.serverTimestamp()
+          });
+
+          // --- STAGE 5: WRITE MASTER LEDGER ---
+          const buyerLedgerId = `mled_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const buyerLedgerRef = db.collection('master_ledger').doc(buyerLedgerId);
+          transaction.set(buyerLedgerRef, {
+            entryId: buyerLedgerId,
+            transactionId: txid,
+            walletAddress: `pi_addr_${buyerId.substring(0, 10)}`,
+            userId: buyerId,
+            asset: 'PI_TESTNET',
+            amount: -grandTotal,
+            beforeBalance: buyerBalanceBefore,
+            afterBalance: buyerBalanceAfter,
+            referenceId: orderId,
+            source: 'CHECKOUT',
+            status: 'CONFIRMED',
+            memo: `Payment debit for marketplace order #${orderId}`,
+            timestamp: new Date().toISOString(),
+            createdAt: FieldValue.serverTimestamp()
+          });
+
+          const sellerLedgerId = `mled_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const sellerLedgerRef = db.collection('master_ledger').doc(sellerLedgerId);
+          transaction.set(sellerLedgerRef, {
+            entryId: sellerLedgerId,
+            transactionId: txid,
+            walletAddress: `pi_addr_${sellerId.substring(0, 10)}`,
+            userId: sellerId,
+            asset: 'PI_TESTNET',
+            amount: grandTotal,
+            beforeBalance: sellerBalanceBefore,
+            afterBalance: sellerBalanceAfter,
+            referenceId: orderId,
+            source: 'CHECKOUT',
+            status: 'CONFIRMED',
+            memo: `Sale credit for marketplace order #${orderId}`,
+            timestamp: new Date().toISOString(),
+            createdAt: FieldValue.serverTimestamp()
+          });
+
+          // --- STAGE 6: UPDATE MASTER WALLETS ---
+          const buyerMasterWalletRef = db.collection('master_wallets').doc(buyerId);
+          const buyerMasterWalletSnap = await transaction.get(buyerMasterWalletRef);
+          const buyerMasterWalletData = buyerMasterWalletSnap.exists ? buyerMasterWalletSnap.data() : {};
+          transaction.set(buyerMasterWalletRef, {
+            ...buyerMasterWalletData,
+            userId: buyerId,
+            address: `pi_addr_${buyerId.substring(0, 10)}`,
+            piTestnetBalance: buyerBalanceAfter,
+            updatedAt: FieldValue.serverTimestamp()
+          }, { merge: true });
+
+          const sellerMasterWalletRef = db.collection('master_wallets').doc(sellerId);
+          const sellerMasterWalletSnap = await transaction.get(sellerMasterWalletRef);
+          const sellerMasterWalletData = sellerMasterWalletSnap.exists ? sellerMasterWalletSnap.data() : {};
+          transaction.set(sellerMasterWalletRef, {
+            ...sellerMasterWalletData,
+            userId: sellerId,
+            address: `pi_addr_${sellerId.substring(0, 10)}`,
+            piTestnetBalance: sellerBalanceAfter,
+            updatedAt: FieldValue.serverTimestamp()
+          }, { merge: true });
+
+          // --- STAGE 7: UPDATE MERCHANT SETTLEMENT ---
+          const settlementId = `SETTLE_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+          const settlementRef = db.collection('merchantSettlements').doc(settlementId);
+          const releaseDate = new Date();
+          releaseDate.setDate(releaseDate.getDate() + 7);
+          transaction.set(settlementRef, {
+            settlementId,
+            orderId,
+            businessId: sessionData.businessId || 'PI-BIZ',
+            storeId: sessionData.storeId || '',
+            sellerId: sellerId,
+            amount: grandTotal * 0.95,
+            currency: sessionData.currency || 'Pi',
+            status: 'PENDING',
+            createdAt: new Date().toISOString(),
+            releaseEligibleAt: releaseDate.toISOString()
+          });
+
+          // --- STAGE 8: COMPLETE ORDER (Create verified order doc) ---
+          const orderRef = db.collection('orders').doc(orderId);
+          const orderNumber = 'ORD-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+          const qrCode = `PI_QR_${orderId}_${Date.now()}`;
+          const nowIso = new Date().toISOString();
+
+          const initialLog = {
+            timestamp: nowIso,
+            message: 'Order Created',
+            actorUid: buyerId,
+            role: 'buyer',
+            status: 'CONFIRMED'
+          };
+
+          const initialHistory = {
+            status: 'CONFIRMED',
+            timestamp: nowIso,
+            updatedBy: buyerId,
+            remarks: 'Order completed and verified server-side'
+          };
+
+          const orderData = {
+            id: orderId,
+            orderId: orderId,
+            orderNumber,
+            qrVerificationCode: qrCode,
+            receiptNumber: `RCP-${orderNumber}`,
+            type: 'order',
+            buyerId,
+            userUid: buyerId,
+            sellerId,
+            businessId: sessionData.businessId || 'PI-BIZ',
+            storeId: sessionData.storeId || '',
+            productId: sessionData.productId || '',
+            quantity: sessionData.quantity || 1,
+            price: sessionData.price || 0,
+            currency: sessionData.currency || 'Pi',
+            subtotal: sessionData.subtotal || grandTotal,
+            discount: sessionData.discount || 0,
+            shipping: sessionData.shipping || 0,
+            tax: sessionData.tax || 0,
+            grandTotal,
+            amount: grandTotal,
+            paymentStatus: 'Paid',
+            orderStatus: 'CONFIRMED',
+            paymentId: paymentDocId,
+            paymentTxId: txid,
+            transactionId: txid,
+            activityLogs: [initialLog],
+            historyLog: [initialHistory],
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            items: cartItems.map(item => {
+              const cleanItem: any = {};
+              Object.entries(item).forEach(([k, v]) => {
+                if (v !== undefined && !Number.isNaN(v)) cleanItem[k] = v;
+              });
+              return cleanItem;
+            })
+          };
+
+          transaction.set(orderRef, orderData);
+
+          // --- STAGE 9: LOYALTY POINTS REWARD ---
+          const points = Math.floor(grandTotal * 10);
+          const loyaltyAccountId = `LOY_${buyerId}`;
+          const loyaltyAccountRef = db.collection('loyaltyAccounts').doc(loyaltyAccountId);
+          const loyaltyAccountSnap = await transaction.get(loyaltyAccountRef);
+
+          if (!loyaltyAccountSnap.exists) {
+            transaction.set(loyaltyAccountRef, {
+              accountId: loyaltyAccountId,
+              customerId: buyerId,
+              businessId: sessionData.businessId || 'PI-BIZ',
+              pointsBalance: points,
+              tier: 'bronze',
+              lifetimePoints: points,
+              lastEarnedAt: FieldValue.serverTimestamp()
+            });
+          } else {
+            const lData = loyaltyAccountSnap.data();
+            const currentPoints = (lData?.pointsBalance || 0) + points;
+            const lifetime = (lData?.lifetimePoints || 0) + points;
+            let newTier = 'bronze';
+            if (lifetime >= 5000) newTier = 'gold';
+            else if (lifetime >= 2000) newTier = 'silver';
+
+            transaction.update(loyaltyAccountRef, {
+              pointsBalance: FieldValue.increment(points),
+              lifetimePoints: FieldValue.increment(points),
+              tier: newTier,
+              lastEarnedAt: FieldValue.serverTimestamp()
+            });
+          }
+
+          const lTrxId = `LTRX_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+          const lTrxRef = db.collection('loyaltyTransactions').doc(lTrxId);
+          transaction.set(lTrxRef, {
+            transactionId: lTrxId,
+            accountId: loyaltyAccountId,
+            type: 'earn',
+            points,
+            referenceType: 'order',
+            referenceId: orderId,
+            createdAt: FieldValue.serverTimestamp()
+          });
+
+          // --- STAGE 10: SAVE PAYMENT TRANSACTION ---
+          const transactionData = {
+            paymentId,
+            txid,
+            uid: buyerId,
+            businessId: sessionData.businessId || "PI-CORP-001",
+            storeId: sessionData.storeId || "PI-STORE-001",
+            amount: grandTotal,
+            memo: metadata?.memo || paymentData?.memo || `Payment for order #${orderNumber}`,
+            paymentStatus: "completed",
+            orderId: orderId,
+            createdAt: FieldValue.serverTimestamp()
+          };
+          transaction.set(paymentRef, transactionData);
+
+          // --- STAGE 11: UPDATE SESSIONS TO COMPLETED ---
+          transaction.update(sessionRef, {
+            status: 'completed',
+            updatedAt: new Date().toISOString()
+          });
+        });
+        
+        console.log(`[Server Transaction] Complete flow successfully committed for order ${orderId}.`);
       }
 
       runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
-      res.json({ success: true, payment: paymentData, logs: runtimeLogs });
+      res.json({ success: true, payment: paymentData, orderId: finalOrderId, logs: runtimeLogs });
     } catch (error: any) {
       const errorMsg = error.response?.data || error.message;
       console.error("[Pi Payment Complete] Error completing payment:", errorMsg);
@@ -707,7 +1053,7 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  if (true) { // AI Studio bypass for authentication in sandbox
+  if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

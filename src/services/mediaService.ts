@@ -106,7 +106,7 @@ export const mediaService = {
     }
 
     // 2. Fallback: If options.storeId exists but options.businessId doesn't, try to fetch the store to get its businessId!
-    if (!resolvedBusinessId && resolvedStoreId) {
+    if (!resolvedBusinessId && resolvedStoreId && resolvedStoreId !== 'none') {
       try {
         const storeDoc = await getDoc(doc(db, 'stores', resolvedStoreId));
         if (storeDoc.exists()) {
@@ -114,6 +114,45 @@ export const mediaService = {
         }
       } catch (err) {
         console.warn('[mediaService] Failed to resolve businessId from storeId:', err);
+      }
+    }
+
+    // 2b. Universal lookup: If we have an ownerUid, try resolving businessId and storeId from their active store/business if either is missing or invalid
+    const isInvalidVal = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '' || val === 'unknown';
+    if (ownerUid && (isInvalidVal(resolvedBusinessId) || isInvalidVal(resolvedStoreId))) {
+      try {
+        // Query stores owned by this ownerUid
+        const storesQuery = query(collection(db, 'stores'));
+        const storesSnap = await getDocs(storesQuery);
+        const validStoreDoc = storesSnap.docs.find(d => {
+          const sData = d.data();
+          return sData.status !== 'deleted' && (sData.ownerId === ownerUid || sData.ownerUid === ownerUid);
+        }) || storesSnap.docs[0];
+
+        if (validStoreDoc) {
+          if (isInvalidVal(resolvedStoreId)) {
+            resolvedStoreId = validStoreDoc.id;
+          }
+          if (isInvalidVal(resolvedBusinessId)) {
+            resolvedBusinessId = validStoreDoc.data()?.businessId;
+          }
+        }
+
+        // If still businessId is invalid, try business lookup
+        if (isInvalidVal(resolvedBusinessId)) {
+          const bizQuery = query(collection(db, 'businesses'));
+          const bizSnap = await getDocs(bizQuery);
+          const validBizDoc = bizSnap.docs.find(d => {
+            const bData = d.data();
+            return bData.status !== 'deleted' && (bData.ownerUid === ownerUid || bData.ownerId === ownerUid);
+          }) || bizSnap.docs[0];
+
+          if (validBizDoc) {
+            resolvedBusinessId = validBizDoc.id;
+          }
+        }
+      } catch (err) {
+        console.warn('[mediaService] Failed to fallback resolve business/store:', err);
       }
     }
 

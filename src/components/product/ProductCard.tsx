@@ -312,7 +312,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           productName: `${rest.productName} (Copy)`,
           productSlug: `${rest.productSlug}-copy-${Math.floor(Math.random() * 1000)}`,
           sku: `${rest.sku}-COPY-${Math.floor(Math.random() * 1000)}`,
-          status: 'draft'
+          status: rest.status || 'published'
         });
         triggerToast('Product duplicated');
         window.dispatchEvent(new Event('productsChanged'));

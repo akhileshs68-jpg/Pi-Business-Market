@@ -117,7 +117,7 @@ export const UNIVERSAL_BUSINESS_TYPES: Record<string, RegistrationFormConfig> = 
     requiresLicense: false,
     requiresTaxId: false,
     customFields: [
-      { id: 'hasPhysicalStore', label: 'Physical Storefront Available', type: 'boolean', required: true },
+      { id: 'hasPhysicalStore', label: 'Physical Storefront Available', type: 'boolean', required: false },
       { id: 'deliveryRadiusKm', label: 'Delivery Radius (km)', type: 'number', required: false, placeholder: '10' },
       { id: 'acceptsReturns', label: 'Accepts Product Returns', type: 'boolean', required: false }
     ]

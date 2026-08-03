@@ -86,29 +86,64 @@ export const cartService = {
     // Fetch product to get latest details and stock
     const productRef = doc(db, 'products', item.productId);
     const productSnap = await getDoc(productRef);
-    let ownerId = 'unknown';
-    let businessId = 'unknown';
-    let storeId = 'unknown';
+    let ownerId = 'none';
+    let businessId = 'none';
+    let storeId = 'none';
     let stock = 999;
+    const isInvalid = (val: any) => !val || val === 'none' || val === 'unknown' || val === 'null' || val === 'undefined' || val === '';
     
     if (productSnap.exists()) {
       const pData = productSnap.data();
-      ownerId = pData.ownerUid || 'unknown';
-      businessId = pData.businessId || 'unknown';
-      storeId = pData.storeId || 'unknown';
+      ownerId = pData.ownerUid || pData.ownerId || pData.sellerId || pData.merchantId || pData.createdBy || 'none';
+      businessId = pData.businessId || 'none';
+      storeId = pData.storeId || 'none';
       stock = pData.stock !== undefined ? pData.stock : 999;
 
       if (pData.status === 'Deleted' || pData.status === 'draft' || pData.status === 'Inactive') {
         throw new Error('This product is no longer available.');
       }
 
-      if (storeId && storeId !== 'unknown' && storeId !== 'none' && storeId !== 'undefined') {
+      // 1. If storeId is valid, verify store
+      if (!isInvalid(storeId)) {
         const storeSnap = await getDoc(doc(db, 'stores', storeId));
         if (storeSnap.exists()) {
           const sData = storeSnap.data();
           if (sData.status !== 'active' && sData.status !== 'published' && sData.status !== 'approved' && sData.status) {
             throw new Error('This product is no longer available.');
           }
+          if (isInvalid(businessId)) businessId = sData.businessId;
+          if (isInvalid(ownerId)) ownerId = sData.ownerId || sData.ownerUid;
+        }
+      } else {
+        // Fallback store
+        const storesQuery = query(collection(db, 'stores'));
+        const storesSnap = await getDocs(storesQuery);
+        const validStoreDoc = storesSnap.docs.find(d => {
+          const data = d.data() as any;
+          return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || isInvalid(ownerId));
+        }) || storesSnap.docs[0];
+
+        if (validStoreDoc) {
+          const sData = validStoreDoc.data() as any;
+          storeId = validStoreDoc.id;
+          if (isInvalid(businessId)) businessId = sData.businessId;
+          if (isInvalid(ownerId)) ownerId = sData.ownerId || sData.ownerUid;
+        }
+      }
+
+      // 2. Fallback business
+      if (isInvalid(businessId)) {
+        const bizQuery = query(collection(db, 'businesses'));
+        const bizSnap = await getDocs(bizQuery);
+        const validBizDoc = bizSnap.docs.find(d => {
+          const data = d.data() as any;
+          return data.status !== 'deleted' && (data.ownerUid === ownerId || data.ownerId === ownerId || isInvalid(ownerId));
+        }) || bizSnap.docs[0];
+
+        if (validBizDoc) {
+          businessId = validBizDoc.id;
+          const bData = validBizDoc.data() as any;
+          if (isInvalid(ownerId)) ownerId = bData.ownerUid || bData.ownerId;
         }
       }
     }
@@ -122,6 +157,12 @@ export const cartService = {
         quantity: newQuantity,
         subtotal: item.unitPrice * newQuantity,
         stock: stock,
+        ownerId,
+        ownerUid: ownerId,
+        sellerId: ownerId,
+        merchantId: ownerId,
+        businessId,
+        storeId,
         updatedAt: new Date().toISOString()
       });
     } else {
@@ -131,6 +172,9 @@ export const cartService = {
         id: itemId,
         userId,
         ownerId,
+        ownerUid: ownerId,
+        sellerId: ownerId,
+        merchantId: ownerId,
         businessId,
         storeId,
         productName: item.name,

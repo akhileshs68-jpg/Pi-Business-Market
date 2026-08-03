@@ -77,7 +77,7 @@ export const paymentService = {
         ...(txid ? { transactionId: txid } : {})
       };
       
-      await updateDoc(paymentRef, updates);
+      await setDoc(paymentRef, updates, { merge: true });
 
       const headers = await getAuthHeaders();
       await fetch('/api/payments/status', {
@@ -133,50 +133,72 @@ export const paymentService = {
     onSuccess: (txid: string) => void,
     onError: (err: string) => void
   ) {
+    console.log('[PaymentService] Payment Created - Starting processPiPayment. Payment ID:', paymentId);
     await piPaymentService.createPayment({ amount, memo, metadata }, {
       onReadyForServerApproval: async (piPaymentId: string) => {
+        console.log('[PaymentService] Approval Callback Entered for Pi Payment ID:', piPaymentId);
         try {
+          console.log('[PaymentService] Approve Request Started...');
+          let headers: any = { 'Content-Type': 'application/json' };
+          try {
+            headers = await getAuthHeaders();
+          } catch (authErr) {
+            console.warn('[PaymentService] Auth header fallback for approve:', authErr);
+          }
           const res = await fetch('/api/payments/approve', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ paymentId: piPaymentId, metadata })
           });
-          if (!res.ok) throw new Error('Server approval failed');
-          // Server handles Processing state
+          const resText = await res.text();
+          console.log('[PaymentService] Approve Response status:', res.status, 'body:', resText);
+          if (!res.ok) {
+            throw new Error(`Server approval failed (${res.status}): ${resText}`);
+          }
+          console.log('[PaymentService] Approval Callback Finished.');
         } catch (err: any) {
-          console.error(err);
+          console.error('[PaymentService] Exception in onReadyForServerApproval:', err);
+          throw err;
         }
       },
       onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
+        console.log('[PaymentService] Completion Callback Entered. Payment ID:', piPaymentId, 'TxID:', txid);
         try {
-          const headers = await getAuthHeaders();
+          console.log('[PaymentService] Completion Request Started...');
+          let headers: any = { 'Content-Type': 'application/json' };
+          try {
+            headers = await getAuthHeaders();
+          } catch (authErr) {
+            console.warn('[PaymentService] Auth header fallback:', authErr);
+          }
           const res = await fetch('/api/payments/complete', {
             method: 'POST',
             headers,
             body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
           });
-          if (!res.ok) throw new Error('Verification Failed');
-          
-          // Server handles Completed state
-          onSuccess(txid);
-          
-          // Note: The backend / webhook should ideally update the order status
-          // But for immediate UI feedback we can also update the order if we have it
-          if (metadata.orderId) {
-            // Server handles order Paid state
+          const resText = await res.text();
+          console.log('[PaymentService] Complete Response status:', res.status, 'body:', resText);
+          if (!res.ok) {
+            throw new Error(`Verification Failed (${res.status}): ${resText}`);
           }
+          
+          console.log('[PaymentService] Completion Finished.');
+          onSuccess(txid);
         } catch (err: any) {
-          console.error(err);
-          await this.updateTransactionStatus(paymentId, 'Failed');
-          onError('Verification Failed');
+          console.error('[PaymentService] Exception in onReadyForServerCompletion:', err);
+          await this.updateTransactionStatus(paymentId, 'Failed').catch(console.error);
+          onError('Verification Failed: ' + err.message);
+          throw err;
         }
       },
       onCancel: async (piPaymentId: string) => {
-        await this.updateTransactionStatus(paymentId, 'Cancelled');
+        console.log('[PaymentService] Payment Cancelled. Payment ID:', piPaymentId);
+        await this.updateTransactionStatus(paymentId, 'Cancelled').catch(console.error);
         onError('Payment cancelled by user');
       },
       onError: async (error: Error, piPaymentId: string) => {
-        await this.updateTransactionStatus(paymentId, 'Failed');
+        console.error('[PaymentService] Payment Error:', error, 'Payment ID:', piPaymentId);
+        await this.updateTransactionStatus(paymentId, 'Failed').catch(console.error);
         onError(error.message);
       }
     });

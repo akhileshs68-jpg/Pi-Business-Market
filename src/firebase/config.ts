@@ -1,29 +1,46 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, Firestore, initializeFirestore, connectFirestoreEmulator, getFirestore as _getFirestore } from 'firebase/firestore';
-import { getStorage, FirebaseStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore, initializeFirestore, getFirestore as _getFirestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+import firebaseAppletConfig from '../../firebase-applet-config.json';
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
-export const isFirebaseConfigured = () => {
-  return !!(import.meta as any).env.VITE_FIREBASE_API_KEY;
-};
-
-const useEmulator = () => false;
-
-export const getFirebaseApp = () => {
-  if (!app) {
-    const firebaseConfig = {
+const getRawConfig = () => {
+  const envKey = (import.meta as any).env.VITE_FIREBASE_API_KEY;
+  if (envKey) {
+    return {
       apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY,
       authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID,
       storageBucket: (import.meta as any).env.VITE_FIREBASE_STORAGE_BUCKET,
       messagingSenderId: (import.meta as any).env.VITE_FIREBASE_MESSAGING_SENDER_ID,
       appId: (import.meta as any).env.VITE_FIREBASE_APP_ID,
+      firestoreDatabaseId: (import.meta as any).env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
     };
+  }
+  return {
+    apiKey: firebaseAppletConfig.apiKey,
+    authDomain: firebaseAppletConfig.authDomain,
+    projectId: firebaseAppletConfig.projectId,
+    storageBucket: firebaseAppletConfig.storageBucket,
+    messagingSenderId: firebaseAppletConfig.messagingSenderId,
+    appId: firebaseAppletConfig.appId,
+    firestoreDatabaseId: firebaseAppletConfig.firestoreDatabaseId,
+  };
+};
+
+export const isFirebaseConfigured = () => {
+  const cfg = getRawConfig();
+  return !!(cfg.apiKey && cfg.projectId);
+};
+
+export const getFirebaseApp = () => {
+  if (!app) {
+    const firebaseConfig = getRawConfig();
     if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
       console.warn('Firebase configuration is missing.');
       return null as any;
@@ -46,7 +63,8 @@ export const getFirebaseDb = () => {
   const app = getFirebaseApp();
   if (!app) throw new Error('Firebase Firestore unavailable');
   if (!db) {
-    const databaseId = (import.meta as any).env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+    const rawCfg = getRawConfig();
+    const databaseId = rawCfg.firestoreDatabaseId;
     try {
       if (databaseId && typeof databaseId === 'string' && databaseId.trim().length > 0) {
         db = initializeFirestore(app, { experimentalForceLongPolling: true }, databaseId);
@@ -74,3 +92,4 @@ export const getFirebaseStorage = () => {
   }
   return storage;
 };
+

@@ -71,24 +71,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isProcessing.current = true;
           console.log('[DEBUG] [AuthProvider] Authenticated UID:', firebaseUser.uid);
           const lastPiUid = localStorage.getItem('last_pi_uid');
-          const lastResolvedUid = localStorage.getItem('last_resolved_uid');
-          let fetchedProfile = await authService.getUserProfile(firebaseUser.uid, lastPiUid || undefined, lastResolvedUid || undefined);
+          let fetchedProfile = await authService.getUserProfile(firebaseUser.uid, lastPiUid || undefined);
           console.log('[DEBUG] [AuthProvider] Profile fetched:', fetchedProfile);
           if (fetchedProfile) {
             fetchedProfile = await migrateProfileIfNeeded(fetchedProfile);
           }
           if (isMounted) {
-            setProfile(fetchedProfile);
             if (fetchedProfile) {
+              setProfile(fetchedProfile);
               setUser(fetchedProfile);
             } else {
-              // Create skeleton/temp user object indicating authenticated but no profile doc
+              // Create clean, isolated user object strictly for this firebaseUser
               const username = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 5);
-              setUser({
+              const freshUser: User = {
                 uid: firebaseUser.uid,
-                piUid: 'google_' + firebaseUser.uid,
+                piUid: 'user_' + firebaseUser.uid.slice(0, 8),
                 username,
                 displayName: firebaseUser.displayName || 'Pioneer',
+                photoUrl: firebaseUser.photoURL || undefined,
                 roles: ['buyer'],
                 activeRole: 'buyer',
                 role: 'Buyer',
@@ -101,14 +101,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 status: 'active',
                 profileCompleted: false,
                 onboardingCompleted: false
-              } as any);
+              } as any;
+              setUser(freshUser);
+              setProfile(freshUser);
+              authService.updateUserProfile(firebaseUser.uid, freshUser).catch(console.error);
             }
 
             // Asynchronously resolve enterprise identity
             identityService.resolveIdentity(
               firebaseUser.uid,
-              fetchedProfile?.piUid || 'google_' + firebaseUser.uid,
-              fetchedProfile?.username || 'pioneer',
+              fetchedProfile?.piUid || 'user_' + firebaseUser.uid.slice(0, 8),
+              fetchedProfile?.username || 'user_' + firebaseUser.uid.slice(0, 5),
               fetchedProfile?.displayName || firebaseUser.displayName || 'Pioneer'
             ).then(entIdentity => {
               if (isMounted) {
@@ -190,9 +193,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setLoading(true);
     try {
-      await authService.logout();
       setUser(null);
       setProfile(null);
+      setIdentity(null);
+      setPermissions([]);
+      await authService.logout();
     } catch (err: any) {
       setError(err.message || 'Logout failed');
     } finally {

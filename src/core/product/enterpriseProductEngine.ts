@@ -93,7 +93,7 @@ export class EnterpriseProductEngine {
     const { id, productId: pid, createdAt, updatedAt, ...copyData } = original;
     copyData.productName = `${original.productName || 'Product'} (Copy)`;
     copyData.sku = original.sku ? `${original.sku}-COPY` : `SKU-${Date.now()}`;
-    copyData.status = 'draft';
+    copyData.status = original.status || 'published';
 
     return await this.saveProduct(copyData, false);
   }

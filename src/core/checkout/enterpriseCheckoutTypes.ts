@@ -39,6 +39,7 @@ export interface PiTestnetVerificationResult {
   amountVerified: number;
   timestamp: string;
   errorMessage?: string;
+  orderId?: string;
 }
 
 export interface OrderSummaryBreakdown {

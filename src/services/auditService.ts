@@ -40,25 +40,27 @@ export const auditService = {
     const logId = `AUDIT_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
     const logRef = doc(db, 'auditLogs', logId);
 
-    const log: AuditLog = {
+    const logData: Record<string, any> = {
       logId,
-      actorUid,
-      actorName,
-      action,
-      targetType,
-      targetId,
-      description,
-      before: options?.before,
-      after: options?.after,
+      actorUid: actorUid || 'system',
+      actorName: actorName || 'System',
+      action: action || 'UNKNOWN_ACTION',
+      targetType: targetType || 'SYSTEM',
+      targetId: targetId || 'GLOBAL',
+      description: description || '',
       severity: options?.severity || 'info',
-      timestamp: new Date().toISOString()
+      timestamp: serverTimestamp()
     };
 
+    if (options?.before !== undefined) {
+      logData.before = JSON.parse(JSON.stringify(options.before));
+    }
+    if (options?.after !== undefined) {
+      logData.after = JSON.parse(JSON.stringify(options.after));
+    }
+
     try {
-      await setDoc(logRef, {
-        ...log,
-        timestamp: serverTimestamp()
-      });
+      await setDoc(logRef, logData);
     } catch (err) {
       console.error('Failed to record audit log', err);
     }

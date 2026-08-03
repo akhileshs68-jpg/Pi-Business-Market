@@ -40,13 +40,10 @@ const SEED_USERS: User[] = [DEFAULT_CURRENT_USER];
 export class PiBusinessMarketDB {
   static init() {
     if (!localStorage.getItem(KEYS.USERS)) {
-      localStorage.setItem(KEYS.USERS, JSON.stringify(SEED_USERS));
+      localStorage.setItem(KEYS.USERS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.STORES)) {
       localStorage.setItem(KEYS.STORES, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.CURRENT_USER)) {
-      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(DEFAULT_CURRENT_USER));
     }
   }
 
@@ -60,10 +57,10 @@ export class PiBusinessMarketDB {
     localStorage.setItem(key, JSON.stringify(data));
   }
 
-  static getCurrentUser(): User {
+  static getCurrentUser(): User | null {
     this.init();
     const userStr = localStorage.getItem(KEYS.CURRENT_USER);
-    return userStr ? JSON.parse(userStr) : DEFAULT_CURRENT_USER;
+    return userStr ? JSON.parse(userStr) : null;
   }
 
   static saveCurrentUser(user: User): void {

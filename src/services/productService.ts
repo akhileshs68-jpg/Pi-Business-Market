@@ -11,7 +11,32 @@ import {
   deleteDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
+
+function sanitizeImageField(val: any): any {
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    const lower = trimmed.toLowerCase();
+    if (
+      !trimmed ||
+      lower === 'none' ||
+      lower === 'undefined' ||
+      lower === 'null' ||
+      lower === 'placeholder' ||
+      lower === '[object object]' ||
+      lower.startsWith('blob:')
+    ) {
+      return '';
+    }
+    return trimmed;
+  }
+  if (Array.isArray(val)) {
+    return val
+      .map(item => sanitizeImageField(item))
+      .filter(item => typeof item === 'string' && item !== '');
+  }
+  return val;
+}
 
 async function getCloudinaryPublicId(url: string, db: any): Promise<string> {
   if (!url || url === 'none') return 'none';
@@ -68,6 +93,31 @@ async function getCloudinaryPublicId(url: string, db: any): Promise<string> {
   return 'none';
 }
 
+function removeUndefinedFields(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  // Preserve special non-plain objects like FieldValue, Timestamp, Date
+  if (obj.constructor && obj.constructor.name !== 'Object' && obj.constructor.name !== 'Array' && !Array.isArray(obj)) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .map(item => removeUndefinedFields(item))
+      .filter(item => item !== undefined);
+  }
+  const cleanObj: any = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== undefined) {
+      const cleaned = removeUndefinedFields(val);
+      if (cleaned !== undefined) {
+        cleanObj[key] = cleaned;
+      }
+    }
+  }
+  return cleanObj;
+}
+
 export const productService = {
   async createItem(itemData: any): Promise<string> {
     const db = getFirebaseDb();
@@ -87,6 +137,14 @@ export const productService = {
       }
     });
 
+    // Sanitize image fields inside sanitizedData
+    if (sanitizedData.imageUrl) sanitizedData.imageUrl = sanitizeImageField(sanitizedData.imageUrl);
+    if (sanitizedData.mainImage) sanitizedData.mainImage = sanitizeImageField(sanitizedData.mainImage);
+    if (sanitizedData.serviceImage) sanitizedData.serviceImage = sanitizeImageField(sanitizedData.serviceImage);
+    if (sanitizedData.logoUrl) sanitizedData.logoUrl = sanitizeImageField(sanitizedData.logoUrl);
+    if (sanitizedData.imageUrls) sanitizedData.imageUrls = sanitizeImageField(sanitizedData.imageUrls);
+    if (sanitizedData.images) sanitizedData.images = sanitizeImageField(sanitizedData.images);
+
     let imageUrl = sanitizedData.imageUrl || sanitizedData.imageUrls?.[0] || sanitizedData.serviceImage || sanitizedData.logoUrl;
     if (collectionName === 'products') {
       const productImages = sanitizedData.imageUrls || sanitizedData.images || [];
@@ -94,12 +152,15 @@ export const productService = {
         imageUrl = productImages[0];
       }
     }
+    
+    const defaultPlaceholder = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400';
+    imageUrl = sanitizeImageField(imageUrl);
     if (!imageUrl) {
-      imageUrl = 'none';
+      imageUrl = defaultPlaceholder;
     }
 
     let publicId = sanitizedData.publicId || sanitizedData.storagePath || sanitizedData.logoPublicId;
-    if (collectionName === 'products' && imageUrl && imageUrl !== 'none') {
+    if (collectionName === 'products' && imageUrl && imageUrl !== defaultPlaceholder) {
       const resolvedPublicId = await getCloudinaryPublicId(imageUrl, db);
       if (resolvedPublicId && resolvedPublicId !== 'none') {
         publicId = resolvedPublicId;
@@ -111,55 +172,76 @@ export const productService = {
 
     let finalStoreId = sanitizedData.storeId;
     let finalBusinessId = sanitizedData.businessId;
-    let ownerId = sanitizedData.ownerUid || sanitizedData.ownerId;
+    let ownerId = sanitizedData.ownerUid || sanitizedData.ownerId || sanitizedData.sellerId || sanitizedData.merchantId || sanitizedData.createdBy || sanitizedData.createdByUid;
     let selectedStore: any = null;
 
-    if (collectionName === 'products') {
-      // 1. Load the selected Store document
-      if (finalStoreId && finalStoreId !== 'none') {
-        const storeSnap = await getDoc(doc(db, 'stores', finalStoreId));
-        if (storeSnap.exists()) {
-          selectedStore = storeSnap.data();
-          finalStoreId = storeSnap.id;
-          finalBusinessId = selectedStore.businessId;
-          ownerId = selectedStore.ownerId || selectedStore.ownerUid;
+    const isInvalid = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '' || val === 'unknown';
+
+    // 1. Resolve ownerId if missing
+    if (isInvalid(ownerId)) {
+      try {
+        const auth = getFirebaseAuth();
+        if (auth?.currentUser?.uid) {
+          ownerId = auth.currentUser.uid;
         }
+      } catch (e) {
+        // ignore
       }
+    }
 
-      // Fallback: If not found or if finalStoreId was 'none', try to query any store document
-      if (!selectedStore) {
-        const storesQuery = query(collection(db, 'stores'));
-        const storesSnap = await getDocs(storesQuery);
-        const validStoreDoc = storesSnap.docs.find(d => {
-          const data = d.data();
-          return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || ownerId === 'none' || !ownerId);
-        }) || storesSnap.docs[0];
-
-        if (validStoreDoc) {
-          selectedStore = validStoreDoc.data();
-          finalStoreId = validStoreDoc.id;
-          finalBusinessId = selectedStore.businessId;
-          ownerId = selectedStore.ownerId || selectedStore.ownerUid;
-        }
+    // 2. Load the selected Store document
+    if (!isInvalid(finalStoreId)) {
+      const storeSnap = await getDoc(doc(db, 'stores', finalStoreId));
+      if (storeSnap.exists()) {
+        selectedStore = storeSnap.data();
+        finalStoreId = storeSnap.id;
+        if (isInvalid(finalBusinessId)) finalBusinessId = selectedStore.businessId;
+        if (isInvalid(ownerId)) ownerId = selectedStore.ownerId || selectedStore.ownerUid;
       }
+    }
 
-      // Console.log requested in instructions
-      console.log({
-        selectedStore,
-        storeId: finalStoreId,
-        businessId: finalBusinessId,
-        ownerId
-      });
+    // Fallback Store lookup if needed
+    if (!selectedStore) {
+      const storesQuery = query(collection(db, 'stores'));
+      const storesSnap = await getDocs(storesQuery);
+      const validStoreDoc = storesSnap.docs.find(d => {
+        const data = d.data();
+        return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || isInvalid(ownerId));
+      }) || storesSnap.docs[0];
 
-      // Abort publishing if any are missing, or "none", null, undefined, empty string
-      const isInvalid = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '';
-      if (!selectedStore || isInvalid(finalStoreId) || isInvalid(finalBusinessId) || isInvalid(ownerId)) {
-        throw new Error('Aborting publishing: storeId, businessId, or ownerId is missing or invalid.');
+      if (validStoreDoc) {
+        selectedStore = validStoreDoc.data();
+        finalStoreId = validStoreDoc.id;
+        if (isInvalid(finalBusinessId)) finalBusinessId = selectedStore.businessId;
+        if (isInvalid(ownerId)) ownerId = selectedStore.ownerId || selectedStore.ownerUid;
       }
-    } else {
-      if (!ownerId) ownerId = 'none';
-      if (!finalBusinessId) finalBusinessId = 'none';
-      if (!finalStoreId) finalStoreId = 'none';
+    }
+
+    // Fallback Business lookup if businessId still invalid
+    if (isInvalid(finalBusinessId)) {
+      const bizQuery = query(collection(db, 'businesses'));
+      const bizSnap = await getDocs(bizQuery);
+      const validBizDoc = bizSnap.docs.find(d => {
+        const data = d.data();
+        return data.status !== 'deleted' && (data.ownerUid === ownerId || data.ownerId === ownerId || isInvalid(ownerId));
+      }) || bizSnap.docs[0];
+
+      if (validBizDoc) {
+        finalBusinessId = validBizDoc.id;
+        const bData = validBizDoc.data() as any;
+        if (isInvalid(ownerId)) ownerId = bData.ownerUid || bData.ownerId;
+      }
+    }
+
+    console.log({
+      selectedStore,
+      storeId: finalStoreId,
+      businessId: finalBusinessId,
+      ownerId
+    });
+
+    if (!selectedStore || isInvalid(finalStoreId) || isInvalid(finalBusinessId) || isInvalid(ownerId)) {
+      throw new Error('Aborting publishing: storeId, businessId, or ownerId is missing or invalid.');
     }
 
     console.log(`[Firestore ${collectionName} Create Pre-Check]`);
@@ -187,7 +269,11 @@ export const productService = {
       imageUrl,
       publicId,
       ownerId,
-      ownerUid: ownerId, // Compatibility
+      ownerUid: ownerId,
+      sellerId: ownerId,
+      merchantId: ownerId,
+      createdBy: ownerId,
+      createdByUid: ownerId,
       businessId: finalBusinessId,
       storeId: finalStoreId,
       createdAt: serverTimestamp(),
@@ -199,16 +285,22 @@ export const productService = {
       docData.images = sanitizedData.imageUrls || sanitizedData.images || [];
       docData.price = sanitizedData.price;
 
-      // Do NOT save "none", null, undefined for imageUrl/publicId
-      if (!imageUrl || imageUrl === 'none' || imageUrl === 'null' || imageUrl === 'undefined') {
-        delete docData.imageUrl;
+      if (!docData.imageUrl || docData.imageUrl === 'none' || docData.imageUrl === 'null' || docData.imageUrl === 'undefined') {
+        docData.imageUrl = defaultPlaceholder;
       }
       if (!publicId || publicId === 'none' || publicId === 'null' || publicId === 'undefined') {
         delete docData.publicId;
       }
+      if (docData.images) {
+        docData.images = docData.images.map((img: any) => sanitizeImageField(img)).filter(Boolean);
+        if (docData.images.length === 0) {
+          docData.images = [defaultPlaceholder];
+        }
+      }
     }
     
-    await setDoc(itemRef, docData);
+    const cleanDocData = removeUndefinedFields(docData);
+    await setDoc(itemRef, cleanDocData);
     return id;
   },
 
@@ -224,6 +316,14 @@ export const productService = {
       }
     });
 
+    // Sanitize image fields inside sanitizedData
+    if (sanitizedData.imageUrl) sanitizedData.imageUrl = sanitizeImageField(sanitizedData.imageUrl);
+    if (sanitizedData.mainImage) sanitizedData.mainImage = sanitizeImageField(sanitizedData.mainImage);
+    if (sanitizedData.serviceImage) sanitizedData.serviceImage = sanitizeImageField(sanitizedData.serviceImage);
+    if (sanitizedData.logoUrl) sanitizedData.logoUrl = sanitizeImageField(sanitizedData.logoUrl);
+    if (sanitizedData.imageUrls) sanitizedData.imageUrls = sanitizeImageField(sanitizedData.imageUrls);
+    if (sanitizedData.images) sanitizedData.images = sanitizeImageField(sanitizedData.images);
+
     const docSnap = await getDoc(itemRef);
     const existing = docSnap.exists() ? docSnap.data() : {};
 
@@ -234,12 +334,15 @@ export const productService = {
         imageUrl = productImages[0];
       }
     }
+    
+    const defaultPlaceholder = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400';
+    imageUrl = sanitizeImageField(imageUrl);
     if (!imageUrl) {
-      imageUrl = 'none';
+      imageUrl = defaultPlaceholder;
     }
 
     let publicId = sanitizedData.publicId || sanitizedData.storagePath || sanitizedData.logoPublicId || existing.publicId || existing.storagePath;
-    if (type === 'product' && imageUrl && imageUrl !== 'none') {
+    if (type === 'product' && imageUrl && imageUrl !== defaultPlaceholder) {
       const resolvedPublicId = await getCloudinaryPublicId(imageUrl, db);
       if (resolvedPublicId && resolvedPublicId !== 'none') {
         publicId = resolvedPublicId;
@@ -251,55 +354,76 @@ export const productService = {
 
     let finalStoreId = sanitizedData.storeId || existing.storeId;
     let finalBusinessId = sanitizedData.businessId || existing.businessId;
-    let ownerId = sanitizedData.ownerUid || sanitizedData.ownerId || existing.ownerUid || existing.ownerId;
+    let ownerId = sanitizedData.ownerUid || sanitizedData.ownerId || sanitizedData.sellerId || sanitizedData.merchantId || existing.ownerUid || existing.ownerId || existing.sellerId;
     let selectedStore: any = null;
 
-    if (type === 'product') {
-      // 1. Load the selected Store document
-      if (finalStoreId && finalStoreId !== 'none') {
-        const storeSnap = await getDoc(doc(db, 'stores', finalStoreId));
-        if (storeSnap.exists()) {
-          selectedStore = storeSnap.data();
-          finalStoreId = storeSnap.id;
-          finalBusinessId = selectedStore.businessId;
-          ownerId = selectedStore.ownerId || selectedStore.ownerUid;
+    const isInvalid = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '' || val === 'unknown';
+
+    // 1. Resolve ownerId if missing
+    if (isInvalid(ownerId)) {
+      try {
+        const auth = getFirebaseAuth();
+        if (auth?.currentUser?.uid) {
+          ownerId = auth.currentUser.uid;
         }
+      } catch (e) {
+        // ignore
       }
+    }
 
-      // Fallback
-      if (!selectedStore) {
-        const storesQuery = query(collection(db, 'stores'));
-        const storesSnap = await getDocs(storesQuery);
-        const validStoreDoc = storesSnap.docs.find(d => {
-          const data = d.data();
-          return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || ownerId === 'none' || !ownerId);
-        }) || storesSnap.docs[0];
-
-        if (validStoreDoc) {
-          selectedStore = validStoreDoc.data();
-          finalStoreId = validStoreDoc.id;
-          finalBusinessId = selectedStore.businessId;
-          ownerId = selectedStore.ownerId || selectedStore.ownerUid;
-        }
+    // 2. Load the selected Store document
+    if (!isInvalid(finalStoreId)) {
+      const storeSnap = await getDoc(doc(db, 'stores', finalStoreId));
+      if (storeSnap.exists()) {
+        selectedStore = storeSnap.data();
+        finalStoreId = storeSnap.id;
+        if (isInvalid(finalBusinessId)) finalBusinessId = selectedStore.businessId;
+        if (isInvalid(ownerId)) ownerId = selectedStore.ownerId || selectedStore.ownerUid;
       }
+    }
 
-      // Console.log requested in instructions
-      console.log({
-        selectedStore,
-        storeId: finalStoreId,
-        businessId: finalBusinessId,
-        ownerId
-      });
+    // Fallback Store lookup if needed
+    if (!selectedStore) {
+      const storesQuery = query(collection(db, 'stores'));
+      const storesSnap = await getDocs(storesQuery);
+      const validStoreDoc = storesSnap.docs.find(d => {
+        const data = d.data();
+        return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || isInvalid(ownerId));
+      }) || storesSnap.docs[0];
 
-      // Abort updating if any are missing or "none" / null / undefined / empty string
-      const isInvalid = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '';
-      if (!selectedStore || isInvalid(finalStoreId) || isInvalid(finalBusinessId) || isInvalid(ownerId)) {
-        throw new Error('Aborting updating: storeId, businessId, or ownerId is missing or invalid.');
+      if (validStoreDoc) {
+        selectedStore = validStoreDoc.data();
+        finalStoreId = validStoreDoc.id;
+        if (isInvalid(finalBusinessId)) finalBusinessId = selectedStore.businessId;
+        if (isInvalid(ownerId)) ownerId = selectedStore.ownerId || selectedStore.ownerUid;
       }
-    } else {
-      if (!ownerId) ownerId = 'none';
-      if (!finalBusinessId) finalBusinessId = 'none';
-      if (!finalStoreId) finalStoreId = 'none';
+    }
+
+    // Fallback Business lookup if businessId still invalid
+    if (isInvalid(finalBusinessId)) {
+      const bizQuery = query(collection(db, 'businesses'));
+      const bizSnap = await getDocs(bizQuery);
+      const validBizDoc = bizSnap.docs.find(d => {
+        const data = d.data();
+        return data.status !== 'deleted' && (data.ownerUid === ownerId || data.ownerId === ownerId || isInvalid(ownerId));
+      }) || bizSnap.docs[0];
+
+      if (validBizDoc) {
+        finalBusinessId = validBizDoc.id;
+        const bData = validBizDoc.data() as any;
+        if (isInvalid(ownerId)) ownerId = bData.ownerUid || bData.ownerId;
+      }
+    }
+
+    console.log({
+      selectedStore,
+      storeId: finalStoreId,
+      businessId: finalBusinessId,
+      ownerId
+    });
+
+    if (!selectedStore || isInvalid(finalStoreId) || isInvalid(finalBusinessId) || isInvalid(ownerId)) {
+      throw new Error('Aborting updating: storeId, businessId, or ownerId is missing or invalid.');
     }
 
     console.log(`[Firestore ${collectionName} Update Pre-Check]`);
@@ -327,7 +451,11 @@ export const productService = {
       imageUrl,
       publicId,
       ownerId,
-      ownerUid: ownerId, // Compatibility
+      ownerUid: ownerId,
+      sellerId: ownerId,
+      merchantId: ownerId,
+      createdBy: ownerId,
+      createdByUid: ownerId,
       businessId: finalBusinessId,
       storeId: finalStoreId,
       updatedAt: serverTimestamp(),
@@ -340,16 +468,22 @@ export const productService = {
         docData.price = sanitizedData.price;
       }
 
-      // Do NOT save "none", null, undefined for imageUrl/publicId
-      if (!imageUrl || imageUrl === 'none' || imageUrl === 'null' || imageUrl === 'undefined') {
-        delete docData.imageUrl;
+      if (!docData.imageUrl || docData.imageUrl === 'none' || docData.imageUrl === 'null' || docData.imageUrl === 'undefined') {
+        docData.imageUrl = defaultPlaceholder;
       }
       if (!publicId || publicId === 'none' || publicId === 'null' || publicId === 'undefined') {
         delete docData.publicId;
       }
+      if (docData.images) {
+        docData.images = docData.images.map((img: any) => sanitizeImageField(img)).filter(Boolean);
+        if (docData.images.length === 0) {
+          docData.images = [defaultPlaceholder];
+        }
+      }
     }
 
-    await updateDoc(itemRef, docData);
+    const cleanDocData = removeUndefinedFields(docData);
+    await updateDoc(itemRef, cleanDocData);
   },
 
   async deleteItem(id: string, type: 'product' | 'service', ...args: any[]): Promise<void> {
@@ -452,13 +586,13 @@ export const productService = {
     return this.updateItem(id, 'product', data);
   },
   async archiveProduct(id: string) {
-    return this.updateItem(id, 'product', { status: 'Inactive' });
+    return this.updateItem(id, 'product', { status: 'archived' });
   },
   async restoreProduct(id: string) {
-    return this.updateItem(id, 'product', { status: 'Draft' });
+    return this.updateItem(id, 'product', { status: 'published' });
   },
   async softDeleteProduct(id: string, ...args: any[]) {
-    return this.updateItem(id, 'product', { status: 'Deleted' });
+    return this.updateItem(id, 'product', { status: 'deleted' });
   },
   async permanentDeleteProduct(id: string, ...args: any[]) {
     return this.deleteItem(id, 'product');

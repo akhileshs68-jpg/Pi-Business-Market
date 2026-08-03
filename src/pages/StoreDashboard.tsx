@@ -6,7 +6,8 @@ import { Store, Business } from '../types';
 import { StoreWizard } from '../components/store/StoreWizard';
 import { StoreCard } from '../components/store/StoreCard';
 import { ReviewManagement } from '../components/ReviewManagement';
-import { useNavigate, useParams } from 'react-router-dom';
+import { ProductManager } from '../components/business/ProductManager';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
   Plus, 
   ShoppingBag, 
@@ -19,12 +20,14 @@ import {
   MessageSquare,
   ArrowLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const StoreDashboard: React.FC = () => {
-  const { businessId } = useParams<{ businessId?: string }>();
+  const { businessId, storeId } = useParams<{ businessId?: string; storeId?: string }>();
+  const location = useLocation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stores, setStores] = useState<Store[]>([]);
@@ -32,8 +35,16 @@ export const StoreDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [filterBusiness, setFilterBusiness] = useState<string>(businessId || 'all');
-  const [activeView, setActiveView] = useState<'stores' | 'reviews'>('stores');
+  const [activeView, setActiveView] = useState<'stores' | 'products' | 'reviews'>(
+    location.pathname.includes('/products') ? 'products' : 'stores'
+  );
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.pathname.includes('/products')) {
+      setActiveView('products');
+    }
+  }, [location.pathname]);
 
   const fetchData = async () => {
     console.log('[StoreDashboard] fetchData called, user:', user?.uid);
@@ -163,6 +174,16 @@ export const StoreDashboard: React.FC = () => {
               <StoreIcon size={14} /> My Stores
             </button>
             <button
+              onClick={() => setActiveView('products')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeView === 'products' 
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                  : 'text-slate-500 hover:text-white'
+              }`}
+            >
+              <Package size={14} /> Products
+            </button>
+            <button
               onClick={() => setActiveView('reviews')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
                 activeView === 'reviews' 
@@ -243,6 +264,8 @@ export const StoreDashboard: React.FC = () => {
               Retry
             </button>
           </div>
+        ) : activeView === 'products' ? (
+          <ProductManager />
         ) : activeView === 'reviews' ? (
           <ReviewManagement businessId={filterBusiness === 'all' ? businesses[0]?.id : filterBusiness} />
         ) : loading ? (

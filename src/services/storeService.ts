@@ -10,9 +10,34 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
 import { Store, StoreStatus } from '../types';
 import { businessService } from './businessService';
+
+function sanitizeImageField(val: any): any {
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    const lower = trimmed.toLowerCase();
+    if (
+      !trimmed ||
+      lower === 'none' ||
+      lower === 'undefined' ||
+      lower === 'null' ||
+      lower === 'placeholder' ||
+      lower === '[object object]' ||
+      lower.startsWith('blob:')
+    ) {
+      return '';
+    }
+    return trimmed;
+  }
+  if (Array.isArray(val)) {
+    return val
+      .map(item => sanitizeImageField(item))
+      .filter(item => typeof item === 'string' && item !== '');
+  }
+  return val;
+}
 
 export const storeService = {
   /**
@@ -75,10 +100,43 @@ export const storeService = {
       }
     });
 
-    const imageUrl = sanitizedData.logoUrl || sanitizedData.imageUrl || 'none';
+    // Sanitize image fields in sanitizedData
+    if (sanitizedData.logoUrl) sanitizedData.logoUrl = sanitizeImageField(sanitizedData.logoUrl);
+    if (sanitizedData.imageUrl) sanitizedData.imageUrl = sanitizeImageField(sanitizedData.imageUrl);
+    if (sanitizedData.coverImageUrl) sanitizedData.coverImageUrl = sanitizeImageField(sanitizedData.coverImageUrl);
+
+    const defaultLogo = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100';
+    const defaultCover = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500';
+
+    const imageUrl = sanitizedData.logoUrl || sanitizedData.imageUrl || defaultLogo;
     const publicId = sanitizedData.logoPublicId || sanitizedData.publicId || 'none';
-    const ownerId = sanitizedData.ownerUid || 'none';
-    const finalBusinessId = sanitizedData.businessId || 'none';
+    
+    let ownerId = sanitizedData.ownerUid || 'none';
+    const isInvalid = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '' || val === 'unknown';
+    if (isInvalid(ownerId)) {
+      try {
+        const auth = getFirebaseAuth();
+        if (auth?.currentUser?.uid) {
+          ownerId = auth.currentUser.uid;
+        }
+      } catch (e) {}
+    }
+
+    let finalBusinessId = sanitizedData.businessId || 'none';
+    if (isInvalid(finalBusinessId)) {
+      try {
+        const bizQuery = query(collection(db, 'businesses'));
+        const bizSnap = await getDocs(bizQuery);
+        const validBizDoc = bizSnap.docs.find(d => {
+          const bData = d.data();
+          return bData.status !== 'deleted' && (bData.ownerUid === ownerId || bData.ownerId === ownerId);
+        }) || bizSnap.docs[0];
+
+        if (validBizDoc) {
+          finalBusinessId = validBizDoc.id;
+        }
+      } catch (e) {}
+    }
     const finalStoreId = storeId;
 
     console.log('[Firestore Store Write Pre-Check]');
@@ -93,7 +151,6 @@ export const storeService = {
       ownerId === undefined ||
       finalBusinessId === undefined ||
       finalStoreId === undefined ||
-      ownerId === undefined ||
       imageUrl === undefined ||
       publicId === undefined
     ) {
@@ -103,8 +160,10 @@ export const storeService = {
     const docData = {
       ...sanitizedData,
       published: true,
-      status: 'published',
+      status: sanitizedData.status || 'active',
       imageUrl,
+      logoUrl: sanitizedData.logoUrl || defaultLogo,
+      coverImageUrl: sanitizedData.coverImageUrl || defaultCover,
       publicId,
       ownerId,
       businessId: finalBusinessId,
@@ -134,9 +193,10 @@ export const storeService = {
         const data = doc.data();
         return {
           ...data,
+          storeId: data.storeId || doc.id,
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
           updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : data.updatedAt,
-        } as Store;
+        } as unknown as Store;
       })
       .filter(store => store.status !== 'deleted');
   },
@@ -281,13 +341,46 @@ export const storeService = {
       if (val !== undefined) sanitizedData[key] = val;
     });
 
+    // Sanitize image fields in sanitizedData
+    if (sanitizedData.logoUrl) sanitizedData.logoUrl = sanitizeImageField(sanitizedData.logoUrl);
+    if (sanitizedData.imageUrl) sanitizedData.imageUrl = sanitizeImageField(sanitizedData.imageUrl);
+    if (sanitizedData.coverImageUrl) sanitizedData.coverImageUrl = sanitizeImageField(sanitizedData.coverImageUrl);
+
     const docSnap = await getDoc(storeRef);
     const existing = docSnap.exists() ? docSnap.data() : {};
 
-    const imageUrl = sanitizedData.logoUrl || sanitizedData.imageUrl || existing.logoUrl || existing.imageUrl || 'none';
+    const defaultLogo = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100';
+    const defaultCover = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500';
+
+    const imageUrl = sanitizedData.logoUrl || sanitizedData.imageUrl || existing.logoUrl || existing.imageUrl || defaultLogo;
     const publicId = sanitizedData.logoPublicId || sanitizedData.publicId || existing.logoPublicId || existing.publicId || 'none';
-    const ownerId = sanitizedData.ownerUid || existing.ownerUid || existing.ownerId || 'none';
-    const finalBusinessId = sanitizedData.businessId || existing.businessId || 'none';
+    
+    let ownerId = sanitizedData.ownerUid || existing.ownerUid || existing.ownerId || 'none';
+    const isInvalid = (val: any) => !val || val === 'none' || val === 'undefined' || val === 'null' || val === '' || val === 'unknown';
+    if (isInvalid(ownerId)) {
+      try {
+        const auth = getFirebaseAuth();
+        if (auth?.currentUser?.uid) {
+          ownerId = auth.currentUser.uid;
+        }
+      } catch (e) {}
+    }
+
+    let finalBusinessId = sanitizedData.businessId || existing.businessId || 'none';
+    if (isInvalid(finalBusinessId)) {
+      try {
+        const bizQuery = query(collection(db, 'businesses'));
+        const bizSnap = await getDocs(bizQuery);
+        const validBizDoc = bizSnap.docs.find(d => {
+          const bData = d.data();
+          return bData.status !== 'deleted' && (bData.ownerUid === ownerId || bData.ownerId === ownerId);
+        }) || bizSnap.docs[0];
+
+        if (validBizDoc) {
+          finalBusinessId = validBizDoc.id;
+        }
+      } catch (e) {}
+    }
     const finalStoreId = storeId;
 
     console.log('[Firestore Store Update Pre-Check]');
@@ -302,7 +395,6 @@ export const storeService = {
       ownerId === undefined ||
       finalBusinessId === undefined ||
       finalStoreId === undefined ||
-      ownerId === undefined ||
       imageUrl === undefined ||
       publicId === undefined
     ) {
@@ -312,6 +404,8 @@ export const storeService = {
     const docData = {
       ...sanitizedData,
       imageUrl,
+      logoUrl: sanitizedData.logoUrl || existing.logoUrl || defaultLogo,
+      coverImageUrl: sanitizedData.coverImageUrl || existing.coverImageUrl || defaultCover,
       publicId,
       ownerId,
       businessId: finalBusinessId,

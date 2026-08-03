@@ -251,6 +251,7 @@ export class EnterpriseCheckoutEngine {
     sessionId: string,
     metadata: any
   ): Promise<PiTestnetVerificationResult> {
+    console.log('[EnterpriseCheckout] Payment Created - Starting executePiTestnetPayment. Amount:', amount, 'Session:', sessionId);
     return new Promise((resolve, reject) => {
       const paymentRecordId = `PAY_PI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
@@ -258,37 +259,77 @@ export class EnterpriseCheckoutEngine {
         { amount, memo, metadata: { ...metadata, sessionId, paymentRecordId } },
         {
           onReadyForServerApproval: async (piPaymentId: string) => {
+            console.log('[EnterpriseCheckout] Approval Callback Entered for Pi Payment ID:', piPaymentId);
             try {
-              console.log('[EnterpriseCheckout] Pi Payment Server Approval:', piPaymentId);
-              // 1. CRITICAL: Call approval API endpoint IMMEDIATELY before Firestore to prevent timeout
-              // No auth headers needed for approve, saving critical time
+              console.log('[EnterpriseCheckout] Approve Request Started...');
+              let headers: any = { 'Content-Type': 'application/json' };
+              try {
+                headers = await getAuthHeaders();
+              } catch (authErr) {
+                console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
+              }
               const res = await fetch('/api/payments/approve', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ paymentId: piPaymentId, metadata })
               });
+              const resText = await res.text();
+              console.log('[EnterpriseCheckout] Approve Response status:', res.status, 'body:', resText);
+              
               if (!res.ok) {
-                console.error('Server API returned non-ok status for approve.');
+                console.error('[EnterpriseCheckout] Server API returned non-ok status for approve:', res.status, resText);
+                if (!piPaymentId.startsWith('SIM_')) {
+                  throw new Error(`Server payment approval failed (${res.status}): ${resText}`);
+                }
               }
-              // 2. Fire-and-forget non-critical Firestore write (don't await it to save latency)
+              console.log('[EnterpriseCheckout] Approval Callback Finished.');
               paymentService.updateTransactionStatus(paymentRecordId, 'Processing', piPaymentId).catch(console.error);
             } catch (err: any) {
-              console.error('Server approval failure:', err);
+              console.error('[EnterpriseCheckout] Server approval failure:', err);
+              if (piPaymentId.startsWith('SIM_')) {
+                console.warn('[EnterpriseCheckout] Simulated payment approval fallback on network error.');
+                paymentService.updateTransactionStatus(paymentRecordId, 'Processing', piPaymentId).catch(console.error);
+              } else {
+                reject(err);
+                throw err;
+              }
             }
           },
           onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
+            console.log('[EnterpriseCheckout] Completion Callback Entered. Payment ID:', piPaymentId, 'TxID:', txid);
             try {
-              console.log('[EnterpriseCheckout] Pi Payment Verified on Chain:', txid);
-              
-              // 1. Hit completion endpoint first
-              const headers = await getAuthHeaders();
+              console.log('[EnterpriseCheckout] Completion Request Started...');
+              let headers: any = { 'Content-Type': 'application/json' };
+              try {
+                headers = await getAuthHeaders();
+              } catch (authErr) {
+                console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
+              }
               const res = await fetch('/api/payments/complete', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ paymentId: piPaymentId, txid, metadata })
               });
-              
-              // 2. Update status without awaiting
+              const resText = await res.text();
+              console.log('[EnterpriseCheckout] Complete Response status:', res.status, 'body:', resText);
+
+              let serverOrderId = '';
+              try {
+                const parsed = JSON.parse(resText);
+                if (parsed && parsed.orderId) {
+                  serverOrderId = parsed.orderId;
+                }
+              } catch (parseErr) {
+                console.warn('[EnterpriseCheckout] Failed to parse complete response as JSON:', parseErr);
+              }
+
+              if (!res.ok) {
+                if (!piPaymentId.startsWith('SIM_')) {
+                  throw new Error(`Server payment completion failed (${res.status}): ${resText}`);
+                }
+              }
+
+              console.log('[EnterpriseCheckout] Completion Finished.');
               paymentService.updateTransactionStatus(paymentRecordId, 'Completed', txid).catch(console.error);
 
               resolve({
@@ -297,16 +338,34 @@ export class EnterpriseCheckoutEngine {
                 transactionId: txid,
                 walletAddress: metadata.walletAddress || 'PI_TESTNET_WAL_' + Math.random().toString(36).substring(2, 8),
                 amountVerified: amount,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                orderId: serverOrderId
               });
             } catch (err: any) {
-              reject(new Error('Server completion verification failed: ' + err.message));
+              console.error('[EnterpriseCheckout] Server completion verification failure:', err);
+              if (piPaymentId.startsWith('SIM_')) {
+                console.warn('[EnterpriseCheckout] Simulated payment completion fallback on network error.');
+                paymentService.updateTransactionStatus(paymentRecordId, 'Completed', txid).catch(console.error);
+                resolve({
+                  verified: true,
+                  paymentId: piPaymentId,
+                  transactionId: txid,
+                  walletAddress: metadata.walletAddress || 'PI_TESTNET_WAL_' + Math.random().toString(36).substring(2, 8),
+                  amountVerified: amount,
+                  timestamp: new Date().toISOString()
+                });
+              } else {
+                reject(new Error('Server completion verification failed: ' + err.message));
+                throw err;
+              }
             }
           },
-          onCancel: (piPaymentId: string) => {
+          onCancel: async (piPaymentId: string) => {
+            console.log('[EnterpriseCheckout] Payment Cancelled by user. Payment ID:', piPaymentId);
             reject(new Error('Payment cancelled by user.'));
           },
-          onError: (error: Error, piPaymentId: string) => {
+          onError: async (error: Error, piPaymentId: string) => {
+            console.error('[EnterpriseCheckout] Payment Error:', error, 'Payment ID:', piPaymentId);
             reject(new Error(`Pi Payment Error: ${error.message}`));
           }
         }
@@ -327,210 +386,28 @@ export class EnterpriseCheckoutEngine {
     userUid: string;
     customerNotes?: string;
   }): Promise<string> {
-    const { session, address, paymentMethod, transactionId, grandTotal, orderItems, userUid, customerNotes } = params;
+    const { transactionId } = params;
     const db = getFirebaseDb();
 
-    // 1. Idempotency Check: check if order for this transactionId or sessionId already exists
-    const existingQ = query(collection(db, 'orders'), where('paymentTxId', '==', transactionId));
-    const existingSnap = await getDocs(existingQ);
-    if (!existingSnap.empty) {
-      console.info('[EnterpriseCheckout] Idempotent hit: Order already processed for transaction:', transactionId);
-      return existingSnap.docs[0].id;
-    }
+    console.log('[EnterpriseCheckout] Polling for server-side order confirmation. TxID:', transactionId);
 
-    // 2. Save Payment Transaction Record
-    const paymentId = await paymentService.createTransaction({
-      userId: userUid,
-      sellerId: session.sellerId || session.businessId || 'PI-SELLER',
-      businessId: session.businessId || 'PI-BIZ',
-      storeId: session.storeId || 'PI-STORE',
-      orderId: session.sessionId,
-      productIds: orderItems.map(i => i.productId),
-      currency: session.currency || 'Pi',
-      paymentMethod,
-      amount: grandTotal
-    });
-    await paymentService.updateTransactionStatus(paymentId, 'Completed', transactionId);
-
-    // 3. Create Verified Order
-    const orderId = await orderService.createFromSession({
-      ...session,
-      customerNotes: customerNotes || session.customerNotes,
-      shippingAddress: address,
-      billingAddress: address,
-      paymentStatus: 'SUCCESS',
-      orderStatus: 'CONFIRMED',
-      paymentId: paymentId,
-      transactionId: transactionId,
-      amount: grandTotal,
-      currency: session.currency || 'Pi',
-      timestamp: Date.now()
-    }, orderItems);
-
-    
-    // Fire-and-forget post-processing (Wallet sync, Ledgers, BMP Rewards, Analytics)
-    (async () => {
-// 4. Update Pi Wallet, Master Ledger & Business Ledger
-    try {
-      const sellerId = session.sellerId || session.businessId || 'PI-SELLER';
-      if (paymentMethod === 'pi_testnet') {
-        const provider = paymentEngine.getProvider('pi_testnet');
-        
-        // Retrieve balances before transactions
-        const buyerBefore = await provider.getBalance(userUid);
-        const sellerBefore = await provider.getBalance(sellerId);
-
-        // Perform debit and credit updates on the wallet provider
-        await paymentEngine.processMarketplacePayment(
-          'pi_testnet',
-          userUid,
-          sellerId,
-          grandTotal,
-          orderId
-        );
-
-        // Calculate balances after
-        const buyerAfter = buyerBefore - grandTotal;
-        const sellerAfter = sellerBefore + grandTotal;
-
-        // Synchronize unified master wallets documents for both parties
-        await masterWalletService.syncMasterWalletDoc(userUid);
-        await masterWalletService.syncMasterWalletDoc(sellerId);
-
-        // Record buyer debit in immutable master ledger
-        await masterLedgerService.recordEntry({
-          transactionId,
-          walletAddress: `pi_addr_${userUid.substring(0, 10)}`,
-          userId: userUid,
-          asset: 'PI_TESTNET',
-          amount: -grandTotal,
-          beforeBalance: buyerBefore,
-          afterBalance: buyerAfter,
-          referenceId: orderId,
-          source: 'CHECKOUT',
-          status: 'CONFIRMED',
-          memo: `Payment debit for marketplace order #${orderId}`
-        });
-
-        // Record seller credit in immutable master ledger
-        await masterLedgerService.recordEntry({
-          transactionId,
-          walletAddress: `pi_addr_${sellerId.substring(0, 10)}`,
-          userId: sellerId,
-          asset: 'PI_TESTNET',
-          amount: grandTotal,
-          beforeBalance: sellerBefore,
-          afterBalance: sellerAfter,
-          referenceId: orderId,
-          source: 'CHECKOUT',
-          status: 'CONFIRMED',
-          memo: `Sale credit for marketplace order #${orderId}`
-        });
-
-        console.log(`[EnterpriseCheckout] Wallet & Master Ledger successfully synchronized for Order: ${orderId}`);
+    // Poll Firestore up to 12 times (6 seconds total) to let the server-side payment completion process the write securely
+    let orderDocId = '';
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const existingQ = query(collection(db, 'orders'), where('paymentTxId', '==', transactionId));
+      const existingSnap = await getDocs(existingQ);
+      if (!existingSnap.empty) {
+        orderDocId = existingSnap.docs[0].id;
+        console.info('[EnterpriseCheckout] Idempotent hit: Order successfully processed server-side:', orderDocId);
+        break;
       }
-    } catch (walletErr) {
-      console.error('[EnterpriseCheckout] Failed updating wallet balances & ledger entries:', walletErr);
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // 5. Trigger Server-side BMP Rewards (10 BMP per Pi)
-    try {
-      const businessId = session.businessId || 'PI-BIZ';
-      await loyaltyService.earnPoints(userUid, businessId, grandTotal, orderId);
-      console.log(`[EnterpriseCheckout] Rewards credited for buyer ${userUid}, order ${orderId}`);
-    } catch (rewardErr) {
-      console.error('[EnterpriseCheckout] Failed to process rewards ledger:', rewardErr);
+    if (orderDocId) {
+      return orderDocId;
     }
 
-    // 6. Merchant Settlement Queue Record
-    try {
-      const settlementId = `SETTLE_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      const releaseDate = new Date();
-      releaseDate.setDate(releaseDate.getDate() + 7); // 7-day escrow hold
-
-      const settlementRecord: MerchantSettlementQueueRecord = {
-        settlementId,
-        orderId,
-        businessId: session.businessId || 'PI-BIZ',
-        storeId: session.storeId,
-        sellerId: session.sellerId || 'PI-SELLER',
-        amount: grandTotal * 0.95, // 5% platform fee retained
-        currency: session.currency || 'Pi',
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
-        releaseEligibleAt: releaseDate.toISOString()
-      };
-
-      await setDoc(doc(db, 'merchantSettlements', settlementId), settlementRecord);
-    } catch (settleErr) {
-      console.error('[EnterpriseCheckout] Failed to create merchant settlement queue item:', settleErr);
-    }
-
-    // 7. Record Enterprise Audit Log
-    try {
-      await auditService.logAction(
-        userUid,
-        'Pi Pioneer',
-        'PLACE_ORDER',
-        'orders',
-        orderId,
-        `Verified Pi Testnet transaction: ${transactionId} for Order ${orderId}`,
-        { severity: 'info' }
-      );
-    } catch (auditErr) {
-      console.error('[EnterpriseCheckout] Failed to create enterprise audit log:', auditErr);
-    }
-
-    // 8. Record Analytics Event
-    try {
-      await analyticsService.trackEvent({
-        userUid: userUid,
-        eventType: 'payment_success',
-        businessId: session.businessId || 'PI-BIZ',
-        storeId: session.storeId || 'PI-STORE',
-        metadata: {
-          orderId,
-          grandTotal,
-          paymentMethod,
-          transactionId
-        }
-      });
-    } catch (analyticsErr) {
-      console.error('[EnterpriseCheckout] Failed to track transaction analytics:', analyticsErr);
-    }
-
-    // 9. Centralized Subscription/Event Engine Notification Broadcasts
-    try {
-      subscriptionService.publishEvent('PAYMENT_CONFIRMED', {
-        paymentId,
-        transactionId,
-        orderId,
-        grandTotal,
-        userUid,
-        sellerId: session.sellerId || session.businessId || 'PI-SELLER'
-      }, transactionId);
-
-      subscriptionService.publishEvent('ORDER_CREATED', {
-        orderId,
-        grandTotal,
-        userUid,
-        itemsCount: orderItems.length
-      }, transactionId);
-
-      subscriptionService.publishEvent('WALLET_UPDATED', {
-        userId: userUid,
-        asset: 'PI_TESTNET',
-        grandTotal
-      });
-    } catch (subErr) {
-      console.error('[EnterpriseCheckout] Central subscription event publication failed:', subErr);
-    }
-
-    
-    })().catch(err => {
-      console.error('[EnterpriseCheckout] Async Post-Processing Error:', err);
-    });
-
-    return orderId;
+    throw new Error('Server-side order processing timed out. Please check your order history.');
   }
 }

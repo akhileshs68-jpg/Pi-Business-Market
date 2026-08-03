@@ -30,14 +30,20 @@ export class IdentityService {
     username: string = '',
     displayName: string = ''
   ): Promise<EnterpriseIdentity> {
-    let identity = await identityRepository.getIdentityByUid(uid);
+    let identity: EnterpriseIdentity | null = null;
 
-    if (!identity && piUid) {
-      identity = await identityRepository.getIdentityByPiUid(piUid);
-    }
+    try {
+      identity = await identityRepository.getIdentityByUid(uid);
 
-    if (!identity && username) {
-      identity = await identityRepository.getIdentityByUsername(username);
+      if (!identity && piUid) {
+        identity = await identityRepository.getIdentityByPiUid(piUid);
+      }
+
+      if (!identity && username) {
+        identity = await identityRepository.getIdentityByUsername(username);
+      }
+    } catch (err) {
+      logger.warn('IdentityService', `Identity lookup notice for ${uid}: ${err}`);
     }
 
     const isOwner = username === 'pi_pioneer_88' || (identity && (identity.roles.includes('superadmin') || identity.roles.includes('super_admin')));
@@ -81,8 +87,12 @@ export class IdentityService {
         lastLogin: now
       };
 
-      await identityRepository.saveIdentity(identity);
-      logger.audit('IdentityService', `Initialized Enterprise Identity for user ${uid}`, uid, { roles: initialRoles });
+      try {
+        await identityRepository.saveIdentity(identity);
+        logger.audit('IdentityService', `Initialized Enterprise Identity for user ${uid}`, uid, { roles: initialRoles });
+      } catch (saveErr) {
+        logger.warn('IdentityService', `Could not persist initialized identity for ${uid}: ${saveErr}`);
+      }
     } else {
       // Identity exists - update uid to current authenticated uid if different
       if (identity.uid !== uid) {
@@ -92,7 +102,11 @@ export class IdentityService {
         identity.roles = Array.from(new Set([...identity.roles, 'buyer', 'seller', 'business_owner', 'superadmin', 'merchant', 'owner']));
         identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
       }
-      await identityRepository.saveIdentity(identity);
+      try {
+        await identityRepository.saveIdentity(identity);
+      } catch (saveErr) {
+        logger.warn('IdentityService', `Could not persist updated identity for ${uid}: ${saveErr}`);
+      }
     }
 
     if (!identity) {

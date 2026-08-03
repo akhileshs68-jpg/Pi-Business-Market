@@ -18,11 +18,10 @@ service cloud.firestore {
      * Enforces schema integrity, type safety, and immutable identity.
      */
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'piUid', 'username', 'role', 'accountType', 'status']) &&
+      return data.keys().hasAll(['uid', 'piUid', 'username', 'accountType', 'status']) &&
              data.uid is string && data.uid.size() <= 128 &&
              data.piUid is string && data.piUid.size() <= 128 &&
              data.username is string && data.username.size() <= 128 &&
-             data.role in ['Buyer', 'Seller', 'Business Owner', 'Service Provider', 'Employer', 'Job Seeker', 'Admin', 'Super Admin'] &&
              data.accountType in ['individual', 'business', 'enterprise'] &&
              data.status in ['active', 'suspended', 'pending_verification'];
     }
@@ -149,7 +148,14 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (
+      allow update: if isSignedIn() && (
+        resource.data.ownerUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) || 
+        isAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))
+      );
+      allow delete: if isSignedIn() && (
         resource.data.ownerUid == request.auth.uid || 
         resource.data.sellerId == request.auth.uid || 
         isBusinessOwner(resource.data.businessId) || 
@@ -279,26 +285,202 @@ service cloud.firestore {
     }
 
     // 6. Commerce & OMS
+    match /checkoutSessions/{sessionId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.userUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        incoming().buyerId == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        incoming().sellerId == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /orderDrafts/{draftId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().buyerId == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /userAddresses/{addressId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
     match /orders/{orderId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.userUid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (
+        resource == null ||
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.userUid == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        resource.data.businessId == request.auth.uid ||
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        resource == null ||
+        incoming().buyerId == request.auth.uid ||
+        incoming().userUid == request.auth.uid ||
+        incoming().sellerId == request.auth.uid ||
+        incoming().businessId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.userUid == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        resource.data.businessId == request.auth.uid ||
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+    }
+
+    match /wallets/{walletId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userId == request.auth.uid || 
+        incoming().userId == request.auth.uid ||
+        walletId.startsWith(request.auth.uid + "_") ||
+        isAdmin() ||
+        (incoming().userId == (resource == null ? incoming().userId : resource.data.userId) &&
+         incoming().balance >= (resource == null ? 0.0 : resource.data.balance))
+      );
+    }
+
+    match /wallet_transactions/{txId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userId == request.auth.uid || 
+        incoming().userId == request.auth.uid || 
+        isAdmin() ||
+        (incoming().type == 'CREDIT')
+      );
+    }
+
+    match /master_wallets/{walletId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userId == request.auth.uid || 
+        incoming().userId == request.auth.uid || 
+        isAdmin() ||
+        (incoming().userId == (resource == null ? incoming().userId : resource.data.userId) &&
+         incoming().piTestnetBalance >= (resource == null ? 0.0 : resource.data.piTestnetBalance))
+      );
+    }
+
+    match /master_ledger/{ledgerId} {
+      allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /ledger_entries/{entryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /user_gamification/{docId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /user_active_pioneer/{docId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    match /merchantSettlements/{docId} {
+      allow read: if isSignedIn() && (
+        resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid ||
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource.data.userUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
     match /orderItems/{itemId} {
-      allow read: if isSignedIn(); // Simplified, ideally check orderId
-      allow create: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.userUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        incoming().buyerId == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        incoming().sellerId == request.auth.uid || 
+        isAdmin()
+      );
     }
 
     match /orderTimeline/{eventId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null || 
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.userUid == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        incoming().buyerId == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
+        incoming().sellerId == request.auth.uid || 
+        isAdmin()
+      );
     }
 
     match /payments/{paymentId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.userUid || isBusinessOwner(resource.data.businessId) || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if false; // Payments are immutable after creation
+      allow read: if isSignedIn() && (
+        resource == null || 
+        resource.data.uid == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) || 
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        incoming().uid == request.auth.uid || 
+        incoming().userId == request.auth.uid
+      );
+      allow update: if isSignedIn() && (
+        (resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid) || 
+        isBusinessOwner(resource.data.businessId) || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /paymentHistory/{historyId} {
+      allow read: if isSignedIn() && (
+        resource == null || 
+        resource.data.uid == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
+      allow write: if isAdmin();
     }
 
     match /notifications/{notifId} {
@@ -413,6 +595,140 @@ service cloud.firestore {
         isAdmin() ||
         (resource.data.businessId != null && hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin']))
       );
+    }
+
+    match /identities/{identityId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /loyaltyAccounts/{accountId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /loyaltyTransactions/{txId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /securitySessions/{sessionId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /sessions/{sessionId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /business_verifications/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /systemBackups/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /accountDeletionRequests/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /dataExportRequests/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /privacyConsents/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /fraudSignals/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /securityEvents/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invoices/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /receipts/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /attributeGroups/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /attributes/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /categories/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /categoryAttributes/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /customerNotes/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /customers/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /customerTimeline/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /share_events/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /blockedUsers/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /reportedConversations/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /reviewReports/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /anti_cheat_audit_logs/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /recentSearches/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /serviceAvailability/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /servicePackages/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /userWishlists/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /warehouseLocations/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /warehouses/{docId} {
+      allow read, write: if isSignedIn();
     }
   }
 }

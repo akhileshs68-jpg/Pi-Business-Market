@@ -108,36 +108,48 @@ export const PiInAppPaymentModal: React.FC<PiInAppPaymentModalProps> = ({
         },
         {
           onReadyForServerApproval: async (paymentId) => {
+            console.log('[InAppModal] Approval Callback Entered for Payment ID:', paymentId);
             try {
-              console.log('[InAppModal] Payment Ready for Server Approval:', paymentId);
               setPaymentStatus('completing');
               setStatusMessage('Requesting server approval...');
               
-              // We hit the approval endpoint IMMEDIATELY without auth token to prevent timeouts
+              console.log('[InAppModal] Approve Request Started...');
+              const authModule = await import('../../firebase/config');
+              const auth = authModule.getFirebaseAuth();
+              const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+
               const res = await fetch('/api/payments/approve', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ paymentId, metadata })
               });
+              const resText = await res.text();
+              console.log('[InAppModal] Approve Response status:', res.status, 'body:', resText);
               
               if (!res.ok) {
-                console.error('InAppModal Server approval returned error');
+                console.error('[InAppModal] Server approval returned non-ok status');
+                throw new Error(`InAppModal approval failed (${res.status}): ${resText}`);
               }
               
+              console.log('[InAppModal] Approval Callback Finished.');
               setStatusMessage('Server approved. Signing transaction on Pi Network blockchain...');
             } catch (err) {
-              console.error('Approval failed:', err);
+              console.error('[InAppModal] Exception in onReadyForServerApproval:', err);
+              throw err;
             }
           },
           onReadyForServerCompletion: async (paymentId, txid) => {
-            console.log('[InAppModal] Payment completed:', paymentId, txid);
-            
+            console.log('[InAppModal] Completion Callback Entered for Payment ID:', paymentId, 'TxID:', txid);
             try {
+              console.log('[InAppModal] Completion Request Started...');
               const authModule = await import('../../firebase/config');
               const auth = authModule.getFirebaseAuth();
               const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
               
-              await fetch('/api/payments/complete', {
+              const res = await fetch('/api/payments/complete', {
                 method: 'POST',
                 headers: { 
                   'Content-Type': 'application/json',
@@ -145,25 +157,33 @@ export const PiInAppPaymentModal: React.FC<PiInAppPaymentModalProps> = ({
                 },
                 body: JSON.stringify({ paymentId, txid, metadata })
               });
-            } catch (err) {
-              console.error('Completion call failed', err);
-            }
+              const resText = await res.text();
+              console.log('[InAppModal] Complete Response status:', res.status, 'body:', resText);
 
-            setPaymentStatus('success');
-            setLastTxid(txid);
-            setStatusMessage('Payment successfully confirmed on Pi Network Mainnet!');
-            setIsProcessing(false);
-            if (onSuccess) {
-              onSuccess(paymentId, txid);
+              if (!res.ok) {
+                throw new Error(`InAppModal completion failed (${res.status}): ${resText}`);
+              }
+
+              console.log('[InAppModal] Completion Finished.');
+              setPaymentStatus('success');
+              setLastTxid(txid);
+              setStatusMessage('Payment successfully confirmed on Pi Network Mainnet!');
+              setIsProcessing(false);
+              if (onSuccess) {
+                onSuccess(paymentId, txid);
+              }
+            } catch (err) {
+              console.error('[InAppModal] Exception in onReadyForServerCompletion:', err);
+              throw err;
             }
           },
-          onCancel: (paymentId) => {
+          onCancel: async (paymentId) => {
             console.log('[InAppModal] Payment cancelled:', paymentId);
             setPaymentStatus('idle');
             setStatusMessage('Payment was cancelled.');
             setIsProcessing(false);
           },
-          onError: (error, paymentId) => {
+          onError: async (error, paymentId) => {
             console.error('[InAppModal] Payment error:', error, paymentId);
             setPaymentStatus('error');
             setStatusMessage(error.message || 'Payment failed. Please try again.');
