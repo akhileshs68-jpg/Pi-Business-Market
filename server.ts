@@ -260,56 +260,94 @@ async function startServer() {
         }
       }
 
-     // Duplicate Payment Protection & Replay Protection
-if (getApps().length > 0) {
-  try {
-    let db: any = null;
-
-    if (process.env.NODE_ENV === "production") {
-      db = getDb();
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[DEV] Skip Firestore duplicate check");
-    } else {
-      if (db) {
-        const paymentDocId =
-          metadata?.internalPaymentId || `PAY_${paymentId}`;
-
-        const existingDoc = await db
-          .collection("payments")
-          .doc(paymentDocId)
-          .get();
-
-        if (existingDoc.exists) {
-          const docData = existingDoc.data();
-
-          if (docData?.paymentStatus === "completed") {
-            const msg = `Duplicate/Replay protection check: Payment ${paymentId} has already been completed.`;
-
-            console.warn(`[Pi Payment Approve] ${msg}`);
-            runtimeLogs.push(`[Runtime Log] ${msg}`);
-
-            return res.status(400).json({
-              error:
-                "Replay Attempt Blocked: This payment has already been finalized.",
-              logs: runtimeLogs,
-            });
+      // Duplicate Payment Protection & Replay Protection
+      if (getApps().length > 0) {
+        try {
+          const db = getDb();
+          if (db) {
+            const paymentDocId = `PAY_${paymentId}`;
+            const existingDoc = await db.collection('payments').doc(paymentDocId).get();
+            if (existingDoc.exists) {
+              const docData = existingDoc.data();
+              if (docData?.paymentStatus === 'completed') {
+                const msg = `Duplicate/Replay protection check: Payment ${paymentId} has already been completed.`;
+                console.warn(`[Pi Payment Approve] ${msg}`);
+                runtimeLogs.push(`[Runtime Log] ${msg}`);
+                return res.status(400).json({
+                  error: "Replay Attempt Blocked: This payment has already been finalized.",
+                  logs: runtimeLogs
+                });
+              }
+            }
           }
+        } catch (dbError: any) {
+          console.warn(`[Firebase Admin Warning] Skipping duplicate protection due to database error: ${dbError.message}`);
+          runtimeLogs.push(`[Runtime Log] Skipping duplicate protection due to database error: ${dbError.message}`);
         }
       }
+
+      if (paymentId && paymentId.startsWith('SIM_')) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error(`[Security Violation] Simulated payment approval blocked in production environment for paymentId: ${paymentId}`);
+          return res.status(403).json({ error: "Simulated payments are strictly forbidden in production mode.", logs: runtimeLogs });
+        }
+        console.log(`[Pi Payment Simulated] Simulated payment for ${paymentId}`);
+        runtimeLogs.push(`[Runtime Log] Simulated payment for: ${paymentId}`);
+        
+        if (req.path.includes('complete')) {
+            if (getApps && getApps().length > 0) {
+                try {
+                    const db = getDb();
+                    if (db) {
+                        const paymentDocId = `PAY_${paymentId}`;
+                        await db.collection('payments').doc(paymentDocId).set({ paymentStatus: 'completed' }, { merge: true }).catch(() => {});
+                    }
+                } catch (dbError: any) {
+                    console.warn(`[Firebase Admin Warning] Failed to update simulated payment status: ${dbError.message}`);
+                }
+            }
+        }
+        
+        return res.json({ success: true, payment: { status: req.path.includes('complete') ? 'completed' : 'approved' }, logs: runtimeLogs });
+      }
+
+      const apiKey = process.env.PI_NETWORK_API_KEY;
+      const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
+
+      if (isMissingApiKey) {
+        runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
+        console.error("[Security Alert] Payment approval rejected: PI_NETWORK_API_KEY is missing.");
+        return res.status(500).json({
+          error: "PI_NETWORK_API_KEY is not configured.",
+          logs: runtimeLogs
+        });
+      }
+
+      console.log("[Pi Payment Approve] PI_NETWORK_API_KEY found. Sending approval POST...");
+      runtimeLogs.push("[Runtime Log] Sending approval POST to Pi Network API...");
+      
+      const response = await axios.post(
+        `https://api.minepi.com/v2/payments/${paymentId}/approve`,
+        {},
+        { headers: { Authorization: `Key ${apiKey}` } }
+      );
+      
+      console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
+      runtimeLogs.push(`[Runtime Log] Pi Network server approved payment: ${paymentId}`);
+      runtimeLogs.push(`[Runtime Log] Pi response data: ${JSON.stringify(response.data || {})}`);
+
+      res.json({ success: true, payment: response.data, logs: runtimeLogs });
+    } catch (error: any) {
+      const errorMsg = error.response?.data || error.message;
+      console.error("[Pi Payment Approve] Error approving payment:", errorMsg);
+      runtimeLogs.push(`[Runtime Log] Error approving payment: ${JSON.stringify(errorMsg)}`);
+      res.status(500).json({
+        error: "Failed to approve payment with Pi Network server",
+        details: errorMsg,
+        logs: runtimeLogs
+      });
     }
-
-  } catch (dbError: any) {
-    console.warn(
-      `[Firebase Admin Warning] Skipping duplicate protection due to database error: ${dbError.message}`
-    );
-
-    runtimeLogs.push(
-      `[Runtime Log] Skipping duplicate protection due to database error: ${dbError.message}`
-    );
-  }
-}
+  });
 
   // Delete Resource Endpoint
   app.delete("/api/delete-resource", authenticatePaymentRequest, async (req, res) => {
@@ -365,23 +403,7 @@ const paymentRef = db
       // 1. Prevent duplicate payment processing
       if (getApps().length > 0 && paymentRef) {
         try {
-          if (process.env.NODE_ENV === "production") {
-  const existingDoc = await paymentRef.get();
-
-  if (existingDoc.exists) {
-    const docData = existingDoc.data();
-
-    if (docData?.paymentStatus === "completed") {
-      return res.json({
-        success: true,
-        paymentId,
-        txid
-      });
-    }
-  }
-} else {
-  console.warn("[DEV] Skipping duplicate payment check.");
-}
+          const existingDoc = await paymentRef.get();
           if (existingDoc.exists) {
             const docData = existingDoc.data();
             if (docData?.paymentStatus === 'completed') {
@@ -479,29 +501,15 @@ const paymentRef = db
           throw new Error("Missing sessionId in payment metadata");
         }
 
-        const sessionRef = db.collection("checkoutSessions").doc(sessionId);
-
-console.log("========== DEBUG SESSION ==========");
-
-let sessionSnap;
-
-try {
-  sessionSnap = await sessionRef.get();
-  console.log("session exists:", sessionSnap.exists);
-} catch (err) {
-  console.error("SESSION GET FAILED:", err);
-  throw err;
-}
-
-if (!sessionSnap.exists) {
-  throw new Error(`Checkout session ${sessionId} not found`);
-}
-
-const sessionData = sessionSnap.data();
-
-if (!sessionData) {
-  throw new Error("Empty session data");
-}
+        const sessionRef = db.collection('checkoutSessions').doc(sessionId);
+        const sessionSnap = await sessionRef.get();
+        if (!sessionSnap.exists) {
+          throw new Error(`Checkout session ${sessionId} not found`);
+        }
+        const sessionData = sessionSnap.data();
+        if (!sessionData) {
+          throw new Error("Empty session data");
+        }
 
         const grandTotal = parseFloat(metadata?.amount || paymentData?.amount || sessionData.grandTotal || 0);
         const sellerId = sessionData.sellerId || sessionData.businessId || 'PI-SELLER';
