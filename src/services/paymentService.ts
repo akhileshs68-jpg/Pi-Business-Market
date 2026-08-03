@@ -3,6 +3,7 @@ import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
 import { PaymentRecord, PaymentMethodId, PaymentStatusType } from '../types/payment';
 import { piPaymentService } from './piPaymentService';
 import { orderService } from './orderService';
+import { EnterpriseCheckoutEngine } from '../core/checkout/enterpriseCheckoutEngine';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -133,86 +134,42 @@ export const paymentService = {
     onSuccess: (txid: string) => void,
     onError: (err: string) => void
   ) {
-    console.log('[PaymentService] Payment Created - Starting processPiPayment. Payment ID:', paymentId);
-    await piPaymentService.createPayment({ amount, memo, metadata }, {
-      onReadyForServerApproval: async (piPaymentId: string) => {
-        console.log('[PaymentService] Approval Callback Entered for Pi Payment ID:', piPaymentId);
-        try {
-          console.log('[PaymentService] Approve Request Started...');
-          let headers: any = { 'Content-Type': 'application/json' };
-          try {
-            headers = await getAuthHeaders();
-          } catch (authErr) {
-            console.warn('[PaymentService] Auth header fallback for approve:', authErr);
-          }
-          console.log("[DEBUG PAYMENT METADATA]", metadata);
-          const augmentedMetadata = { ...metadata };
-          if (!augmentedMetadata.sessionId && metadata.orderId) augmentedMetadata.sessionId = metadata.orderId;
-          const res = await fetch('/api/payments/approve', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata })
-          });
-          const resText = await res.text();
-          console.log('[PaymentService] Approve Response status:', res.status, 'body:', resText);
-          if (!res.ok) {
-            throw new Error(`Server approval failed (${res.status}): ${resText}`);
-          }
-          console.log('[PaymentService] Approval Callback Finished.');
-        } catch (err: any) {
-          console.error('[PaymentService] Exception in onReadyForServerApproval:', err);
-          throw err;
-        }
-      },
-      onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
-        console.log('[PaymentService] Completion Callback Entered. Payment ID:', piPaymentId, 'TxID:', txid);
-        try {
-          console.log('[PaymentService] Completion Request Started...');
-          let headers: any = { 'Content-Type': 'application/json' };
-          try {
-            headers = await getAuthHeaders();
-          } catch (authErr) {
-            console.warn('[PaymentService] Auth header fallback:', authErr);
-          }
-          const augmentedMetadata = { ...metadata };
-          if (!augmentedMetadata.sessionId && metadata.orderId) augmentedMetadata.sessionId = metadata.orderId;
-          const res = await fetch('/api/payments/complete', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata })
-          });
-          const resText = await res.text();
-          console.log('[PaymentService] Complete Response status:', res.status, 'body:', resText);
-          if (!res.ok) {
-            throw new Error(`Verification Failed (${res.status}): ${resText}`);
-          }
-          
-          console.log('[PaymentService] Completion Finished.');
-          onSuccess(txid);
-        } catch (err: any) {
-          console.error('[PaymentService] Exception in onReadyForServerCompletion:', err);
-          await this.updateTransactionStatus(paymentId, 'Failed').catch(console.error);
-          onError('Verification Failed: ' + err.message);
-          throw err;
-        }
-      },
-      onCancel: async (piPaymentId: string) => {
-        console.log('[PaymentService] Payment Cancelled. Payment ID:', piPaymentId);
-        await this.updateTransactionStatus(paymentId, 'Cancelled').catch(console.error);
-        onError('Payment cancelled by user');
-      },
-      onError: async (error: Error, piPaymentId: string) => {
-        console.error('[PaymentService] Payment Error:', error, 'Payment ID:', piPaymentId);
-        await this.updateTransactionStatus(paymentId, 'Failed').catch(console.error);
-        onError(error.message);
+    console.log('[PaymentService] Delegating payment execution to EnterpriseCheckoutEngine. Payment ID:', paymentId);
+
+    const augmentedMetadata = {
+      buyerId: metadata.buyerId || metadata.buyerUid || 'guest_pioneer',
+      sellerId: metadata.sellerId || 'PI-SELLER',
+      businessId: metadata.businessId || 'PI-BIZ',
+      storeId: metadata.storeId || 'PI-STORE',
+      orderId: metadata.orderId || metadata.sessionId || paymentId,
+      sessionId: metadata.sessionId || metadata.orderId || paymentId,
+      ...metadata,
+      internalPaymentId: paymentId
+    };
+
+    try {
+      const result = await EnterpriseCheckoutEngine.executePiTestnetPayment(
+        amount,
+        memo,
+        augmentedMetadata.sessionId,
+        augmentedMetadata
+      );
+      if (result.verified) {
+        onSuccess(result.transactionId);
+      } else {
+        onError(result.errorMessage || 'Payment verification failed');
       }
-    });
+    } catch (err: any) {
+      console.error('[PaymentService] Exception in processPiPayment delegation:', err);
+      onError(err.message || 'Payment execution failed');
+    }
   }
 };
 
-// Backward compatibility methods for existing code
+/* =========================================================================
+ * LEGACY / BACKWARD COMPATIBILITY DELEGATION
+ * ========================================================================= */
 (paymentService as any).createPaymentIntent = async function(params: any) {
-  // Map old params to new system if possible
   const id = await this.createTransaction({
     userId: params.payerUid,
     sellerId: params.payeeUid,
@@ -227,19 +184,5 @@ export const paymentService = {
   return id;
 };
 (paymentService as any).updatePaymentStatus = async function(id: string, status: string, method?: string) {
-  return; 
-};
-// More backward compatibility
-(paymentService as any).getBusinessPayments = async function(businessId: string): Promise<any[]> {
-  return [];
-};
-(paymentService as any).getCustomerPayments = async function(customerId: string): Promise<any[]> {
-  return [];
-};
-
-(paymentService as any).getBusinessPayments = async function(businessId: string): Promise<any[]> {
-  return [];
-};
-(paymentService as any).getCustomerPayments = async function(customerId: string): Promise<any[]> {
-  return [];
+  return this.updateTransactionStatus(id, status); 
 };

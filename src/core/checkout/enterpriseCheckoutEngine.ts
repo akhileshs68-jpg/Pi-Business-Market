@@ -252,11 +252,27 @@ export class EnterpriseCheckoutEngine {
     metadata: any
   ): Promise<PiTestnetVerificationResult> {
     console.log('[EnterpriseCheckout] Payment Created - Starting executePiTestnetPayment. Amount:', amount, 'Session:', sessionId);
+
+    const requiredMetadata = ['sessionId', 'buyerId', 'sellerId', 'businessId', 'storeId', 'orderId'];
+    for (const key of requiredMetadata) {
+      if (!metadata[key]) {
+        console.error(`[EnterpriseCheckout] Missing mandatory metadata field: ${key}`);
+        return {
+          verified: false,
+          paymentId: '',
+          transactionId: '',
+          amountVerified: 0,
+          timestamp: new Date().toISOString(),
+          errorMessage: `Missing mandatory metadata field: ${key}`
+        };
+      }
+    }
+
     return new Promise((resolve, reject) => {
-      const paymentRecordId = `PAY_PI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const internalPaymentId = `PAY_PI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
       piPaymentService.createPayment(
-        { amount, memo, metadata: { ...metadata, sessionId, paymentRecordId } },
+        { amount, memo, metadata: { ...metadata, sessionId, internalPaymentId } },
         {
           onReadyForServerApproval: async (piPaymentId: string) => {
             console.log('[EnterpriseCheckout] Approval Callback Entered for Pi Payment ID:', piPaymentId);
@@ -268,7 +284,7 @@ export class EnterpriseCheckoutEngine {
               } catch (authErr) {
                 console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
               }
-              const augmentedMetadata = { ...metadata, sessionId, paymentRecordId };
+              const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
               const res = await fetch('/api/payments/approve', {
                 method: 'POST',
                 headers,
@@ -284,12 +300,12 @@ export class EnterpriseCheckoutEngine {
                 }
               }
               console.log('[EnterpriseCheckout] Approval Callback Finished.');
-              paymentService.updateTransactionStatus(paymentRecordId, 'Processing', piPaymentId).catch(console.error);
+              paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
             } catch (err: any) {
               console.error('[EnterpriseCheckout] Server approval failure:', err);
               if (piPaymentId.startsWith('SIM_')) {
                 console.warn('[EnterpriseCheckout] Simulated payment approval fallback on network error.');
-                paymentService.updateTransactionStatus(paymentRecordId, 'Processing', piPaymentId).catch(console.error);
+                paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
               } else {
                 reject(err);
                 throw err;
@@ -306,7 +322,7 @@ export class EnterpriseCheckoutEngine {
               } catch (authErr) {
                 console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
               }
-              const augmentedMetadata = { ...metadata, sessionId, paymentRecordId };
+              const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
               const res = await fetch('/api/payments/complete', {
                 method: 'POST',
                 headers,
@@ -332,7 +348,7 @@ export class EnterpriseCheckoutEngine {
               }
 
               console.log('[EnterpriseCheckout] Completion Finished.');
-              paymentService.updateTransactionStatus(paymentRecordId, 'Completed', txid).catch(console.error);
+              paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
 
               resolve({
                 verified: true,
@@ -347,7 +363,7 @@ export class EnterpriseCheckoutEngine {
               console.error('[EnterpriseCheckout] Server completion verification failure:', err);
               if (piPaymentId.startsWith('SIM_')) {
                 console.warn('[EnterpriseCheckout] Simulated payment completion fallback on network error.');
-                paymentService.updateTransactionStatus(paymentRecordId, 'Completed', txid).catch(console.error);
+                paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
                 resolve({
                   verified: true,
                   paymentId: piPaymentId,

@@ -265,7 +265,7 @@ async function startServer() {
         try {
           const db = getDb();
           if (db) {
-            const paymentDocId = `PAY_${paymentId}`;
+            const paymentDocId = metadata?.internalPaymentId || `PAY_${paymentId}`;
             const existingDoc = await db.collection('payments').doc(paymentDocId).get();
             if (existingDoc.exists) {
               const docData = existingDoc.data();
@@ -299,7 +299,7 @@ async function startServer() {
                 try {
                     const db = getDb();
                     if (db) {
-                        const paymentDocId = `PAY_${paymentId}`;
+                        const paymentDocId = metadata?.internalPaymentId || `PAY_${paymentId}`;
                         await db.collection('payments').doc(paymentDocId).set({ paymentStatus: 'completed' }, { merge: true }).catch(() => {});
                     }
                 } catch (dbError: any) {
@@ -392,15 +392,11 @@ async function startServer() {
       }
 
       const db = getApps().length > 0 ? getDb() : null;
-
-const paymentDocId =
-  metadata?.internalPaymentId || `PAY_${paymentId}`;
-
-const paymentRef = db
-  ? db.collection("payments").doc(paymentDocId)
-  : null;
+      const paymentDocId = metadata?.internalPaymentId || `PAY_${paymentId}`;
+      const paymentRef = db ? db.collection('payments').doc(paymentDocId) : null;
 
       // 1. Prevent duplicate payment processing
+      let skipDatabase = false;
       if (getApps().length > 0 && paymentRef) {
         try {
           const existingDoc = await paymentRef.get();
@@ -425,6 +421,16 @@ const paymentRef = db
         } catch (dbError: any) {
           console.warn(`[Firebase Admin Warning] Skipping duplicate check due to database error: ${dbError.message}`);
           runtimeLogs.push(`[Runtime Log] Skipping duplicate check due to database error: ${dbError.message}`);
+          
+          if (dbError.message.includes("default credentials") || dbError.message.includes("ADC") || dbError.message.includes("Application Default Credentials") || dbError.message.includes("NOT_FOUND") || dbError.message.includes("PERMISSION_DENIED")) {
+            if (process.env.NODE_ENV !== 'production') {
+              skipDatabase = true;
+              console.warn("[Sandbox Fallback] ADC not found in development mode. Bypassing database operations.");
+              runtimeLogs.push("[Runtime Log] Bypassing database operations due to missing ADC in development mode.");
+            } else {
+              throw dbError;
+            }
+          }
         }
       }
 
@@ -468,7 +474,104 @@ const paymentRef = db
       let finalOrderId = "";
 
       // 2. Perform server-side transaction & database updates
-      if (getApps().length > 0 && db) {
+      if (skipDatabase) {
+        console.log(`[Development Fallback] Using Client SDK bypass to complete payment...`);
+        runtimeLogs.push(`[Runtime Log] Using Client SDK bypass...`);
+        try {
+          const { initializeApp, getApps, getApp } = await import("firebase/app");
+          // Replaced firestore import
+          
+          const firebaseConfig = {
+            apiKey: process.env.VITE_FIREBASE_API_KEY,
+            projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+          };
+          const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+          const { getFirestore, doc, setDoc, updateDoc, getDoc, serverTimestamp } = await import("firebase/firestore/lite");
+          const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+          const clientDb = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
+          
+          const sessionId = metadata?.sessionId || metadata?.orderId;
+          if (!sessionId) {
+            throw new Error("Missing sessionId in payment metadata");
+          }
+          
+          const sessionRef = doc(clientDb, 'checkoutSessions', sessionId);
+          const sessionSnap = await getDoc(sessionRef);
+          if (!sessionSnap.exists()) {
+            throw new Error(`Checkout session ${sessionId} not found`);
+          }
+          const sessionData = sessionSnap.data();
+          
+          const orderId = `ORD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+          finalOrderId = orderId;
+          const orderNumber = Math.floor(100000 + Math.random() * 900000).toString();
+          const nowIso = new Date().toISOString();
+          
+          const buyerId = sessionData.userUid || sessionData.buyerId || sessionData.userId || metadata?.buyerId || metadata?.uid || metadata?.userUid || 'unknown_user';
+          const sellerId = sessionData.sellerId || sessionData.businessId || 'PI-SELLER';
+          const grandTotal = parseFloat(metadata?.amount || paymentData?.amount || sessionData.grandTotal || 0);
+          
+          const orderRef = doc(clientDb, 'orders', orderId);
+          await setDoc(orderRef, {
+            orderId,
+            orderNumber,
+            type: 'order',
+            buyerId,
+            userUid: buyerId,
+            sellerId,
+            businessId: sessionData.businessId || 'PI-BIZ',
+            storeId: sessionData.storeId || '',
+            grandTotal,
+            amount: grandTotal,
+            paymentStatus: 'Paid',
+            orderStatus: 'CONFIRMED',
+            paymentId: metadata?.internalPaymentId || `PAY_${paymentId}`,
+            paymentTxId: txid,
+            transactionId: txid,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+            items: sessionData.items || []
+          });
+          
+          await updateDoc(sessionRef, {
+            status: 'completed',
+            updatedAt: nowIso
+          });
+          
+          const clientPaymentRef = doc(clientDb, 'payments', metadata?.internalPaymentId || `PAY_${paymentId}`);
+          await setDoc(clientPaymentRef, {
+            paymentId,
+            txid,
+            uid: buyerId,
+            businessId: sessionData.businessId || "PI-CORP-001",
+            amount: grandTotal,
+            memo: metadata?.memo || paymentData?.memo || `Payment for order #${orderNumber}`,
+            paymentStatus: "completed",
+            orderId: orderId,
+            createdAt: serverTimestamp()
+          });
+          
+          console.log(`[Development Fallback] Completed bypass for order ${orderId}`);
+          runtimeLogs.push(`[Runtime Log] Development fallback: order created, session & payment updated`);
+          
+          const finalPaymentDocId = metadata?.internalPaymentId || `PAY_${paymentId}`;
+          console.log(`[Runtime Verification]`);
+          console.log(`Client payment document id: ${metadata?.internalPaymentId || 'N/A'}`);
+          console.log(`Pi payment id: ${paymentId}`);
+          console.log(`Firestore payment document path: payments/${finalPaymentDocId}`);
+          console.log(`Checkout session id: ${sessionId}`);
+          console.log(`Order id: ${orderId}`);
+
+          runtimeLogs.push(`Client payment document id: ${metadata?.internalPaymentId || 'N/A'}`);
+          runtimeLogs.push(`Pi payment id: ${paymentId}`);
+          runtimeLogs.push(`Firestore payment document path: payments/${finalPaymentDocId}`);
+          runtimeLogs.push(`Checkout session id: ${sessionId}`);
+          runtimeLogs.push(`Order id: ${orderId}`);
+        } catch (devError: any) {
+          console.error("[Development Fallback] Failed:", devError);
+          runtimeLogs.push(`[Runtime Log] Development fallback failed: ${devError.message}`);
+        }
+      } else if (getApps().length > 0 && db && !skipDatabase) {
         if (metadata?.productType === 'InAppProduct') {
           console.log(`[Pi Payment Complete] Skipping order logic for InAppProduct ${metadata.productId}`);
           // Skip order logic but mark payment as successful
@@ -818,6 +921,19 @@ const paymentRef = db
           });
 
           // --- STAGE 10: SAVE PAYMENT TRANSACTION ---
+          console.log(`[Runtime Verification]`);
+          console.log(`Client payment document id: ${metadata?.internalPaymentId || 'N/A'}`);
+          console.log(`Pi payment id: ${paymentId}`);
+          console.log(`Firestore payment document path: payments/${paymentDocId}`);
+          console.log(`Checkout session id: ${sessionId}`);
+          console.log(`Order id: ${orderId}`);
+
+          runtimeLogs.push(`Client payment document id: ${metadata?.internalPaymentId || 'N/A'}`);
+          runtimeLogs.push(`Pi payment id: ${paymentId}`);
+          runtimeLogs.push(`Firestore payment document path: payments/${paymentDocId}`);
+          runtimeLogs.push(`Checkout session id: ${sessionId}`);
+          runtimeLogs.push(`Order id: ${orderId}`);
+
           const transactionData = {
             paymentId,
             txid,

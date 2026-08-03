@@ -204,7 +204,8 @@ export const Checkout: React.FC = () => {
             businessId: session.businessId,
             storeId: session.storeId,
             walletAddress: user.walletAddress || '',
-            notes: customerNotes
+            notes: customerNotes,
+            orderId: session.sessionId
           }
         );
 
