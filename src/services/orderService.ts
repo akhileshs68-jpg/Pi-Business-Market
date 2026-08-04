@@ -497,15 +497,31 @@ export const orderService = {
   },
 
   async raiseDispute(orderId: string, userUid: string, reason: string): Promise<void> {
+    console.log('[orderService.raiseDispute ENTRY] Beginning dispute flow.', { orderId, userUid, reason });
+    if (!orderId) {
+      console.error('[orderService.raiseDispute Error] Missing orderId parameter.');
+      throw new Error('Order ID is required to raise a dispute');
+    }
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason) {
+      console.error('[orderService.raiseDispute Error] Empty reason.');
+      throw new Error('Dispute reason cannot be empty');
+    }
+
     const db = getFirebaseDb();
-    await updateDoc(doc(db, 'orders', orderId), {
-      disputeReason: reason,
+    const orderRef = doc(db, 'orders', orderId);
+    console.log('[orderService.raiseDispute BEFORE Firestore updateDoc]', { path: orderRef.path, cleanReason });
+
+    await updateDoc(orderRef, {
+      disputeReason: cleanReason,
       disputeStatus: 'opened',
       disputedAt: new Date().toISOString(),
       updatedAt: serverTimestamp()
     });
 
-    await this.updateOrderStatus(orderId, OrderStatus.DISPUTED, userUid, 'buyer', `Dispute opened: ${reason}`);
+    console.log('[orderService.raiseDispute AFTER updateDoc] Executing updateOrderStatus to DISPUTED...');
+    await this.updateOrderStatus(orderId, OrderStatus.DISPUTED, userUid, 'buyer', `Dispute opened: ${cleanReason}`);
+    console.log('[orderService.raiseDispute RESPONSE SUCCESS] Dispute created successfully on Firestore.');
   },
 
   async updateFulfillmentStatus(orderId: string, status: string, actorUid?: string, role?: string) {

@@ -67,6 +67,8 @@ export const OrderDetails: React.FC = () => {
   
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason] = useState('');
+  const [isDisputing, setIsDisputing] = useState(false);
+  const [disputeError, setDisputeError] = useState<string | null>(null);
   const [copiedQr, setCopiedQr] = useState(false);
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -286,13 +288,69 @@ export const OrderDetails: React.FC = () => {
   };
 
   const handleRaiseDispute = async () => {
-    if (!order || !user || !disputeReason) return;
+    console.log('[OrderDetails Dispute ENTRY] handleRaiseDispute function triggered.');
+    console.log('[OrderDetails Dispute BEFORE VALIDATION]', {
+      order,
+      orderIdFromParams: orderId,
+      orderObjId: (order as any)?.id,
+      orderObjOrderId: order?.orderId,
+      user,
+      userUid: user?.uid,
+      disputeReason
+    });
+
+    // Resolve order ID
+    const targetOrderId = order?.orderId || (order as any)?.id || orderId;
+    if (!targetOrderId) {
+      console.error('[OrderDetails Dispute Validation Error] No valid order ID resolved.');
+      setDisputeError('Unable to identify order reference for dispute submission.');
+      return;
+    }
+
+    // Resolve active user UID with fallback to Firebase auth if context user is temporarily null
+    let activeUserUid = user?.uid;
+    if (!activeUserUid) {
+      try {
+        const { getFirebaseAuth } = await import('../firebase/config');
+        activeUserUid = getFirebaseAuth().currentUser?.uid;
+      } catch (e) {
+        console.warn('[OrderDetails Dispute] Failed to fetch fallback auth user:', e);
+      }
+    }
+
+    if (!activeUserUid) {
+      console.error('[OrderDetails Dispute Validation Error] User is not logged in.');
+      setDisputeError('Authentication required to raise a dispute.');
+      return;
+    }
+
+    const trimmedReason = (disputeReason || '').trim();
+    if (!trimmedReason) {
+      console.error('[OrderDetails Dispute Validation Error] Empty dispute reason provided.');
+      setDisputeError('Please specify details describing your dispute case.');
+      return;
+    }
+
+    console.log('[OrderDetails Dispute BEFORE FETCH/API CALL] Submitting dispute via orderService.raiseDispute...', {
+      targetOrderId,
+      activeUserUid,
+      trimmedReason
+    });
+
+    setIsDisputing(true);
+    setDisputeError(null);
+
     try {
-      await orderService.raiseDispute(order.orderId, user.uid, disputeReason);
+      await orderService.raiseDispute(targetOrderId, activeUserUid, trimmedReason);
+      console.log('[OrderDetails Dispute AFTER RESPONSE] Dispute case opened successfully.');
       setShowDisputeModal(false);
-      fetchOrderData();
-    } catch (err) {
-      console.error('Dispute failed', err);
+      setDisputeReason('');
+      await fetchOrderData();
+    } catch (err: any) {
+      console.error('[OrderDetails Dispute CATCH BLOCK] Dispute process failed:', err);
+      setDisputeError(err?.message || 'Failed to open dispute. Please check your connection and try again.');
+    } finally {
+      setIsDisputing(false);
     }
   };
 
@@ -875,16 +933,55 @@ export const OrderDetails: React.FC = () => {
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dispute Details</label>
                 <textarea 
                   value={disputeReason}
-                  onChange={(e) => setDisputeReason(e.target.value)}
+                  onChange={(e) => {
+                    setDisputeReason(e.target.value);
+                    if (disputeError) setDisputeError(null);
+                  }}
                   placeholder="Explain transaction issue or non-delivery for platform mediation..."
                   rows={4}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-medium text-white focus:outline-none focus:border-rose-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-medium text-white focus:outline-none focus:border-rose-500 disabled:opacity-50"
+                  disabled={isDisputing}
                 />
               </div>
+
+              {disputeError && (
+                <div className="p-3 bg-rose-950/50 border border-rose-800/60 rounded-xl text-rose-300 text-xs font-medium">
+                  {disputeError}
+                </div>
+              )}
               
               <div className="flex gap-3">
-                <button onClick={() => setShowDisputeModal(false)} className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest">Cancel</button>
-                <button onClick={handleRaiseDispute} disabled={!disputeReason} className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest">Open Case</button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    console.log('[OrderDetails Dispute Modal] Cancel clicked.');
+                    setShowDisputeModal(false);
+                    setDisputeError(null);
+                  }} 
+                  disabled={isDisputing}
+                  className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    console.log('[OrderDetails Dispute Modal] Open Case button clicked.');
+                    handleRaiseDispute();
+                  }} 
+                  disabled={!disputeReason.trim() || isDisputing} 
+                  className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  {isDisputing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Opening...</span>
+                    </>
+                  ) : (
+                    <span>Open Case</span>
+                  )}
+                </button>
               </div>
             </div>
           </div>
