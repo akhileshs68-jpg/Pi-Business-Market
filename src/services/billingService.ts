@@ -24,6 +24,25 @@ import {
 import { Order } from '../types';
 import { businessService } from './businessService';
 
+function removeUndefinedFields<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedFields(item)).filter(item => item !== undefined) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedFields(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 export const billingService = {
 
   /**
@@ -103,8 +122,8 @@ export const billingService = {
       },
       items: (order.items || []).map((item: any, idx: number) => ({
         productId: item.productId || `PROD_${idx}`,
-        productName: item.productName || item.title || 'Pi Marketplace Asset',
-        imageUrl: item.imageUrl || item.image,
+        productName: item.productName || item.title || item.name || 'Pi Marketplace Asset',
+        imageUrl: item.imageUrl || item.image || '',
         isService: !!item.isService,
         quantity: item.quantity || 1,
         unitPrice: item.unitPrice || item.price || 0,
@@ -126,14 +145,17 @@ export const billingService = {
       updatedAt: new Date().toISOString()
     };
 
+    const invoiceData = removeUndefinedFields(invoice);
+    console.log('invoiceData:', invoiceData);
+
     try {
       const invRef = doc(db, 'invoices', invoiceId);
-      await setDoc(invRef, invoice, { merge: true });
+      await setDoc(invRef, invoiceData, { merge: true });
     } catch (e) {
       console.warn('Failed saving invoice to Firestore:', e);
     }
 
-    return invoice;
+    return invoiceData;
   },
 
   /**
@@ -168,8 +190,8 @@ export const billingService = {
       orderNumber: orderOrPayment.orderNumber || 'ORD-PI-001',
       businessName: businessData?.businessName || orderOrPayment.businessName || 'Pi Enterprise Market Merchant',
       storeName: storeData?.storeName || 'Official Storefront',
-      businessLogo: businessData?.logo,
-      storeLogo: storeData?.logoUrl,
+      businessLogo: businessData?.logo || '',
+      storeLogo: storeData?.logoUrl || '',
       buyerName: orderOrPayment.shippingAddress?.fullName || orderOrPayment.buyerName || 'Pi Pioneer Buyer',
       buyerUid: orderOrPayment.userUid || orderOrPayment.userId || 'BUYER_PI_USER',
       sellerName: businessData?.ownerName || 'Verified Merchant',
@@ -182,14 +204,17 @@ export const billingService = {
       createdAt: new Date().toISOString()
     };
 
+    const receiptData = removeUndefinedFields(receipt);
+    console.log('receiptData:', receiptData);
+
     try {
       const rcpRef = doc(db, 'receipts', receiptId);
-      await setDoc(rcpRef, receipt, { merge: true });
+      await setDoc(rcpRef, receiptData, { merge: true });
     } catch (e) {
       console.warn('Failed saving receipt to Firestore:', e);
     }
 
-    return receipt;
+    return receiptData;
   },
 
   /**

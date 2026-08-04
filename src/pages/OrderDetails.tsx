@@ -291,7 +291,7 @@ export const OrderDetails: React.FC = () => {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter truncate">Order {order.orderNumber}</h1>
               <span className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
-                {order.orderStatus.replace(/_/g, ' ')}
+                {(order.orderStatus ?? 'pending_payment').replace(/_/g, ' ')}
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium">Placed on {formatDate(order.createdAt)}</p>

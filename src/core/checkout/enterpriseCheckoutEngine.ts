@@ -347,6 +347,8 @@ export class EnterpriseCheckoutEngine {
                 }
               }
 
+              const finalOrderId = serverOrderId || sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase());
+
               console.log('[EnterpriseCheckout] Completion Finished.');
               paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
 
@@ -357,7 +359,7 @@ export class EnterpriseCheckoutEngine {
                 walletAddress: metadata.walletAddress || 'PI_TESTNET_WAL_' + Math.random().toString(36).substring(2, 8),
                 amountVerified: amount,
                 timestamp: new Date().toISOString(),
-                orderId: serverOrderId
+                orderId: finalOrderId
               });
             } catch (err: any) {
               console.error('[EnterpriseCheckout] Server completion verification failure:', err);
@@ -370,7 +372,8 @@ export class EnterpriseCheckoutEngine {
                   transactionId: txid,
                   walletAddress: metadata.walletAddress || 'PI_TESTNET_WAL_' + Math.random().toString(36).substring(2, 8),
                   amountVerified: amount,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  orderId: sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase())
                 });
               } else {
                 reject(new Error('Server completion verification failed: ' + err.message));
@@ -392,7 +395,7 @@ export class EnterpriseCheckoutEngine {
   }
 
   /**
-   * Idempotent Order Creation & Reward Trigger Engine
+   * Order Confirmation Resolver (No Polling)
    */
   static async finalizeOrderAndProcessRewards(params: {
     session: CheckoutSession;
@@ -403,33 +406,28 @@ export class EnterpriseCheckoutEngine {
     orderItems: OrderItem[];
     userUid: string;
     customerNotes?: string;
+    orderId?: string;
   }): Promise<string> {
-    const { transactionId } = params;
+    if (params.orderId) {
+      return params.orderId;
+    }
+    const { transactionId, userUid } = params;
     const db = getFirebaseDb();
 
-    console.log('[EnterpriseCheckout] Polling for server-side order confirmation. TxID:', transactionId);
+    console.log('[EnterpriseCheckout] Checking order status directly without polling. TxID:', transactionId);
 
-    // Poll Firestore up to 12 times (6 seconds total) to let the server-side payment completion process the write securely
-    let orderDocId = '';
-    for (let attempt = 0; attempt < 12; attempt++) {
-      const existingQ = query(
-        collection(db, 'orders'), 
-        where('paymentTxId', '==', transactionId),
-        where('userUid', '==', params.userUid)
-      );
-      const existingSnap = await getDocs(existingQ);
-      if (!existingSnap.empty) {
-        orderDocId = existingSnap.docs[0].id;
-        console.info('[EnterpriseCheckout] Idempotent hit: Order successfully processed server-side:', orderDocId);
-        break;
-      }
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    if (orderDocId) {
+    const existingQ = query(
+      collection(db, 'orders'), 
+      where('paymentTxId', '==', transactionId),
+      where('userUid', '==', userUid)
+    );
+    const existingSnap = await getDocs(existingQ);
+    if (!existingSnap.empty) {
+      const orderDocId = existingSnap.docs[0].id;
+      console.info('[EnterpriseCheckout] Direct check succeeded: Order processed server-side:', orderDocId);
       return orderDocId;
     }
 
-    throw new Error('Server-side order processing timed out. Please check your order history.');
+    throw new Error('Server-side order processing was not confirmed. Please check your order history.');
   }
 }

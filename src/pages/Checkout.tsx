@@ -213,54 +213,48 @@ export const Checkout: React.FC = () => {
           throw new Error(verification.errorMessage || 'Pi Testnet transaction verification failed.');
         }
         txid = verification.transactionId;
+        const serverOrderId = verification.orderId;
+        if (!serverOrderId) {
+          throw new Error('Order creation was not confirmed by server during payment completion.');
+        }
+
+        const finalAddress = sameAsBilling ? shippingAddress : shippingAddress;
+        const orderId = serverOrderId;
+
+        // Fetch created order to present in confirmation screen
+        const createdOrder = await orderService.getOrder(orderId);
+
+        // Clear Cart
+        if (session.cartIds && session.cartIds.length > 0) {
+          await Promise.all(
+            session.cartIds.map(async cid => {
+              if (cid) await cartService.clearCart(cid);
+            })
+          );
+        }
+
+        setCompletedOrder(createdOrder || {
+          orderId,
+          grandTotal,
+          amount: grandTotal,
+          timestamp: Date.now(),
+          shippingAddress: finalAddress
+        });
+        setPaymentTxId(txid);
+        setPaymentState('success');
+        setIsProcessing(false);
+
+        const event = new CustomEvent('toast', { 
+          detail: { message: 'Order Placed & Pi Payment Verified Successfully!', type: 'success' } 
+        });
+        window.dispatchEvent(event);
+
+        setTimeout(() => {
+          navigate(`/order-details/${orderId}`);
+        }, 5000);
       } else {
         throw new Error('Pi Testnet Pi is the ONLY active payment currency. BMP is for loyalty rewards only.');
       }
-
-      // Finalize Order Creation & Reward Engine in Firestore
-      const finalAddress = sameAsBilling ? shippingAddress : shippingAddress;
-      const orderId = await EnterpriseCheckoutEngine.finalizeOrderAndProcessRewards({
-        session,
-        address: finalAddress,
-        paymentMethod: 'pi_testnet',
-        transactionId: txid,
-        grandTotal,
-        orderItems,
-        userUid: buyerId,
-        customerNotes: customerNotes || undefined
-      });
-
-      // Fetch created order to present in confirmation screen
-      const createdOrder = await orderService.getOrder(orderId);
-
-      // Clear Cart
-      if (session.cartIds && session.cartIds.length > 0) {
-        await Promise.all(
-          session.cartIds.map(async cid => {
-            if (cid) await cartService.clearCart(cid);
-          })
-        );
-      }
-
-      setCompletedOrder(createdOrder || {
-        orderId,
-        grandTotal,
-        amount: grandTotal,
-        timestamp: Date.now(),
-        shippingAddress: finalAddress
-      });
-      setPaymentTxId(txid);
-      setPaymentState('success');
-      setIsProcessing(false);
-
-      const event = new CustomEvent('toast', { 
-        detail: { message: 'Order Placed & Pi Payment Verified Successfully!', type: 'success' } 
-      });
-      window.dispatchEvent(event);
-
-      setTimeout(() => {
-        navigate(`/order-details/${orderId}`);
-      }, 5000);
 
     } catch (err: any) {
       console.error('Order placement failed:', err);
