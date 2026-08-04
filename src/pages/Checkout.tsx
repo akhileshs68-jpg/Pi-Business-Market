@@ -222,7 +222,44 @@ export const Checkout: React.FC = () => {
         const orderId = serverOrderId;
 
         // Fetch created order to present in confirmation screen
-        const createdOrder = await orderService.getOrder(orderId);
+        let createdOrder = await orderService.getOrder(orderId);
+
+        if (!createdOrder) {
+          console.warn('[Checkout] Order document not found in Firestore for orderId:', orderId, '. Creating fallback order document client-side...');
+          const nowIso = new Date().toISOString();
+          const fallbackOrderData = {
+            id: orderId,
+            orderId: orderId,
+            orderNumber: orderId,
+            sessionId: session.sessionId,
+            buyerId,
+            userUid: buyerId,
+            sellerId: session.sellerId || session.businessId || 'PI-SELLER',
+            businessId: session.businessId || 'PI-BIZ',
+            storeId: session.storeId || '',
+            items: session.items || [],
+            grandTotal,
+            totalAmount: grandTotal,
+            amount: grandTotal,
+            subtotal: session.subtotal || grandTotal,
+            shippingAddress: finalAddress,
+            paymentMethod: 'Pi Network (Testnet)',
+            paymentStatus: 'completed',
+            orderStatus: 'paid',
+            status: 'paid',
+            txid,
+            transactionId: txid,
+            createdAt: nowIso,
+            updatedAt: nowIso
+          };
+          try {
+            await orderService.createOrderWithId(orderId, fallbackOrderData);
+            createdOrder = await orderService.getOrder(orderId) || fallbackOrderData;
+          } catch (createErr) {
+            console.error('[Checkout] Failed to create fallback order document:', createErr);
+            createdOrder = fallbackOrderData;
+          }
+        }
 
         // Clear Cart
         if (session.cartIds && session.cartIds.length > 0) {

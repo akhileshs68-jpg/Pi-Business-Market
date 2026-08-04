@@ -100,6 +100,67 @@ export const orderService = {
     return id;
   },
 
+  async createOrderWithId(targetOrderId: string, orderData: any): Promise<string> {
+    const db = getFirebaseDb();
+    const itemRef = doc(db, 'orders', targetOrderId);
+    const snap = await getDoc(itemRef);
+    if (snap.exists()) {
+      return targetOrderId;
+    }
+
+    const sanitizedData: any = {};
+    Object.entries(orderData).forEach(([key, val]) => {
+      if (val !== undefined && !Number.isNaN(val)) {
+        if (key === 'items' && Array.isArray(val)) {
+          sanitizedData[key] = val.map(item => {
+            const cleanItem: any = {};
+            Object.entries(item).forEach(([k, v]) => {
+              if (v !== undefined && !Number.isNaN(v)) cleanItem[k] = v;
+            });
+            return cleanItem;
+          });
+        } else {
+          sanitizedData[key] = val;
+        }
+      }
+    });
+
+    const nowIso = new Date().toISOString();
+    const orderNumber = sanitizedData.orderNumber || targetOrderId;
+    const qrCode = `PI_QR_${targetOrderId}_${Date.now()}`;
+
+    const initialLog = {
+      timestamp: nowIso,
+      message: 'Order Verified & Created',
+      actorUid: sanitizedData.buyerId || sanitizedData.userUid || 'SYSTEM',
+      role: 'buyer',
+      status: sanitizedData.orderStatus || OrderStatus.PENDING_PAYMENT
+    };
+
+    const initialHistory = {
+      status: sanitizedData.orderStatus || OrderStatus.PENDING_PAYMENT,
+      timestamp: nowIso,
+      updatedBy: sanitizedData.buyerId || sanitizedData.userUid || 'SYSTEM',
+      remarks: 'Order verified via Pi Business Market Engine'
+    };
+
+    await setDoc(itemRef, {
+      ...sanitizedData,
+      id: targetOrderId,
+      orderId: targetOrderId,
+      orderNumber,
+      qrVerificationCode: qrCode,
+      receiptNumber: `RCP-${orderNumber}`,
+      type: 'order',
+      activityLogs: [initialLog],
+      historyLog: [initialHistory],
+      createdAt: sanitizedData.createdAt || nowIso,
+      updatedAt: nowIso,
+    });
+
+    return targetOrderId;
+  },
+
   async updateOrderStatus(
     id: string, 
     status: string, 

@@ -114,21 +114,32 @@ export const OrderDetails: React.FC = () => {
     console.log('[OrderDetails Navigation Trace] Starting fetchOrderData for orderId:', orderId);
     setLoading(true);
     try {
-      let data = await orderService.getOrder(orderId!);
+      const cleanId = orderId?.trim();
+      let data = cleanId ? await orderService.getOrder(cleanId) : null;
       console.log('[OrderDetails Navigation Trace] Initial getOrder result:', data);
 
-      if (!data && orderId) {
-        console.warn('[OrderDetails Navigation Trace] Order document not found directly by ID. Attempting fallback lookup by sessionId...');
+      if (!data && cleanId) {
+        console.warn('[OrderDetails Navigation Trace] Order document not found directly by ID. Attempting fallback queries...');
         try {
           const { getFirebaseDb } = await import('../firebase/config');
           const { collection, query, where, getDocs } = await import('firebase/firestore');
           const db = getFirebaseDb();
-          const q = query(collection(db, 'orders'), where('sessionId', '==', orderId));
-          const snap = await getDocs(q);
+          
+          let snap = await getDocs(query(collection(db, 'orders'), where('orderId', '==', cleanId)));
+          if (snap.empty) {
+            snap = await getDocs(query(collection(db, 'orders'), where('sessionId', '==', cleanId)));
+          }
+          if (snap.empty) {
+            snap = await getDocs(query(collection(db, 'orders'), where('txid', '==', cleanId)));
+          }
+          if (snap.empty) {
+            snap = await getDocs(query(collection(db, 'orders'), where('transactionId', '==', cleanId)));
+          }
+
           if (!snap.empty) {
             const docData = snap.docs[0].data();
             data = { id: snap.docs[0].id, orderId: snap.docs[0].id, ...docData };
-            console.log('[OrderDetails Navigation Trace] Fallback order found by sessionId:', data);
+            console.log('[OrderDetails Navigation Trace] Fallback order found:', data);
           }
         } catch (fallbackErr) {
           console.warn('[OrderDetails Navigation Trace] Fallback query failed:', fallbackErr);
