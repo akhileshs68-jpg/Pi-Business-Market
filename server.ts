@@ -152,7 +152,8 @@ const authenticatePaymentRequest = async (
   res: express.Response,
   next: express.NextFunction
 ) => {
-  const endpoint = req.path;
+  const endpoint = req.path || req.url;
+  console.log(`[AuthenticatePaymentRequest ENTRY] Path: ${req.path}, URL: ${req.url}, Method: ${req.method}`);
   const authHeader = req.headers.authorization;
   const isProd = process.env.NODE_ENV === 'production';
 
@@ -241,14 +242,63 @@ export const app = express();
 
 app.use(express.json());
 
-// Enable CORS for Vercel serverless and client requests
+// Enable CORS & Request Logging / Routing Normalization for Vercel Serverless
 app.use((req, res, next) => {
+  // Never intercept or rewrite Vite assets, source files, or frontend routes in dev mode
+  const url = req.url || '';
+  if (
+    url.startsWith('/@vite') ||
+    url.startsWith('/src') ||
+    url.startsWith('/@react-refresh') ||
+    url.startsWith('/@id') ||
+    url.startsWith('/@fs') ||
+    url.startsWith('/node_modules') ||
+    url.startsWith('/favicon.ico') ||
+    url.includes('.tsx') ||
+    url.includes('.ts') ||
+    url.includes('.jsx') ||
+    url.includes('.js') ||
+    url.includes('.css') ||
+    url.includes('.map')
+  ) {
+    return next();
+  }
+
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
+
+  const originalUrl = req.originalUrl || req.url;
+  const xForwardedUri = req.headers['x-forwarded-uri'] as string | undefined;
+  const xMatchedPath = req.headers['x-matched-path'] as string | undefined;
+
+  console.log(`[Express Request ENTRY] Method: ${req.method} | req.url: ${req.url} | originalUrl: ${originalUrl} | x-forwarded-uri: ${xForwardedUri} | x-matched-path: ${xMatchedPath}`);
+
+  // Restore URI if Vercel rewritten to root /api or /api/index
+  if ((req.url === '/api' || req.url === '/api/' || req.url === '/api/index') && xForwardedUri) {
+    if (xForwardedUri !== '/api' && xForwardedUri !== '/api/') {
+      req.url = xForwardedUri;
+      console.log(`[Express URL Restored from x-forwarded-uri] New req.url: ${req.url}`);
+    }
+  }
+
+  // Ensure /api prefix exists ONLY if it's an API route missing /api
+  if (
+    !req.url.startsWith('/api/') &&
+    req.url !== '/api' &&
+    (req.url.startsWith('/payments') ||
+     req.url.startsWith('/auth') ||
+     req.url.startsWith('/delete-resource') ||
+     req.url.startsWith('/upload') ||
+     req.url.startsWith('/debug-'))
+  ) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+    console.log(`[Express URL Prefixed] New req.url: ${req.url}`);
+  }
+
   next();
 });
 
@@ -298,7 +348,7 @@ async function startServer() {
 // =========================================================================
 
 // Pi Network Auth Validation Endpoint
-app.post("/api/auth/pi", async (req, res) => {
+app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     try {
       const { accessToken } = req.body;
       if (!accessToken) {
@@ -354,8 +404,10 @@ app.post("/api/auth/pi", async (req, res) => {
   // =========================================================================
 
   // 1. Approve Payment Endpoint
-  app.post("/api/payments/approve", authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/approve", "/payments/approve"], authenticatePaymentRequest, async (req, res) => {
     const runtimeLogs: string[] = [];
+    console.log(`[Pi Payment Approve ENTRY] Request reached POST /api/payments/approve. Body:`, JSON.stringify(req.body));
+    runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/approve route handler at ${new Date().toISOString()}`);
     try {
       const { paymentId, metadata } = req.body;
       if (!paymentId) {
@@ -462,7 +514,7 @@ app.post("/api/auth/pi", async (req, res) => {
   });
 
   // Delete Resource Endpoint
-  app.delete("/api/delete-resource", authenticatePaymentRequest, async (req, res) => {
+  app.delete(["/api/delete-resource", "/delete-resource"], authenticatePaymentRequest, async (req, res) => {
     try {
       const { resourceType, resourceId } = req.body;
       const user = (req as any).user;
@@ -480,8 +532,10 @@ app.post("/api/auth/pi", async (req, res) => {
     }
   });
 
-  app.post("/api/payments/complete", authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/complete", "/payments/complete"], authenticatePaymentRequest, async (req, res) => {
     const runtimeLogs: string[] = [];
+    console.log(`[Pi Payment Complete ENTRY] Request reached POST /api/payments/complete. Body:`, JSON.stringify(req.body));
+    runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/complete route handler at ${new Date().toISOString()}`);
     
     const logTx = async (docRef: any, fn: () => any) => {
       const docPath = typeof docRef === 'string' ? docRef : (docRef?.path || '<query>');
@@ -1116,7 +1170,7 @@ app.post("/api/auth/pi", async (req, res) => {
     }
   });
 
-  app.post("/api/payments/status", authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/status", "/payments/status"], authenticatePaymentRequest, async (req, res) => {
     try {
       const { transactionId, status } = req.body;
       if (!transactionId || !status) {
@@ -1157,7 +1211,7 @@ app.post("/api/auth/pi", async (req, res) => {
     }
   });
 
-  app.post("/api/payments/incomplete", authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/incomplete", "/payments/incomplete"], authenticatePaymentRequest, async (req, res) => {
     try {
       const { payment } = req.body;
       if (!payment || !payment.identifier) {
