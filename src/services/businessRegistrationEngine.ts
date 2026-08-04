@@ -21,6 +21,7 @@ import { withRetry } from '../lib/retry';
 import { UserRole } from '../types';
 
 import { searchService } from './searchService';
+import { removeUndefinedFields } from '../utils/firestoreUtils';
 
 export class BusinessRegistrationEngine {
   /**
@@ -265,7 +266,7 @@ export class BusinessRegistrationEngine {
           userUpdates.bmpWalletAddress = payload.bmpWalletAddress;
         }
 
-        transaction.set(userRef, userUpdates, { merge: true });
+        transaction.set(userRef, removeUndefinedFields(userUpdates), { merge: true });
 
         // 5. Create Owner Business Member Record
         transaction.set(memberRef, {

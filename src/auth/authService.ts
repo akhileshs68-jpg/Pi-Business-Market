@@ -20,6 +20,7 @@ import {
 import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { User, UserRole } from '../types';
 import { identityService } from '../services/identity/identityService';
+import { removeUndefinedFields } from '../utils/firestoreUtils';
 
 export interface RoleConfig {
   id: string;
@@ -135,35 +136,39 @@ export const authService = {
   },
 
   /**
-   * Authenticates the user with specific scopes, with caching
+   * Authenticates the user with specific scopes, with caching and payments scope verification
    */
-  async authenticatePi(scopes: string[]): Promise<any> {
-    console.log('[AuthService] Pi.authenticate() called with scopes:', scopes);
+  async authenticatePi(requestedScopes: string[] = ['username', 'payments'], forceRefresh: boolean = false): Promise<any> {
+    const scopes = Array.from(new Set([...requestedScopes, 'username', 'payments']));
+    console.log('[AuthService] Pi.authenticate() called with scopes:', scopes, 'forceRefresh:', forceRefresh);
     
-    if (piAuthResult) {
-      console.log('[PiAuth] Existing session detected');
-      console.log('[PiAuth] Reusing cached authentication');
+    if (!forceRefresh && piAuthResult && piAuthResult.hasPaymentsScope) {
+      console.log('[PiAuth] Existing session with payments scope detected');
       return piAuthResult;
     }
 
-    try {
-      const cachedStr = sessionStorage.getItem('pi_auth_session');
-      if (cachedStr) {
-        piAuthResult = JSON.parse(cachedStr);
-        console.log('[PiAuth] Existing session detected');
-        console.log('[PiAuth] Reusing cached authentication');
-        return piAuthResult;
+    if (!forceRefresh && !piAuthResult) {
+      try {
+        const cachedStr = sessionStorage.getItem('pi_auth_session');
+        if (cachedStr) {
+          const parsed = JSON.parse(cachedStr);
+          if (parsed && parsed.hasPaymentsScope) {
+            piAuthResult = parsed;
+            console.log('[PiAuth] Existing session with payments scope restored from sessionStorage');
+            return piAuthResult;
+          }
+        }
+      } catch (e) {
+        console.error('[AuthService] Failed to parse cached session', e);
       }
-    } catch (e) {
-      console.error('[AuthService] Failed to parse cached session', e);
     }
 
-    if (piAuthPromise) {
+    if (piAuthPromise && !forceRefresh) {
       console.log('[AuthService] Returning existing Pi Authentication promise');
       return piAuthPromise;
     }
 
-    console.log('[PiAuth] Authentication required');
+    console.log('[PiAuth] Authentication required natively');
     await this.initPi();
     
     const onIncompletePaymentFound = async (payment: any) => {
@@ -190,6 +195,7 @@ export const authService = {
 
     piAuthPromise = (async () => {
       try {
+        const isPiBrowser = typeof window !== 'undefined' && typeof window.Pi !== 'undefined';
         const isPreviewDomain = typeof window !== 'undefined' && !import.meta.env.PROD && (
           window.location.hostname.includes('run.app') || 
           window.location.hostname.includes('vercel.app') || 
@@ -198,14 +204,15 @@ export const authService = {
         );
         const isPiBrowserApp = typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.includes('PiBrowser');
 
-        if (isPreviewDomain && !isPiBrowserApp) {
+        if (!isPiBrowser && isPreviewDomain && !isPiBrowserApp) {
           console.log('[AuthService] Running in preview/dev environment outside PiBrowser app, using mock Pi auth result');
           const mockAuth = {
             accessToken: 'mock_access_token_pioneer_123',
             user: {
               uid: 'mock_pi_uid_123',
               username: 'pi_pioneer_88'
-            }
+            },
+            hasPaymentsScope: true
           };
           piAuthResult = mockAuth;
           try {
@@ -214,50 +221,17 @@ export const authService = {
           return mockAuth;
         }
 
-        const isPiBrowser = typeof window !== 'undefined' && typeof window.Pi !== 'undefined';
         if (isPiBrowser) {
-          console.log('[AuthService] Initiating window.Pi.authenticate...');
+          console.log('[AuthService] Initiating native window.Pi.authenticate with scopes:', scopes);
           
-          const authenticateWithTimeout = new Promise<any>((resolve, reject) => {
-            const timeoutId = setTimeout(() => {
-              console.warn('[AuthService] Pi.authenticate timeout reached after 10000ms. Falling back to mock auth.');
-              resolve({
-                accessToken: 'mock_access_token_pioneer_123',
-                user: {
-                  uid: 'mock_pi_uid_123',
-                  username: 'pi_pioneer_88'
-                }
-              });
-            }, 10000);
-
-            console.log('[AuthService] window.Pi.authenticate() starting');
-            window.Pi.authenticate(scopes, onIncompletePaymentFound)
-              .then((result: any) => {
-                clearTimeout(timeoutId);
-                console.log('[AuthService] window.Pi.authenticate() resolved successfully');
-                resolve(result);
-              })
-              .catch((err: any) => {
-                clearTimeout(timeoutId);
-                console.error('[AuthService] window.Pi.authenticate() rejected:', err);
-                if (isPreviewDomain) {
-                  console.warn('[AuthService] Fallback to mock auth in preview environment after error');
-                  resolve({
-                    accessToken: 'mock_access_token_pioneer_123',
-                    user: {
-                      uid: 'mock_pi_uid_123',
-                      username: 'pi_pioneer_88'
-                    }
-                  });
-                } else {
-                  reject(err);
-                }
-              });
-          });
-
-          const piAuth = await authenticateWithTimeout;
+          const result = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+          console.log('[AuthService] window.Pi.authenticate() resolved successfully natively:', result);
           
-          console.log('[AuthService] Pi.authenticate resolved:', piAuth);
+          const piAuth = {
+            ...result,
+            hasPaymentsScope: true
+          };
+
           piAuthResult = piAuth;
           try {
             sessionStorage.setItem('pi_auth_session', JSON.stringify(piAuth));
@@ -271,9 +245,11 @@ export const authService = {
         }
       } catch (err) {
         console.error('[AuthService] Pi.authenticate rejected:', err);
-        piAuthPromise = null; // Allow retry on failure
+        piAuthResult = null;
+        try { sessionStorage.removeItem('pi_auth_session'); } catch(e) {}
         throw err;
       } finally {
+        piAuthPromise = null;
         console.log('[AuthService] Pi.authenticate execution finished');
       }
     })();
@@ -420,7 +396,7 @@ export const authService = {
             roles: defaultRoles,
             accountType: isOwner ? 'business' : 'individual',
             verified: true,
-            kycVerified: isOwner,
+            kycVerified: Boolean(isOwner),
             profileCompleted: true,
             onboardingCompleted: true,
             lastResolvedUid: firebaseUid,
@@ -430,12 +406,14 @@ export const authService = {
             status: 'active'
           };
 
-          await setDoc(canonicalRef, {
+          const newUserData = removeUndefinedFields({
             ...finalUserData,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             lastLogin: serverTimestamp()
           });
+
+          await setDoc(canonicalRef, newUserData);
         } else {
           // Perform ONE-TIME migration or update canonical document users/{firebaseUid}
           finalUserData = {
@@ -446,6 +424,7 @@ export const authService = {
             username: username || existingUserData.username,
             displayName,
             roles: Array.from(new Set([...(existingUserData.roles || []), ...defaultRoles])),
+            kycVerified: Boolean(existingUserData.kycVerified ?? isOwner ?? false),
             profileCompleted: true,
             onboardingCompleted: true,
             lastResolvedUid: firebaseUid,
@@ -454,11 +433,13 @@ export const authService = {
             lastLogin: now
           };
 
-          await setDoc(canonicalRef, {
+          const updatedUserData = removeUndefinedFields({
             ...finalUserData,
             updatedAt: serverTimestamp(),
             lastLogin: serverTimestamp()
-          }, { merge: true });
+          });
+
+          await setDoc(canonicalRef, updatedUserData, { merge: true });
         }
 
         localStorage.setItem('last_resolved_uid', firebaseUid);
@@ -589,25 +570,26 @@ export const authService = {
       const userRef = doc(db, 'users', uid);
       const userSnap = await getDoc(userRef);
       
-      const sanitizedUpdates: any = {};
-      Object.entries(updates).forEach(([k, v]) => {
-        if (v !== undefined) {
-          sanitizedUpdates[k] = v;
-        }
-      });
+      const payload: any = { ...updates };
+      if ('kycVerified' in payload) {
+        payload.kycVerified = Boolean(payload.kycVerified);
+      }
+      
+      const sanitizedUpdates = removeUndefinedFields(payload);
       
       if (userSnap.exists()) {
-        await updateDoc(userRef, {
+        await updateDoc(userRef, removeUndefinedFields({
           ...sanitizedUpdates,
           updatedAt: serverTimestamp()
-        });
+        }));
       } else {
-        await setDoc(userRef, {
+        await setDoc(userRef, removeUndefinedFields({
           ...sanitizedUpdates,
           uid,
+          kycVerified: Boolean(updates.kycVerified ?? false),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
-        });
+        }));
       }
     } catch (error) {
       console.error('[AuthService] Update user profile failed:', error);

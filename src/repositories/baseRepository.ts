@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { AppError } from '../core/errors';
 import { logger } from '../core/logger';
+import { removeUndefinedFields } from '../utils/firestoreUtils';
 
 export abstract class BaseRepository<T extends { id: string }> {
   protected collectionName: string;
@@ -43,7 +44,8 @@ export abstract class BaseRepository<T extends { id: string }> {
     try {
       const db = getFirebaseDb();
       const ref = doc(db, this.collectionName, data.id);
-      await setDoc(ref, data, { merge: true });
+      const sanitized = removeUndefinedFields(data);
+      await setDoc(ref, sanitized, { merge: true });
     } catch (err: any) {
       logger.error('Repository', `Error saving ${this.collectionName}/${data.id}: ${err.message}`);
       throw new AppError('INTERNAL_ERROR', `Repository write error on ${this.collectionName}`);

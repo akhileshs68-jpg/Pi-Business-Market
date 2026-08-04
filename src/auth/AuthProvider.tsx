@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 piUid: 'user_' + firebaseUser.uid.slice(0, 8),
                 username,
                 displayName: firebaseUser.displayName || 'Pioneer',
-                photoUrl: firebaseUser.photoURL || undefined,
+                photoUrl: firebaseUser.photoURL || '',
                 roles: ['buyer'],
                 activeRole: 'buyer',
                 role: 'Buyer',
