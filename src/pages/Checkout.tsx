@@ -249,8 +249,12 @@ export const Checkout: React.FC = () => {
         });
         window.dispatchEvent(event);
 
+        console.log('[Checkout Navigation Trace] Order completed successfully. Target Order ID:', orderId);
+        console.log('[Checkout Navigation Trace] Scheduling auto-navigate to:', `/order-details/${orderId}`, 'in 5 seconds.');
         setTimeout(() => {
+          console.log('[Checkout Navigation Trace] setTimeout triggered! Executing navigate to:', `/order-details/${orderId}`);
           navigate(`/order-details/${orderId}`);
+          console.log('[Checkout Navigation Trace] navigate() call executed.');
         }, 5000);
       } else {
         throw new Error('Pi Testnet Pi is the ONLY active payment currency. BMP is for loyalty rewards only.');
@@ -783,13 +787,22 @@ const PaymentSuccessScreen = ({ order, paymentTxId, address, navigate }: any) =>
 
       <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
         <button 
-          onClick={() => navigate(`/order-details/${order.orderId || order.id}`)}
+          onClick={() => {
+            const targetUri = `/order-details/${order.orderId || order.id}`;
+            console.log('[Checkout Navigation Trace] Manual "View Order" clicked. Target URI:', targetUri);
+            navigate(targetUri);
+            console.log('[Checkout Navigation Trace] navigate() call executed.');
+          }}
           className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           <Package className="w-4 h-4" /> View Order
         </button>
         <button 
-          onClick={() => navigate('/cart')}
+          onClick={() => {
+            console.log('[Checkout Navigation Trace] Manual "Back to Market" clicked. Target URI: /cart');
+            navigate('/cart');
+            console.log('[Checkout Navigation Trace] navigate() call executed.');
+          }}
           className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           <ShoppingBag className="w-4 h-4" /> Back to Market
