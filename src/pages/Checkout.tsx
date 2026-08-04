@@ -237,7 +237,7 @@ export const Checkout: React.FC = () => {
             sellerId: session.sellerId || session.businessId || 'PI-SELLER',
             businessId: session.businessId || 'PI-BIZ',
             storeId: session.storeId || '',
-            items: session.items || [],
+            items: (session as any).items || [],
             grandTotal,
             totalAmount: grandTotal,
             amount: grandTotal,

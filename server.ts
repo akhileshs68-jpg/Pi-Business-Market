@@ -274,8 +274,31 @@ async function startServer() {
 
   const PORT = 3000;
 
-  // Pi Network Auth Validation Endpoint
-  app.post("/api/auth/pi", async (req, res) => {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+// =========================================================================
+// REGISTER API ROUTES SYNCHRONOUSLY AT MODULE LEVEL FOR VERCEL SERVERLESS & STANDALONE
+// =========================================================================
+
+// Pi Network Auth Validation Endpoint
+app.post("/api/auth/pi", async (req, res) => {
     try {
       const { accessToken } = req.body;
       if (!accessToken) {
@@ -1415,27 +1438,6 @@ async function startServer() {
     fs.writeFileSync('/tmp/client_debug.json', JSON.stringify(req.body, null, 2));
     res.json({ success: true });
   });
-
-  if (!process.env.VERCEL) {
-    if (process.env.NODE_ENV !== "production") {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa",
-      });
-      app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), "dist");
-      app.use(express.static(distPath));
-      app.get("*", (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
-      });
-    }
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
-}
 
 if (!process.env.VERCEL) {
   startServer();
