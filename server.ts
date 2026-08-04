@@ -186,6 +186,21 @@ const authenticatePaymentRequest = async (
   }
 };
 
+export const app = express();
+
+app.use(express.json());
+
+// Enable CORS for Vercel serverless and client requests
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
   
@@ -206,10 +221,7 @@ async function startServer() {
     }
   }
 
-  const app = express();
   const PORT = 3000;
-
-  app.use(express.json());
 
   // Pi Network Auth Validation Endpoint
   app.post("/api/auth/pi", async (req, res) => {
@@ -605,7 +617,7 @@ async function startServer() {
         try {
           const cartQuery = db.collection('cartItems').where('cartId', 'in', cartIds);
           let cartItemsSnap = await logTx(`cartItems (cartIds: ${cartIds.join(',')})`, () => cartQuery.get());
-          cartItems = cartItemsSnap.docs.map(d => ({ itemId: d.id, ...d.data() }));
+          cartItems = cartItemsSnap.docs.map((d: any) => ({ itemId: d.id, ...d.data() }));
         } catch (cartErr: any) {
           console.warn(`[Pi Payment Complete] Cart items fetch note (${cartErr?.message || cartErr}). Using metadata fallback...`);
         }
@@ -1045,7 +1057,7 @@ async function startServer() {
             const paymentRef = db.collection('payments').doc(transactionId);
             
             // Only allow changing from Pending/Processing to Cancelled/Failed
-            await db.runTransaction(async (t) => {
+            await db.runTransaction(async (t: any) => {
               const doc = await t.get(paymentRef);
               if (!doc.exists) throw new Error("Transaction not found");
               
@@ -1354,25 +1366,31 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+  if (!process.env.VERCEL) {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
 
 
