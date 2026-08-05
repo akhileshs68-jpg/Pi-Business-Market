@@ -49,6 +49,53 @@ declare global {
   }
 }
 
+function getAbsoluteUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.href) {
+      const href = window.location.href;
+      if (href.startsWith('http://') || href.startsWith('https://')) {
+        const urlObj = new URL(href);
+        if (urlObj.origin && urlObj.origin !== 'null' && !urlObj.origin.startsWith('file:')) {
+          const resolved = `${urlObj.origin}${cleanPath}`;
+          console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Parsed href. Origin: ${urlObj.origin}, Resolved URL: ${resolved}`);
+          return resolved;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error parsing window.location.href:', e);
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      const origin = window.location.origin;
+      if (origin !== 'null' && !origin.startsWith('file:')) {
+        const resolved = `${origin}${cleanPath}`;
+        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Read origin. Origin: ${origin}, Resolved URL: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {
+    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error reading window.location.origin:', e);
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.host) {
+      const protocol = window.location.protocol || 'https:';
+      const host = window.location.host;
+      if (host && !host.startsWith('file:')) {
+        const resolved = `${protocol}//${host}${cleanPath}`;
+        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Formed host. Origin: ${protocol}//${host}, Resolved URL: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {}
+
+  console.warn(`[DEBUG_TRACE] [getAbsoluteUrl] All origin checks failed. Falling back to relative path: ${cleanPath}`);
+  return cleanPath;
+}
+
 let piInitPromise: Promise<void> | null = null;
 let piAuthPromise: Promise<any> | null = null;
 let piAuthResult: any = null;
@@ -253,7 +300,7 @@ export const authService = {
             if (token) headers['Authorization'] = `Bearer ${token}`;
           }
           console.log('[DEBUG_TRACE] [onIncompletePaymentFound] BEFORE await fetch /api/payments/incomplete');
-          const fetchRes = await fetch('/api/payments/incomplete', {
+          const fetchRes = await fetch(getAbsoluteUrl('/api/payments/incomplete'), {
             method: 'POST',
             headers,
             body: JSON.stringify({ payment })
@@ -393,7 +440,7 @@ export const authService = {
             const accessToken = piAuth.accessToken;
             
             console.log('[DEBUG_TRACE] [loginWithPi async worker] BEFORE await fetch /api/auth/pi');
-            const response = await fetch('/api/auth/pi', {
+            const response = await fetch(getAbsoluteUrl('/api/auth/pi'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ accessToken }),

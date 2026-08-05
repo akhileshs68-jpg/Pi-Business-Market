@@ -5,19 +5,76 @@ import { piPaymentService } from './piPaymentService';
 import { orderService } from './orderService';
 import { EnterpriseCheckoutEngine } from '../core/checkout/enterpriseCheckoutEngine';
 
+function getAbsoluteUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.href) {
+      const href = window.location.href;
+      if (href.startsWith('http://') || href.startsWith('https://')) {
+        const urlObj = new URL(href);
+        if (urlObj.origin && urlObj.origin !== 'null' && !urlObj.origin.startsWith('file:')) {
+          const resolved = `${urlObj.origin}${cleanPath}`;
+          console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Parsed href. Origin: ${urlObj.origin}, Resolved URL: ${resolved}`);
+          return resolved;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error parsing window.location.href:', e);
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      const origin = window.location.origin;
+      if (origin !== 'null' && !origin.startsWith('file:')) {
+        const resolved = `${origin}${cleanPath}`;
+        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Read origin. Origin: ${origin}, Resolved URL: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {
+    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error reading window.location.origin:', e);
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.host) {
+      const protocol = window.location.protocol || 'https:';
+      const host = window.location.host;
+      if (host && !host.startsWith('file:')) {
+        const resolved = `${protocol}//${host}${cleanPath}`;
+        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Formed host. Origin: ${protocol}//${host}, Resolved URL: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {}
+
+  console.warn(`[DEBUG_TRACE] [getAbsoluteUrl] All origin checks failed. Falling back to relative path: ${cleanPath}`);
+  return cleanPath;
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  console.log('[DEBUG_TRACE] [getAuthHeaders] ENTER (paymentService)');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   try {
     const auth = getFirebaseAuth();
     if (auth && auth.currentUser) {
-      const token = await auth.currentUser.getIdToken();
+      console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase currentUser found:', auth.currentUser.uid);
+      const tokenPromise = auth.currentUser.getIdToken();
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
+      const token = await Promise.race([tokenPromise, timeoutPromise]);
       if (token) {
+        console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase token successfully acquired');
         headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.warn('[DEBUG_TRACE] [getAuthHeaders] Firebase ID token request timed out (1.2s timeout exceeded) or returned null');
       }
+    } else {
+      console.log('[DEBUG_TRACE] [getAuthHeaders] No active Firebase currentUser');
     }
   } catch (err) {
-    console.error('Error getting auth token:', err);
+    console.error('[DEBUG_TRACE] [getAuthHeaders] Error retrieving Firebase token:', err);
   }
+  console.log('[DEBUG_TRACE] [getAuthHeaders] EXIT (paymentService)');
   return headers;
 }
 
@@ -81,7 +138,7 @@ export const paymentService = {
       await setDoc(paymentRef, updates, { merge: true });
 
       const headers = await getAuthHeaders();
-      await fetch('/api/payments/status', {
+      await fetch(getAbsoluteUrl('/api/payments/status'), {
         method: 'POST',
         headers,
         body: JSON.stringify({ transactionId: paymentId, status, txid })
