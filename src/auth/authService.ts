@@ -62,6 +62,17 @@ export function isRealPiBrowser(): boolean {
   return isPiUA;
 }
 
+/**
+ * Verifies if the native window.Pi instance actually possesses the payments scope
+ */
+export function hasNativePaymentsScope(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!isRealPiBrowser()) return true; // Non-Pi browsers/Mock environments always treated as having scope
+  if (!(window as any).Pi) return false;
+  const consented = (window as any).Pi.consentedScopes;
+  return Array.isArray(consented) && consented.includes('payments');
+}
+
 export const authService = {
   async trackSession(userUid: string) {
     try {
@@ -195,7 +206,7 @@ export const authService = {
   },
 
   /**
-   * Authenticates the user with specific scopes, with caching and payments scope verification
+   * Authenticates the user with specific scopes, with caching and native payments scope verification
    */
   async authenticatePi(requestedScopes: string[] = ['username', 'payments'], forceRefresh: boolean = false): Promise<any> {
     const startTime = Date.now();
@@ -209,29 +220,11 @@ export const authService = {
     const scopes = Array.from(new Set(['username', 'payments', ...requestedScopes]));
     console.log('[DEBUG_TRACE] [authenticatePi] [STEP 6] Scopes assembled:', scopes);
     
-    if (!forceRefresh && piAuthResult && piAuthResult.hasPaymentsScope) {
-      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7a] Returning cached memory piAuthResult with payments scope');
+    // REDESIGN: Only return cached in-memory session if the native Pi SDK also possesses active payments scope
+    if (!forceRefresh && piAuthResult && piAuthResult.hasPaymentsScope && hasNativePaymentsScope()) {
+      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7a] Returning cached memory piAuthResult with verified native payments scope');
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT (cached memory)');
       return piAuthResult;
-    }
-
-    if (!forceRefresh && !piAuthResult) {
-      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7b] Checking sessionStorage pi_auth_session');
-      try {
-        const cachedStr = sessionStorage.getItem('pi_auth_session');
-        console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7c] sessionStorage raw string:', cachedStr);
-        if (cachedStr) {
-          const parsed = JSON.parse(cachedStr);
-          if (parsed && parsed.hasPaymentsScope && parsed.accessToken) {
-            piAuthResult = parsed;
-            console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7d] Session restored from sessionStorage');
-            console.log('[DEBUG_TRACE] [authenticatePi] EXIT (sessionStorage)');
-            return piAuthResult;
-          }
-        }
-      } catch (e) {
-        console.error('[DEBUG_TRACE] [authenticatePi] [STEP 7e] Failed to parse cached session:', e);
-      }
     }
 
     if (piAuthPromise && !forceRefresh) {
@@ -292,9 +285,6 @@ export const authService = {
             hasPaymentsScope: true
           };
           piAuthResult = mockAuth;
-          try {
-            sessionStorage.setItem('pi_auth_session', JSON.stringify(mockAuth));
-          } catch (e) {}
           console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (mock)');
           return mockAuth;
         }
@@ -327,11 +317,6 @@ export const authService = {
           };
 
           piAuthResult = piAuth;
-          try {
-            sessionStorage.setItem('pi_auth_session', JSON.stringify(piAuth));
-          } catch(e) {
-            console.error('[DEBUG_TRACE] [authenticatePi async worker] Failed to save session:', e);
-          }
           console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (native success)');
           return piAuth;
         } else {
@@ -341,7 +326,6 @@ export const authService = {
       } catch (err) {
         console.error('[DEBUG_TRACE] [authenticatePi async worker] IMMEDIATELY AFTER window.Pi.authenticate REJECTED with error:', err);
         piAuthResult = null;
-        try { sessionStorage.removeItem('pi_auth_session'); } catch(e) {}
         throw err;
       } finally {
         piAuthPromise = null;
@@ -643,7 +627,6 @@ export const authService = {
       piAuthPromise = null;
       loginInProgressPromise = null;
 
-      try { sessionStorage.removeItem('pi_auth_session'); } catch (e) {}
       try { localStorage.removeItem('last_resolved_uid'); } catch (e) {}
       try { localStorage.removeItem('last_pi_uid'); } catch (e) {}
       try { localStorage.removeItem('active_security_session'); } catch (e) {}

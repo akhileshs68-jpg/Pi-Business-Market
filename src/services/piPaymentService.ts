@@ -1,4 +1,4 @@
-import { authService, isRealPiBrowser } from '../auth/authService';
+import { authService, isRealPiBrowser, hasNativePaymentsScope } from '../auth/authService';
 
 export interface PiPaymentCallbacks {
   onReadyForServerApproval: (paymentId: string) => Promise<void> | void;
@@ -48,8 +48,13 @@ export const piPaymentService = {
         await authService.initPi();
         console.log('[DEBUG_TRACE] [createPayment] AFTER await authService.initPi()');
 
-        console.log('[DEBUG_TRACE] [createPayment] BEFORE await authService.authenticatePi()');
-        await authService.authenticatePi(['username', 'payments'], false);
+        // Check if the native SDK has active payments scope right now
+        const hasScope = hasNativePaymentsScope();
+        console.log('[DEBUG_TRACE] [createPayment] hasNativePaymentsScope check:', hasScope);
+
+        console.log('[DEBUG_TRACE] [createPayment] BEFORE await authService.authenticatePi() with forceRefresh:', !hasScope);
+        // Force refresh / real native handshake if scope is missing in window.Pi
+        await authService.authenticatePi(['username', 'payments'], !hasScope);
         console.log('[DEBUG_TRACE] [createPayment] AFTER await authService.authenticatePi()');
 
         console.log('[DEBUG_TRACE] [createPayment] BEFORE callback registration & window.Pi.createPayment() call');
