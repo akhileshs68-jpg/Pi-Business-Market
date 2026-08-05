@@ -24,11 +24,25 @@ export const DailyCheckInCard: React.FC<Props> = ({ profile, onProfileUpdated })
     isReady: true
   });
 
+  // Helper to convert timestamps / ISO strings / Firestore objects safely to ms
+  const getTimestampMs = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'object' && 'seconds' in val && typeof val.seconds === 'number') {
+      return val.seconds * 1000;
+    }
+    if (typeof val === 'string') {
+      const parsed = new Date(val).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
   // Calculate timer remaining
   useEffect(() => {
     const updateTimer = () => {
       const now = Date.now();
-      const lastCheckIn = profile.lastCheckInTime || 0;
+      const lastCheckIn = getTimestampMs(profile.lastCheckInTime);
       const diffMs = now - lastCheckIn;
       const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours
 

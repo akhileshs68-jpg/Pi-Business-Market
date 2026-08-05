@@ -182,7 +182,12 @@ export const Checkout: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
-    if (!session || !user || isProcessing) return;
+    console.log('[DEBUG_TRACE] [handlePlaceOrder] ENTER');
+    if (!session || !user || isProcessing) {
+      console.log('[DEBUG_TRACE] [handlePlaceOrder] Early return guard:', { hasSession: !!session, hasUser: !!user, isProcessing });
+      console.log('[DEBUG_TRACE] [handlePlaceOrder] EXIT (guard)');
+      return;
+    }
     setIsProcessing(true);
     setRecoveryError('');
 
@@ -192,7 +197,7 @@ export const Checkout: React.FC = () => {
       let txid = '';
 
       if (selectedPaymentMethod === 'pi_testnet' || selectedPaymentMethod === ('pi' as any)) {
-        // Execute Pi Testnet Payment
+        console.log('[DEBUG_TRACE] [handlePlaceOrder] BEFORE await EnterpriseCheckoutEngine.executePiTestnetPayment');
         const verification = await EnterpriseCheckoutEngine.executePiTestnetPayment(
           summaryBreakdown?.piTestnetAmount || grandTotal,
           `Pi Market Order #${session.sessionId}`,
@@ -208,6 +213,7 @@ export const Checkout: React.FC = () => {
             orderId: session.sessionId
           }
         );
+        console.log('[DEBUG_TRACE] [handlePlaceOrder] AFTER await EnterpriseCheckoutEngine.executePiTestnetPayment, result:', verification);
 
         if (!verification.verified) {
           throw new Error(verification.errorMessage || 'Pi Testnet transaction verification failed.');

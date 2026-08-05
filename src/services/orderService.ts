@@ -497,7 +497,7 @@ export const orderService = {
   },
 
   async raiseDispute(orderId: string, userUid: string, reason: string): Promise<void> {
-    console.log('[orderService.raiseDispute ENTRY] Beginning dispute flow.', { orderId, userUid, reason });
+    console.log('[orderService.raiseDispute ENTRY] Calling /api/orders/dispute API...', { orderId, userUid, reason });
     if (!orderId) {
       console.error('[orderService.raiseDispute Error] Missing orderId parameter.');
       throw new Error('Order ID is required to raise a dispute');
@@ -508,20 +508,38 @@ export const orderService = {
       throw new Error('Dispute reason cannot be empty');
     }
 
-    const db = getFirebaseDb();
-    const orderRef = doc(db, 'orders', orderId);
-    console.log('[orderService.raiseDispute BEFORE Firestore updateDoc]', { path: orderRef.path, cleanReason });
+    let authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      const { getFirebaseAuth } = await import('../firebase/config');
+      const auth = getFirebaseAuth();
+      if (auth && auth.currentUser) {
+        const token = await auth.currentUser.getIdToken();
+        if (token) {
+          authHeaders['Authorization'] = `Bearer ${token}`;
+        }
+      }
+    } catch (authErr) {
+      console.warn('[orderService.raiseDispute] Notice retrieving auth token:', authErr);
+    }
 
-    await updateDoc(orderRef, {
-      disputeReason: cleanReason,
-      disputeStatus: 'opened',
-      disputedAt: new Date().toISOString(),
-      updatedAt: serverTimestamp()
+    const response = await fetch('/api/orders/dispute', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        orderId,
+        userUid,
+        reason: cleanReason
+      })
     });
 
-    console.log('[orderService.raiseDispute AFTER updateDoc] Executing updateOrderStatus to DISPUTED...');
-    await this.updateOrderStatus(orderId, OrderStatus.DISPUTED, userUid, 'buyer', `Dispute opened: ${cleanReason}`);
-    console.log('[orderService.raiseDispute RESPONSE SUCCESS] Dispute created successfully on Firestore.');
+    const data = await response.json().catch(() => ({ success: false, error: 'Invalid server JSON response' }));
+    console.log('[orderService.raiseDispute Response]', { status: response.status, data });
+
+    if (!response.ok || !data.success) {
+      throw new Error(data?.error || 'Failed to open dispute on server');
+    }
+
+    console.log('[orderService.raiseDispute SUCCESS] Dispute case opened successfully on server.');
   },
 
   async updateFulfillmentStatus(orderId: string, status: string, actorUid?: string, role?: string) {

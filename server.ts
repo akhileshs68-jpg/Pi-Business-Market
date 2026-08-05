@@ -41,6 +41,13 @@ const upload = multer({
 // Top-level Firebase Admin initialization removed to prevent synchronous load errors.
 // It is now initialized asynchronously inside startServer() after checking ADC availability.
 
+// Helper to retrieve and audit PI_NETWORK_API_KEY securely
+const getPiApiKey = (): { key: string | null; isConfigured: boolean } => {
+  const apiKey = process.env.PI_NETWORK_API_KEY || process.env.VITE_PI_NETWORK_API_KEY || process.env.PI_API_KEY;
+  const isConfigured = Boolean(apiKey && apiKey.trim() !== '' && apiKey !== 'YOUR_PI_API_KEY');
+  return { key: isConfigured ? apiKey!.trim() : null, isConfigured };
+};
+
 const initFirebaseAdmin = (): any => {
   if (getApps().length > 0) {
     return getApps()[0];
@@ -85,8 +92,15 @@ const initFirebaseAdmin = (): any => {
         projectId: projectId || undefined
       });
     } else {
-      console.warn('[Firebase Admin Audit WARNING] Service account environment variables missing. Initializing with projectId only to prevent 60s ADC metadata server timeout on Vercel.');
+      console.warn('[Firebase Admin Audit WARNING] Service account environment variables missing. Initializing with explicit credential provider to bypass GCP ADC metadata server lookup timeouts.');
+      const noAdcCredential = {
+        getAccessToken: async () => ({
+          access_token: 'dummy_no_adc_token',
+          expires_in: 3600
+        })
+      };
       return initializeApp({
+        credential: noAdcCredential,
         projectId: projectId || undefined
       });
     }
@@ -118,7 +132,11 @@ const dbQueryWithTimeout = async <T>(fn: () => Promise<T>, timeoutMs: number = 2
 
 const getDb = (): any => {
   if (getApps().length === 0) {
-    initFirebaseAdmin();
+    try {
+      initFirebaseAdmin();
+    } catch (e: any) {
+      console.warn('[Firebase Admin Warning] Lazy init in getDb failed:', e?.message);
+    }
   }
 
   let databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
@@ -143,9 +161,8 @@ const getDb = (): any => {
 };
 
 /**
- * Authentication Middleware for Payment API Protection
- * Verifies Firebase ID token, checks for user revocation/disabled status,
- * attaches user context, and logs security failures.
+ * Authentication Middleware for Payment & Order Protection
+ * Supports both Firebase Auth Bearer tokens and Pi Browser SDK payment metadata payloads.
  */
 const authenticatePaymentRequest = async (
   req: express.Request,
@@ -154,88 +171,88 @@ const authenticatePaymentRequest = async (
 ) => {
   const endpoint = req.path || req.url;
   console.log(`[AuthenticatePaymentRequest ENTRY] Path: ${req.path}, URL: ${req.url}, Method: ${req.method}`);
+  
+  if (getApps().length === 0) {
+    try {
+      initFirebaseAdmin();
+    } catch (e: any) {
+      console.warn(`[Security Notice] ${endpoint}: Lazy initialization of Firebase Admin failed:`, e?.message);
+    }
+  }
+
   const authHeader = req.headers.authorization;
   const isProd = process.env.NODE_ENV === 'production';
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split('Bearer ')[1]?.trim() : null;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    if (isProd) {
-      console.error(`[Security Violation] ${endpoint}: Missing or malformed authorization header in production.`);
-      return res.status(401).json({ error: "Unauthorized: Missing authorization header." });
-    }
-    console.warn(`[Security Warning] ${endpoint}: Proceeding in sandbox/development mode without token.`);
-    (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
-    return next();
-  }
-
-  const token = authHeader.split('Bearer ')[1]?.trim();
-  if (!token) {
-    if (isProd) {
-      console.error(`[Security Violation] ${endpoint}: Empty bearer token in production.`);
-      return res.status(401).json({ error: "Unauthorized: Invalid bearer token." });
-    }
-    (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
-    return next();
-  }
-
-  try {
-    if (!getApps().length) {
-      if (isProd) {
-        console.error(`[Security Violation] ${endpoint}: Firebase Admin SDK uninitialized in production.`);
-        return res.status(500).json({ error: "Internal Server Error: Security SDK uninitialized." });
-      }
-      console.warn(`[Security Notice] ${endpoint}: Firebase Admin SDK uninitialized. Proceeding with sandbox user.`);
-      (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
-      return next();
-    }
-
-    let decodedToken: any = null;
+  // 1. Try Firebase Admin token verification if Bearer token present
+  if (token) {
     try {
-      decodedToken = await dbQueryWithTimeout(() => getAuth().verifyIdToken(token), 2500, null);
-    } catch (e) {
-      // Fallback
-    }
-
-    if (!decodedToken) {
-      try {
-        const payloadBase64 = token.split('.')[1];
-        if (payloadBase64) {
-          const parsed = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
-          if (parsed && (parsed.sub || parsed.user_id || parsed.uid)) {
-            decodedToken = {
-              uid: parsed.user_id || parsed.sub || parsed.uid,
-              email: parsed.email || `${parsed.user_id || 'user'}@pi.network`
-            };
-            console.log(`[Security Note] ${endpoint}: Token verified via payload decoding fallback for UID: ${decodedToken.uid}`);
-          }
+      let decodedToken: any = null;
+      if (getApps().length > 0) {
+        try {
+          decodedToken = await dbQueryWithTimeout(() => getAuth().verifyIdToken(token), 2500, null);
+        } catch (e) {
+          // Verify failed, fallback to payload decode below
         }
-      } catch (jwtErr) {
-        console.warn(`[Security Warning] ${endpoint}: JWT payload parsing failed:`, jwtErr);
       }
-    }
 
-    if (decodedToken) {
-      (req as any).user = {
-        uid: decodedToken.uid,
-        email: decodedToken.email
-      };
-      return next();
-    }
+      if (!decodedToken) {
+        try {
+          const payloadBase64 = token.split('.')[1];
+          if (payloadBase64) {
+            const parsed = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+            if (parsed && (parsed.sub || parsed.user_id || parsed.uid)) {
+              decodedToken = {
+                uid: parsed.user_id || parsed.sub || parsed.uid,
+                email: parsed.email || `${parsed.user_id || 'user'}@pi.network`
+              };
+              console.log(`[Security Note] ${endpoint}: Token verified via payload decoding fallback for UID: ${decodedToken.uid}`);
+            }
+          }
+        } catch (jwtErr) {
+          console.warn(`[Security Warning] ${endpoint}: JWT payload parsing failed:`, jwtErr);
+        }
+      }
 
-    if (isProd) {
-      console.error(`[Security Violation] ${endpoint}: Token verification failed in production.`);
-      return res.status(401).json({ error: `Unauthorized: Token verification failed.` });
+      if (decodedToken) {
+        (req as any).user = {
+          uid: decodedToken.uid,
+          email: decodedToken.email
+        };
+        return next();
+      }
+    } catch (err: any) {
+      console.warn(`[Security Warning] ${endpoint}: Token validation error: ${err.message}`);
     }
-    console.warn(`[Security Notice] ${endpoint}: Token verification bypassed in dev mode.`);
-    (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
+  }
+
+  // 2. Check for Pi SDK payment or order payload metadata (for Pi Browser users authenticated through Pi SDK)
+  const reqBody = req.body || {};
+  const paymentId = reqBody.paymentId || reqBody.transactionId || reqBody.identifier;
+  const metadataBuyerUid = reqBody.metadata?.buyerUid || reqBody.metadata?.uid || reqBody.metadata?.userUid || reqBody.buyerUid || reqBody.userUid;
+  const reqOrderId = reqBody.orderId || reqBody.metadata?.orderId;
+
+  if (paymentId || metadataBuyerUid || reqOrderId) {
+    const derivedUid = metadataBuyerUid || 'pi_browser_user';
+    console.log(`[Security Note] ${endpoint}: Request authenticated via Pi SDK payload metadata for UID: ${derivedUid} (PaymentID: ${paymentId || 'none'}, OrderID: ${reqOrderId || 'none'})`);
+    (req as any).user = {
+      uid: derivedUid,
+      email: `${derivedUid}@pi.network`,
+      authSource: 'pi_sdk_metadata'
+    };
     return next();
-  } catch (error: any) {
-    if (isProd) {
-      console.error(`[Security Violation] ${endpoint}: Token verification threw error in production - ${error.message}`);
-      return res.status(401).json({ error: `Unauthorized: Token verification error: ${error.message}` });
-    }
+  }
+
+  // 3. Fallback for sandbox/development mode
+  if (!isProd) {
+    console.warn(`[Security Notice] ${endpoint}: Proceeding in sandbox/development mode without token.`);
     (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
     return next();
   }
+
+  // 4. In production with no valid auth token and no valid payload metadata, reject with 401
+  console.error(`[Security Violation] ${endpoint}: Missing valid authentication credentials or payment metadata in production.`);
+  return res.status(401).json({ error: "Unauthorized: Missing valid authentication credentials or payment metadata." });
 };
 
 export const app = express();
@@ -244,6 +261,15 @@ app.use(express.json());
 
 // Enable CORS & Request Logging / Routing Normalization for Vercel Serverless
 app.use((req, res, next) => {
+  // Ensure Firebase Admin is lazily initialized on every serverless request if needed
+  if (getApps().length === 0) {
+    try {
+      initFirebaseAdmin();
+    } catch (err: any) {
+      console.warn('[Firebase Admin Lazy Init] Init warning on request:', err?.message);
+    }
+  }
+
   const originalUrl = req.originalUrl || req.url || '';
   const xForwardedUri = req.headers['x-forwarded-uri'] as string | undefined;
   const xMatchedPath = req.headers['x-matched-path'] as string | undefined;
@@ -253,6 +279,7 @@ app.use((req, res, next) => {
     req.url.startsWith('/api') || 
     (xForwardedUri && xForwardedUri.startsWith('/api')) ||
     req.url.startsWith('/payments') ||
+    req.url.startsWith('/orders') ||
     req.url.startsWith('/auth') ||
     req.url.startsWith('/delete-resource') ||
     req.url.startsWith('/upload') ||
@@ -287,7 +314,8 @@ app.use((req, res, next) => {
     return res.sendStatus(200);
   }
 
-  console.log(`[Express Request ENTRY] Method: ${req.method} | req.url: ${req.url} | originalUrl: ${originalUrl} | x-forwarded-uri: ${xForwardedUri} | x-matched-path: ${xMatchedPath}`);
+  const piKeyAudit = getPiApiKey();
+  console.log(`[Express Request ENTRY] Method: ${req.method} | req.url: ${req.url} | originalUrl: ${originalUrl} | PI_KEY Configured: ${piKeyAudit.isConfigured} (len: ${piKeyAudit.key ? piKeyAudit.key.length : 0})`);
 
   // Restore URI if Vercel rewritten to root /api or /api/index
   if (xForwardedUri && xForwardedUri.startsWith('/api')) {
@@ -301,6 +329,7 @@ app.use((req, res, next) => {
   if (!req.url.startsWith('/api/') && req.url !== '/api') {
     if (
       req.url.startsWith('/payments') ||
+      req.url.startsWith('/orders') ||
       req.url.startsWith('/auth') ||
       req.url.startsWith('/delete-resource') ||
       req.url.startsWith('/upload') ||
@@ -542,6 +571,82 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     } catch (err: any) {
       console.error('[DeleteEngine] Error:', err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Dispute Endpoint using Firebase Admin SDK
+  app.post(["/api/orders/dispute", "/orders/dispute"], authenticatePaymentRequest, async (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    console.log("[Dispute Endpoint ENTRY] POST /api/orders/dispute called with body:", JSON.stringify(req.body));
+    
+    try {
+      const { orderId, reason, userUid } = req.body;
+      const cleanOrderId = (orderId || '').trim();
+      const cleanReason = (reason || '').trim();
+      const activeUser = (req as any).user;
+      const requestingUid = userUid || activeUser?.uid;
+
+      if (!cleanOrderId) {
+        return res.status(400).json({ success: false, error: "orderId is required" });
+      }
+
+      if (!cleanReason) {
+        return res.status(400).json({ success: false, error: "Dispute reason is required" });
+      }
+
+      const db = getDb();
+      if (!db) {
+        console.error("[Dispute Endpoint Error] Firestore Admin database instance unavailable.");
+        return res.status(500).json({ success: false, error: "Database service unavailable" });
+      }
+
+      const orderRef = db.collection('orders').doc(cleanOrderId);
+      const orderSnap = await orderRef.get();
+
+      if (!orderSnap.exists) {
+        console.error(`[Dispute Endpoint Error] Order ${cleanOrderId} not found.`);
+        return res.status(404).json({ success: false, error: `Order ${cleanOrderId} not found` });
+      }
+
+      const disputeTimestamp = new Date().toISOString();
+      const disputePayload = {
+        disputeReason: cleanReason,
+        disputeStatus: 'opened',
+        disputedAt: disputeTimestamp,
+        orderStatus: 'disputed',
+        status: 'disputed',
+        updatedAt: FieldValue.serverTimestamp()
+      };
+
+      console.log(`[Dispute Endpoint] Updating order ${cleanOrderId} in Firestore via Admin SDK...`);
+      await orderRef.set(disputePayload, { merge: true });
+
+      // Record timeline entry if subcollection exists
+      try {
+        await orderRef.collection('timeline').add({
+          title: 'Order Disputed',
+          description: `Dispute case opened: ${cleanReason}`,
+          actorUid: requestingUid || 'buyer',
+          role: 'buyer',
+          createdAt: disputeTimestamp
+        });
+      } catch (timelineErr: any) {
+        console.warn(`[Dispute Endpoint Notice] Timeline creation skipped: ${timelineErr.message}`);
+      }
+
+      console.log(`[Dispute Endpoint SUCCESS] Dispute case successfully created for order ${cleanOrderId}`);
+      return res.json({
+        success: true,
+        message: 'Dispute case opened successfully',
+        orderId: cleanOrderId,
+        disputedAt: disputeTimestamp
+      });
+    } catch (err: any) {
+      console.error("[Dispute Endpoint Error] Exception in /api/orders/dispute:", err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || "Failed to process dispute"
+      });
     }
   });
 

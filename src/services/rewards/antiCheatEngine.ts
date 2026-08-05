@@ -57,17 +57,19 @@ export class AntiCheatEngine {
     if (telemetry.fingerprint) {
       const q = query(
         collection(db, 'user_gamification'),
-        where('lastFingerprint', '==', telemetry.fingerprint),
-        where('userId', '!=', userId)
+        where('lastFingerprint', '==', telemetry.fingerprint)
       );
       const docsSnap = await getDocs(q);
       
       // Let's check how many accounts checked in within last 24h on this device
       let recentDeviceUsers = 0;
       docsSnap.forEach(d => {
-        const lastTime = d.data().lastCheckInTime || 0;
-        if (nowMs - lastTime < 24 * 60 * 60 * 1000) {
-          recentDeviceUsers++;
+        const data = d.data();
+        if (data && data.userId !== userId) {
+          const lastTime = data.lastCheckInTime || 0;
+          if (nowMs - lastTime < 24 * 60 * 60 * 1000) {
+            recentDeviceUsers++;
+          }
         }
       });
 
