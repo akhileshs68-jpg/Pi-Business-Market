@@ -25,25 +25,31 @@ export class IdentityService {
    * Resolve or construct an Enterprise Identity for a given user
    */
   public async resolveIdentity(
-    uid: string,
+    uid: string, // Current Firebase Auth UID (session identifier)
     piUid: string = '',
     username: string = '',
     displayName: string = ''
   ): Promise<EnterpriseIdentity> {
     let identity: EnterpriseIdentity | null = null;
+    const resolvedPiUid = piUid || uid;
 
     try {
-      identity = await identityRepository.getIdentityByUid(uid);
-
-      if (!identity && piUid) {
+      // 1. Try resolving by the absolute canonical Pi UID first
+      if (piUid) {
         identity = await identityRepository.getIdentityByPiUid(piUid);
       }
 
+      // 2. Fallback to lookup by the Firebase Session UID (for legacy accounts)
+      if (!identity) {
+        identity = await identityRepository.getIdentityByUid(uid);
+      }
+
+      // 3. Fallback to username
       if (!identity && username) {
         identity = await identityRepository.getIdentityByUsername(username);
       }
     } catch (err) {
-      logger.warn('IdentityService', `Identity lookup notice for ${uid}: ${err}`);
+      logger.warn('IdentityService', `Identity lookup notice for ${resolvedPiUid}: ${err}`);
     }
 
     const isOwner = username === 'pi_pioneer_88' || (identity && (identity.roles.includes('superadmin') || identity.roles.includes('super_admin')));
@@ -56,9 +62,9 @@ export class IdentityService {
       const now = new Date().toISOString();
 
       identity = {
-        uid,
-        piUid: piUid || `pi_${uid.substring(0, 8)}`,
-        username: username || `user_${uid.substring(0, 6)}`,
+        uid: resolvedPiUid, // Canonical ID is Pi UID (or fallback to uid if not available)
+        piUid: resolvedPiUid,
+        username: username || `user_${resolvedPiUid.substring(0, 6)}`,
         roles: initialRoles,
         permissions: rbacEngine.getPermissionsForRoles(initialRoles),
         personalProfile: {
@@ -71,8 +77,8 @@ export class IdentityService {
         businessIdentities: [],
         storeIdentities: [],
         walletIdentity: {
-          piWalletAddress: `pi_addr_${uid.substring(0, 10)}`,
-          bmpRewardAddress: `bmp_ledger_${uid}`
+          piWalletAddress: `pi_addr_${resolvedPiUid.substring(0, 10)}`,
+          bmpRewardAddress: `bmp_ledger_${resolvedPiUid}`
         },
         verification: {
           isEmailVerified: false,
@@ -89,31 +95,32 @@ export class IdentityService {
 
       try {
         await identityRepository.saveIdentity(identity);
-        logger.audit('IdentityService', `Initialized Enterprise Identity for user ${uid}`, uid, { roles: initialRoles });
+        logger.audit('IdentityService', `Initialized Enterprise Identity for user ${resolvedPiUid}`, resolvedPiUid, { roles: initialRoles });
       } catch (saveErr) {
-        logger.warn('IdentityService', `Could not persist initialized identity for ${uid}: ${saveErr}`);
+        logger.warn('IdentityService', `Could not persist initialized identity for ${resolvedPiUid}: ${saveErr}`);
       }
     } else {
-      // Identity exists - update uid to current authenticated uid if different
-      if (identity.uid !== uid) {
-        identity.uid = uid;
+      // Identity exists - make sure we align the canonical UID with piUid if available
+      if (piUid && identity.uid !== piUid) {
+        identity.uid = piUid;
       }
       if (isOwner && !identity.roles.includes('superadmin')) {
         identity.roles = Array.from(new Set([...identity.roles, 'buyer', 'seller', 'business_owner', 'superadmin', 'merchant', 'owner']));
         identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
       }
+      identity.updatedAt = new Date().toISOString();
       try {
         await identityRepository.saveIdentity(identity);
       } catch (saveErr) {
-        logger.warn('IdentityService', `Could not persist updated identity for ${uid}: ${saveErr}`);
+        logger.warn('IdentityService', `Could not persist updated identity for ${identity.uid}: ${saveErr}`);
       }
     }
 
     if (!identity) {
-      throw new Error(`Failed to resolve identity for user ${uid}`);
+      throw new Error(`Failed to resolve identity for user ${resolvedPiUid}`);
     }
 
-    // Attach active session
+    // Attach active session (Firebase UID is mapped here strictly as the session identifier)
     const session = await sessionManager.createSession(uid);
     identity.activeSessionId = session.sessionId;
 

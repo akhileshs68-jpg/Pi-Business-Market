@@ -13,12 +13,21 @@ export class IdentityRepository extends BaseRepository<EnterpriseIdentity & { id
   }
 
   public async getIdentityByUid(uid: string): Promise<EnterpriseIdentity | null> {
-    const doc = await this.getById(uid);
-    return doc;
+    // 1. Try direct fetch by piUid first (if uid is already a piUid)
+    let doc = await this.getById(uid);
+    if (doc) return doc;
+
+    // 2. Otherwise query where uid == uid (legacy support)
+    const results = await this.findWhere(where('uid', '==', uid));
+    return results.length > 0 ? results[0] : null;
   }
 
   public async getIdentityByPiUid(piUid: string): Promise<EnterpriseIdentity | null> {
     if (!piUid) return null;
+    // O(1) direct document fetch by canonical piUid ID!
+    const doc = await this.getById(piUid);
+    if (doc) return doc;
+
     const results = await this.findWhere(where('piUid', '==', piUid));
     return results.length > 0 ? results[0] : null;
   }
@@ -32,7 +41,7 @@ export class IdentityRepository extends BaseRepository<EnterpriseIdentity & { id
   public async saveIdentity(identity: EnterpriseIdentity): Promise<void> {
     await this.save({
       ...identity,
-      id: identity.uid
+      id: identity.piUid || identity.uid
     });
   }
 }
