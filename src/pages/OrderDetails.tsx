@@ -384,13 +384,23 @@ export const OrderDetails: React.FC = () => {
       await orderService.raiseDispute(targetOrderId, resolvedUserUid, trimmedReason);
       console.log('[OrderDetails Dispute Step 6 SUCCESS] Dispute case successfully created and saved.');
       
+      const nowIso = new Date().toISOString();
+      const newDisputeLog = {
+        timestamp: nowIso,
+        message: `Buyer opened dispute case: ${trimmedReason}`,
+        actorUid: resolvedUserUid,
+        role: 'buyer',
+        status: OrderStatus.DISPUTED
+      };
+
       // Update local state immediately for instant feedback
       setOrder(prev => prev ? {
         ...prev,
         orderStatus: OrderStatus.DISPUTED,
         disputeReason: trimmedReason,
         disputeStatus: 'opened',
-        disputedAt: new Date().toISOString()
+        disputedAt: nowIso,
+        activityLogs: [...(prev.activityLogs || []), newDisputeLog]
       } : prev);
 
       setShowDisputeModal(false);

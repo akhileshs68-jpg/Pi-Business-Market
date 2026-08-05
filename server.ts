@@ -630,12 +630,27 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       }
 
       const disputeTimestamp = new Date().toISOString();
+      const humanMessage = `Buyer opened dispute case: ${cleanReason}`;
+
       const disputePayload = {
         disputeReason: cleanReason,
         disputeStatus: 'opened',
         disputedAt: disputeTimestamp,
         orderStatus: 'disputed',
         status: 'disputed',
+        activityLogs: FieldValue.arrayUnion({
+          timestamp: disputeTimestamp,
+          message: humanMessage,
+          actorUid: requestingUid || 'buyer',
+          role: 'buyer',
+          status: 'disputed'
+        }),
+        historyLog: FieldValue.arrayUnion({
+          status: 'disputed',
+          timestamp: disputeTimestamp,
+          updatedBy: requestingUid || 'buyer',
+          remarks: humanMessage
+        }),
         updatedAt: FieldValue.serverTimestamp()
       };
 

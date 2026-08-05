@@ -437,9 +437,9 @@ export const orderService = {
     const activityLogs = order.activityLogs || [];
     const historyLog = order.historyLog || [];
 
-    // Merge logs and sort by timestamp
-    const combined = [...activityLogs, ...historyLog].map((entry: any, index: number) => ({
-      eventId: `EVT_${index}_${Date.now()}`,
+    // Merge logs from array fields
+    const combined: any[] = [...activityLogs, ...historyLog].map((entry: any, index: number) => ({
+      eventId: `EVT_${index}_${entry.timestamp || order.createdAt}`,
       orderId,
       status: entry.status || order.orderStatus,
       type: 'status_change',
@@ -449,7 +449,38 @@ export const orderService = {
       createdAt: entry.timestamp || order.createdAt
     }));
 
-    return combined.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    // Attempt to read timeline subcollection records
+    try {
+      const db = getFirebaseDb();
+      const { collection, getDocs } = await import('firebase/firestore');
+      const subSnap = await getDocs(collection(db, 'orders', orderId, 'timeline'));
+      subSnap.forEach((docSnap) => {
+        const subData = docSnap.data();
+        combined.push({
+          eventId: docSnap.id,
+          orderId,
+          status: subData.status || 'disputed',
+          type: 'timeline_event',
+          message: subData.description || subData.title || 'Timeline Event',
+          actorUid: subData.actorUid || 'SYSTEM',
+          actorName: subData.role === 'buyer' ? 'Customer' : 'System',
+          createdAt: subData.createdAt || new Date().toISOString()
+        });
+      });
+    } catch (e) {
+      // Ignore subcollection read error if rules or missing
+    }
+
+    // Deduplicate by message and sort ascending by date
+    const uniqueMap = new Map<string, any>();
+    combined.forEach(item => {
+      const key = `${item.createdAt}_${item.message}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, item);
+      }
+    });
+
+    return Array.from(uniqueMap.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   },
 
   // Helper Lifecycle methods
