@@ -37,17 +37,76 @@ import { analyticsService } from '../../services/analyticsService';
 import { subscriptionService } from '../../services/blockchain/subscriptionService';
 
 
+function getAbsoluteUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.href) {
+      const href = window.location.href;
+      if (href.startsWith('http://') || href.startsWith('https://')) {
+        const urlObj = new URL(href);
+        if (urlObj.origin && urlObj.origin !== 'null' && !urlObj.origin.startsWith('file:')) {
+          const resolved = `${urlObj.origin}${cleanPath}`;
+          console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Parsed href. Origin: ${urlObj.origin}, Resolved URL: ${resolved}`);
+          return resolved;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error parsing window.location.href:', e);
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      const origin = window.location.origin;
+      if (origin !== 'null' && !origin.startsWith('file:')) {
+        const resolved = `${origin}${cleanPath}`;
+        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Read origin. Origin: ${origin}, Resolved URL: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {
+    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error reading window.location.origin:', e);
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.location && window.location.host) {
+      const protocol = window.location.protocol || 'https:';
+      const host = window.location.host;
+      if (host && !host.startsWith('file:')) {
+        const resolved = `${protocol}//${host}${cleanPath}`;
+        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Formed host. Origin: ${protocol}//${host}, Resolved URL: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {}
+
+  console.warn(`[DEBUG_TRACE] [getAbsoluteUrl] All origin checks failed. Falling back to relative path: ${cleanPath}`);
+  return cleanPath;
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  console.log('[DEBUG_TRACE] [getAuthHeaders] ENTER');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   try {
     const auth = getFirebaseAuth();
     if (auth && auth.currentUser) {
-      const token = await auth.currentUser.getIdToken();
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase currentUser found:', auth.currentUser.uid);
+      const tokenPromise = auth.currentUser.getIdToken();
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
+      const token = await Promise.race([tokenPromise, timeoutPromise]);
+      if (token) {
+        console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase token successfully acquired');
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.warn('[DEBUG_TRACE] [getAuthHeaders] Firebase ID token request timed out (1.2s timeout exceeded) or returned null');
+      }
+    } else {
+      console.log('[DEBUG_TRACE] [getAuthHeaders] No active Firebase currentUser');
     }
   } catch (err) {
-    console.error('Error getting auth token:', err);
+    console.error('[DEBUG_TRACE] [getAuthHeaders] Error retrieving Firebase token:', err);
   }
+  console.log('[DEBUG_TRACE] [getAuthHeaders] EXIT');
   return headers;
 }
 
@@ -251,13 +310,12 @@ export class EnterpriseCheckoutEngine {
     sessionId: string,
     metadata: any
   ): Promise<PiTestnetVerificationResult> {
-    console.log('[DEBUG_TRACE] [executePiTestnetPayment] ENTER', { amount, memo, sessionId, metadata });
+    console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering createPayment with amount:', amount, 'memo:', memo);
 
     const requiredMetadata = ['sessionId', 'buyerId', 'sellerId', 'businessId', 'storeId', 'orderId'];
     for (const key of requiredMetadata) {
       if (!metadata[key]) {
         console.error(`[DEBUG_TRACE] [executePiTestnetPayment] Missing mandatory metadata field: ${key}`);
-        console.log('[DEBUG_TRACE] [executePiTestnetPayment] EXIT (missing metadata)');
         return {
           verified: false,
           paymentId: '',
@@ -269,50 +327,42 @@ export class EnterpriseCheckoutEngine {
       }
     }
 
-    console.log('[DEBUG_TRACE] [executePiTestnetPayment] BEFORE returning Promise wrapper');
     return new Promise((resolve, reject) => {
-      console.log('[DEBUG_TRACE] [executePiTestnetPayment Promise] ENTER executor');
       const internalPaymentId = `PAY_PI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
-      console.log('[DEBUG_TRACE] [executePiTestnetPayment Promise] BEFORE createPayment call');
       piPaymentService.createPayment(
         { amount, memo, metadata: { ...metadata, sessionId, internalPaymentId } },
         {
           onReadyForServerApproval: async (piPaymentId: string) => {
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] ENTER for piPaymentId:', piPaymentId);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering onReadyForServerApproval with piPaymentId:', piPaymentId);
             try {
               let headers: any = { 'Content-Type': 'application/json' };
               try {
                 headers = await getAuthHeaders();
               } catch (authErr) {
-                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Auth header fallback:', authErr);
+                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Auth header fallback error:', authErr);
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] BEFORE await fetch /api/payments/approve');
-              
-              console.log("========== PI PAYMENT DEBUG ==========");
-console.log("window.location.href =", window.location.href);
-console.log("window.location.origin =", window.location.origin);
-console.log("document.baseURI =", document.baseURI);
-console.log("document.referrer =", document.referrer);
+              const url = getAbsoluteUrl('/api/payments/approve');
+              const bodyStr = JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata });
+              const startTime = Date.now();
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch URL:', url);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] request body:', bodyStr);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch start time:', startTime);
 
-const approveUrl = new URL("/api/payments/approve", window.location.origin).toString();
-
-console.log("Approve URL =", approveUrl);
-
-const res = await fetch(approveUrl, {
-
-              
+              const res = await fetch(url, {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata })
+                body: bodyStr
               });
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] AFTER await fetch /api/payments/approve, status:', res.status);
+              const endTime = Date.now();
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch finish time:', endTime, 'duration:', endTime - startTime, 'ms');
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response status:', res.status);
+
               const resText = await res.text();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] approve response body:', resText);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response body:', resText);
               
               if (!res.ok) {
-                console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Server approve error status:', res.status);
                 if (!piPaymentId.startsWith('SIM_')) {
                   throw new Error(`Server payment approval failed (${res.status}): ${resText}`);
                 }
@@ -327,27 +377,36 @@ const res = await fetch(approveUrl, {
                 throw err;
               }
             }
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] EXIT');
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment] callback exit: onReadyForServerApproval');
           },
           onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] ENTER for piPaymentId:', piPaymentId, 'txid:', txid);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering onReadyForServerCompletion with piPaymentId:', piPaymentId, 'txid:', txid);
             try {
               let headers: any = { 'Content-Type': 'application/json' };
               try {
                 headers = await getAuthHeaders();
               } catch (authErr) {
-                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] Auth header fallback:', authErr);
+                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] Auth header fallback error:', authErr);
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] BEFORE await fetch /api/payments/complete');
-              const res = await fetch('/api/payments/complete', {
+              const url = getAbsoluteUrl('/api/payments/complete');
+              const bodyStr = JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata });
+              const startTime = Date.now();
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch URL:', url);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] request body:', bodyStr);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch start time:', startTime);
+
+              const res = await fetch(url, {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata })
+                body: bodyStr
               });
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] AFTER await fetch /api/payments/complete, status:', res.status);
+              const endTime = Date.now();
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch finish time:', endTime, 'duration:', endTime - startTime, 'ms');
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response status:', res.status);
+
               const resText = await res.text();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] complete response body:', resText);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response body:', resText);
 
               let serverOrderId = '';
               try {
@@ -369,7 +428,6 @@ const res = await fetch(approveUrl, {
 
               paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
 
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] BEFORE resolve Promise');
               resolve({
                 verified: true,
                 paymentId: piPaymentId,
@@ -379,7 +437,6 @@ const res = await fetch(approveUrl, {
                 timestamp: new Date().toISOString(),
                 orderId: finalOrderId
               });
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] AFTER resolve Promise');
             } catch (err: any) {
               console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] Exception:', err);
               if (piPaymentId.startsWith('SIM_')) {
@@ -394,25 +451,22 @@ const res = await fetch(approveUrl, {
                   orderId: sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase())
                 });
               } else {
-                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] BEFORE reject Promise');
                 reject(new Error('Server completion verification failed: ' + err.message));
-                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] AFTER reject Promise');
                 throw err;
               }
             }
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] EXIT');
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment] callback exit: onReadyForServerCompletion');
           },
           onCancel: async (piPaymentId: string) => {
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onCancel] ENTER for piPaymentId:', piPaymentId);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment] onCancel with piPaymentId:', piPaymentId);
             reject(new Error('Payment cancelled by user.'));
           },
           onError: async (error: Error, piPaymentId: string) => {
-            console.error('[DEBUG_TRACE] [executePiTestnetPayment.onError] ENTER for piPaymentId:', piPaymentId, 'error:', error);
+            console.error('[DEBUG_TRACE] [executePiTestnetPayment] onError with piPaymentId:', piPaymentId, 'error:', error);
             reject(new Error(`Pi Payment Error: ${error.message}`));
           }
         }
       );
-      console.log('[DEBUG_TRACE] [executePiTestnetPayment Promise] AFTER createPayment call');
     });
   }
 
