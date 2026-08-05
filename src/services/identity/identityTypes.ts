@@ -118,6 +118,8 @@ export interface EnterpriseIdentity {
   walletIdentity: WalletIdentity;
   verification: VerificationIdentity;
   activeSessionId?: string;
+  platformRole?: string;
+  activeRole?: string;
   createdAt: string;
   updatedAt: string;
   lastLogin: string;

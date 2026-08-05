@@ -23,14 +23,16 @@ const DEFAULT_CURRENT_USER: User = {
   username: 'pi_pioneer_88',
   displayName: 'Alex Mercer',
   walletAddress: 'GBCWD32QYJ7LURP5H6V77JHYX345PPONNFFVVZZ44SSTT22XXYYZZ',
-  role: 'Buyer',
+  role: 'buyer',
+  activeRole: 'buyer',
+  roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
   accountType: 'individual',
   verified: true,
   kycVerified: false,
   createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   updatedAt: new Date().toISOString(),
   lastLogin: new Date().toISOString(),
-  platformRole: 'buyer',
+  platformRole: 'user',
   permissions: [],
   status: 'active'
 };
