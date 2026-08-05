@@ -289,7 +289,20 @@ export class EnterpriseCheckoutEngine {
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] BEFORE await fetch /api/payments/approve');
-              const res = await fetch('/api/payments/approve', {
+              
+              console.log("========== PI PAYMENT DEBUG ==========");
+console.log("window.location.href =", window.location.href);
+console.log("window.location.origin =", window.location.origin);
+console.log("document.baseURI =", document.baseURI);
+console.log("document.referrer =", document.referrer);
+
+const approveUrl = new URL("/api/payments/approve", window.location.origin).toString();
+
+console.log("Approve URL =", approveUrl);
+
+const res = await fetch(approveUrl, {
+
+              
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata })
