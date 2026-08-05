@@ -13,22 +13,22 @@ const config = {
   appId: configData.appId,
 };
 
+console.log("Using Config Project ID:", config.projectId);
+console.log("Using Database ID:", configData.firestoreDatabaseId);
+
 const app = initializeApp(config);
 const db = initializeFirestore(app, { experimentalForceLongPolling: true }, configData.firestoreDatabaseId);
 
-async function check() {
-  const b = await getDocs(collection(db, 'businesses'));
-  console.log("Total Businesses:", b.docs.length);
-  b.docs.forEach(d => console.log('BIZ:', d.id, JSON.stringify(d.data())));
-  
-  const s = await getDocs(collection(db, 'stores'));
-  console.log("Total Stores:", s.docs.length);
-  s.docs.forEach(d => console.log('STORE:', d.id, JSON.stringify(d.data())));
-  
-  const p = await getDocs(collection(db, 'products'));
-  console.log("Total Products:", p.docs.length);
-  p.docs.forEach(d => console.log('PROD:', d.id, JSON.stringify(d.data())));
-  
+async function run() {
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    console.log("Total Users:", snap.docs.length);
+    snap.docs.forEach(d => {
+      console.log(`Doc ID: ${d.id} =>`, JSON.stringify(d.data()));
+    });
+  } catch (err: any) {
+    console.error("Client fetch error:", err.message);
+  }
   process.exit(0);
 }
-check();
+run();
