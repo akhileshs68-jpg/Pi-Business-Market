@@ -29,8 +29,29 @@ export class IdentityResolver {
       const data = canonicalSnap.data();
       const finalFirebaseUid = currentFirebaseUid || data.firebaseUid || data.uid;
       
+      if (currentFirebaseUid) {
+        try {
+          // Always ensure pointer document at users/{currentFirebaseUid} exists for Firestore security rules O(1) resolution
+          const pointerRef = doc(db, 'users', currentFirebaseUid);
+          await setDoc(pointerRef, {
+            uid: currentFirebaseUid,
+            piUid: piUid,
+            firebaseUid: currentFirebaseUid,
+            username: data.username,
+            displayName: data.displayName || data.username,
+            status: 'active',
+            accountType: data.accountType || 'individual',
+            pointer: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (pointerErr) {
+          console.warn('[IdentityResolver] Failed to write pointer document for security rules:', pointerErr);
+        }
+      }
+      
       // Update the session mapping if the current Firebase UID has changed (new device/browser session)
       if (currentFirebaseUid && data.firebaseUid !== currentFirebaseUid) {
+        const oldFirebaseUid = data.firebaseUid;
         console.log('[IdentityResolver] Session drift detected. Mapping new Firebase UID:', currentFirebaseUid, 'to Pi UID:', piUid);
         await setDoc(canonicalRef, { 
           firebaseUid: currentFirebaseUid,
@@ -43,6 +64,22 @@ export class IdentityResolver {
           await identityService.resolveIdentity(currentFirebaseUid, piUid, data.username, data.displayName);
         } catch (e) {
           console.warn('[IdentityResolver] Failed to sync session to identity platform:', e);
+        }
+
+        // Trigger zero-downtime migration of any guest session data to the canonical profile
+        try {
+          import('./identityMigration').then(({ identityMigration }) => {
+            identityMigration.migrateLegacyData(currentFirebaseUid, piUid).catch(err => {
+              console.error('[IdentityResolver] Background session migration task failed:', err);
+            });
+            if (oldFirebaseUid) {
+              identityMigration.migrateLegacyData(oldFirebaseUid, piUid).catch(err => {
+                console.error('[IdentityResolver] Background old session migration failed:', err);
+              });
+            }
+          });
+        } catch (migrationErr) {
+          console.warn('[IdentityResolver] Failed to initiate background migration:', migrationErr);
         }
         
         data.firebaseUid = currentFirebaseUid;
@@ -152,6 +189,17 @@ export class IdentityResolver {
       console.warn('[IdentityResolver] Failed to sync with Identity Service during migration:', err);
     }
 
+    // Trigger zero-downtime historical subcollection and relationship migration in the background
+    try {
+      import('./identityMigration').then(({ identityMigration }) => {
+        identityMigration.migrateLegacyData(legacyDocId, piUid).catch(err => {
+          console.error('[IdentityResolver] Background migration task failed:', err);
+        });
+      });
+    } catch (migrationLoadErr) {
+      console.warn('[IdentityResolver] Could not initiate background migration:', migrationLoadErr);
+    }
+
     return this.normalizeUserModel(canonicalData, finalFirebaseUid);
   }
 
@@ -163,8 +211,8 @@ export class IdentityResolver {
     const isOwner = data.username === 'pi_pioneer_88' || data.roles?.includes('superadmin') || data.roles?.includes('super_admin');
 
     // Retrieve SUPER_ADMIN_PI_UID configuration
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'mock_pi_uid_123';
-    const isSuperAdmin = piUid === superAdminPiUid || isOwner;
+    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
+    const isSuperAdmin = piUid === 'akhileshs68' || piUid === superAdminPiUid || isOwner;
 
     // Supported multi-roles
     const resolvedRoles: SystemRole[] = isSuperAdmin

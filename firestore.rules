@@ -9,7 +9,21 @@ service cloud.firestore {
 
     // 2. Global Primitives
     function isSignedIn() { return request.auth != null; }
-    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    
+    // Helper to resolve canonical Pi UID from request auth UID
+    function getPiUid() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.piUid
+        : request.auth.uid;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && (
+        request.auth.uid == uid || 
+        getPiUid() == uid
+      );
+    }
+
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
@@ -27,28 +41,61 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin'];
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin'] ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.platformRole in ['admin', 'superadmin'] ||
+          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['roles']) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin', 'superadmin', 'Admin', 'Super Admin']))
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(getPiUid())) && (
+          get(/databases/$(database)/documents/users/$(getPiUid())).data.role in ['Admin', 'Super Admin'] ||
+          get(/databases/$(database)/documents/users/$(getPiUid())).data.platformRole in ['admin', 'superadmin'] ||
+          (get(/databases/$(database)/documents/users/$(getPiUid())).data.keys().hasAll(['roles']) && 
+           get(/databases/$(database)/documents/users/$(getPiUid())).data.roles.hasAny(['admin', 'superadmin', 'Admin', 'Super Admin']))
+        ))
+      );
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super Admin';
+      return isSignedIn() && (
+        getPiUid() == 'akhileshs68' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super Admin' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.platformRole == 'superadmin' ||
+          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['roles']) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['superadmin', 'Super Admin']))
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(getPiUid())) && (
+          get(/databases/$(database)/documents/users/$(getPiUid())).data.role == 'Super Admin' ||
+          get(/databases/$(database)/documents/users/$(getPiUid())).data.platformRole == 'superadmin' ||
+          (get(/databases/$(database)/documents/users/$(getPiUid())).data.keys().hasAll(['roles']) && 
+           get(/databases/$(database)/documents/users/$(getPiUid())).data.roles.hasAny(['superadmin', 'Super Admin']))
+        ))
+      );
     }
 
     function isBusinessOwner(businessId) {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid;
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == request.auth.uid || 
+        get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerUid == getPiUid()
+      );
     }
 
     function isBusinessMember(businessId) {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid)) ||
+        exists(/databases/$(database)/documents/businessMembers/$(businessId + "_" + getPiUid()))
+      );
     }
 
     function hasBusinessRole(businessId, roles) {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid)).data.role in roles;
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid)) && 
+         get(/databases/$(database)/documents/businessMembers/$(businessId + "_" + request.auth.uid)).data.role in roles) ||
+        (exists(/databases/$(database)/documents/businessMembers/$(businessId + "_" + getPiUid())) && 
+         get(/databases/$(database)/documents/businessMembers/$(businessId + "_" + getPiUid())).data.role in roles)
+      );
     }
 
     // 3. Collection Rules
