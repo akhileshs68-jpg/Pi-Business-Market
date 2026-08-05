@@ -208,18 +208,34 @@ export class IdentityResolver {
    */
   public normalizeUserModel(data: any, firebaseUid: string): User {
     const piUid = data.piUid || data.uid;
-    const isOwner = data.username === 'pi_pioneer_88' || data.roles?.includes('superadmin') || data.roles?.includes('super_admin');
+    const isOwner = data.username === 'pi_pioneer_88' || data.roles?.includes('superadmin') || data.roles?.includes('super_admin') || data.platformRole === 'superadmin';
 
     // Retrieve SUPER_ADMIN_PI_UID configuration
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
     const isSuperAdmin = piUid === 'akhileshs68' || piUid === superAdminPiUid || isOwner;
 
-    // Supported multi-roles
-    const resolvedRoles: SystemRole[] = isSuperAdmin
-      ? ['superadmin', 'buyer', 'seller', 'business_owner', 'merchant', 'service_provider']
-      : (data.roles || ['buyer']);
+    // platformRole is independent of business capabilities
+    const platformRole = isSuperAdmin ? 'superadmin' : 'user';
 
-    const platformRole = isSuperAdmin ? 'superadmin' : (resolvedRoles[0] || 'buyer');
+    // Every Pi user must always have these capabilities
+    const resolvedRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];
+
+    // activeRole is only the currently selected capability and must always be one of the four
+    let activeRole = 'buyer';
+    const rawActive = data.activeRole || data.role;
+    if (rawActive) {
+      const normalized = rawActive.toLowerCase().trim().replace(/[\s_-]/g, '_');
+      if (normalized === 'buyer' || normalized === 'customer') {
+        activeRole = 'buyer';
+      } else if (normalized === 'seller') {
+        activeRole = 'seller';
+      } else if (normalized === 'business_owner' || normalized === 'merchant' || normalized === 'owner' || normalized === 'businessowner') {
+        activeRole = 'business_owner';
+      } else if (normalized === 'service_provider' || normalized === 'serviceprovider') {
+        activeRole = 'service_provider';
+      }
+    }
+
     const permissions = rbacEngine.getPermissionsForRoles(resolvedRoles);
 
     return {
@@ -232,6 +248,8 @@ export class IdentityResolver {
       walletAddress: data.walletAddress || `pi_addr_${piUid.substring(0, 10)}`,
       platformRole: platformRole,
       roles: resolvedRoles,
+      activeRole: activeRole,
+      role: activeRole,
       status: data.status || 'active',
       permissions: permissions,
       profileCompleted: true,

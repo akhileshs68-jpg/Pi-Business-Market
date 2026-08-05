@@ -305,7 +305,7 @@ function NavbarComponent({
 
   const roleResolver = new RoleResolver(currentUser || null);
   const isSuperAdmin = roleResolver.isSuperAdmin();
-  const availableRolesList = Array.from(roleResolver.getResolvedRoles());
+  const availableRolesList = ['buyer', 'seller', 'business_owner', 'service_provider'];
   const activeRoleRaw = (currentUser as any)?.activeRole || roleResolver.getCanonicalRole();
   const activeRoleName = activeRoleRaw.replace(/_/g, ' ').toUpperCase();
 

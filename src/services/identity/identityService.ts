@@ -52,13 +52,12 @@ export class IdentityService {
       logger.warn('IdentityService', `Identity lookup notice for ${resolvedPiUid}: ${err}`);
     }
 
-    const isOwner = username === 'pi_pioneer_88' || (identity && (identity.roles.includes('superadmin') || identity.roles.includes('super_admin')));
+    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
+    const isOwner = username === 'pi_pioneer_88' || resolvedPiUid === 'akhileshs68' || resolvedPiUid === superAdminPiUid || uid === 'akhileshs68' || uid === superAdminPiUid || (identity && (identity.platformRole === 'superadmin' || identity.roles?.includes('superadmin') || identity.roles?.includes('super_admin')));
 
     if (!identity) {
-      const initialRoles: SystemRole[] = isOwner 
-        ? ['buyer', 'seller', 'business_owner', 'superadmin', 'merchant', 'owner'] 
-        : ['buyer'];
-
+      const initialRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];
+      const platformRole = isOwner ? 'superadmin' : 'user';
       const now = new Date().toISOString();
 
       identity = {
@@ -66,6 +65,8 @@ export class IdentityService {
         piUid: resolvedPiUid,
         username: username || `user_${resolvedPiUid.substring(0, 6)}`,
         roles: initialRoles,
+        platformRole: platformRole,
+        activeRole: 'buyer',
         permissions: rbacEngine.getPermissionsForRoles(initialRoles),
         personalProfile: {
           fullName: displayName || username || 'Pi Pioneer',
@@ -104,10 +105,12 @@ export class IdentityService {
       if (piUid && identity.uid !== piUid) {
         identity.uid = piUid;
       }
-      if (isOwner && !identity.roles.includes('superadmin')) {
-        identity.roles = Array.from(new Set([...identity.roles, 'buyer', 'seller', 'business_owner', 'superadmin', 'merchant', 'owner']));
-        identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
+      identity.roles = ['buyer', 'seller', 'business_owner', 'service_provider'];
+      identity.platformRole = isOwner ? 'superadmin' : 'user';
+      if (!identity.activeRole) {
+        identity.activeRole = 'buyer';
       }
+      identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
       identity.updatedAt = new Date().toISOString();
       try {
         await identityRepository.saveIdentity(identity);
@@ -132,18 +135,11 @@ export class IdentityService {
    */
   public async addRoleToIdentity(uid: string, newRole: SystemRole): Promise<EnterpriseIdentity> {
     const identity = await this.resolveIdentity(uid);
-
-    if (!identity.roles.includes(newRole)) {
-      identity.roles.push(newRole);
-      identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
-      identity.updatedAt = new Date().toISOString();
-
-      await identityRepository.saveIdentity(identity);
-      logger.audit('IdentityService', `Added role ${newRole} to user ${uid}`, uid, { updatedRoles: identity.roles });
-      
-      eventBus.publish('USER_REGISTERED', { uid, roleAdded: newRole }, uid);
-    }
-
+    // Standard capabilities are always pre-loaded
+    identity.roles = ['buyer', 'seller', 'business_owner', 'service_provider'];
+    identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
+    identity.updatedAt = new Date().toISOString();
+    await identityRepository.saveIdentity(identity);
     return identity;
   }
 
@@ -159,11 +155,8 @@ export class IdentityService {
     const exists = identity.businessIdentities.some(b => b.businessId === business.businessId);
     if (!exists) {
       identity.businessIdentities.push(business);
-      // Auto-assign business_owner role if missing
-      if (!identity.roles.includes('business_owner')) {
-        identity.roles.push('business_owner');
-        identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
-      }
+      identity.roles = ['buyer', 'seller', 'business_owner', 'service_provider'];
+      identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
       identity.updatedAt = new Date().toISOString();
 
       await identityRepository.saveIdentity(identity);
@@ -185,10 +178,8 @@ export class IdentityService {
     const exists = identity.storeIdentities.some(s => s.storeId === store.storeId);
     if (!exists) {
       identity.storeIdentities.push(store);
-      if (!identity.roles.includes('seller')) {
-        identity.roles.push('seller');
-        identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
-      }
+      identity.roles = ['buyer', 'seller', 'business_owner', 'service_provider'];
+      identity.permissions = rbacEngine.getPermissionsForRoles(identity.roles);
       identity.updatedAt = new Date().toISOString();
 
       await identityRepository.saveIdentity(identity);

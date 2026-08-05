@@ -469,7 +469,7 @@ export const ProfilePage: React.FC = () => {
                 <div className="space-y-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Switch Active Role View</span>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {allResolvedRoles.map((r) => {
+                    {['buyer', 'seller', 'business_owner', 'service_provider'].map((r) => {
                       const normalized = r.toLowerCase();
                       const isActiveRole = activeRoleView.toLowerCase() === normalized;
                       const label = r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
