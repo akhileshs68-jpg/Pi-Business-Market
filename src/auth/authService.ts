@@ -432,127 +432,50 @@ export const authService = {
 
         const now = new Date().toISOString();
 
-        // 5. Check/Create/Migrate Firestore User profile under canonical firebaseUid
-        const db = getFirebaseDb();
-        const usersCol = collection(db, 'users');
-        const canonicalRef = doc(db, 'users', firebaseUid);
-        const canonicalSnap = await getDoc(canonicalRef);
-
-        let existingUserData: any = null;
-        let legacyDocId: string | null = null;
-
-        if (canonicalSnap.exists()) {
-          existingUserData = canonicalSnap.data();
-        } else {
-          // Look for legacy document to migrate ONE-TIME to users/{firebaseUid}
-          if (piUid) {
-            try {
-              const piSnap = await getDocs(query(usersCol, where('piUid', '==', piUid)));
-              if (!piSnap.empty) {
-                legacyDocId = piSnap.docs[0].id;
-                existingUserData = piSnap.docs[0].data();
-              }
-            } catch (e) {
-              console.warn('[AuthService] Query by piUid failed:', e);
-            }
-          }
-
-          if (!existingUserData && username) {
-            try {
-              const userSnap = await getDocs(query(usersCol, where('username', '==', username)));
-              if (!userSnap.empty) {
-                legacyDocId = userSnap.docs[0].id;
-                existingUserData = userSnap.docs[0].data();
-              }
-            } catch (e) {
-              console.warn('[AuthService] Query by username failed:', e);
-            }
-          }
-
-          if (!existingUserData && (username === 'pi_pioneer_88' || piUid === 'mock_pi_uid_123')) {
-            const pioneerSnap = await getDoc(doc(db, 'users', 'user_active_pioneer'));
-            if (pioneerSnap.exists()) {
-              legacyDocId = pioneerSnap.id;
-              existingUserData = pioneerSnap.data();
-            }
-          }
-        }
-
-        const isOwner = username === 'pi_pioneer_88' || existingUserData?.roles?.includes('superadmin') || existingUserData?.roles?.includes('super_admin');
-        const defaultRoles = isOwner ? ['buyer', 'seller', 'business_owner', 'owner', 'superadmin'] : (existingUserData?.roles || ['buyer']);
-        const displayName = existingUserData?.displayName || (isOwner ? 'Pi Pioneer 88' : username);
-
-        let finalUserData: any;
-
-        if (!existingUserData) {
-          // Create brand new user document at users/{firebaseUid}
-          finalUserData = {
-            uid: firebaseUid,
+        // Use identityResolver to resolve the canonical user by Pi UID
+        const { identityResolver } = await import('../services/identity/identityResolver');
+        
+        // Define fallback identifiers if we are running in simulator/local dev
+        const finalPiUid = piUid || 'pi_' + firebaseUid.slice(0, 10);
+        const finalUsername = username || 'user_' + firebaseUid.slice(0, 8);
+        
+        let resolvedUser = await identityResolver.resolveUserByPiUid(finalPiUid, firebaseUid);
+        
+        if (!resolvedUser) {
+          // Create the canonical document at users/{piUid}
+          const db = getFirebaseDb();
+          const canonicalRef = doc(db, 'users', finalPiUid);
+          
+          const isOwner = finalUsername === 'pi_pioneer_88';
+          const defaultRoles = isOwner ? ['buyer', 'seller', 'business_owner', 'superadmin'] : ['buyer'];
+          
+          const freshUser = {
+            uid: finalPiUid,
             firebaseUid,
-            piUid,
-            username,
-            displayName,
+            piUid: finalPiUid,
+            username: finalUsername,
+            displayName: isOwner ? 'Pi Pioneer 88' : finalUsername,
             roles: defaultRoles,
             accountType: isOwner ? 'business' : 'individual',
             verified: true,
-            kycVerified: Boolean(isOwner),
+            kycVerified: isOwner,
             profileCompleted: true,
             onboardingCompleted: true,
             lastResolvedUid: firebaseUid,
-            createdAt: now,
-            updatedAt: now,
-            lastLogin: now,
-            status: 'active'
-          };
-
-          const newUserData = removeUndefinedFields({
-            ...finalUserData,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            lastLogin: serverTimestamp()
-          });
-
-          await setDoc(canonicalRef, newUserData);
-        } else {
-          // Perform ONE-TIME migration or update canonical document users/{firebaseUid}
-          finalUserData = {
-            ...existingUserData,
-            uid: firebaseUid,
-            firebaseUid,
-            piUid: piUid || existingUserData.piUid,
-            username: username || existingUserData.username,
-            displayName,
-            roles: Array.from(new Set([...(existingUserData.roles || []), ...defaultRoles])),
-            kycVerified: Boolean(existingUserData.kycVerified ?? isOwner ?? false),
-            profileCompleted: true,
-            onboardingCompleted: true,
-            lastResolvedUid: firebaseUid,
-            ...(legacyDocId ? { migratedFromUid: legacyDocId } : {}),
-            updatedAt: now,
-            lastLogin: now
+            lastLogin: serverTimestamp(),
+            status: 'active'
           };
-
-          const updatedUserData = removeUndefinedFields({
-            ...finalUserData,
-            updatedAt: serverTimestamp(),
-            lastLogin: serverTimestamp()
-          });
-
-          await setDoc(canonicalRef, updatedUserData, { merge: true });
+          
+          await setDoc(canonicalRef, freshUser);
+          resolvedUser = await identityResolver.resolveUserByPiUid(finalPiUid, firebaseUid);
         }
-
+        
         localStorage.setItem('last_resolved_uid', firebaseUid);
-        if (piUid) localStorage.setItem('last_pi_uid', piUid);
-
-        // Sync with Enterprise Identity Platform
-        const identity = await identityService.resolveIdentity(firebaseUid, piUid, username, displayName);
-
-        return {
-          ...finalUserData,
-          uid: firebaseUid,
-          platformRole: identity.roles[0] || 'buyer',
-          permissions: identity.permissions,
-        } as User;
+        if (finalPiUid) localStorage.setItem('last_pi_uid', finalPiUid);
+        
+        return resolvedUser!;
       } catch (error) {
         console.error('[AuthService] Login failed:', error);
         throw error;
@@ -569,48 +492,26 @@ export const authService = {
    * Multi-Tenant Isolation Invariant: Ensures users NEVER see another user's profile or avatar.
    */
   async getUserProfile(uid: string, piUid?: string): Promise<User | null> {
-    console.log('[AuthService] getUserProfile() for uid:', uid);
+    console.log('[AuthService] getUserProfile() for uid:', uid, 'piUid:', piUid);
     try {
-      const db = getFirebaseDb();
-      const canonicalRef = doc(db, 'users', uid);
-      const canonicalSnap = await getDoc(canonicalRef);
+      const { identityResolver } = await import('../services/identity/identityResolver');
 
-      if (canonicalSnap.exists()) {
-        const data = canonicalSnap.data();
-        localStorage.setItem('last_resolved_uid', uid);
-        return {
-          ...data,
-          uid,
-          profileCompleted: true,
-          onboardingCompleted: true,
-          createdAt: data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updatedAt: data.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-          lastLogin: data.lastLogin?.toDate?.()?.toISOString() || new Date().toISOString(),
-        } as User;
-      }
-
-      // If canonical document users/{uid} does NOT exist yet, check if there is an exact match by piUid
-      // ONLY if piUid belongs specifically to this user (not generic/mock values)
+      // 1. If we have piUid, resolve directly via the canonical piUid!
       if (piUid && piUid !== 'user_active_pioneer_pi' && piUid !== 'mock_pi_uid_123') {
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const piSnap = await getDocs(query(collection(db, 'users'), where('piUid', '==', piUid)));
-        if (!piSnap.empty) {
-          const matchedDoc = piSnap.docs[0];
-          const matchedData = matchedDoc.data();
-          if (matchedData.uid === uid || matchedData.firebaseUid === uid) {
-            return {
-              ...matchedData,
-              uid,
-              createdAt: matchedData.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              lastLogin: new Date().toISOString()
-            } as User;
-          }
+        const user = await identityResolver.resolveUserByPiUid(piUid, uid);
+        if (user) {
+          localStorage.setItem('last_resolved_uid', uid);
+          return user;
         }
       }
 
-      // DO NOT fallback to last_resolved_uid or user_active_pioneer!
-      // Multi-tenant privacy invariant: Return null so AuthProvider can construct a fresh profile for this UID.
+      // 2. Otherwise try resolving by firebaseUid (checks canonical and legacy lookups)
+      const user = await identityResolver.resolveUserByFirebaseUid(uid);
+      if (user) {
+        localStorage.setItem('last_resolved_uid', uid);
+        return user;
+      }
+
       return null;
     } catch (error: any) {
       console.error('[AuthService] Get user profile failed:', error);

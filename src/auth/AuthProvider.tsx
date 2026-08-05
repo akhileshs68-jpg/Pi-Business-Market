@@ -81,38 +81,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setProfile(fetchedProfile);
               setUser(fetchedProfile);
             } else {
-              // Create clean, isolated user object strictly for this firebaseUser
-              const username = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 5);
-              const freshUser: User = {
-                uid: firebaseUser.uid,
-                piUid: 'user_' + firebaseUser.uid.slice(0, 8),
-                username,
+              // Construct a normalized profile on the fly using the identityResolver
+              const { identityResolver } = await import('../services/identity/identityResolver');
+              const mockPiUid = lastPiUid || 'pi_' + firebaseUser.uid.slice(0, 10);
+              const mockUsername = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 8);
+              
+              const freshUser = identityResolver.normalizeUserModel({
+                uid: mockPiUid,
+                piUid: mockPiUid,
+                username: mockUsername,
                 displayName: firebaseUser.displayName || 'Pioneer',
-                photoUrl: firebaseUser.photoURL || '',
                 roles: ['buyer'],
-                activeRole: 'buyer',
-                role: 'Buyer',
-                accountType: 'individual',
-                verified: false,
-                kycVerified: false,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
-                status: 'active',
-                profileCompleted: false,
-                onboardingCompleted: false
-              } as any;
+                status: 'active'
+              }, firebaseUser.uid);
+              
               setUser(freshUser);
               setProfile(freshUser);
-              authService.updateUserProfile(firebaseUser.uid, freshUser).catch(console.error);
+              
+              // Persist it
+              const { getFirebaseDb } = await import('../firebase/config');
+              const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+              setDoc(doc(getFirebaseDb(), 'users', mockPiUid), {
+                ...freshUser,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                lastLogin: serverTimestamp()
+              }, { merge: true }).catch(console.error);
             }
 
-            // Asynchronously resolve enterprise identity
+            // Resolve the canonical identity platform document
+            const activePiUid = fetchedProfile?.piUid || lastPiUid || 'pi_' + firebaseUser.uid.slice(0, 10);
+            const activeUsername = fetchedProfile?.username || firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 8);
+            const activeDisplayName = fetchedProfile?.displayName || firebaseUser.displayName || 'Pioneer';
+
             identityService.resolveIdentity(
               firebaseUser.uid,
-              fetchedProfile?.piUid || 'user_' + firebaseUser.uid.slice(0, 8),
-              fetchedProfile?.username || 'user_' + firebaseUser.uid.slice(0, 5),
-              fetchedProfile?.displayName || firebaseUser.displayName || 'Pioneer'
+              activePiUid,
+              activeUsername,
+              activeDisplayName
             ).then(entIdentity => {
               if (isMounted) {
                 setIdentity(entIdentity);

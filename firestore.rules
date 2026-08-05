@@ -53,14 +53,11 @@ service cloud.firestore {
 
     // 3. Collection Rules
     match /users/{uid} {
-      allow get: if isOwner(uid) || isAdmin();
+      allow get: if isOwner(uid) || (isSignedIn() && (request.auth.uid == resource.data.firebaseUid || request.auth.uid == resource.data.lastResolvedUid)) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(uid) && isValidUser(incoming()) && incoming().uid == uid;
-      allow update: if isOwner(uid) && 
-                    isValidUser(incoming()) && 
-                    incoming().uid == existing().uid &&
-                    incoming().piUid == existing().piUid &&
-                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'walletAddress', 'updatedAt', 'lastLogin', 'role', 'accountType']);
+      allow create: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == incoming().firebaseUid || request.auth.uid == incoming().lastResolvedUid))) && isValidUser(incoming());
+      allow update: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == existing().firebaseUid || request.auth.uid == existing().lastResolvedUid))) && 
+                    isValidUser(incoming());
     }
 
     // New Business Identity Rules
