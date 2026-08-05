@@ -94,10 +94,8 @@ export const bmpRewardsProvider: WalletProvider = {
       // Sync user_gamification document if it exists
       const gSnap = await transaction.get(gamificationRef);
       if (gSnap.exists()) {
-        const curGData = gSnap.data();
         transaction.update(gamificationRef, {
           bmpBalance: balanceAfter,
-          lifetimeBmp: (curGData.lifetimeBmp || 0) + amount,
           updatedAt: serverTimestamp()
         });
       }

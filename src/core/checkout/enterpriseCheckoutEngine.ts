@@ -251,12 +251,13 @@ export class EnterpriseCheckoutEngine {
     sessionId: string,
     metadata: any
   ): Promise<PiTestnetVerificationResult> {
-    console.log('[EnterpriseCheckout] Payment Created - Starting executePiTestnetPayment. Amount:', amount, 'Session:', sessionId);
+    console.log('[DEBUG_TRACE] [executePiTestnetPayment] ENTER', { amount, memo, sessionId, metadata });
 
     const requiredMetadata = ['sessionId', 'buyerId', 'sellerId', 'businessId', 'storeId', 'orderId'];
     for (const key of requiredMetadata) {
       if (!metadata[key]) {
-        console.error(`[EnterpriseCheckout] Missing mandatory metadata field: ${key}`);
+        console.error(`[DEBUG_TRACE] [executePiTestnetPayment] Missing mandatory metadata field: ${key}`);
+        console.log('[DEBUG_TRACE] [executePiTestnetPayment] EXIT (missing metadata)');
         return {
           verified: false,
           paymentId: '',
@@ -268,68 +269,72 @@ export class EnterpriseCheckoutEngine {
       }
     }
 
+    console.log('[DEBUG_TRACE] [executePiTestnetPayment] BEFORE returning Promise wrapper');
     return new Promise((resolve, reject) => {
+      console.log('[DEBUG_TRACE] [executePiTestnetPayment Promise] ENTER executor');
       const internalPaymentId = `PAY_PI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
+      console.log('[DEBUG_TRACE] [executePiTestnetPayment Promise] BEFORE createPayment call');
       piPaymentService.createPayment(
         { amount, memo, metadata: { ...metadata, sessionId, internalPaymentId } },
         {
           onReadyForServerApproval: async (piPaymentId: string) => {
-            console.log('[EnterpriseCheckout] Approval Callback Entered for Pi Payment ID:', piPaymentId);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] ENTER for piPaymentId:', piPaymentId);
             try {
-              console.log('[EnterpriseCheckout] Approve Request Started...');
               let headers: any = { 'Content-Type': 'application/json' };
               try {
                 headers = await getAuthHeaders();
               } catch (authErr) {
-                console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
+                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Auth header fallback:', authErr);
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] BEFORE await fetch /api/payments/approve');
               const res = await fetch('/api/payments/approve', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata })
               });
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] AFTER await fetch /api/payments/approve, status:', res.status);
               const resText = await res.text();
-              console.log('[EnterpriseCheckout] Approve Response status:', res.status, 'body:', resText);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] approve response body:', resText);
               
               if (!res.ok) {
-                console.error('[EnterpriseCheckout] Server API returned non-ok status for approve:', res.status, resText);
+                console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Server approve error status:', res.status);
                 if (!piPaymentId.startsWith('SIM_')) {
                   throw new Error(`Server payment approval failed (${res.status}): ${resText}`);
                 }
               }
-              console.log('[EnterpriseCheckout] Approval Callback Finished.');
               paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
             } catch (err: any) {
-              console.error('[EnterpriseCheckout] Server approval failure:', err);
+              console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Exception:', err);
               if (piPaymentId.startsWith('SIM_')) {
-                console.warn('[EnterpriseCheckout] Simulated payment approval fallback on network error.');
                 paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
               } else {
                 reject(err);
                 throw err;
               }
             }
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] EXIT');
           },
           onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
-            console.log('[EnterpriseCheckout] Completion Callback Entered. Payment ID:', piPaymentId, 'TxID:', txid);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] ENTER for piPaymentId:', piPaymentId, 'txid:', txid);
             try {
-              console.log('[EnterpriseCheckout] Completion Request Started...');
               let headers: any = { 'Content-Type': 'application/json' };
               try {
                 headers = await getAuthHeaders();
               } catch (authErr) {
-                console.warn('[EnterpriseCheckout] Auth header retrieval fallback:', authErr);
+                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] Auth header fallback:', authErr);
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] BEFORE await fetch /api/payments/complete');
               const res = await fetch('/api/payments/complete', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata })
               });
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] AFTER await fetch /api/payments/complete, status:', res.status);
               const resText = await res.text();
-              console.log('[EnterpriseCheckout] Complete Response status:', res.status, 'body:', resText);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] complete response body:', resText);
 
               let serverOrderId = '';
               try {
@@ -338,7 +343,7 @@ export class EnterpriseCheckoutEngine {
                   serverOrderId = parsed.orderId;
                 }
               } catch (parseErr) {
-                console.warn('[EnterpriseCheckout] Failed to parse complete response as JSON:', parseErr);
+                console.warn('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] JSON parse fail:', parseErr);
               }
 
               if (!res.ok) {
@@ -349,9 +354,9 @@ export class EnterpriseCheckoutEngine {
 
               const finalOrderId = serverOrderId || sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase());
 
-              console.log('[EnterpriseCheckout] Completion Finished.');
               paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
 
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] BEFORE resolve Promise');
               resolve({
                 verified: true,
                 paymentId: piPaymentId,
@@ -361,10 +366,10 @@ export class EnterpriseCheckoutEngine {
                 timestamp: new Date().toISOString(),
                 orderId: finalOrderId
               });
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] AFTER resolve Promise');
             } catch (err: any) {
-              console.error('[EnterpriseCheckout] Server completion verification failure:', err);
+              console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] Exception:', err);
               if (piPaymentId.startsWith('SIM_')) {
-                console.warn('[EnterpriseCheckout] Simulated payment completion fallback on network error.');
                 paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
                 resolve({
                   verified: true,
@@ -376,21 +381,25 @@ export class EnterpriseCheckoutEngine {
                   orderId: sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase())
                 });
               } else {
+                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] BEFORE reject Promise');
                 reject(new Error('Server completion verification failed: ' + err.message));
+                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] AFTER reject Promise');
                 throw err;
               }
             }
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] EXIT');
           },
           onCancel: async (piPaymentId: string) => {
-            console.log('[EnterpriseCheckout] Payment Cancelled by user. Payment ID:', piPaymentId);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onCancel] ENTER for piPaymentId:', piPaymentId);
             reject(new Error('Payment cancelled by user.'));
           },
           onError: async (error: Error, piPaymentId: string) => {
-            console.error('[EnterpriseCheckout] Payment Error:', error, 'Payment ID:', piPaymentId);
+            console.error('[DEBUG_TRACE] [executePiTestnetPayment.onError] ENTER for piPaymentId:', piPaymentId, 'error:', error);
             reject(new Error(`Pi Payment Error: ${error.message}`));
           }
         }
       );
+      console.log('[DEBUG_TRACE] [executePiTestnetPayment Promise] AFTER createPayment call');
     });
   }
 

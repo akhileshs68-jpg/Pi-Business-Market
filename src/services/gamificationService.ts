@@ -315,7 +315,19 @@ export const gamificationService = {
 
       if (snap.exists()) {
         const data = snap.data();
-        lastCheckInTime = data.lastCheckInTime || 0;
+        const parseTime = (val: any): number => {
+          if (!val) return 0;
+          if (typeof val === 'number') return val;
+          if (typeof val === 'object' && 'seconds' in val && typeof val.seconds === 'number') {
+            return val.seconds * 1000;
+          }
+          if (typeof val === 'string') {
+            const parsed = new Date(val).getTime();
+            return isNaN(parsed) ? 0 : parsed;
+          }
+          return 0;
+        };
+        lastCheckInTime = parseTime(data.lastCheckInTime);
         currentStreak = data.streakCount || 0;
         lifetimeBmp = data.lifetimeBmp || 0;
         existingBadges = data.badges || [];
