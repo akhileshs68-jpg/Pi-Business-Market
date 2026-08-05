@@ -2,8 +2,10 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { ThemeProvider } from './context/ThemeContext';
+import { initRemoteLogger } from './utils/remoteLogger';
 
-
+// Initialize remote logging first to catch any early load errors
+initRemoteLogger();
 
 import './index.css';
 import ErrorBoundary from './components/ErrorBoundary';

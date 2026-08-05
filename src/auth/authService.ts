@@ -56,7 +56,12 @@ function getAbsoluteUrl(path: string): string {
       const href = window.location.href;
       if (href.startsWith('http://') || href.startsWith('https://')) {
         const urlObj = new URL(href);
-        if (urlObj.origin && urlObj.origin !== 'null' && !urlObj.origin.startsWith('file:')) {
+        // CRITICAL CHECK: If the origin contains '.pi' or 'sandbox' or is 'null', it is NOT a valid Web2 backend host.
+        // Fall back to relative path so that the browser natively resolves it relative to the iframe's real Web2 HTML document URL!
+        const isPiDomain = urlObj.hostname.endsWith('.pi') || 
+                           urlObj.hostname.includes('sandbox.pi') || 
+                           urlObj.hostname.includes('minepi.com');
+        if (urlObj.origin && urlObj.origin !== 'null' && !urlObj.origin.startsWith('file:') && !isPiDomain) {
           const resolved = `${urlObj.origin}${cleanPath}`;
           console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Parsed href. Origin: ${urlObj.origin}, Resolved URL: ${resolved}`);
           return resolved;
@@ -70,7 +75,8 @@ function getAbsoluteUrl(path: string): string {
   try {
     if (typeof window !== 'undefined' && window.location && window.location.origin) {
       const origin = window.location.origin;
-      if (origin !== 'null' && !origin.startsWith('file:')) {
+      const isPiDomain = origin.includes('.pi') || origin.includes('minepi.com');
+      if (origin !== 'null' && !origin.startsWith('file:') && !isPiDomain) {
         const resolved = `${origin}${cleanPath}`;
         console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Read origin. Origin: ${origin}, Resolved URL: ${resolved}`);
         return resolved;
@@ -84,7 +90,8 @@ function getAbsoluteUrl(path: string): string {
     if (typeof window !== 'undefined' && window.location && window.location.host) {
       const protocol = window.location.protocol || 'https:';
       const host = window.location.host;
-      if (host && !host.startsWith('file:')) {
+      const isPiDomain = host.includes('.pi') || host.includes('minepi.com');
+      if (host && !host.startsWith('file:') && !isPiDomain) {
         const resolved = `${protocol}//${host}${cleanPath}`;
         console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Formed host. Origin: ${protocol}//${host}, Resolved URL: ${resolved}`);
         return resolved;
@@ -92,7 +99,7 @@ function getAbsoluteUrl(path: string): string {
     }
   } catch (e) {}
 
-  console.warn(`[DEBUG_TRACE] [getAbsoluteUrl] All origin checks failed. Falling back to relative path: ${cleanPath}`);
+  console.warn(`[DEBUG_TRACE] [getAbsoluteUrl] All Web2 origin checks failed (or Pi domain detected). Falling back to relative path: ${cleanPath}`);
   return cleanPath;
 }
 

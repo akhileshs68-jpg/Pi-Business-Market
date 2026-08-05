@@ -215,9 +215,26 @@ const authenticatePaymentRequest = async (
       }
 
       if (decodedToken) {
+        let finalUid = decodedToken.uid;
+        try {
+          const db = getDb();
+          if (db) {
+            const userDoc: any = await dbQueryWithTimeout(() => db.collection('users').doc(decodedToken.uid).get(), 1000, null);
+            if (userDoc && userDoc.exists) {
+              const userData = userDoc.data();
+              if (userData && userData.piUid) {
+                console.log(`[Security Note] ${endpoint}: Mapped Firebase UID ${decodedToken.uid} to Canonical Pi UID: ${userData.piUid}`);
+                finalUid = userData.piUid;
+              }
+            }
+          }
+        } catch (dbErr: any) {
+          console.warn(`[Security Warning] ${endpoint}: Failed to map Firebase UID to Pi UID:`, dbErr?.message);
+        }
+
         (req as any).user = {
-          uid: decodedToken.uid,
-          email: decodedToken.email
+          uid: finalUid,
+          email: decodedToken.email || `${finalUid}@pi.network`
         };
         return next();
       }
@@ -535,7 +552,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       const response = await axios.post(
         `https://api.minepi.com/v2/payments/${paymentId}/approve`,
         {},
-        { headers: { Authorization: `Key ${apiKey}` } }
+        { headers: { Authorization: `Key ${apiKey}` }, timeout: 10000 }
       );
       
       console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
@@ -799,7 +816,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         const response = await axios.post(
           `https://api.minepi.com/v2/payments/${paymentId}/complete`,
           { txid },
-          { headers: { Authorization: `Key ${apiKey}` } }
+          { headers: { Authorization: `Key ${apiKey}` }, timeout: 10000 }
         );
         paymentData = response.data;
         console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId} with Pi Network Server`);
@@ -1683,8 +1700,22 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   });
 
   
-  app.post("/api/debug-log", (req, res) => {
-    fs.writeFileSync('/tmp/client_debug.json', JSON.stringify(req.body, null, 2));
+  app.post("/api/debug-log", async (req, res) => {
+    try {
+      console.log(`[CLIENT_LOG] Received client log payload:`, JSON.stringify(req.body));
+      fs.writeFileSync('/tmp/client_debug.json', JSON.stringify(req.body, null, 2));
+      
+      const db = getDb();
+      if (db) {
+        await db.collection('clientLogs').add({
+          log: req.body,
+          timestamp: new Date().toISOString(),
+          userAgent: req.headers['user-agent'] || 'unknown'
+        });
+      }
+    } catch (err: any) {
+      console.error('[CLIENT_LOG_ERROR] Failed to store client log:', err?.message);
+    }
     res.json({ success: true });
   });
 
