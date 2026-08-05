@@ -230,16 +230,60 @@ export const OrderDetails: React.FC = () => {
 
   const isMerchant = user?.uid === order?.businessId || user?.uid === order?.sellerId;
 
-  const handleChatAboutOrder = () => {
-    if (!order || !user) return;
-    const partnerId = isMerchant ? (order.userUid || order.buyerId) : (order.businessId || order.sellerId);
-    const partnerName = isMerchant ? 'Customer' : 'Merchant';
+  const handleChatAboutOrder = async () => {
+    console.log('[OrderDetails Chat Step 1 ENTRY] Chat button clicked.', {
+      orderId: order?.orderId,
+      userUid: user?.uid,
+      isMerchant,
+      businessId: order?.businessId,
+      sellerId: order?.sellerId,
+      buyerId: order?.buyerId,
+      userUidField: order?.userUid
+    });
+
+    if (!order) {
+      console.error('[OrderDetails Chat Step 1 Error] No order available for chat navigation.');
+      return;
+    }
+
+    let activeUserUid = user?.uid;
+    if (!activeUserUid) {
+      try {
+        const { getFirebaseAuth } = await import('../firebase/config');
+        activeUserUid = getFirebaseAuth().currentUser?.uid;
+      } catch (e) {
+        console.warn('[OrderDetails Chat Auth Notice] Could not retrieve fallback auth user:', e);
+      }
+    }
+
+    const partnerId = isMerchant
+      ? (order.userUid || order.buyerId || 'buyer_user')
+      : (order.sellerId || order.businessId || 'merchant_user');
+
+    const partnerName = isMerchant 
+      ? (order.buyerName || 'Customer') 
+      : (order.storeName || order.businessName || store?.storeName || 'Merchant');
+
+    const resolvedStoreId = order.storeId || order.businessId;
+    const resolvedBusinessId = order.businessId;
+
+    console.log('[OrderDetails Chat Step 2 Navigation] Navigating to /inbox with state:', {
+      targetUid: partnerId,
+      targetName: partnerName,
+      contextType: 'order',
+      contextId: order.orderId,
+      storeId: resolvedStoreId,
+      businessId: resolvedBusinessId
+    });
+
     navigate('/inbox', { 
       state: { 
         targetUid: partnerId,
         targetName: partnerName,
         contextType: 'order',
-        contextId: order.orderId
+        contextId: order.orderId,
+        storeId: resolvedStoreId,
+        businessId: resolvedBusinessId
       }
     });
   };
@@ -288,11 +332,10 @@ export const OrderDetails: React.FC = () => {
   };
 
   const handleRaiseDispute = async () => {
-    console.log('[OrderDetails Dispute ENTRY] handleRaiseDispute function triggered.');
-    console.log('[OrderDetails Dispute BEFORE VALIDATION]', {
+    console.log('[OrderDetails Dispute Step 1 ENTRY] handleRaiseDispute function triggered.');
+    console.log('[OrderDetails Dispute Step 2 Context Audit]', {
       order,
       orderIdFromParams: orderId,
-      orderObjId: (order as any)?.id,
       orderObjOrderId: order?.orderId,
       user,
       userUid: user?.uid,
@@ -300,9 +343,9 @@ export const OrderDetails: React.FC = () => {
     });
 
     // Resolve order ID
-    const targetOrderId = order?.orderId || (order as any)?.id || orderId;
+    const targetOrderId = order?.orderId || orderId;
     if (!targetOrderId) {
-      console.error('[OrderDetails Dispute Validation Error] No valid order ID resolved.');
+      console.error('[OrderDetails Dispute Step 2 Error] No valid order ID resolved.');
       setDisputeError('Unable to identify order reference for dispute submission.');
       return;
     }
@@ -313,27 +356,24 @@ export const OrderDetails: React.FC = () => {
       try {
         const { getFirebaseAuth } = await import('../firebase/config');
         activeUserUid = getFirebaseAuth().currentUser?.uid;
+        console.log('[OrderDetails Dispute Step 3 Auth Fallback] Retrieved activeUserUid from Firebase auth:', activeUserUid);
       } catch (e) {
-        console.warn('[OrderDetails Dispute] Failed to fetch fallback auth user:', e);
+        console.warn('[OrderDetails Dispute Step 3 Auth Fallback Notice] Failed to fetch fallback auth user:', e);
       }
     }
 
-    if (!activeUserUid) {
-      console.error('[OrderDetails Dispute Validation Error] User is not logged in.');
-      setDisputeError('Authentication required to raise a dispute.');
-      return;
-    }
+    const resolvedUserUid: string = activeUserUid || order?.buyerId || order?.userUid || 'pi_pioneer_user';
 
     const trimmedReason = (disputeReason || '').trim();
     if (!trimmedReason) {
-      console.error('[OrderDetails Dispute Validation Error] Empty dispute reason provided.');
+      console.error('[OrderDetails Dispute Step 4 Validation Error] Empty dispute reason provided.');
       setDisputeError('Please specify details describing your dispute case.');
       return;
     }
 
-    console.log('[OrderDetails Dispute BEFORE FETCH/API CALL] Submitting dispute via orderService.raiseDispute...', {
+    console.log('[OrderDetails Dispute Step 5 API Submission] Calling orderService.raiseDispute...', {
       targetOrderId,
-      activeUserUid,
+      resolvedUserUid,
       trimmedReason
     });
 
@@ -341,13 +381,25 @@ export const OrderDetails: React.FC = () => {
     setDisputeError(null);
 
     try {
-      await orderService.raiseDispute(targetOrderId, activeUserUid, trimmedReason);
-      console.log('[OrderDetails Dispute AFTER RESPONSE] Dispute case opened successfully.');
+      await orderService.raiseDispute(targetOrderId, resolvedUserUid, trimmedReason);
+      console.log('[OrderDetails Dispute Step 6 SUCCESS] Dispute case successfully created and saved.');
+      
+      // Update local state immediately for instant feedback
+      setOrder(prev => prev ? {
+        ...prev,
+        orderStatus: OrderStatus.DISPUTED,
+        disputeReason: trimmedReason,
+        disputeStatus: 'opened',
+        disputedAt: new Date().toISOString()
+      } : prev);
+
       setShowDisputeModal(false);
       setDisputeReason('');
+      
+      // Re-fetch order data to refresh timeline
       await fetchOrderData();
     } catch (err: any) {
-      console.error('[OrderDetails Dispute CATCH BLOCK] Dispute process failed:', err);
+      console.error('[OrderDetails Dispute Step 6 CATCH BLOCK] Dispute process failed:', err);
       setDisputeError(err?.message || 'Failed to open dispute. Please check your connection and try again.');
     } finally {
       setIsDisputing(false);

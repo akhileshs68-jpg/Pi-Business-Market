@@ -831,7 +831,7 @@ const PaymentSuccessScreen = ({ order, paymentTxId, address, navigate }: any) =>
       <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
         <button 
           onClick={() => {
-            const targetUri = `/order-details/${order.orderId || order.id}`;
+            const targetUri = `/order-details/${order.orderId}`;
             console.log('[Checkout Navigation Trace] Manual "View Order" clicked. Target URI:', targetUri);
             navigate(targetUri);
             console.log('[Checkout Navigation Trace] navigate() call executed.');

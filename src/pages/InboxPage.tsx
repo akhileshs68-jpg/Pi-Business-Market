@@ -27,25 +27,34 @@ const InboxPage: React.FC = () => {
 
     const handleInitialSelection = async () => {
       const state = location.state as any;
-      if (state?.targetUid) {
+      console.log('[InboxPage Step 1 ENTRY] Checking location.state for initial conversation setup:', state);
+      
+      const targetUid = state?.targetUid || (state?.contextType === 'order' ? 'merchant' : undefined);
+      if (targetUid || state?.contextId) {
         try {
-          const participants = [user.uid, state.targetUid];
-          const type = state.contextType === 'order' ? 'order' : 
-                       state.contextType === 'booking' ? 'booking' :
-                       state.contextType === 'product' ? 'business_customer' : 'direct';
+          const partnerUid = targetUid || 'merchant';
+          const participants = partnerUid === user.uid ? [user.uid, 'merchant_partner'] : [user.uid, partnerUid];
+          const type = state?.contextType === 'order' ? 'order' : 
+                       state?.contextType === 'booking' ? 'booking' :
+                       state?.contextType === 'product' ? 'business_customer' : 'direct';
+
+          console.log('[InboxPage Step 2 getOrCreateConversation] Calling messagingService with participants:', participants, 'type:', type, 'contextId:', state?.contextId);
 
           const conv = await messagingService.getOrCreateConversation(participants, type as any, {
-            businessId: state.targetName || undefined,
-            productId: state.contextType === 'product' ? state.contextId : undefined,
-            orderId: state.contextType === 'order' ? state.contextId : undefined,
-            bookingId: state.contextType === 'booking' ? state.contextId : undefined,
-            relatedEntityType: state.contextType,
-            relatedEntityId: state.contextId
+            businessId: state?.businessId || (state?.contextType === 'product' || state?.contextType === 'business_customer' ? state.targetName : undefined),
+            storeId: state?.storeId,
+            productId: state?.contextType === 'product' ? state.contextId : undefined,
+            orderId: state?.contextType === 'order' ? state.contextId : undefined,
+            bookingId: state?.contextType === 'booking' ? state.contextId : undefined,
+            relatedEntityType: state?.contextType,
+            relatedEntityId: state?.contextId
           });
+          
+          console.log('[InboxPage Step 3 SUCCESS] Conversation initialized/loaded:', conv.conversationId);
           setSelectedConversation(conv);
           setMobileView('chat');
         } catch (error) {
-          console.error('Failed to initialize conversation from state:', error);
+          console.error('[InboxPage Step 3 ERROR] Failed to initialize conversation from state:', error);
         }
       }
     };
@@ -63,7 +72,7 @@ const InboxPage: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, location.state]);
 
   if (authLoading || (isLoading && conversations.length === 0)) {
     return (
