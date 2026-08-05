@@ -34,6 +34,29 @@ import { notificationService } from './notificationService';
 // Client-side transient cache for rate limiting & spam prevention
 const clientRateLimitCache: Record<string, { lastSentTime: number; lastContent: string }> = {};
 
+function removeUndefinedFields<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedFields(item)).filter(item => item !== undefined) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    // Do NOT iterate over internal properties of custom class instances (like FieldValue, Timestamp, Date)
+    if (obj.constructor && obj.constructor.name !== 'Object') {
+      return obj;
+    }
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedFields(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 export const messagingService = {
   /**
    * INITIATE OR FETCH CONVERSATION
@@ -97,13 +120,6 @@ export const messagingService = {
       conversationId,
       type,
       participants: sortedParticipants,
-      businessId: resolvedBusinessId || options?.businessId,
-      storeId: options?.storeId,
-      productId: resolvedProductId,
-      orderId: resolvedOrderId,
-      bookingId: resolvedBookingId,
-      relatedEntityType: options?.relatedEntityType || (resolvedOrderId ? 'order' : resolvedProductId ? 'product' : undefined),
-      relatedEntityId: options?.relatedEntityId || resolvedOrderId || resolvedProductId || resolvedBookingId,
       status: 'active',
       unreadCounts,
       lastActivity: new Date().toISOString(),
@@ -111,12 +127,30 @@ export const messagingService = {
       updatedAt: new Date().toISOString()
     };
 
-    await setDoc(convRef, {
+    const targetBizId = resolvedBusinessId || options?.businessId;
+    if (targetBizId) newConversation.businessId = targetBizId;
+    if (options?.storeId) newConversation.storeId = options.storeId;
+    if (resolvedProductId) newConversation.productId = resolvedProductId;
+    if (resolvedOrderId) newConversation.orderId = resolvedOrderId;
+    if (resolvedBookingId) newConversation.bookingId = resolvedBookingId;
+
+    const relType = options?.relatedEntityType || (resolvedOrderId ? 'order' : resolvedProductId ? 'product' : undefined);
+    if (relType) newConversation.relatedEntityType = relType;
+
+    const relId = options?.relatedEntityId || resolvedOrderId || resolvedProductId || resolvedBookingId;
+    if (relId) newConversation.relatedEntityId = relId;
+
+    const convDataRaw = {
       ...newConversation,
       lastActivity: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    };
+
+    const convData = removeUndefinedFields(convDataRaw);
+    console.log('[MessagingService] Complete conversation object writing to Firestore:', convData);
+
+    await setDoc(convRef, convData);
 
     // Create a secure messaging audit log
     await this.logAudit('CONVERSATION_CREATED', {
@@ -252,11 +286,15 @@ export const messagingService = {
         }
       });
 
-      transaction.set(messageRef, {
+      const msgDataRaw = {
         ...message,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      };
+      const msgData = removeUndefinedFields(msgDataRaw);
+      console.log('[MessagingService] Complete message object writing to Firestore:', msgData);
+
+      transaction.set(messageRef, msgData);
       
       transaction.update(convRef, updates);
     });
@@ -374,14 +412,20 @@ export const messagingService = {
     const q = query(
       collection(db, 'conversations'),
       where('participants', 'array-contains', userUid),
-      where('status', '==', 'active'),
-      orderBy('lastActivity', 'desc')
+      where('status', '==', 'active')
     );
 
     return onSnapshot(q, (snapshot) => {
       const conversations = snapshot.docs.map(doc => this.mapDocToConversation(doc))
-        .filter(conv => !(conv.deletedBy && conv.deletedBy.includes(userUid))); // Filter out deleted for this user
+        .filter(conv => !(conv.deletedBy && conv.deletedBy.includes(userUid))) // Filter out deleted for this user
+        .sort((a, b) => {
+          const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+          const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+          return timeB - timeA;
+        });
       callback(conversations);
+    }, (err) => {
+      console.error('[MessagingService] error in subscribeToConversations:', err);
     });
   },
 

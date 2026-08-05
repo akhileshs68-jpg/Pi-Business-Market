@@ -600,10 +600,31 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         return res.status(500).json({ success: false, error: "Database service unavailable" });
       }
 
-      const orderRef = db.collection('orders').doc(cleanOrderId);
-      const orderSnap = await orderRef.get();
+      let orderRef = db.collection('orders').doc(cleanOrderId);
+      let orderSnap = await orderRef.get();
 
       if (!orderSnap.exists) {
+        console.warn(`[Dispute Endpoint] Direct doc lookup for ID '${cleanOrderId}' missed. Searching collection via fallback queries...`);
+        const q1 = await db.collection('orders').where('orderId', '==', cleanOrderId).get();
+        if (!q1.empty) {
+          orderSnap = q1.docs[0];
+          orderRef = orderSnap.ref;
+        } else {
+          const q2 = await db.collection('orders').where('sessionId', '==', cleanOrderId).get();
+          if (!q2.empty) {
+            orderSnap = q2.docs[0];
+            orderRef = orderSnap.ref;
+          } else {
+            const q3 = await db.collection('orders').where('txid', '==', cleanOrderId).get();
+            if (!q3.empty) {
+              orderSnap = q3.docs[0];
+              orderRef = orderSnap.ref;
+            }
+          }
+        }
+      }
+
+      if (!orderSnap || !orderSnap.exists) {
         console.error(`[Dispute Endpoint Error] Order ${cleanOrderId} not found.`);
         return res.status(404).json({ success: false, error: `Order ${cleanOrderId} not found` });
       }

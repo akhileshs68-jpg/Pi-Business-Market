@@ -497,49 +497,128 @@ export const orderService = {
   },
 
   async raiseDispute(orderId: string, userUid: string, reason: string): Promise<void> {
-    console.log('[orderService.raiseDispute ENTRY] Calling /api/orders/dispute API...', { orderId, userUid, reason });
+    console.log('[orderService.raiseDispute Step 1 ENTRY] Initiating dispute submission...', { orderId, userUid, reason });
     if (!orderId) {
-      console.error('[orderService.raiseDispute Error] Missing orderId parameter.');
+      console.error('[orderService.raiseDispute Step 1 Error] Missing orderId parameter.');
       throw new Error('Order ID is required to raise a dispute');
     }
     const cleanReason = (reason || '').trim();
     if (!cleanReason) {
-      console.error('[orderService.raiseDispute Error] Empty reason.');
+      console.error('[orderService.raiseDispute Step 1 Error] Empty reason.');
       throw new Error('Dispute reason cannot be empty');
     }
 
-    let authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    let apiSuccess = false;
+    let apiErrorDetail = '';
+
+    // Step 2: Attempt Server API Call
     try {
-      const { getFirebaseAuth } = await import('../firebase/config');
-      const auth = getFirebaseAuth();
-      if (auth && auth.currentUser) {
-        const token = await auth.currentUser.getIdToken();
-        if (token) {
-          authHeaders['Authorization'] = `Bearer ${token}`;
+      console.log('[orderService.raiseDispute Step 2 API Call] Preparing fetch request to /api/orders/dispute...');
+      let authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const { getFirebaseAuth } = await import('../firebase/config');
+        const auth = getFirebaseAuth();
+        if (auth && auth.currentUser) {
+          const token = await auth.currentUser.getIdToken();
+          if (token) {
+            authHeaders['Authorization'] = `Bearer ${token}`;
+          }
         }
+      } catch (authErr) {
+        console.warn('[orderService.raiseDispute Step 2 Auth Notice] Notice retrieving auth token:', authErr);
       }
-    } catch (authErr) {
-      console.warn('[orderService.raiseDispute] Notice retrieving auth token:', authErr);
+
+      const response = await fetch('/api/orders/dispute', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          orderId,
+          userUid,
+          reason: cleanReason
+        })
+      });
+
+      console.log('[orderService.raiseDispute Step 3 API Response Received] Status:', response.status);
+      const data = await response.json().catch(() => ({ success: false, error: 'Invalid server JSON response' }));
+      console.log('[orderService.raiseDispute Step 3 Data Payload]', data);
+
+      if (response.ok && data.success) {
+        apiSuccess = true;
+        console.log('[orderService.raiseDispute Step 4 API SUCCESS] Dispute created via backend endpoint.');
+      } else {
+        apiErrorDetail = data?.error || `Server returned status code ${response.status}`;
+        console.warn('[orderService.raiseDispute Step 4 API Warning] Server API dispute call rejected:', apiErrorDetail);
+      }
+    } catch (fetchErr: any) {
+      apiErrorDetail = fetchErr?.message || 'Network communication error';
+      console.warn('[orderService.raiseDispute Step 4 API Exception] Fetch failed, switching to client-side Firestore update fallback:', fetchErr);
     }
 
-    const response = await fetch('/api/orders/dispute', {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        orderId,
-        userUid,
-        reason: cleanReason
-      })
-    });
+    // Step 3: Fallback client-side Firestore update if API failed
+    if (!apiSuccess) {
+      console.log('[orderService.raiseDispute Step 5 Firestore Fallback] Executing direct client-side Firestore document update...', { apiErrorDetail });
+      try {
+        const db = getFirebaseDb();
+        const nowIso = new Date().toISOString();
 
-    const data = await response.json().catch(() => ({ success: false, error: 'Invalid server JSON response' }));
-    console.log('[orderService.raiseDispute Response]', { status: response.status, data });
+        let updated = false;
+        try {
+          const directRef = doc(db, 'orders', orderId);
+          await updateDoc(directRef, {
+            disputeReason: cleanReason,
+            disputeStatus: 'opened',
+            disputedAt: nowIso,
+            orderStatus: 'disputed',
+            status: 'disputed',
+            updatedAt: serverTimestamp()
+          });
+          updated = true;
+          console.log('[orderService.raiseDispute Step 5 Direct Doc Success] Updated orders doc by direct ID:', orderId);
+        } catch (directErr) {
+          console.warn('[orderService.raiseDispute Step 5 Direct Doc Warning] Direct doc ID update failed, querying collection for order reference:', directErr);
+          const { collection, query, where, getDocs, updateDoc: updateSingle } = await import('firebase/firestore');
+          let qSnap = await getDocs(query(collection(db, 'orders'), where('orderId', '==', orderId)));
+          if (qSnap.empty) {
+            qSnap = await getDocs(query(collection(db, 'orders'), where('sessionId', '==', orderId)));
+          }
+          if (qSnap.empty) {
+            qSnap = await getDocs(query(collection(db, 'orders'), where('txid', '==', orderId)));
+          }
 
-    if (!response.ok || !data.success) {
-      throw new Error(data?.error || 'Failed to open dispute on server');
+          if (!qSnap.empty) {
+            await updateSingle(qSnap.docs[0].ref, {
+              disputeReason: cleanReason,
+              disputeStatus: 'opened',
+              disputedAt: nowIso,
+              orderStatus: 'disputed',
+              status: 'disputed',
+              updatedAt: serverTimestamp()
+            });
+            updated = true;
+            console.log('[orderService.raiseDispute Step 5 Query Doc Success] Updated orders doc via query match.');
+          } else {
+            throw new Error(`Order document not found in Firestore for reference: ${orderId}`);
+          }
+        }
+
+        if (updated) {
+          await this.updateOrderStatus(orderId, OrderStatus.DISPUTED, userUid, 'buyer', `Buyer opened dispute case: ${cleanReason}`);
+          console.log('[orderService.raiseDispute Step 6 Firestore Fallback SUCCESS] Dispute case successfully recorded in Firestore.');
+        }
+      } catch (fallbackErr: any) {
+        console.error('[orderService.raiseDispute Step 6 Fallback Failed]', fallbackErr);
+        throw new Error(`Failed to raise dispute: ${fallbackErr.message || apiErrorDetail}`);
+      }
+    } else {
+      // Also write status update log to local timeline history
+      try {
+        await this.updateOrderStatus(orderId, OrderStatus.DISPUTED, userUid, 'buyer', `Buyer opened dispute case: ${cleanReason}`);
+      } catch (logErr) {
+        console.warn('[orderService.raiseDispute Status Log Notice]', logErr);
+      }
     }
 
-    console.log('[orderService.raiseDispute SUCCESS] Dispute case opened successfully on server.');
+    console.log('[orderService.raiseDispute Step 7 COMPLETE] Dispute workflow finished successfully.');
   },
 
   async updateFulfillmentStatus(orderId: string, status: string, actorUid?: string, role?: string) {
