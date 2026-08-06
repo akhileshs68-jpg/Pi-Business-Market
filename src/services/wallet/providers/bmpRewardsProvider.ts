@@ -1,14 +1,16 @@
-import { collection, doc, getDoc, setDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '../../../firebase/config';
 import { WalletProvider, WalletTransaction } from '../walletTypes';
+import { getCanonicalRewardUserId } from '../../rewards/rewardIdentityResolver';
 
 export const bmpRewardsProvider: WalletProvider = {
   id: 'bmp_rewards',
   name: 'BMP Rewards',
 
   async getBalance(userId: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
-    const walletRef = doc(db, 'wallets', `${userId}_bmp_rewards`);
+    const walletRef = doc(db, 'wallets', `${canonicalUserId}_bmp_rewards`);
     const snap = await getDoc(walletRef);
     if (snap.exists()) {
       return snap.data().balance || 0;
@@ -16,7 +18,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
     // Auto-migrate or initialize wallet document with defaults if it does not exist
     try {
-      const gamificationRef = doc(db, 'user_gamification', userId);
+      const gamificationRef = doc(db, 'user_gamification', canonicalUserId);
       const gamificationSnap = await getDoc(gamificationRef);
       
       let initialBalance = 300; // Default demo balance
@@ -31,7 +33,7 @@ export const bmpRewardsProvider: WalletProvider = {
       await runTransaction(db, async (transaction) => {
         const txRef = doc(collection(db, 'wallet_transactions'));
         transaction.set(walletRef, {
-          userId,
+          userId: canonicalUserId,
           provider: this.id,
           balance: initialBalance,
           lifetimeEarned: initialLifetime,
@@ -43,7 +45,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
         transaction.set(txRef, {
           walletId: walletRef.id,
-          userId,
+          userId: canonicalUserId,
           provider: this.id,
           type: 'CREDIT',
           amount: initialBalance,
@@ -63,9 +65,10 @@ export const bmpRewardsProvider: WalletProvider = {
   },
 
   async credit(userId: string, amount: number, source: WalletTransaction['source'], description: string, referenceId?: string): Promise<string> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
-    const walletRef = doc(db, 'wallets', `${userId}_bmp_rewards`);
-    const gamificationRef = doc(db, 'user_gamification', userId);
+    const walletRef = doc(db, 'wallets', `${canonicalUserId}_bmp_rewards`);
+    const gamificationRef = doc(db, 'user_gamification', canonicalUserId);
     const txRef = doc(collection(db, 'wallet_transactions'));
 
     await runTransaction(db, async (transaction) => {
@@ -75,7 +78,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
       if (!walletDoc.exists()) {
         transaction.set(walletRef, {
-          userId,
+          userId: canonicalUserId,
           provider: this.id,
           balance: balanceAfter,
           lifetimeEarned: balanceAfter,
@@ -102,7 +105,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
       const txData: Omit<WalletTransaction, 'id' | 'createdAt'> & { createdAt: any } = {
         walletId: walletRef.id,
-        userId,
+        userId: canonicalUserId,
         provider: this.id,
         type: 'CREDIT',
         amount,
@@ -122,8 +125,8 @@ export const bmpRewardsProvider: WalletProvider = {
       transaction.set(ledgerRef, {
         entryId: ledgerId,
         transactionId: txRef.id,
-        walletAddress: `pi_addr_${userId.substring(0, 10)}`,
-        userId,
+        walletAddress: `pi_addr_${canonicalUserId.substring(0, 10)}`,
+        userId: canonicalUserId,
         asset: 'BMP_REWARD',
         amount,
         beforeBalance: balanceBefore,
@@ -147,7 +150,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
     // Sync master wallet document asynchronously without blocking to avoid circular dependency
     import('../../blockchain/masterWalletService').then(({ masterWalletService }) => {
-      masterWalletService.syncMasterWalletDoc(userId).catch(err => {
+      masterWalletService.syncMasterWalletDoc(canonicalUserId).catch(err => {
         console.warn('Asynchronous master wallet synchronization failed:', err);
       });
     }).catch(() => {});
@@ -156,9 +159,10 @@ export const bmpRewardsProvider: WalletProvider = {
   },
 
   async debit(userId: string, amount: number, source: WalletTransaction['source'], description: string, referenceId?: string): Promise<string> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
-    const walletRef = doc(db, 'wallets', `${userId}_bmp_rewards`);
-    const gamificationRef = doc(db, 'user_gamification', userId);
+    const walletRef = doc(db, 'wallets', `${canonicalUserId}_bmp_rewards`);
+    const gamificationRef = doc(db, 'user_gamification', canonicalUserId);
     const txRef = doc(collection(db, 'wallet_transactions'));
 
     await runTransaction(db, async (transaction) => {
@@ -187,7 +191,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
       const txData: Omit<WalletTransaction, 'id' | 'createdAt'> & { createdAt: any } = {
         walletId: walletRef.id,
-        userId,
+        userId: canonicalUserId,
         provider: this.id,
         type: 'DEBIT',
         amount,
@@ -207,8 +211,8 @@ export const bmpRewardsProvider: WalletProvider = {
       transaction.set(ledgerRef, {
         entryId: ledgerId,
         transactionId: txRef.id,
-        walletAddress: `pi_addr_${userId.substring(0, 10)}`,
-        userId,
+        walletAddress: `pi_addr_${canonicalUserId.substring(0, 10)}`,
+        userId: canonicalUserId,
         asset: 'BMP_REWARD',
         amount: -amount,
         beforeBalance: balanceBefore,
@@ -232,7 +236,7 @@ export const bmpRewardsProvider: WalletProvider = {
 
     // Sync master wallet document asynchronously without blocking to avoid circular dependency
     import('../../blockchain/masterWalletService').then(({ masterWalletService }) => {
-      masterWalletService.syncMasterWalletDoc(userId).catch(err => {
+      masterWalletService.syncMasterWalletDoc(canonicalUserId).catch(err => {
         console.warn('Asynchronous master wallet synchronization failed:', err);
       });
     }).catch(() => {});
