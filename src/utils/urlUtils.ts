@@ -32,7 +32,20 @@ export function getApiBaseUrl(): string {
     const injected = (window as any).__APP_URL__;
     if (typeof injected === 'string' && injected.startsWith('http') && !injected.includes('minepi.com')) {
       rawUrl = injected;
+      try {
+        localStorage.setItem('app_backend_url', rawUrl);
+      } catch (e) {}
     }
+  }
+
+  // 3b. Fallback to cached app_backend_url in localStorage
+  if (!rawUrl && typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('app_backend_url');
+      if (cached && cached.startsWith('http') && !cached.includes('minepi.com')) {
+        rawUrl = cached;
+      }
+    } catch (e) {}
   }
 
   // 4. Inspect window.location

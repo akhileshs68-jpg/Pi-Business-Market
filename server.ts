@@ -388,33 +388,14 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
-    app.use(async (req, res, next) => {
-      if (req.method === 'GET' && (req.headers.accept?.includes('text/html') || req.url === '/' || req.url === '/index.html')) {
-        const host = req.get("host") || req.headers.host || "";
-        let protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-        if (Array.isArray(protocol)) protocol = protocol[0];
-        if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
-          protocol = "https";
-        }
-        const appUrl = `${protocol}://${host}`;
-        try {
-          const indexPath = path.join(process.cwd(), "index.html");
-          let html = fs.readFileSync(indexPath, "utf-8");
-          html = await vite.transformIndexHtml(req.url, html);
-          html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
-          return res.status(200).set({ "Content-Type": "text/html" }).end(html);
-        } catch (e) {
-          vite.ssrFixStacktrace(e as Error);
-          return next(e);
-        }
-      }
-      next();
-    });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      if (req.path.includes(".")) {
+        return res.status(404).send("Not found");
+      }
       const host = req.get("host") || req.headers.host || "";
       let protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
       if (Array.isArray(protocol)) protocol = protocol[0];
@@ -493,6 +474,166 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   });
 
   // =========================================================================
+  // PI NETWORK PAYMENT DEBUG LOGGING ENGINE (Server & Client Timeline Tracing)
+  // =========================================================================
+
+  interface PaymentDebugEntry {
+    id: string;
+    timestamp: string;
+    source: 'client' | 'server';
+    paymentId?: string;
+    correlationId?: string;
+    eventName: string;
+    level: 'info' | 'warn' | 'error';
+    httpStatus?: number;
+    requestBody?: any;
+    responseBody?: any;
+    durationMs?: number;
+    error?: any;
+    rawDetails?: any;
+    userAgent?: string;
+    url?: string;
+  }
+
+  const paymentDebugStore: PaymentDebugEntry[] = [];
+  const MAX_PAYMENT_DEBUG_ENTRIES = 1000;
+
+  function extractPaymentIdFromText(text: string, detailsObj?: any): string | undefined {
+    if (detailsObj && typeof detailsObj === 'object') {
+      if (detailsObj.paymentId) return String(detailsObj.paymentId);
+      if (detailsObj.piPaymentId) return String(detailsObj.piPaymentId);
+      if (detailsObj.identifier) return String(detailsObj.identifier);
+      if (detailsObj.metadata?.paymentId) return String(detailsObj.metadata.paymentId);
+    }
+    const str = typeof text === 'string' ? text : JSON.stringify(text || '');
+    const uuidMatch = str.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i);
+    if (uuidMatch) return uuidMatch[0];
+    const kvMatch = str.match(/(?:paymentId|piPaymentId|identifier)["':\s]+([a-zA-Z0-9_-]{10,64})/i);
+    if (kvMatch) return kvMatch[1];
+    return undefined;
+  }
+
+  function extractCorrelationIdFromText(text: string, detailsObj?: any): string | undefined {
+    if (detailsObj && typeof detailsObj === 'object') {
+      if (detailsObj.sessionId) return String(detailsObj.sessionId);
+      if (detailsObj.internalPaymentId) return String(detailsObj.internalPaymentId);
+      if (detailsObj.correlationId) return String(detailsObj.correlationId);
+      if (detailsObj.txid) return String(detailsObj.txid);
+      if (detailsObj.metadata?.sessionId) return String(detailsObj.metadata.sessionId);
+      if (detailsObj.metadata?.internalPaymentId) return String(detailsObj.metadata.internalPaymentId);
+    }
+    const str = typeof text === 'string' ? text : JSON.stringify(text || '');
+    const sessMatch = str.match(/(?:sessionId|internalPaymentId|correlationId|txid)["':\s]+([a-zA-Z0-9_-]{8,64})/i);
+    if (sessMatch) return sessMatch[1];
+    return undefined;
+  }
+
+  function recordPaymentDebugLog(entry: Partial<PaymentDebugEntry>): PaymentDebugEntry {
+    const ts = entry.timestamp || new Date().toISOString();
+    const rawText = `${entry.eventName || ''} ${JSON.stringify(entry.rawDetails || '')} ${JSON.stringify(entry.requestBody || '')} ${JSON.stringify(entry.responseBody || '')}`;
+    
+    const paymentId = entry.paymentId || extractPaymentIdFromText(rawText, entry.rawDetails || entry.requestBody);
+    const correlationId = entry.correlationId || extractCorrelationIdFromText(rawText, entry.rawDetails || entry.requestBody);
+
+    const fullEntry: PaymentDebugEntry = {
+      id: `dbg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      timestamp: ts,
+      source: entry.source || 'server',
+      paymentId: paymentId || undefined,
+      correlationId: correlationId || undefined,
+      eventName: entry.eventName || 'UNNAMED_EVENT',
+      level: entry.level || 'info',
+      httpStatus: entry.httpStatus,
+      requestBody: entry.requestBody,
+      responseBody: entry.responseBody,
+      durationMs: entry.durationMs,
+      error: entry.error,
+      rawDetails: entry.rawDetails,
+      userAgent: entry.userAgent,
+      url: entry.url
+    };
+
+    paymentDebugStore.push(fullEntry);
+    if (paymentDebugStore.length > MAX_PAYMENT_DEBUG_ENTRIES) {
+      paymentDebugStore.shift();
+    }
+
+    try {
+      const db = getDb();
+      if (db) {
+        db.collection('paymentDebugLogs').add({
+          ...fullEntry,
+          createdAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+    } catch (err) {}
+
+    return fullEntry;
+  }
+
+  function groupLogsBySession(logs: PaymentDebugEntry[]) {
+    const sessionsMap: Record<string, {
+      paymentId: string;
+      correlationId?: string;
+      startTime: string;
+      lastUpdate: string;
+      status: string;
+      eventsCount: number;
+      events: PaymentDebugEntry[];
+    }> = {};
+
+    const unassociatedEvents: PaymentDebugEntry[] = [];
+
+    for (const log of logs) {
+      const key = log.paymentId || log.correlationId;
+      if (!key) {
+        unassociatedEvents.push(log);
+        continue;
+      }
+
+      if (!sessionsMap[key]) {
+        sessionsMap[key] = {
+          paymentId: log.paymentId || key,
+          correlationId: log.correlationId,
+          startTime: log.timestamp,
+          lastUpdate: log.timestamp,
+          status: 'IN_PROGRESS',
+          eventsCount: 0,
+          events: []
+        };
+      }
+
+      const session = sessionsMap[key];
+      session.lastUpdate = log.timestamp;
+      if (log.correlationId && !session.correlationId) {
+        session.correlationId = log.correlationId;
+      }
+      if (log.paymentId && !session.paymentId) {
+        session.paymentId = log.paymentId;
+      }
+
+      const evName = (log.eventName || '').toLowerCase();
+      if (evName.includes('completion') || evName.includes('completed') || evName.includes('success')) {
+        session.status = 'COMPLETED';
+      } else if (evName.includes('approval') || evName.includes('approved')) {
+        if (session.status !== 'COMPLETED') session.status = 'APPROVED';
+      } else if (evName.includes('cancel')) {
+        session.status = 'CANCELLED';
+      } else if (evName.includes('error') || evName.includes('failed') || log.level === 'error') {
+        session.status = 'ERROR';
+      }
+
+      session.events.push(log);
+      session.eventsCount = session.events.length;
+    }
+
+    return {
+      sessions: Object.values(sessionsMap).sort((a, b) => new Date(b.lastUpdate).getTime() - new Date(a.lastUpdate).getTime()).slice(0, 100),
+      unassociatedEvents: unassociatedEvents.slice(-50)
+    };
+  }
+
+  // =========================================================================
   // PI NETWORK PAYMENT ENDPOINTS (Server-to-Server Approval & Completion)
   // Reference: https://pi-apps.github.io/pi-sdk-docs/quick-start/genai/Payments
   // =========================================================================
@@ -500,24 +641,44 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   // 1. Approve Payment Endpoint
   app.post(["/api/payments/approve", "/payments/approve"], authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
+    const reqTimestamp = new Date().toISOString();
     const runtimeLogs: string[] = [];
-    console.log(`[Pi Payment Approve ENTRY] Request reached POST /api/payments/approve. Body:`, JSON.stringify(req.body));
-    runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/approve route handler at ${new Date().toISOString()}`);
+    const { paymentId, metadata } = req.body || {};
+    const correlationId = metadata?.internalPaymentId || metadata?.sessionId;
+
+    recordPaymentDebugLog({
+      timestamp: reqTimestamp,
+      source: 'server',
+      paymentId,
+      correlationId,
+      eventName: '[SERVER_PAYMENT_TRACE] POST /api/payments/approve RECEIVED',
+      level: 'info',
+      requestBody: req.body
+    });
+
+    console.log(`[${reqTimestamp}] [SERVER_PAYMENT_TRACE] POST /api/payments/approve RECEIVED for paymentId: ${paymentId}. Body:`, JSON.stringify(req.body));
+    runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/approve route handler at ${reqTimestamp}`);
     try {
-      const { paymentId, metadata } = req.body;
       if (!paymentId) {
+        console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Rejecting approval: paymentId is missing.`);
+        recordPaymentDebugLog({
+          timestamp: new Date().toISOString(),
+          source: 'server',
+          eventName: '[SERVER_PAYMENT_TRACE] Approval Rejected: paymentId missing',
+          level: 'warn',
+          httpStatus: 400
+        });
         return res.status(400).json({ error: "paymentId is required" });
       }
 
       runtimeLogs.push(`[Runtime Log] Payment approval request received for paymentId: ${paymentId}`);
-      console.log(`[Pi Payment Approve] Payment approval request for ID: ${paymentId}`);
 
       // Authenticated User & Ownership check
       const user = (req as any).user;
       if (user && user.uid !== 'dev_user' && user.authSource !== 'pi_sdk_metadata') {
         const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid || metadata?.buyerId;
         if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
-          console.warn(`[Security Notice] User ${user.uid} approving payment with buyer ID ${expectedBuyerUid}. Proceeding with Pi payment approval.`);
+          console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] [Security Notice] User ${user.uid} approving payment with buyer ID ${expectedBuyerUid}. Proceeding with Pi payment approval.`);
         }
       }
 
@@ -534,8 +695,18 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           const docData = existingDoc.data();
           if (docData?.paymentStatus === 'completed') {
             const msg = `Duplicate/Replay protection check: Payment ${paymentId} has already been completed.`;
-            console.warn(`[Pi Payment Approve] ${msg}`);
+            console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] ${msg}`);
             runtimeLogs.push(`[Runtime Log] ${msg}`);
+            recordPaymentDebugLog({
+              timestamp: new Date().toISOString(),
+              source: 'server',
+              paymentId,
+              correlationId,
+              eventName: '[SERVER_PAYMENT_TRACE] Replay attempt blocked (Already Completed)',
+              level: 'warn',
+              httpStatus: 400,
+              responseBody: { error: "Replay Attempt Blocked" }
+            });
             return res.status(400).json({
               error: "Replay Attempt Blocked: This payment has already been finalized.",
               logs: runtimeLogs
@@ -548,10 +719,20 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
       if (!isConfigured || !apiKey) {
         runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
-        console.warn("[Pi Payment Approve] PI_NETWORK_API_KEY is missing or unconfigured.");
+        console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] PI_NETWORK_API_KEY is missing or unconfigured.`);
         
         if (process.env.NODE_ENV !== 'production') {
-          console.log("[Pi Payment Approve] Development mode: returning sandbox mock approval success");
+          console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Development mode: returning sandbox mock approval success`);
+          recordPaymentDebugLog({
+            timestamp: new Date().toISOString(),
+            source: 'server',
+            paymentId,
+            correlationId,
+            eventName: '[SERVER_PAYMENT_TRACE] Sandbox Mock Approval Success',
+            level: 'info',
+            httpStatus: 200,
+            responseBody: { success: true, sandbox: true }
+          });
           return res.json({
             success: true,
             sandbox: true,
@@ -560,15 +741,35 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           });
         }
 
+        recordPaymentDebugLog({
+          timestamp: new Date().toISOString(),
+          source: 'server',
+          paymentId,
+          correlationId,
+          eventName: '[SERVER_PAYMENT_TRACE] Approval Failed: PI_NETWORK_API_KEY missing',
+          level: 'error',
+          httpStatus: 500
+        });
         return res.status(500).json({
           error: "PI_NETWORK_API_KEY is not configured.",
           logs: runtimeLogs
         });
       }
 
-      console.log(`[Pi Payment Approve] PI_NETWORK_API_KEY found (length: ${apiKey.length}). Sending approval POST for paymentId: ${paymentId}...`);
+      console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] PI_NETWORK_API_KEY configured. Sending POST https://api.minepi.com/v2/payments/${paymentId}/approve...`);
       runtimeLogs.push("[Runtime Log] Sending approval POST to Pi Network API...");
       
+      const piReqStartTime = Date.now();
+      recordPaymentDebugLog({
+        timestamp: new Date().toISOString(),
+        source: 'server',
+        paymentId,
+        correlationId,
+        eventName: '[SERVER_PAYMENT_TRACE] Request Sent to Pi Platform API: POST /v2/payments/' + paymentId + '/approve',
+        level: 'info',
+        requestBody: { url: `https://api.minepi.com/v2/payments/${paymentId}/approve` }
+      });
+
       try {
         const response = await axios.post(
           `https://api.minepi.com/v2/payments/${paymentId}/approve`,
@@ -576,19 +777,32 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           { headers: { Authorization: `Key ${apiKey}` }, timeout: 15000 }
         );
         
-        console.log(`[Pi Payment Approve] Successfully approved payment ${paymentId}`);
+        const durationMs = Date.now() - piReqStartTime;
+        console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Successfully approved payment ${paymentId} with Pi Network Platform API in ${durationMs}ms.`);
         runtimeLogs.push(`[Runtime Log] Pi Network server approved payment: ${paymentId}`);
         runtimeLogs.push(`[Runtime Log] Pi response data: ${JSON.stringify(response.data || {})}`);
 
+        recordPaymentDebugLog({
+          timestamp: new Date().toISOString(),
+          source: 'server',
+          paymentId,
+          correlationId,
+          eventName: '[SERVER_PAYMENT_TRACE] Pi Platform Approval Response SUCCESS',
+          level: 'info',
+          httpStatus: response.status,
+          durationMs,
+          responseBody: response.data
+        });
+
         return res.json({ success: true, payment: response.data, logs: runtimeLogs });
       } catch (axiosError: any) {
+        const durationMs = Date.now() - piReqStartTime;
         const errorData = axiosError.response?.data;
         const errorStatus = axiosError.response?.status;
         const errorString = JSON.stringify(errorData || axiosError.message || '');
         
-        console.error(`[Pi Payment Approve] Axios error (${errorStatus}):`, errorString);
+        console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Axios error approving payment (${errorStatus}):`, errorString);
 
-        // Check if Pi Network API returned that payment is ALREADY approved
         const isAlreadyApproved = 
           errorString.toLowerCase().includes('already approved') || 
           errorString.toLowerCase().includes('already_approved') ||
@@ -596,8 +810,21 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           errorData?.message?.toLowerCase()?.includes('approved');
 
         if (isAlreadyApproved) {
-          console.log(`[Pi Payment Approve] Payment ${paymentId} was ALREADY approved on Pi Network API. Returning success.`);
+          console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Payment ${paymentId} was ALREADY approved on Pi Network API. Returning success.`);
           runtimeLogs.push(`[Runtime Log] Payment ${paymentId} was already approved on Pi Network API.`);
+          
+          recordPaymentDebugLog({
+            timestamp: new Date().toISOString(),
+            source: 'server',
+            paymentId,
+            correlationId,
+            eventName: '[SERVER_PAYMENT_TRACE] Pi Platform Approval Response: ALREADY APPROVED',
+            level: 'info',
+            httpStatus: errorStatus || 200,
+            durationMs,
+            responseBody: errorData || { identifier: paymentId, status: 'approved' }
+          });
+
           return res.json({
             success: true,
             alreadyApproved: true,
@@ -606,12 +833,37 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           });
         }
 
+        recordPaymentDebugLog({
+          timestamp: new Date().toISOString(),
+          source: 'server',
+          paymentId,
+          correlationId,
+          eventName: '[SERVER_PAYMENT_TRACE] Pi Platform Approval Response ERROR',
+          level: 'error',
+          httpStatus: errorStatus || 500,
+          durationMs,
+          error: errorString,
+          responseBody: errorData
+        });
+
         throw axiosError;
       }
     } catch (error: any) {
       const errorMsg = error.response?.data || error.message;
-      console.error("[Pi Payment Approve] Error approving payment:", errorMsg);
+      console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Exception approving payment:`, errorMsg);
       runtimeLogs.push(`[Runtime Log] Error approving payment: ${JSON.stringify(errorMsg)}`);
+      
+      recordPaymentDebugLog({
+        timestamp: new Date().toISOString(),
+        source: 'server',
+        paymentId,
+        correlationId,
+        eventName: '[SERVER_PAYMENT_TRACE] Exception Approving Payment',
+        level: 'error',
+        httpStatus: 500,
+        error: errorMsg
+      });
+
       res.status(500).json({
         error: "Failed to approve payment with Pi Network server",
         details: errorMsg,
@@ -753,9 +1005,23 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
   app.post(["/api/payments/complete", "/payments/complete"], authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
+    const reqTimestamp = new Date().toISOString();
     const runtimeLogs: string[] = [];
-    console.log(`[Pi Payment Complete ENTRY] Request reached POST /api/payments/complete. Body:`, JSON.stringify(req.body));
-    runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/complete route handler at ${new Date().toISOString()}`);
+    const { paymentId, txid, metadata } = req.body || {};
+    const correlationId = metadata?.internalPaymentId || metadata?.sessionId;
+
+    recordPaymentDebugLog({
+      timestamp: reqTimestamp,
+      source: 'server',
+      paymentId,
+      correlationId,
+      eventName: '[SERVER_PAYMENT_TRACE] POST /api/payments/complete RECEIVED',
+      level: 'info',
+      requestBody: req.body
+    });
+
+    console.log(`[${reqTimestamp}] [SERVER_PAYMENT_TRACE] POST /api/payments/complete RECEIVED for paymentId: ${paymentId}, txid: ${txid}. Body:`, JSON.stringify(req.body));
+    runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/complete route handler at ${reqTimestamp}`);
     
     const logTx = async (docRef: any, fn: () => any) => {
       const docPath = typeof docRef === 'string' ? docRef : (docRef?.path || '<query>');
@@ -772,14 +1038,20 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     };
 
     try {
-      const { paymentId, txid, metadata } = req.body;
       if (!paymentId || !txid) {
+        console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Rejecting completion: paymentId or txid missing.`);
+        recordPaymentDebugLog({
+          timestamp: new Date().toISOString(),
+          source: 'server',
+          eventName: '[SERVER_PAYMENT_TRACE] Completion Rejected: paymentId or txid missing',
+          level: 'warn',
+          httpStatus: 400
+        });
         return res.status(400).json({ error: "paymentId and txid are required" });
       }
 
       runtimeLogs.push(`[Runtime Log] Payment completion request received for paymentId: ${paymentId}`);
       runtimeLogs.push(`[Runtime Log] User approval blockchain txid: ${txid}`);
-      console.log(`[Pi Payment Complete] Completion request for ID: ${paymentId}, TxID: ${txid}`);
 
       // 1. Authenticated User & Ownership check
       const user = (req as any).user;
@@ -787,7 +1059,16 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       if (user && user.uid !== 'dev_user') {
         const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid || metadata?.buyerId;
         if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
-          console.error(`[Security Violation] User ${user.uid} tried to complete payment owned by ${expectedBuyerUid}`);
+          console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] [Security Violation] User ${user.uid} tried to complete payment owned by ${expectedBuyerUid}`);
+          recordPaymentDebugLog({
+            timestamp: new Date().toISOString(),
+            source: 'server',
+            paymentId,
+            correlationId,
+            eventName: '[SERVER_PAYMENT_TRACE] Completion Ownership Violation',
+            level: 'error',
+            httpStatus: 403
+          });
           return res.status(403).json({ error: "Access Denied: Payment ownership mismatch.", logs: runtimeLogs });
         }
       }
@@ -813,11 +1094,22 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             const existingOrderId = docData?.orderId;
             if (existingOrderId && typeof existingOrderId === 'string' && existingOrderId.trim() !== '') {
               const msg = `Duplicate check: Payment ${paymentId} has already been completed with order ${existingOrderId}.`;
-              console.warn(`[Pi Payment Complete] ${msg}`);
+              console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] ${msg}`);
               runtimeLogs.push(`[Runtime Log] ${msg}`);
               runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
-              console.log(`[Server Transaction] RETURN SUCCESS (duplicate check) for order ${existingOrderId}`);
               runtimeLogs.push(`[Runtime Log] RETURN SUCCESS (duplicate check) for order ${existingOrderId}`);
+              
+              recordPaymentDebugLog({
+                timestamp: new Date().toISOString(),
+                source: 'server',
+                paymentId,
+                correlationId,
+                eventName: '[SERVER_PAYMENT_TRACE] Completion Duplicate Check: Already Completed',
+                level: 'info',
+                httpStatus: 200,
+                responseBody: { success: true, message: "Payment already processed", orderId: existingOrderId }
+              });
+
               return res.json({
                 success: true,
                 message: "Payment already processed",
@@ -828,7 +1120,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
                 logs: runtimeLogs
               });
             } else {
-              console.warn(`[Pi Payment Complete] Duplicate payment ${paymentId} completed but missing orderId. Continuing order creation.`);
+              console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Duplicate payment ${paymentId} completed but missing orderId. Continuing order creation.`);
             }
           }
         }
@@ -839,21 +1131,51 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
       if (!isConfigured || !apiKey) {
         runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
-        console.warn("[Pi Payment Complete] PI_NETWORK_API_KEY is missing or unconfigured.");
+        console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] PI_NETWORK_API_KEY is missing or unconfigured.`);
         
         if (process.env.NODE_ENV !== 'production') {
-          console.log("[Pi Payment Complete] Development mode: returning mock completion success");
+          console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Development mode: returning mock completion success`);
           paymentData = { identifier: paymentId, status: 'completed', txid };
+          recordPaymentDebugLog({
+            timestamp: new Date().toISOString(),
+            source: 'server',
+            paymentId,
+            correlationId,
+            eventName: '[SERVER_PAYMENT_TRACE] Sandbox Mock Completion Success',
+            level: 'info',
+            httpStatus: 200,
+            responseBody: paymentData
+          });
         } else {
+          recordPaymentDebugLog({
+            timestamp: new Date().toISOString(),
+            source: 'server',
+            paymentId,
+            correlationId,
+            eventName: '[SERVER_PAYMENT_TRACE] Completion Failed: PI_NETWORK_API_KEY missing',
+            level: 'error',
+            httpStatus: 500
+          });
           return res.status(500).json({
             error: "PI_NETWORK_API_KEY is not configured.",
             logs: runtimeLogs
           });
         }
       } else {
-        console.log(`[Pi Payment Complete] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
+        console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
         runtimeLogs.push("[Runtime Log] POSTing to Pi Network API v2/payments/.../complete...");
         
+        const piReqStartTime = Date.now();
+        recordPaymentDebugLog({
+          timestamp: new Date().toISOString(),
+          source: 'server',
+          paymentId,
+          correlationId,
+          eventName: '[SERVER_PAYMENT_TRACE] Request Sent to Pi Platform API: POST /v2/payments/' + paymentId + '/complete',
+          level: 'info',
+          requestBody: { url: `https://api.minepi.com/v2/payments/${paymentId}/complete`, txid }
+        });
+
         try {
           const response = await axios.post(
             `https://api.minepi.com/v2/payments/${paymentId}/complete`,
@@ -861,14 +1183,28 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             { headers: { Authorization: `Key ${apiKey}` }, timeout: 15000 }
           );
           paymentData = response.data;
-          console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId} with Pi Network Server`);
+          const durationMs = Date.now() - piReqStartTime;
+          console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Successfully completed payment ${paymentId} with Pi Network Server in ${durationMs}ms`);
           runtimeLogs.push(`[Runtime Log] Pi Network server response: verified & completed. ${JSON.stringify(paymentData || {})}`);
+
+          recordPaymentDebugLog({
+            timestamp: new Date().toISOString(),
+            source: 'server',
+            paymentId,
+            correlationId,
+            eventName: '[SERVER_PAYMENT_TRACE] Pi Platform Completion Response SUCCESS',
+            level: 'info',
+            httpStatus: response.status,
+            durationMs,
+            responseBody: paymentData
+          });
         } catch (axiosError: any) {
+          const durationMs = Date.now() - piReqStartTime;
           const errorData = axiosError.response?.data;
           const errorStatus = axiosError.response?.status;
           const errorString = JSON.stringify(errorData || axiosError.message || '');
 
-          console.error(`[Pi Payment Complete] Axios error (${errorStatus}):`, errorString);
+          console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Axios error completing payment (${errorStatus}):`, errorString);
 
           const isAlreadyCompleted = 
             errorString.toLowerCase().includes('already completed') || 
@@ -877,10 +1213,34 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             errorData?.message?.toLowerCase()?.includes('completed');
 
           if (isAlreadyCompleted) {
-            console.log(`[Pi Payment Complete] Payment ${paymentId} was ALREADY completed on Pi Network API.`);
+            console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Payment ${paymentId} was ALREADY completed on Pi Network API.`);
             runtimeLogs.push(`[Runtime Log] Payment ${paymentId} was already completed on Pi Network API.`);
             paymentData = errorData || { identifier: paymentId, status: 'completed', txid };
+
+            recordPaymentDebugLog({
+              timestamp: new Date().toISOString(),
+              source: 'server',
+              paymentId,
+              correlationId,
+              eventName: '[SERVER_PAYMENT_TRACE] Pi Platform Completion Response: ALREADY COMPLETED',
+              level: 'info',
+              httpStatus: errorStatus || 200,
+              durationMs,
+              responseBody: paymentData
+            });
           } else {
+            recordPaymentDebugLog({
+              timestamp: new Date().toISOString(),
+              source: 'server',
+              paymentId,
+              correlationId,
+              eventName: '[SERVER_PAYMENT_TRACE] Pi Platform Completion Response ERROR',
+              level: 'error',
+              httpStatus: errorStatus || 500,
+              durationMs,
+              error: errorString,
+              responseBody: errorData
+            });
             throw axiosError;
           }
         }
@@ -1782,21 +2142,255 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   
   app.post("/api/debug-log", async (req, res) => {
     try {
-      console.log(`[CLIENT_LOG] Received client log payload:`, JSON.stringify(req.body));
-      fs.writeFileSync('/tmp/client_debug.json', JSON.stringify(req.body, null, 2));
+      const payload = req.body || {};
+      const messageStr = typeof payload.message === 'string' ? payload.message : JSON.stringify(payload.message || payload);
       
+      let httpStatus: number | undefined = undefined;
+      let durationMs: number | undefined = undefined;
+      let requestBody: any = undefined;
+      let responseBody: any = undefined;
+      let errorObj: any = undefined;
+
+      if (Array.isArray(payload.details)) {
+        for (const item of payload.details) {
+          if (typeof item === 'object' && item !== null) {
+            if (item.status !== undefined) httpStatus = Number(item.status);
+            if (item.durationMs !== undefined) durationMs = Number(item.durationMs);
+            if (item.bodyStr || item.body || item.payload) requestBody = item.bodyStr || item.body || item.payload;
+            if (item.resText || item.response || item.result) responseBody = item.resText || item.response || item.result;
+            if (item.message || item.stack || item.error) errorObj = item.message || item.error || item;
+          }
+        }
+      }
+
+      const recorded = recordPaymentDebugLog({
+        timestamp: payload.timestamp || new Date().toISOString(),
+        source: 'client',
+        eventName: messageStr,
+        level: payload.level === 'error' ? 'error' : (payload.level === 'warn' ? 'warn' : 'info'),
+        httpStatus,
+        durationMs,
+        requestBody,
+        responseBody,
+        error: errorObj,
+        rawDetails: payload.details,
+        userAgent: payload.userAgent || req.headers['user-agent'] || undefined,
+        url: payload.url
+      });
+
+      console.log(`[CLIENT_LOG] Recorded client trace: "${messageStr.slice(0, 100)}"`);
+      
+      try {
+        fs.writeFileSync('/tmp/client_debug.json', JSON.stringify({ latest: recorded, payload }, null, 2));
+      } catch (e) {}
+
       const db = getDb();
       if (db) {
         await db.collection('clientLogs').add({
-          log: req.body,
+          log: payload,
+          recordedEntry: recorded,
           timestamp: new Date().toISOString(),
           userAgent: req.headers['user-agent'] || 'unknown'
-        });
+        }).catch(() => {});
       }
     } catch (err: any) {
       console.error('[CLIENT_LOG_ERROR] Failed to store client log:', err?.message);
     }
     res.json({ success: true });
+  });
+
+  // =========================================================================
+  // PAYMENT DEBUG RETRIEVAL & DIAGNOSTIC ENDPOINTS
+  // =========================================================================
+
+  app.get(["/api/debug-log/latest", "/api/payment-debug/latest", "/api/payment-debug", "/api/debug-log"], (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    
+    const paymentIdQuery = (req.query.paymentId || req.query.id || req.query.txid) as string;
+    const { sessions, unassociatedEvents } = groupLogsBySession(paymentDebugStore);
+
+    if (paymentIdQuery) {
+      const matchedEvents = paymentDebugStore.filter(l => 
+        l.paymentId === paymentIdQuery || 
+        l.correlationId === paymentIdQuery || 
+        l.eventName.includes(paymentIdQuery)
+      );
+      const matchedSession = sessions.find(s => s.paymentId === paymentIdQuery || s.correlationId === paymentIdQuery);
+
+      return res.json({
+        success: true,
+        queryPaymentId: paymentIdQuery,
+        session: matchedSession || null,
+        totalEvents: matchedEvents.length,
+        timeline: matchedEvents
+      });
+    }
+
+    const latestSession = sessions[0] || null;
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      totalLogsCount: paymentDebugStore.length,
+      totalSessionsCount: sessions.length,
+      latestPaymentId: latestSession?.paymentId || null,
+      latestCorrelationId: latestSession?.correlationId || null,
+      latestSession: latestSession,
+      sessions: sessions,
+      unassociatedEvents: unassociatedEvents,
+      allLogsTimeline: paymentDebugStore
+    });
+  });
+
+  app.get("/api/payment-debug/:paymentId", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    const pId = req.params.paymentId;
+    const { sessions } = groupLogsBySession(paymentDebugStore);
+    const matchedEvents = paymentDebugStore.filter(l => 
+      l.paymentId === pId || 
+      l.correlationId === pId || 
+      l.eventName.includes(pId)
+    );
+    const matchedSession = sessions.find(s => s.paymentId === pId || s.correlationId === pId);
+
+    res.json({
+      success: true,
+      paymentId: pId,
+      session: matchedSession || null,
+      totalEvents: matchedEvents.length,
+      timeline: matchedEvents
+    });
+  });
+
+  app.post(["/api/payment-debug/clear", "/api/debug-log/clear"], (req, res) => {
+    paymentDebugStore.length = 0;
+    res.json({ success: true, message: "Payment debug store cleared." });
+  });
+
+  app.get(["/api/payment-debug-ui", "/debug-logs-ui"], (req, res) => {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Pi Payment Trace Debugger</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+    h1 { color: #38bdf8; margin-top: 0; display: flex; align-items: center; justify-content: space-between; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+    .badge-approved { background: #0284c7; color: white; }
+    .badge-completed { background: #16a34a; color: white; }
+    .badge-error { background: #dc2626; color: white; }
+    .badge-progress { background: #d97706; color: white; }
+    .badge-client { background: #6366f1; color: white; }
+    .badge-server { background: #8b5cf6; color: white; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #334155; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; }
+    pre { background: #090d16; padding: 8px; border-radius: 4px; overflow-x: auto; color: #38bdf8; max-height: 200px; font-size: 11px; margin: 4px 0; }
+    button { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #0369a1; }
+    .btn-danger { background: #b91c1c; }
+    .btn-danger:hover { background: #991b1b; }
+  </style>
+</head>
+<body>
+  <h1>
+    <span>⚡ Pi Payment Trace Debugger</span>
+    <div>
+      <button onclick="fetchLogs()">🔄 Refresh Logs</button>
+      <button class="btn-danger" onclick="clearLogs()">🗑️ Clear Logs</button>
+    </div>
+  </h1>
+
+  <div class="card" id="summaryCard">
+    Loading trace data...
+  </div>
+
+  <div id="sessionsContainer"></div>
+
+  <script>
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/debug-log/latest');
+        const data = await res.json();
+        
+        document.getElementById('summaryCard').innerHTML = \`
+          <strong>Total Sessions:</strong> \${data.totalSessionsCount || 0} | 
+          <strong>Total Events:</strong> \${data.totalLogsCount || 0} | 
+          <strong>Latest Payment ID:</strong> \${data.latestPaymentId || 'None'} | 
+          <strong>Latest Status:</strong> \${data.latestSession ? data.latestSession.status : 'N/A'}
+        \`;
+
+        const container = document.getElementById('sessionsContainer');
+        if (!data.sessions || data.sessions.length === 0) {
+          container.innerHTML = '<div class="card">No payment sessions recorded yet. Perform a payment attempt in Pi Browser!</div>';
+          return;
+        }
+
+        container.innerHTML = data.sessions.map(s => \`
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:12px;">
+              <div>
+                <span class="badge badge-\${s.status.toLowerCase()}">\${s.status}</span>
+                <strong style="margin-left:10px; font-size:16px;">Payment ID: \${s.paymentId}</strong>
+                \${s.correlationId ? \`<span style="color:#94a3b8; margin-left:12px; font-size:12px;">(Session: \${s.correlationId})</span>\` : ''}
+              </div>
+              <div style="font-size:12px; color:#94a3b8;">
+                \${new Date(s.startTime).toLocaleTimeString()} - \${new Date(s.lastUpdate).toLocaleTimeString()}
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Src</th>
+                  <th>Event Trace</th>
+                  <th>Status</th>
+                  <th>Duration</th>
+                  <th>Payload / Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                \${s.events.map(e => \`
+                  <tr>
+                    <td style="white-space:nowrap; font-family:monospace; color:#94a3b8;">\${new Date(e.timestamp).toLocaleTimeString()}</td>
+                    <td><span class="badge badge-\${e.source}">\${e.source}</span></td>
+                    <td style="font-weight:bold; color:\${e.level === 'error' ? '#f87171' : (e.level === 'warn' ? '#fbbf24' : '#f8fafc')}">\${e.eventName}</td>
+                    <td>\${e.httpStatus ? \`<span style="color:\${e.httpStatus >= 400 ? '#f87171' : '#4ade80'}">\${e.httpStatus}</span>\` : '-'}</td>
+                    <td>\${e.durationMs ? e.durationMs + 'ms' : '-'}</td>
+                    <td>
+                      \${e.error ? \`<pre style="color:#f87171;">ERROR: \${typeof e.error === 'object' ? JSON.stringify(e.error) : e.error}</pre>\` : ''}
+                      \${e.requestBody ? \`<details><summary style="cursor:pointer; color:#38bdf8;">Request Body</summary><pre>\${JSON.stringify(e.requestBody, null, 2)}</pre></details>\` : ''}
+                      \${e.responseBody ? \`<details><summary style="cursor:pointer; color:#4ade80;">Response Body</summary><pre>\${JSON.stringify(e.responseBody, null, 2)}</pre></details>\` : ''}
+                      \${e.rawDetails ? \`<details><summary style="cursor:pointer; color:#94a3b8;">Raw Details</summary><pre>\${JSON.stringify(e.rawDetails, null, 2)}</pre></details>\` : ''}
+                    </td>
+                  </tr>
+                \`).join('')}
+              </tbody>
+            </table>
+          </div>
+        \`).join('');
+      } catch (err) {
+        document.getElementById('summaryCard').innerHTML = '<span style="color:red">Failed to load logs: ' + err.message + '</span>';
+      }
+    }
+
+    async function clearLogs() {
+      if (confirm('Clear all in-memory debug logs?')) {
+        await fetch('/api/payment-debug/clear', { method: 'POST' });
+        fetchLogs();
+      }
+    }
+
+    fetchLogs();
+    setInterval(fetchLogs, 3000);
+  </script>
+</body>
+</html>`);
   });
 
   // Fallback handler for unhandled /api requests to guarantee JSON response

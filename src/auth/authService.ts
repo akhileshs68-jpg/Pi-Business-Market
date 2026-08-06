@@ -67,6 +67,15 @@ export function isRealPiBrowser(): boolean {
   return isPiUA || isNativeHost;
 }
 
+export function isDevMockAllowed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    (import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true' ||
+    localStorage.getItem('DEV_MOCK_AUTH_ENABLED') === 'true' ||
+    Boolean((import.meta as any).env.DEV)
+  );
+}
+
 /**
  * Verifies if the native window.Pi instance actually possesses the payments scope
  */
@@ -290,8 +299,8 @@ export const authService = {
         console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 12] isRealPiBrowser:', isRealPi);
 
         if (!isRealPi) {
-          if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true') {
-            console.log('[DEBUG_TRACE] [authenticatePi async worker] Explicit VITE_ENABLE_DEV_MOCK=true enabled, returning mock auth result');
+          if (isDevMockAllowed()) {
+            console.log('[DEBUG_TRACE] [authenticatePi async worker] Dev/Preview environment detected, returning mock auth result');
             const mockAuth = {
               accessToken: 'mock_access_token_pioneer_123',
               user: {
@@ -304,7 +313,7 @@ export const authService = {
             console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (mock)');
             return mockAuth;
           }
-          console.error('[DEBUG_TRACE] [authenticatePi async worker] Not inside Pi Browser and VITE_ENABLE_DEV_MOCK is false');
+          console.error('[DEBUG_TRACE] [authenticatePi async worker] Not inside Pi Browser and isDevMockAllowed is false');
           throw new Error('Pi Browser authentication is required. No Pi account is available.');
         }
 
@@ -452,8 +461,8 @@ export const authService = {
       }
     } else {
       // Dev mode outside Pi Browser
-      if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true') {
-        console.log('[PI_VERIFY_STEP 1/10] Running in explicit dev mode (VITE_ENABLE_DEV_MOCK=true) - using dev mock credentials.');
+      if (isDevMockAllowed()) {
+        console.log('[PI_VERIFY_STEP 1/10] Running in web preview/dev mode - using dev mock credentials.');
         piUid = 'dev_pioneer_mock';
         username = 'dev_pioneer_mock';
         piAuth = { accessToken: 'mock_access_token_dev', user: { uid: piUid, username }, hasPaymentsScope: true };
@@ -461,7 +470,7 @@ export const authService = {
         console.log('[UID_FROM_SDK]', piUid);
         console.log('[USERNAME_FROM_SDK]', username);
       } else {
-        console.error('[PI_VERIFY_STEP 1/10] Not inside Pi Browser and VITE_ENABLE_DEV_MOCK is false.');
+        console.error('[PI_VERIFY_STEP 1/10] Not inside Pi Browser and isDevMockAllowed is false.');
         throw new Error('Pi Browser authentication is required. No Pi account is available.');
       }
     }
@@ -658,9 +667,9 @@ export const authService = {
       return latestVerifiedPiUser;
     }
 
-    // Outside Pi Browser without explicit dev mode: do NOT return any Pi user profile or mock data
-    if (!isRealPiBrowser() && (import.meta as any).env.VITE_ENABLE_DEV_MOCK !== 'true') {
-      console.log('[AuthService] Not inside Pi Browser and VITE_ENABLE_DEV_MOCK is false. Returning null profile.');
+    // Outside Pi Browser without dev mock mode: do NOT return any Pi user profile or mock data
+    if (!isRealPiBrowser() && !isDevMockAllowed()) {
+      console.log('[AuthService] Not inside Pi Browser and isDevMockAllowed is false. Returning null profile.');
       return null;
     }
 
