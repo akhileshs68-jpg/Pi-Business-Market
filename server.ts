@@ -392,7 +392,16 @@ async function startServer() {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const host = req.get("host") || req.headers.host || "";
+      const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+      const appUrl = `${protocol}://${host}`;
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        let html = fs.readFileSync(indexPath, "utf-8");
+        html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
+        return res.setHeader("Content-Type", "text/html").send(html);
+      }
+      res.sendFile(indexPath);
     });
   }
 
