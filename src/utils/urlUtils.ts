@@ -78,9 +78,12 @@ export function getApiBaseUrl(): string {
 
 export function getAbsoluteUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const baseUrl = getApiBaseUrl();
-  
+  let baseUrl = getApiBaseUrl();
+
   if (baseUrl) {
+    if (baseUrl.startsWith('http://') && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1')) {
+      baseUrl = baseUrl.replace(/^http:\/\//, 'https://');
+    }
     return `${baseUrl}${cleanPath}`;
   }
   return cleanPath;
