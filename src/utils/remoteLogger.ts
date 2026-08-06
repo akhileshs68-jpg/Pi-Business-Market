@@ -1,6 +1,8 @@
 // Client-side Remote Logger for debugging Mobile Pi Browser payment lifecycle
 // Intercepts all console calls, uncaught errors, network requests, lifecycle events, and postMessage calls
 
+import { getAbsoluteUrl } from './urlUtils';
+
 let isSending = false;
 
 export function initRemoteLogger() {
@@ -46,7 +48,7 @@ export function initRemoteLogger() {
       };
 
       // Use standard relative fetch - it will resolve relative to iframe base URL
-      await fetch('/api/debug-log', {
+      await fetch(getAbsoluteUrl('/api/debug-log'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

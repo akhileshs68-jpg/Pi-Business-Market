@@ -3,6 +3,7 @@ import { getFirebaseDb } from '../firebase/config';
 import { notificationService } from './notificationService';
 import { OrderStatus } from '../types';
 import { getCanonicalRewardUserId } from './rewards/rewardIdentityResolver';
+import { getAbsoluteUrl } from '../utils/urlUtils';
 
 export const orderService = {
   async createOrder(orderData: any): Promise<string> {
@@ -602,7 +603,7 @@ export const orderService = {
         console.warn('[orderService.raiseDispute Step 2 Auth Notice] Notice retrieving auth token:', authErr);
       }
 
-      const response = await fetch('/api/orders/dispute', {
+      const response = await fetch(getAbsoluteUrl('/api/orders/dispute'), {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({

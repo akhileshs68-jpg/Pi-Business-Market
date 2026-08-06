@@ -4,60 +4,7 @@ import { PaymentRecord, PaymentMethodId, PaymentStatusType } from '../types/paym
 import { piPaymentService } from './piPaymentService';
 import { orderService } from './orderService';
 import { EnterpriseCheckoutEngine } from '../core/checkout/enterpriseCheckoutEngine';
-
-function getAbsoluteUrl(path: string): string {
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  try {
-    if (typeof window !== 'undefined' && window.location && window.location.href) {
-      const href = window.location.href;
-      if (href.startsWith('http://') || href.startsWith('https://')) {
-        const urlObj = new URL(href);
-        // CRITICAL CHECK: If the origin contains '.pi' or 'sandbox' or is 'null', it is NOT a valid Web2 backend host.
-        // Fall back to relative path so that the browser natively resolves it relative to the iframe's real Web2 HTML document URL!
-        const isPiDomain = urlObj.hostname.endsWith('.pi') || 
-                           urlObj.hostname.includes('sandbox.pi') || 
-                           urlObj.hostname.includes('minepi.com');
-        if (urlObj.origin && urlObj.origin !== 'null' && !urlObj.origin.startsWith('file:') && !isPiDomain) {
-          const resolved = `${urlObj.origin}${cleanPath}`;
-          console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Parsed href. Origin: ${urlObj.origin}, Resolved URL: ${resolved}`);
-          return resolved;
-        }
-      }
-    }
-  } catch (e) {
-    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error parsing window.location.href:', e);
-  }
-
-  try {
-    if (typeof window !== 'undefined' && window.location && window.location.origin) {
-      const origin = window.location.origin;
-      const isPiDomain = origin.includes('.pi') || origin.includes('minepi.com');
-      if (origin !== 'null' && !origin.startsWith('file:') && !isPiDomain) {
-        const resolved = `${origin}${cleanPath}`;
-        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Read origin. Origin: ${origin}, Resolved URL: ${resolved}`);
-        return resolved;
-      }
-    }
-  } catch (e) {
-    console.error('[DEBUG_TRACE] [getAbsoluteUrl] Error reading window.location.origin:', e);
-  }
-
-  try {
-    if (typeof window !== 'undefined' && window.location && window.location.host) {
-      const protocol = window.location.protocol || 'https:';
-      const host = window.location.host;
-      const isPiDomain = host.includes('.pi') || host.includes('minepi.com');
-      if (host && !host.startsWith('file:') && !isPiDomain) {
-        const resolved = `${protocol}//${host}${cleanPath}`;
-        console.log(`[DEBUG_TRACE] [getAbsoluteUrl] Formed host. Origin: ${protocol}//${host}, Resolved URL: ${resolved}`);
-        return resolved;
-      }
-    }
-  } catch (e) {}
-
-  console.warn(`[DEBUG_TRACE] [getAbsoluteUrl] All Web2 origin checks failed (or Pi domain detected). Falling back to relative path: ${cleanPath}`);
-  return cleanPath;
-}
+import { getAbsoluteUrl } from '../utils/urlUtils';
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   console.log('[DEBUG_TRACE] [getAuthHeaders] ENTER (paymentService)');
