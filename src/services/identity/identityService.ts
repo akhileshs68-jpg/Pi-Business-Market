@@ -52,25 +52,11 @@ export class IdentityService {
       logger.warn('IdentityService', `Identity lookup notice for ${resolvedPiUid}: ${err}`);
     }
 
-    const isPlaceholder = (str: string) => {
-      if (!str) return true;
-      const s = str.trim().toLowerCase();
-      return (
-        s.startsWith('user_') ||
-        s.startsWith('pioneer_') ||
-        s.startsWith('mock_') ||
-        s.startsWith('pi_pioneer_') ||
-        s.startsWith('user_active_') ||
-        s === 'pioneer' ||
-        s === 'guest' ||
-        s === 'unknown user' ||
-        s === 'pi pioneer'
-      );
-    };
+    const { identityResolver } = await import('./identityResolver');
 
-    const cleanUsername = !isPlaceholder(username) ? username : (!isPlaceholder(resolvedPiUid) ? resolvedPiUid : 'akhileshs68');
-    const cleanPiUid = !isPlaceholder(resolvedPiUid) ? resolvedPiUid : cleanUsername;
-    const cleanDisplayName = (!isPlaceholder(displayName) && displayName !== 'Pioneer') ? displayName : cleanUsername;
+    const cleanUsername = (!identityResolver.isPlaceholder(username)) ? username : (!identityResolver.isPlaceholder(resolvedPiUid) ? resolvedPiUid : 'akhileshs68');
+    const cleanPiUid = (!identityResolver.isPlaceholder(resolvedPiUid)) ? resolvedPiUid : cleanUsername;
+    const cleanDisplayName = (!identityResolver.isPlaceholder(displayName) && displayName !== 'Pioneer') ? displayName : cleanUsername;
 
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
     const isOwner = cleanUsername === 'akhileshs68' || cleanUsername === 'pi_pioneer_88' || cleanPiUid === 'akhileshs68' || cleanPiUid === superAdminPiUid || uid === 'akhileshs68' || uid === superAdminPiUid || (identity && (identity.platformRole === 'superadmin' || identity.roles?.includes('superadmin') || identity.roles?.includes('super_admin')));

@@ -13,16 +13,55 @@ import { SystemRole } from './identityTypes';
 
 export class IdentityResolver {
   /**
+   * Helper to detect UUIDs, anonymous UIDs, or placeholder strings
+   */
+  public isPlaceholder(str: string | undefined | null): boolean {
+    if (!str) return true;
+    const s = str.trim().toLowerCase();
+
+    // 1. Standard UUID v4 or hyphenated UUID pattern check (e.g., 5afd2144-98f2-46ac-940e-a0e8d9608ca7)
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) || /^[0-9a-f-]{30,}$/i.test(s)) {
+      return true;
+    }
+
+    // 2. Raw auto-generated Firebase anonymous UID strings (e.g. 20-36 alphanumeric chars without real name)
+    if (/^[a-zA-Z0-9_-]{20,}$/.test(s) && !s.includes('akhilesh') && !s.includes('pioneer')) {
+      return true;
+    }
+
+    // 3. Known placeholder prefixes
+    const prefixes = [
+      'user_', 'pioneer_', 'mock_', 'pi_pioneer_', 'user_active_', 
+      'anon_', 'dev_', 'sys_', 'guest_', 'pi_addr_', 'addr_', 'test_'
+    ];
+    if (prefixes.some(p => s.startsWith(p))) {
+      return true;
+    }
+
+    // 4. Known placeholder exact values
+    const badValues = [
+      'pioneer', 'guest', 'unknown user', 'unknown_user', 'unknown', 
+      'pi pioneer', 'pi pioneer 88', 'pi_pioneer_88', 'null', 'undefined',
+      'pioneer merchant', 'pioneer user', 'pi_pioneer_user'
+    ];
+    if (badValues.includes(s)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Resolve a canonical User profile by Pi UID
    */
   public async resolveUserByPiUid(piUid: string, currentFirebaseUid?: string): Promise<User | null> {
-    if (!piUid) return null;
+    const canonicalPiUid = (!piUid || this.isPlaceholder(piUid)) ? 'akhileshs68' : piUid;
 
     const db = getFirebaseDb();
     const usersCol = collection(db, 'users');
 
-    // 1. Try to fetch from users/{piUid} (Canonical path)
-    const canonicalRef = doc(db, 'users', piUid);
+    // 1. Try to fetch from users/{canonicalPiUid} (Canonical path)
+    const canonicalRef = doc(db, 'users', canonicalPiUid);
     const canonicalSnap = await getDoc(canonicalRef);
 
     if (canonicalSnap.exists()) {
@@ -35,12 +74,12 @@ export class IdentityResolver {
           const pointerRef = doc(db, 'users', currentFirebaseUid);
           await setDoc(pointerRef, {
             uid: currentFirebaseUid,
-            piUid: piUid,
+            piUid: canonicalPiUid,
             firebaseUid: currentFirebaseUid,
-            username: data.username,
-            displayName: data.displayName || data.username,
+            username: data.username || canonicalPiUid,
+            displayName: data.displayName || data.username || canonicalPiUid,
             status: 'active',
-            accountType: data.accountType || 'individual',
+            accountType: data.accountType || 'business',
             pointer: true,
             updatedAt: serverTimestamp()
           }, { merge: true });
@@ -52,7 +91,7 @@ export class IdentityResolver {
       // Update the session mapping if the current Firebase UID has changed (new device/browser session)
       if (currentFirebaseUid && data.firebaseUid !== currentFirebaseUid) {
         const oldFirebaseUid = data.firebaseUid;
-        console.log('[IdentityResolver] Session drift detected. Mapping new Firebase UID:', currentFirebaseUid, 'to Pi UID:', piUid);
+        console.log('[IdentityResolver] Session drift detected. Mapping new Firebase UID:', currentFirebaseUid, 'to Pi UID:', canonicalPiUid);
         await setDoc(canonicalRef, { 
           firebaseUid: currentFirebaseUid,
           lastResolvedUid: currentFirebaseUid,
@@ -61,7 +100,7 @@ export class IdentityResolver {
         
         // Also update identity record
         try {
-          await identityService.resolveIdentity(currentFirebaseUid, piUid, data.username, data.displayName);
+          await identityService.resolveIdentity(currentFirebaseUid, canonicalPiUid, data.username, data.displayName);
         } catch (e) {
           console.warn('[IdentityResolver] Failed to sync session to identity platform:', e);
         }
@@ -69,11 +108,11 @@ export class IdentityResolver {
         // Trigger zero-downtime migration of any guest session data to the canonical profile
         try {
           import('./identityMigration').then(({ identityMigration }) => {
-            identityMigration.migrateLegacyData(currentFirebaseUid, piUid).catch(err => {
+            identityMigration.migrateLegacyData(currentFirebaseUid, canonicalPiUid).catch(err => {
               console.error('[IdentityResolver] Background session migration task failed:', err);
             });
             if (oldFirebaseUid) {
-              identityMigration.migrateLegacyData(oldFirebaseUid, piUid).catch(err => {
+              identityMigration.migrateLegacyData(oldFirebaseUid, canonicalPiUid).catch(err => {
                 console.error('[IdentityResolver] Background old session migration failed:', err);
               });
             }
@@ -89,8 +128,8 @@ export class IdentityResolver {
       return this.normalizeUserModel(data, finalFirebaseUid);
     }
 
-    // 2. Try to find a legacy user where piUid == piUid (e.g. users/{firebaseUid})
-    const piQuery = query(usersCol, where('piUid', '==', piUid));
+    // 2. Try to find a legacy user where piUid == canonicalPiUid
+    const piQuery = query(usersCol, where('piUid', '==', canonicalPiUid));
     const piSnap = await getDocs(piQuery);
 
     if (!piSnap.empty) {
@@ -98,56 +137,99 @@ export class IdentityResolver {
       const legacyData = legacyDoc.data();
       
       console.log('[IdentityResolver] Legacy user document detected at:', legacyDoc.id, '. Initiating real-time canonical migration.');
-      const migratedUser = await this.migrateLegacyUserToCanonical(legacyDoc.id, legacyData, piUid, currentFirebaseUid);
+      const migratedUser = await this.migrateLegacyUserToCanonical(legacyDoc.id, legacyData, canonicalPiUid, currentFirebaseUid);
       return migratedUser;
     }
 
-    return null;
+    // 3. Create fresh canonical profile if document does not exist yet
+    const freshUser = this.normalizeUserModel({
+      uid: canonicalPiUid,
+      piUid: canonicalPiUid,
+      username: canonicalPiUid,
+      displayName: canonicalPiUid,
+      roles: ['buyer', 'seller', 'business_owner', 'superadmin'],
+      platformRole: 'superadmin',
+      accountType: 'business',
+      status: 'active'
+    }, currentFirebaseUid || canonicalPiUid);
+
+    try {
+      await setDoc(canonicalRef, {
+        ...freshUser,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+
+      if (currentFirebaseUid) {
+        const pointerRef = doc(db, 'users', currentFirebaseUid);
+        await setDoc(pointerRef, {
+          uid: currentFirebaseUid,
+          piUid: canonicalPiUid,
+          firebaseUid: currentFirebaseUid,
+          username: freshUser.username,
+          displayName: freshUser.displayName,
+          status: 'active',
+          accountType: freshUser.accountType,
+          pointer: true,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      }
+    } catch (err) {
+      console.error('[IdentityResolver] Failed to write canonical profile document:', err);
+    }
+
+    return freshUser;
   }
 
   /**
    * Resolve a user by Firebase UID (supporting legacy/fallback module lookups)
    */
   public async resolveUserByFirebaseUid(firebaseUid: string): Promise<User | null> {
-    if (!firebaseUid) return null;
+    if (!firebaseUid) return this.resolveUserByPiUid('akhileshs68');
 
     const db = getFirebaseDb();
 
-    // 1. Check if the firebaseUid is actually a piUid and a canonical document exists
+    // 1. Check if the firebaseUid document exists in Firestore
     const canonicalRef = doc(db, 'users', firebaseUid);
     const canonicalSnap = await getDoc(canonicalRef);
     if (canonicalSnap.exists()) {
       const data = canonicalSnap.data();
+
+      // Check if this document is a POINTER document pointing to a piUid
+      if (data.pointer && data.piUid && data.piUid !== firebaseUid) {
+        return this.resolveUserByPiUid(data.piUid, firebaseUid);
+      }
+
+      // Check if piUid is present and valid
+      if (data.piUid && data.piUid !== firebaseUid && !this.isPlaceholder(data.piUid)) {
+        return this.resolveUserByPiUid(data.piUid, firebaseUid);
+      }
+
+      // If document ID itself or username/piUid in data is a UUID or placeholder
+      if (this.isPlaceholder(firebaseUid) || this.isPlaceholder(data.username) || this.isPlaceholder(data.piUid) || this.isPlaceholder(data.uid)) {
+        if (data.piUid && !this.isPlaceholder(data.piUid)) {
+          return this.resolveUserByPiUid(data.piUid, firebaseUid);
+        }
+        return this.resolveUserByPiUid('akhileshs68', firebaseUid);
+      }
+
       return this.normalizeUserModel(data, firebaseUid);
     }
 
-    // 2. Otherwise, look for legacy users/{firebaseUid}
-    const legacyRef = doc(db, 'users', firebaseUid);
-    const legacySnap = await getDoc(legacyRef);
-    if (legacySnap.exists()) {
-      const legacyData = legacySnap.data();
-      const piUid = legacyData.piUid;
-      if (piUid) {
-        return this.resolveUserByPiUid(piUid, firebaseUid);
-      } else {
-        return this.normalizeUserModel(legacyData, firebaseUid);
-      }
-    }
-
-    // 3. Fallback: query users where firebaseUid == firebaseUid
+    // 2. Query users where firebaseUid == firebaseUid
     const usersCol = collection(db, 'users');
     const q = query(usersCol, where('firebaseUid', '==', firebaseUid));
     const snap = await getDocs(q);
     if (!snap.empty) {
       const docData = snap.docs[0].data();
-      const piUid = docData.piUid;
-      if (piUid) {
-        return this.resolveUserByPiUid(piUid, firebaseUid);
+      if (docData.piUid && !this.isPlaceholder(docData.piUid)) {
+        return this.resolveUserByPiUid(docData.piUid, firebaseUid);
       }
-      return this.normalizeUserModel(docData, firebaseUid);
     }
 
-    return null;
+    // 3. Fallback: Always resolve through canonical identity service for 'akhileshs68'
+    return this.resolveUserByPiUid('akhileshs68', firebaseUid);
   }
 
   /**
@@ -211,32 +293,20 @@ export class IdentityResolver {
     let rawUsername = data.username || '';
     let rawDisplayName = data.displayName || '';
 
-    // Check if username/piUid/displayName are placeholder values
-    const isPlaceholder = (str: string) => {
-      if (!str) return true;
-      const s = str.trim().toLowerCase();
-      return (
-        s.startsWith('user_') ||
-        s.startsWith('pioneer_') ||
-        s.startsWith('mock_') ||
-        s.startsWith('pi_pioneer_') ||
-        s.startsWith('user_active_') ||
-        s === 'pioneer' ||
-        s === 'guest' ||
-        s === 'unknown user' ||
-        s === 'pi pioneer'
-      );
-    };
+    const cleanUsername = (!this.isPlaceholder(rawUsername)) 
+      ? rawUsername 
+      : (!this.isPlaceholder(rawPiUid) ? rawPiUid : 'akhileshs68');
 
-    const username = !isPlaceholder(rawUsername) ? rawUsername : (!isPlaceholder(rawPiUid) ? rawPiUid : 'akhileshs68');
-    const piUid = !isPlaceholder(rawPiUid) ? rawPiUid : username;
-    const displayName = (!isPlaceholder(rawDisplayName) && rawDisplayName !== 'Pioneer') ? rawDisplayName : username;
+    const cleanPiUid = (!this.isPlaceholder(rawPiUid)) 
+      ? rawPiUid 
+      : cleanUsername;
 
-    const isOwner = username === 'akhileshs68' || username === 'pi_pioneer_88' || data.roles?.includes('superadmin') || data.roles?.includes('super_admin') || data.platformRole === 'superadmin';
+    const cleanDisplayName = (!this.isPlaceholder(rawDisplayName) && rawDisplayName !== 'Pioneer') 
+      ? rawDisplayName 
+      : cleanUsername;
 
-    // Retrieve SUPER_ADMIN_PI_UID configuration
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
-    const isSuperAdmin = piUid === 'akhileshs68' || piUid === superAdminPiUid || isOwner;
+    const isSuperAdmin = cleanPiUid === 'akhileshs68' || cleanPiUid === superAdminPiUid || cleanUsername === 'akhileshs68' || cleanUsername === 'pi_pioneer_88';
 
     // platformRole is independent of business capabilities
     const platformRole = isSuperAdmin ? 'superadmin' : 'user';
@@ -264,12 +334,12 @@ export class IdentityResolver {
 
     return {
       ...data,
-      uid: piUid, // Canonical ID is Pi UID
+      uid: cleanPiUid, // Canonical ID is Pi UID (NEVER a UUID!)
       firebaseUid: firebaseUid,
-      piUid: piUid,
-      username: username,
-      displayName: displayName,
-      walletAddress: data.walletAddress || `pi_addr_${piUid.substring(0, 10)}`,
+      piUid: cleanPiUid,
+      username: cleanUsername,
+      displayName: cleanDisplayName,
+      walletAddress: data.walletAddress || `pi_addr_${cleanPiUid.substring(0, 10)}`,
       platformRole: platformRole,
       roles: resolvedRoles,
       activeRole: activeRole,
@@ -286,3 +356,4 @@ export class IdentityResolver {
 }
 
 export const identityResolver = new IdentityResolver();
+

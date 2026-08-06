@@ -83,8 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
               // Construct a normalized profile on the fly using the identityResolver
               const { identityResolver } = await import('../services/identity/identityResolver');
-              const canonicalPiUid = (lastPiUid && !lastPiUid.startsWith('user_') && !lastPiUid.startsWith('pioneer_')) ? lastPiUid : 'akhileshs68';
-              const canonicalUsername = 'akhileshs68';
+              const canonicalPiUid = (lastPiUid && !identityResolver.isPlaceholder(lastPiUid)) ? lastPiUid : 'akhileshs68';
+              const canonicalUsername = canonicalPiUid;
               
               const freshUser = identityResolver.normalizeUserModel({
                 uid: canonicalPiUid,
@@ -110,9 +110,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             // Resolve the canonical identity platform document
-            const activePiUid = (fetchedProfile?.piUid && !fetchedProfile.piUid.startsWith('user_') && !fetchedProfile.piUid.startsWith('pioneer_')) ? fetchedProfile.piUid : (lastPiUid && !lastPiUid.startsWith('user_') && !lastPiUid.startsWith('pioneer_') ? lastPiUid : 'akhileshs68');
-            const activeUsername = (fetchedProfile?.username && !fetchedProfile.username.startsWith('user_') && !fetchedProfile.username.startsWith('pioneer_')) ? fetchedProfile.username : 'akhileshs68';
-            const activeDisplayName = (fetchedProfile?.displayName && fetchedProfile.displayName !== 'Pioneer' && !fetchedProfile.displayName.startsWith('user_') && !fetchedProfile.displayName.startsWith('pioneer_')) ? fetchedProfile.displayName : activeUsername;
+            const { identityResolver } = await import('../services/identity/identityResolver');
+            const activePiUid = (fetchedProfile?.piUid && !identityResolver.isPlaceholder(fetchedProfile.piUid)) ? fetchedProfile.piUid : ((lastPiUid && !identityResolver.isPlaceholder(lastPiUid)) ? lastPiUid : 'akhileshs68');
+            const activeUsername = (fetchedProfile?.username && !identityResolver.isPlaceholder(fetchedProfile.username)) ? fetchedProfile.username : 'akhileshs68';
+            const activeDisplayName = (fetchedProfile?.displayName && fetchedProfile.displayName !== 'Pioneer' && !identityResolver.isPlaceholder(fetchedProfile.displayName)) ? fetchedProfile.displayName : activeUsername;
 
             identityService.resolveIdentity(
               firebaseUser.uid,
