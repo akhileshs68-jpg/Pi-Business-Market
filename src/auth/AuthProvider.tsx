@@ -57,27 +57,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .catch((err) => {
             console.warn('[AuthProvider] Auto Pi Account verification on mount notice:', err?.message || err);
             if (isMounted) {
-              setError('Pi Browser authentication is required. No Pi account is available.');
               setUser(null);
               setProfile(null);
               setLoading(false);
             }
           });
-      } else if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true') {
+      } else if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true' || import.meta.env.DEV) {
         authService.verifyAndSynchronizePiAccount(false)
           .then(({ verifiedUser }) => {
             if (isMounted && verifiedUser) {
               setUser(verifiedUser);
               setProfile(verifiedUser);
               setLoading(false);
+            } else if (isMounted) {
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
             }
           })
           .catch(() => {
-            if (isMounted) setLoading(false);
+            if (isMounted) {
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+            }
           });
       } else {
         if (isMounted) {
-          setError('Pi Browser authentication is required. No Pi account is available.');
           setUser(null);
           setProfile(null);
           setLoading(false);
@@ -86,7 +92,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch((err) => {
       console.error("[AuthProvider] Pi SDK init failed:", err);
       if (isMounted) {
-        setError("Pi Browser authentication is required. No Pi account is available.");
         setUser(null);
         setProfile(null);
         setLoading(false);

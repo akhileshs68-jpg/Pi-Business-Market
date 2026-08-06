@@ -1,11 +1,36 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, Plugin} from 'vite';
+
+function injectAppUrlPlugin(): Plugin {
+  return {
+    name: 'inject-app-url',
+    transformIndexHtml(html, ctx) {
+      const req = (ctx as any).req;
+      let appUrl = '';
+      if (req) {
+        const host = req.headers.host || '';
+        let protocol = req.headers['x-forwarded-proto'] || 'https';
+        if (Array.isArray(protocol)) protocol = protocol[0];
+        if (typeof protocol === 'string' && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+          protocol = 'http';
+        } else {
+          protocol = 'https';
+        }
+        appUrl = `${protocol}://${host}`;
+      }
+      if (appUrl) {
+        return html.replace('<head>', `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
+      }
+      return html;
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), injectAppUrlPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
