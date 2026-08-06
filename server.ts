@@ -509,31 +509,6 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         }
       }
 
-      if (paymentId && paymentId.startsWith('SIM_')) {
-        if (process.env.NODE_ENV === 'production') {
-          console.error(`[Security Violation] Simulated payment approval blocked in production environment for paymentId: ${paymentId}`);
-          return res.status(403).json({ error: "Simulated payments are strictly forbidden in production mode.", logs: runtimeLogs });
-        }
-        console.log(`[Pi Payment Simulated] Simulated payment for ${paymentId}`);
-        runtimeLogs.push(`[Runtime Log] Simulated payment for: ${paymentId}`);
-        
-        if (req.path.includes('complete')) {
-            if (getApps && getApps().length > 0) {
-                try {
-                    const db = getDb();
-                    if (db) {
-                        const paymentDocId = metadata?.internalPaymentId || `PAY_${paymentId}`;
-                        await db.collection('payments').doc(paymentDocId).set({ paymentStatus: 'completed' }, { merge: true }).catch(() => {});
-                    }
-                } catch (dbError: any) {
-                    console.warn(`[Firebase Admin Warning] Failed to update simulated payment status: ${dbError.message}`);
-                }
-            }
-        }
-        
-        return res.json({ success: true, payment: { status: req.path.includes('complete') ? 'completed' : 'approved' }, logs: runtimeLogs });
-      }
-
       const apiKey = process.env.PI_NETWORK_API_KEY;
       const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
 
@@ -787,18 +762,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       }
 
       let paymentData: any = {};
-      const isSimulated = paymentId && paymentId.startsWith('SIM_');
-
-      if (isSimulated) {
-        if (process.env.NODE_ENV === 'production') {
-          console.error(`[Security Violation] Simulated payment completion blocked in production environment for paymentId: ${paymentId}`);
-          return res.status(403).json({ error: "Simulated payments are strictly forbidden in production mode.", logs: runtimeLogs });
-        }
-        console.log(`[Pi Payment Simulated] Simulated payment for ${paymentId}`);
-        runtimeLogs.push(`[Runtime Log] Simulated payment for: ${paymentId}`);
-        paymentData = { amount: metadata?.amount || 0.1, memo: metadata?.memo || "Simulated payment", status: "completed" };
-      } else {
-        const apiKey = process.env.PI_NETWORK_API_KEY;
+      const apiKey = process.env.PI_NETWORK_API_KEY;
         const isMissingApiKey = !apiKey || apiKey.trim() === "" || apiKey === "YOUR_PI_API_KEY";
 
         if (isMissingApiKey) {
@@ -821,7 +785,6 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         paymentData = response.data;
         console.log(`[Pi Payment Complete] Successfully completed payment ${paymentId} with Pi Network Server`);
         runtimeLogs.push(`[Runtime Log] Pi Network server response: verified & completed. ${JSON.stringify(paymentData || {})}`);
-      }
 
       let finalOrderId = "";
 

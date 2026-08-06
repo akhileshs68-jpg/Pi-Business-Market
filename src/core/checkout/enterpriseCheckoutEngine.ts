@@ -387,19 +387,13 @@ export class EnterpriseCheckoutEngine {
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY AFTER res.text() result:', resText);
               
               if (!res.ok) {
-                if (!piPaymentId.startsWith('SIM_')) {
-                  throw new Error(`Server payment approval failed (${res.status}): ${resText}`);
-                }
+                throw new Error(`Server payment approval failed (${res.status}): ${resText}`);
               }
               paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
             } catch (err: any) {
               console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Exception:', err);
-              if (piPaymentId.startsWith('SIM_')) {
-                paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
-              } else {
-                reject(err);
-                throw err;
-              }
+              reject(err);
+              throw err;
             }
             console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] EXITING callback for piPaymentId:', piPaymentId);
           },
@@ -453,21 +447,12 @@ export class EnterpriseCheckoutEngine {
               }
 
               if (!res.ok) {
-                if (!piPaymentId.startsWith('SIM_')) {
-                  throw new Error(`Server payment completion failed (${res.status}): ${resText}`);
-                }
+                throw new Error(`Server payment completion failed (${res.status}): ${resText}`);
               }
 
               const finalOrderId = serverOrderId || sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase());
 
               paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
-
-              // Check window.Pi.completePayment existence / execution logging
-              if (typeof (window as any).Pi?.completePayment === 'function') {
-                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] typeof window.Pi.completePayment is function');
-              } else {
-                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] typeof window.Pi.completePayment:', typeof (window as any).Pi?.completePayment);
-              }
 
               resolve({
                 verified: true,
@@ -480,21 +465,8 @@ export class EnterpriseCheckoutEngine {
               });
             } catch (err: any) {
               console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] Exception:', err);
-              if (piPaymentId.startsWith('SIM_')) {
-                paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
-                resolve({
-                  verified: true,
-                  paymentId: piPaymentId,
-                  transactionId: txid,
-                  walletAddress: metadata.walletAddress || 'PI_TESTNET_WAL_' + Math.random().toString(36).substring(2, 8),
-                  amountVerified: amount,
-                  timestamp: new Date().toISOString(),
-                  orderId: sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase())
-                });
-              } else {
-                reject(new Error('Server completion verification failed: ' + err.message));
-                throw err;
-              }
+              reject(new Error('Server completion verification failed: ' + err.message));
+              throw err;
             }
             console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] EXITING callback for piPaymentId:', piPaymentId);
           },
