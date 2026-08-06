@@ -105,7 +105,22 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  if (!rawUrl) return '';
+  if (!rawUrl) {
+    let isPreview = false;
+    if (typeof window !== 'undefined') {
+      try {
+        isPreview = window.location.href.includes('pre') || 
+                    document.referrer.includes('pre') || 
+                    (window.parent !== window && window.parent.location.href.includes('pre'));
+      } catch (err) {
+        // Safe fallback for same-origin policy cross-origin violations
+        isPreview = document.referrer.includes('pre') || window.location.href.includes('pre');
+      }
+    }
+    rawUrl = isPreview 
+      ? 'https://ais-pre-6kavysrnu36vmdfh65yvfl-708502152870.asia-southeast1.run.app'
+      : 'https://ais-dev-6kavysrnu36vmdfh65yvfl-708502152870.asia-southeast1.run.app';
+  }
 
   let formatted = rawUrl.trim().replace(/\/+$/, '');
   if (formatted.startsWith('http://') && !formatted.includes('localhost') && !formatted.includes('127.0.0.1')) {

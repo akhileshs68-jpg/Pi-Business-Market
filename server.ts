@@ -400,6 +400,37 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
+
+    // Dynamic __APP_URL__ injection for Pi Browser iframe support in development
+    app.use(async (req, res, next) => {
+      const isHtml = req.headers.accept?.includes("text/html") || req.path === "/" || req.path.endsWith(".html");
+      if (isHtml && !req.path.startsWith("/api/")) {
+        try {
+          const host = req.get("host") || req.headers.host || "";
+          let protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+          if (Array.isArray(protocol)) protocol = protocol[0];
+          if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
+            protocol = "https";
+          }
+          const appUrl = `${protocol}://${host}`;
+
+          const indexPath = path.join(process.cwd(), "index.html");
+          if (fs.existsSync(indexPath)) {
+            let html = fs.readFileSync(indexPath, "utf-8");
+            // Transform HTML with Vite (injects dev script, HMR, styling, etc.)
+            html = await vite.transformIndexHtml(req.url, html);
+            // Inject dynamically generated window.__APP_URL__
+            html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
+            res.setHeader("Content-Type", "text/html");
+            return res.status(200).send(html);
+          }
+        } catch (htmlErr: any) {
+          console.error("[SERVER_DEVELOPMENT_TRACE] Error transforming/injecting development HTML:", htmlErr?.stack || htmlErr?.message || htmlErr);
+        }
+      }
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
