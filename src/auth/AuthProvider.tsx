@@ -80,10 +80,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (fetchedProfile) {
               setProfile(fetchedProfile);
               setUser(fetchedProfile);
-            } else {
-              // Construct a normalized profile on the fly using the identityResolver
+            } else if (lastPiUid) {
+              // Construct a normalized profile on the fly using the identityResolver if lastPiUid exists
               const { identityResolver } = await import('../services/identity/identityResolver');
-              const canonicalPiUid = (lastPiUid && !identityResolver.isPlaceholder(lastPiUid)) ? lastPiUid : 'akhileshs68';
+              const canonicalPiUid = lastPiUid;
               const canonicalUsername = canonicalPiUid;
               
               const freshUser = identityResolver.normalizeUserModel({
@@ -97,37 +97,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               
               setUser(freshUser);
               setProfile(freshUser);
-              
-              // Persist it
-              const { getFirebaseDb } = await import('../firebase/config');
-              const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-              setDoc(doc(getFirebaseDb(), 'users', canonicalPiUid), {
-                ...freshUser,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                lastLogin: serverTimestamp()
-              }, { merge: true }).catch(console.error);
             }
 
-            // Resolve the canonical identity platform document
+            // Resolve the canonical identity platform document if active identity exists
             const { identityResolver } = await import('../services/identity/identityResolver');
-            const activePiUid = (fetchedProfile?.piUid && !identityResolver.isPlaceholder(fetchedProfile.piUid)) ? fetchedProfile.piUid : ((lastPiUid && !identityResolver.isPlaceholder(lastPiUid)) ? lastPiUid : 'akhileshs68');
-            const activeUsername = (fetchedProfile?.username && !identityResolver.isPlaceholder(fetchedProfile.username)) ? fetchedProfile.username : 'akhileshs68';
-            const activeDisplayName = (fetchedProfile?.displayName && fetchedProfile.displayName !== 'Pioneer' && !identityResolver.isPlaceholder(fetchedProfile.displayName)) ? fetchedProfile.displayName : activeUsername;
+            const activePiUid = fetchedProfile?.piUid || (lastPiUid ?? undefined);
+            const activeUsername = fetchedProfile?.username || activePiUid;
+            const activeDisplayName = (fetchedProfile?.displayName && fetchedProfile.displayName !== 'Pioneer') ? fetchedProfile.displayName : (activeUsername ?? undefined);
 
-            identityService.resolveIdentity(
-              firebaseUser.uid,
-              activePiUid,
-              activeUsername,
-              activeDisplayName
-            ).then(entIdentity => {
-              if (isMounted) {
-                setIdentity(entIdentity);
-                setPermissions(entIdentity.permissions || []);
-              }
-            }).catch(e => {
-              console.error('[AuthProvider] Identity resolution error:', e);
-            });
+            if (activePiUid && activeUsername) {
+              identityService.resolveIdentity(
+                firebaseUser.uid,
+                activePiUid,
+                activeUsername,
+                activeDisplayName
+              ).then(entIdentity => {
+                if (isMounted) {
+                  setIdentity(entIdentity);
+                  setPermissions(entIdentity.permissions || []);
+                }
+              }).catch(e => {
+                console.error('[AuthProvider] Identity resolution error:', e);
+              });
+            }
 
             setLoading(false);
             isInitialLoad.current = false;

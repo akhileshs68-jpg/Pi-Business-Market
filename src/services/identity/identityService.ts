@@ -54,12 +54,12 @@ export class IdentityService {
 
     const { identityResolver } = await import('./identityResolver');
 
-    const cleanUsername = (!identityResolver.isPlaceholder(username)) ? username : (!identityResolver.isPlaceholder(resolvedPiUid) ? resolvedPiUid : 'akhileshs68');
+    const cleanUsername = (!identityResolver.isPlaceholder(username)) ? username : resolvedPiUid;
     const cleanPiUid = (!identityResolver.isPlaceholder(resolvedPiUid)) ? resolvedPiUid : cleanUsername;
     const cleanDisplayName = (!identityResolver.isPlaceholder(displayName) && displayName !== 'Pioneer') ? displayName : cleanUsername;
 
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
-    const isOwner = cleanUsername === 'akhileshs68' || cleanUsername === 'pi_pioneer_88' || cleanPiUid === 'akhileshs68' || cleanPiUid === superAdminPiUid || uid === 'akhileshs68' || uid === superAdminPiUid || (identity && (identity.platformRole === 'superadmin' || identity.roles?.includes('superadmin') || identity.roles?.includes('super_admin')));
+    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const isOwner = superAdminPiUid ? (cleanUsername === superAdminPiUid || cleanPiUid === superAdminPiUid || uid === superAdminPiUid) : false;
 
     if (!identity) {
       const initialRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];

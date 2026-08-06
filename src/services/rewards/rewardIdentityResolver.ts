@@ -53,9 +53,9 @@ export async function getCanonicalRewardUserId(inputUid: string): Promise<string
     console.warn('[RewardIdentityResolver] Resolution fallback for ID:', trimmed, err);
   }
 
-  // Fallback: Default to canonical owner 'akhileshs68' if resolution yields no mapping or input is placeholder/UUID
+  // Fallback: Return trimmed ID if valid
   const { identityResolver } = await import('../identity/identityResolver');
-  const fallback = (trimmed && !identityResolver.isPlaceholder(trimmed)) ? trimmed : 'akhileshs68';
+  const fallback = (trimmed && !identityResolver.isPlaceholder(trimmed)) ? trimmed : 'pioneer_user';
   canonicalUidCache.set(trimmed, fallback);
   return fallback;
 }
@@ -90,8 +90,7 @@ export function isRewardDevOrSandboxMode(userId?: string): boolean {
       u.startsWith('test_') || 
       u.includes('sandbox') || 
       u.includes('mock') || 
-      u.includes('demo') || 
-      u === 'akhileshs68'
+      u.includes('demo')
     ) {
       return true;
     }

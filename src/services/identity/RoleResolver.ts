@@ -59,14 +59,11 @@ export class RoleResolver {
 
   isSuperAdmin(): boolean {
     if (!this.user) return false;
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
+    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
     return (
-      this.user.piUid === 'akhileshs68' ||
-      this.user.piUid === superAdminPiUid ||
-      this.user.uid === 'akhileshs68' ||
-      this.user.uid === superAdminPiUid ||
       this.user.platformRole === 'superadmin' ||
-      this.user.username === 'pi_pioneer_88'
+      this.user.roles?.includes('superadmin') ||
+      (Boolean(superAdminPiUid) && (this.user.piUid === superAdminPiUid || this.user.uid === superAdminPiUid || this.user.username === superAdminPiUid))
     );
   }
 

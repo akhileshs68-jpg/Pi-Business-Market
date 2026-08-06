@@ -55,7 +55,8 @@ export class IdentityResolver {
    * Resolve a canonical User profile by Pi UID
    */
   public async resolveUserByPiUid(piUid: string, currentFirebaseUid?: string): Promise<User | null> {
-    const canonicalPiUid = (!piUid || this.isPlaceholder(piUid)) ? 'akhileshs68' : piUid;
+    if (!piUid || this.isPlaceholder(piUid)) return null;
+    const canonicalPiUid = piUid;
 
     const db = getFirebaseDb();
     const usersCol = collection(db, 'users');
@@ -186,7 +187,7 @@ export class IdentityResolver {
    * Resolve a user by Firebase UID (supporting legacy/fallback module lookups)
    */
   public async resolveUserByFirebaseUid(firebaseUid: string): Promise<User | null> {
-    if (!firebaseUid) return this.resolveUserByPiUid('akhileshs68');
+    if (!firebaseUid) return null;
 
     const db = getFirebaseDb();
 
@@ -211,7 +212,7 @@ export class IdentityResolver {
         if (data.piUid && !this.isPlaceholder(data.piUid)) {
           return this.resolveUserByPiUid(data.piUid, firebaseUid);
         }
-        return this.resolveUserByPiUid('akhileshs68', firebaseUid);
+        return null;
       }
 
       return this.normalizeUserModel(data, firebaseUid);
@@ -228,8 +229,7 @@ export class IdentityResolver {
       }
     }
 
-    // 3. Fallback: Always resolve through canonical identity service for 'akhileshs68'
-    return this.resolveUserByPiUid('akhileshs68', firebaseUid);
+    return null;
   }
 
   /**
@@ -295,7 +295,7 @@ export class IdentityResolver {
 
     const cleanUsername = (!this.isPlaceholder(rawUsername)) 
       ? rawUsername 
-      : (!this.isPlaceholder(rawPiUid) ? rawPiUid : 'akhileshs68');
+      : rawPiUid;
 
     const cleanPiUid = (!this.isPlaceholder(rawPiUid)) 
       ? rawPiUid 
@@ -305,8 +305,8 @@ export class IdentityResolver {
       ? rawDisplayName 
       : cleanUsername;
 
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
-    const isSuperAdmin = cleanPiUid === 'akhileshs68' || cleanPiUid === superAdminPiUid || cleanUsername === 'akhileshs68' || cleanUsername === 'pi_pioneer_88';
+    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const isSuperAdmin = data.platformRole === 'superadmin' || (Boolean(superAdminPiUid) && (cleanPiUid === superAdminPiUid || cleanUsername === superAdminPiUid));
 
     // platformRole is independent of business capabilities
     const platformRole = isSuperAdmin ? 'superadmin' : 'user';

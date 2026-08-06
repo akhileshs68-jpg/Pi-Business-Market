@@ -453,8 +453,8 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         return res.json({
           success: true,
           user: {
-            uid: "akhileshs68",
-            username: "akhileshs68",
+            uid: "dev_mock_pioneer",
+            username: "dev_mock_pioneer",
           },
         });
       } else if (accessToken === "mock_token_123") {

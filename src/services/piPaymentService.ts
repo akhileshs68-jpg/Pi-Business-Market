@@ -68,10 +68,41 @@ export const piPaymentService = {
       console.log('[DEBUG_TRACE] [createPayment] hasNativePaymentsScope check:', hasScope);
 
       console.log('[DEBUG_TRACE] [createPayment] BEFORE await authService.authenticatePi() with forceRefresh:', !hasScope);
-      await authService.authenticatePi(['username', 'payments'], !hasScope);
-      console.log('[DEBUG_TRACE] [createPayment] AFTER await authService.authenticatePi()');
+      const piAuth = await authService.authenticatePi(['username', 'payments'], !hasScope);
+      console.log('[DEBUG_TRACE] [createPayment] AFTER await authService.authenticatePi(), resolved auth:', piAuth);
 
-      console.log('[DEBUG_TRACE] [createPayment] Calling window.Pi.createPayment with:', {
+      const authenticatedUsername = piAuth?.user?.username;
+      const authenticatedPiUid = piAuth?.user?.uid || authenticatedUsername;
+
+      if (!authenticatedUsername) {
+        const noUsernameErr = new Error(
+          "Unable to verify Pi account username from Pi Network authentication response. Payment cancelled."
+        );
+        console.error('[DEBUG_TRACE] [createPayment]', noUsernameErr.message);
+        isPaymentInProgress = false;
+        if (callbacks.onError) {
+          await callbacks.onError(noUsernameErr, 'identity_verification_failed');
+        }
+        return;
+      }
+
+      // Verify that stored application account matches the currently authenticated Pi account
+      const { PiBusinessMarketDB } = await import('./storage');
+      const storedUser = PiBusinessMarketDB.getCurrentUser();
+
+      if (storedUser && storedUser.username && storedUser.username !== authenticatedUsername) {
+        const mismatchErr = new Error(
+          `Pi Account Mismatch: Currently authenticated Pi account (@${authenticatedUsername}) does not match registered user (@${storedUser.username}). Payment stopped.`
+        );
+        console.error('[DEBUG_TRACE] [createPayment]', mismatchErr.message);
+        isPaymentInProgress = false;
+        if (callbacks.onError) {
+          await callbacks.onError(mismatchErr, 'account_mismatch');
+        }
+        return;
+      }
+
+      console.log('[DEBUG_TRACE] [createPayment] Verified Pi Identity match for @' + authenticatedUsername + '. Calling window.Pi.createPayment with:', {
         amount: paymentData.amount,
         memo: paymentData.memo,
         metadata: paymentData.metadata

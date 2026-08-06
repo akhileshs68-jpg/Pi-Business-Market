@@ -40,14 +40,11 @@ export class IdentityGuards {
    */
   public static isSuperAdmin(user: User | null | undefined): boolean {
     if (!user) return false;
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
+    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
     return (
       user.platformRole === 'superadmin' ||
-      user.piUid === 'akhileshs68' ||
-      user.piUid === superAdminPiUid ||
-      user.uid === 'akhileshs68' ||
-      user.uid === superAdminPiUid ||
-      user.username === 'pi_pioneer_88'
+      user.roles?.includes('superadmin') ||
+      (Boolean(superAdminPiUid) && (user.piUid === superAdminPiUid || user.uid === superAdminPiUid || user.username === superAdminPiUid))
     );
   }
 

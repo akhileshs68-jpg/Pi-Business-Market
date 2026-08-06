@@ -137,7 +137,7 @@ export const checkoutService = {
             // Final guarantee for fallbacks if Firestore queries returned no store/business
             if (isInvalid(storeId)) storeId = 'default_store';
             if (isInvalid(businessId)) businessId = 'default_business';
-            if (isInvalid(sellerId)) sellerId = 'akhileshs68';
+            if (isInvalid(sellerId)) sellerId = 'merchant';
 
             // If we successfully resolved storeId, businessId, sellerId, attempt auto-repair update on product doc
             if (storeId !== 'default_store' && businessId !== 'default_business') {

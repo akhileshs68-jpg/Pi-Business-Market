@@ -286,8 +286,8 @@ export const authService = {
           const mockAuth = {
             accessToken: 'mock_access_token_pioneer_123',
             user: {
-              uid: 'akhileshs68',
-              username: 'akhileshs68'
+              uid: 'dev_pioneer_mock',
+              username: 'dev_pioneer_mock'
             },
             hasPaymentsScope: true
           };
@@ -378,9 +378,9 @@ export const authService = {
 
         // Use mock SDK ONLY when running outside Pi Browser in dev/preview
         if (!isRealPi) {
-          console.log('[DEBUG_TRACE] [loginWithPi async worker] Running outside Pi Browser - using canonical Pi identity');
-          piUid = 'akhileshs68';
-          username = 'akhileshs68';
+          console.log('[DEBUG_TRACE] [loginWithPi async worker] Running outside Pi Browser - using dev mock Pi identity');
+          piUid = 'dev_pioneer_mock';
+          username = 'dev_pioneer_mock';
         } else {
           // Official Pi SDK Login inside Pi Browser
           console.log('[DEBUG_TRACE] [loginWithPi async worker] BEFORE await initPi()');
@@ -390,26 +390,35 @@ export const authService = {
             console.log('[DEBUG_TRACE] [loginWithPi async worker] BEFORE await authenticatePi()');
             const piAuth = await this.authenticatePi(['username', 'payments'], true);
             console.log('[DEBUG_TRACE] [loginWithPi async worker] AFTER await authenticatePi() resolved with:', piAuth);
-            const accessToken = piAuth.accessToken;
             
-            console.log('[DEBUG_TRACE] [loginWithPi async worker] BEFORE await fetch /api/auth/pi');
-            const response = await fetch(getAbsoluteUrl('/api/auth/pi'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accessToken }),
-            });
-            console.log('[DEBUG_TRACE] [loginWithPi async worker] AFTER await fetch /api/auth/pi, status:', response.status);
+            // Prefer username and uid directly returned by Pi SDK authentication response
+            if (piAuth?.user?.username && piAuth?.user?.uid) {
+              username = piAuth.user.username; // Exact casing from Pi SDK
+              piUid = piAuth.user.uid;
+            } else {
+              const accessToken = piAuth.accessToken;
+              console.log('[DEBUG_TRACE] [loginWithPi async worker] BEFORE await fetch /api/auth/pi');
+              const response = await fetch(getAbsoluteUrl('/api/auth/pi'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accessToken }),
+              });
+              console.log('[DEBUG_TRACE] [loginWithPi async worker] AFTER await fetch /api/auth/pi, status:', response.status);
 
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Backend validation failed');
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Backend Pi authentication validation failed');
+              }
+
+              const backendResult = await response.json();
+              if (!backendResult.user?.username) {
+                throw new Error('Authenticated Pi user object did not contain a valid username.');
+              }
+              username = backendResult.user.username; // Exact casing from Pi API
+              piUid = backendResult.user.uid || backendResult.user.username;
             }
-
-            const backendResult = await response.json();
-            piUid = backendResult.user.username || backendResult.user.uid || 'akhileshs68';
-            username = backendResult.user.username || 'akhileshs68';
           } catch (sdkErr) {
-            console.error('[DEBUG_TRACE] [loginWithPi async worker] Real Pi SDK failed:', sdkErr);
+            console.error('[DEBUG_TRACE] [loginWithPi async worker] Real Pi SDK authentication failed:', sdkErr);
             throw sdkErr;
           }
         }
@@ -435,9 +444,12 @@ export const authService = {
         // Use identityResolver to resolve the canonical user by Pi UID
         const { identityResolver } = await import('../services/identity/identityResolver');
         
-        // Ensure canonical Pi identity without auto-generated random fallbacks or UUID leaks
-        const finalUsername = (username && !identityResolver.isPlaceholder(username)) ? username : 'akhileshs68';
-        const finalPiUid = (piUid && !identityResolver.isPlaceholder(piUid)) ? piUid : finalUsername;
+        if (!username || !piUid) {
+          throw new Error('Pi authentication response did not contain a verified Pi username or UID.');
+        }
+
+        const finalUsername = username;
+        const finalPiUid = piUid;
         
         let resolvedUser = await identityResolver.resolveUserByPiUid(finalPiUid, firebaseUid);
         
@@ -446,7 +458,8 @@ export const authService = {
           const db = getFirebaseDb();
           const canonicalRef = doc(db, 'users', finalPiUid);
           
-          const isOwner = finalUsername === 'akhileshs68' || finalUsername === 'pi_pioneer_88';
+          const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+          const isOwner = superAdminPiUid ? (finalPiUid === superAdminPiUid || finalUsername === superAdminPiUid) : false;
           const defaultRoles = isOwner ? ['buyer', 'seller', 'business_owner', 'superadmin'] : ['buyer', 'seller', 'business_owner', 'service_provider'];
           
           const freshUser = {
@@ -454,7 +467,7 @@ export const authService = {
             firebaseUid,
             piUid: finalPiUid,
             username: finalUsername,
-            displayName: isOwner ? 'akhileshs68' : finalUsername,
+            displayName: finalUsername,
             roles: defaultRoles,
             accountType: isOwner ? 'business' : 'individual',
             verified: true,
@@ -512,8 +525,7 @@ export const authService = {
         return user;
       }
 
-      // 3. Fallback: Always resolve canonical profile for 'akhileshs68'
-      return await identityResolver.resolveUserByPiUid('akhileshs68', uid);
+      return null;
     } catch (error: any) {
       console.error('[AuthService] Get user profile failed:', error);
       return null;
