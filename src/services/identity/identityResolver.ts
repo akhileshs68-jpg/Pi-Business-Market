@@ -38,6 +38,11 @@ export class IdentityResolver {
     const canonicalRef = doc(db, 'users', canonicalPiUid);
     const canonicalSnap = await getDoc(canonicalRef);
 
+    console.log('[FIRESTORE_QUERY_DEBUG] Requested Firestore path:', `users/${canonicalPiUid}`);
+    console.log('[FIRESTORE_QUERY_DEBUG] Document exists:', canonicalSnap.exists());
+    console.log('[FIRESTORE_QUERY_DEBUG] Document ID:', canonicalPiUid);
+    console.log('[FIRESTORE_QUERY_DEBUG] Returned data:', canonicalSnap.exists() ? canonicalSnap.data() : null);
+
     if (canonicalSnap.exists()) {
       const data = canonicalSnap.data();
       const finalFirebaseUid = currentFirebaseUid || data.firebaseUid || data.uid;
@@ -167,6 +172,12 @@ export class IdentityResolver {
     // 1. Check if the firebaseUid document exists in Firestore
     const canonicalRef = doc(db, 'users', firebaseUid);
     const canonicalSnap = await getDoc(canonicalRef);
+
+    console.log('[FIRESTORE_QUERY_DEBUG] Requested Firestore path:', `users/${firebaseUid}`);
+    console.log('[FIRESTORE_QUERY_DEBUG] Document exists:', canonicalSnap.exists());
+    console.log('[FIRESTORE_QUERY_DEBUG] Document ID:', firebaseUid);
+    console.log('[FIRESTORE_QUERY_DEBUG] Returned data:', canonicalSnap.exists() ? canonicalSnap.data() : null);
+
     if (canonicalSnap.exists()) {
       const data = canonicalSnap.data();
 
@@ -197,12 +208,57 @@ export class IdentityResolver {
     const snap = await getDocs(q);
     if (!snap.empty) {
       const docData = snap.docs[0].data();
+      console.log('[FIRESTORE_QUERY_DEBUG] Found document by query for firebaseUid:', firebaseUid, 'docId:', snap.docs[0].id);
       if (docData.piUid && !this.isPlaceholder(docData.piUid)) {
         return this.resolveUserByPiUid(docData.piUid, firebaseUid);
       }
+      return this.normalizeUserModel(docData, firebaseUid);
     }
 
-    return null;
+    // 3. Document does not exist in Firestore yet: auto-provision users/{firebaseUid}
+    const { authService } = await import('../../auth/authService');
+    const liveUser = authService.getLatestVerifiedUser();
+
+    if (liveUser) {
+      const pointerData = {
+        uid: firebaseUid,
+        piUid: liveUser.piUid,
+        firebaseUid: firebaseUid,
+        username: liveUser.username,
+        displayName: liveUser.displayName,
+        status: 'active',
+        pointer: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      await setDoc(canonicalRef, pointerData, { merge: true });
+      console.log('[FIRESTORE_QUERY_DEBUG] Created missing pointer Firestore document at path:', `users/${firebaseUid}`, 'pointing to piUid:', liveUser.piUid);
+      return liveUser;
+    }
+
+    // If no live Pi user is set, create the authenticated user document under users/{firebaseUid}
+    const freshUser = this.normalizeUserModel({
+      uid: firebaseUid,
+      firebaseUid: firebaseUid,
+      username: firebaseUid,
+      displayName: firebaseUid,
+      roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
+      status: 'active'
+    }, firebaseUid);
+
+    try {
+      await setDoc(canonicalRef, {
+        ...freshUser,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+      console.log('[FIRESTORE_QUERY_DEBUG] Created missing authenticated user document at path:', `users/${firebaseUid}`);
+      return freshUser;
+    } catch (err) {
+      console.error('[FIRESTORE_QUERY_DEBUG] Failed to write missing document at users/' + firebaseUid, err);
+      return freshUser;
+    }
   }
 
   /**
