@@ -136,17 +136,18 @@ export const authService = {
       return;
     }
 
-    const isSandbox = (import.meta as any).env.VITE_PI_SANDBOX !== 'false' && 
-                      (import.meta as any).env.VITE_PI_SANDBOX !== false;
+    const envSandbox = (import.meta as any).env.VITE_PI_SANDBOX;
+    // Default to sandbox: true unless explicitly disabled in production (VITE_PI_SANDBOX === 'false')
+    const isSandbox = envSandbox === 'false' || envSandbox === false ? false : true;
 
     // Helper to safely execute window.Pi.init
     const performInit = () => {
       if (typeof window !== 'undefined' && (window as any).Pi && typeof (window as any).Pi.init === 'function') {
         try {
-          console.log('[DEBUG_TRACE] [initPi] Executing window.Pi.init with version 2.0, sandbox:', isSandbox);
+          console.log('[DEBUG_TRACE] [initPi] Executing window.Pi.init with version 2.0, sandbox:', isSandbox, 'envSandbox:', envSandbox);
           (window as any).Pi.init({ version: "2.0", sandbox: isSandbox });
           piInitialized = true;
-          console.log('[DEBUG_TRACE] [initPi] window.Pi.init succeeded');
+          console.log('[DEBUG_TRACE] [initPi] window.Pi.init succeeded with sandbox =', isSandbox);
         } catch (err: any) {
           console.warn('[DEBUG_TRACE] [initPi] window.Pi.init threw error (may already be initialized):', err);
           piInitialized = true;
@@ -320,8 +321,8 @@ export const authService = {
         if (window.Pi) {
           if (typeof window.Pi.init === 'function' && !piInitialized) {
             try {
-              const isSandbox = (import.meta as any).env.VITE_PI_SANDBOX === 'true' || 
-                                (import.meta as any).env.VITE_PI_SANDBOX === true;
+              const envSandbox = (import.meta as any).env.VITE_PI_SANDBOX;
+              const isSandbox = envSandbox === 'false' || envSandbox === false ? false : true;
               console.log('[DEBUG_TRACE] [authenticatePi async worker] Inline window.Pi.init safeguard call...');
               window.Pi.init({ version: "2.0", sandbox: isSandbox });
               piInitialized = true;
@@ -662,6 +663,13 @@ export const authService = {
    */
   getLatestVerifiedUser(): User | null {
     return latestVerifiedPiUser;
+  },
+
+  /**
+   * Returns the cached Pi auth result from the Pi SDK
+   */
+  getLatestPiAuth(): any {
+    return piAuthResult;
   },
 
   /**

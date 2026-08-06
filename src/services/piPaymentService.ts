@@ -40,22 +40,28 @@ export const piPaymentService = {
     try {
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 1: Pre-payment account check...`);
       
-      let verifiedUser: any;
-      let piAuth: any;
-      try {
-        const result = await authService.verifyAndSynchronizePiAccount(true);
-        verifiedUser = result.verifiedUser;
-        piAuth = result.piAuth;
-      } catch (verifyErr: any) {
-        console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment verification failed:`, verifyErr);
-        isPaymentInProgress = false;
-        if (callbacks.onError) {
-          await callbacks.onError(
-            verifyErr instanceof Error ? verifyErr : new Error(`[Verification Failed] ${verifyErr}`),
-            'pre_payment_verification_failed'
-          );
+      let verifiedUser: any = authService.getLatestVerifiedUser();
+      let piAuth: any = authService.getLatestPiAuth();
+
+      if (!verifiedUser || !piAuth) {
+        try {
+          console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] No cached user session found, running account synchronization...`);
+          const result = await authService.verifyAndSynchronizePiAccount(false);
+          verifiedUser = result.verifiedUser;
+          piAuth = result.piAuth;
+        } catch (verifyErr: any) {
+          console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment verification failed:`, verifyErr);
+          isPaymentInProgress = false;
+          if (callbacks.onError) {
+            await callbacks.onError(
+              verifyErr instanceof Error ? verifyErr : new Error(`[Verification Failed] ${verifyErr}`),
+              'pre_payment_verification_failed'
+            );
+          }
+          return;
         }
-        return;
+      } else {
+        console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Reusing existing verified user session (@${verifiedUser.username}). Skipping re-authentication.`);
       }
 
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Authentication Check Details:`, {
