@@ -382,9 +382,10 @@ export const authService = {
       try {
         console.log('[PI_VERIFY_STEP 1/10] Requesting authentication from window.Pi.authenticate...');
         piAuth = await this.authenticatePi(['username', 'payments'], forceRefresh);
-        console.log('[PI_VERIFY_STEP 1/10] Authentication response received from Pi SDK:', piAuth);
+        console.log('[PI_AUTH_DEBUG] Authentication successful: true');
+        console.log('[PI_AUTH_DEBUG] Authentication response:', JSON.stringify(piAuth));
       } catch (authErr: any) {
-        console.error('[PI_VERIFY_STEP 1/10 FAILED] Pi Network authentication failed:', authErr);
+        console.error('[PI_AUTH_DEBUG] Authentication failed:', authErr);
         throw new Error(`[Step 1 Failed] Pi Network authentication failed: ${authErr.message || authErr}`);
       }
 
@@ -393,9 +394,10 @@ export const authService = {
       if (piAuth?.user?.username && piAuth?.user?.uid) {
         piUid = piAuth.user.uid;
         username = piAuth.user.username; // Exact casing returned by Pi SDK
-        console.log('[PI_VERIFY_STEP 2/10] Profile obtained directly from SDK authentication response.');
+        console.log('[PI_AUTH_DEBUG] Pi User ID:', piUid);
+        console.log('[PI_AUTH_DEBUG] Pi Username:', username);
       } else if (piAuth?.accessToken) {
-        console.log('[PI_VERIFY_STEP 2/10] Validating accessToken with backend /api/auth/pi (https://api.minepi.com/v2/me)...');
+        console.warn('[PI_AUTH_DEBUG] Missing direct user profile in Pi SDK response. Validating accessToken via backend /api/auth/pi...');
         try {
           const res = await fetch(getAbsoluteUrl('/api/auth/pi'), {
             method: 'POST',
@@ -407,17 +409,21 @@ export const authService = {
             throw new Error(errJson.error || `HTTP ${res.status}`);
           }
           const data = await res.json();
+          console.log('[PI_AUTH_DEBUG] Backend validation response:', data);
           if (data?.user?.username && data?.user?.uid) {
             username = data.user.username; // Exact casing from Pi API
             piUid = data.user.uid;
+            console.log('[PI_AUTH_DEBUG] Pi User ID (via backend):', piUid);
+            console.log('[PI_AUTH_DEBUG] Pi Username (via backend):', username);
           } else {
             throw new Error('Backend validation returned empty user object.');
           }
         } catch (fetchErr: any) {
-          console.error('[PI_VERIFY_STEP 2/10 FAILED] Backend validation failed:', fetchErr);
+          console.error('[PI_AUTH_DEBUG] Backend validation failed:', fetchErr);
           throw new Error(`[Step 2 Failed] Unable to fetch authenticated Pi user profile: ${fetchErr.message}`);
         }
       } else {
+        console.error('[PI_AUTH_DEBUG] Pi SDK response missing user and accessToken. Full response:', piAuth);
         throw new Error('[Step 2 Failed] Pi SDK authentication response contained no user profile or access token.');
       }
     } else {
@@ -520,6 +526,8 @@ export const authService = {
     } catch (fsErr) {
       console.warn('[PI_VERIFY_STEP 8/10] Firestore unavailable:', fsErr);
     }
+
+    console.log('[PI_AUTH_DEBUG] Database mapping result:', { success: true, user: freshUser, firestorePath: `users/${piUid}` });
 
     // Step 9: Verification complete
     console.log(`[PI_VERIFY_STEP 9/10] Verification complete! Verified session active for @${username} (UID: ${piUid}).`);

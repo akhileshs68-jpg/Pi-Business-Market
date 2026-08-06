@@ -17,37 +17,10 @@ export class IdentityResolver {
    */
   public isPlaceholder(str: string | undefined | null): boolean {
     if (!str) return true;
-    const s = str.trim().toLowerCase();
-
-    // 1. Standard UUID v4 or hyphenated UUID pattern check (e.g., 5afd2144-98f2-46ac-940e-a0e8d9608ca7)
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) || /^[0-9a-f-]{30,}$/i.test(s)) {
+    const s = String(str).trim().toLowerCase();
+    if (s === '' || s === 'null' || s === 'undefined' || s === 'unknown' || s === 'unknown_user') {
       return true;
     }
-
-    // 2. Raw auto-generated Firebase anonymous UID strings (e.g. 20-36 alphanumeric chars without real name)
-    if (/^[a-zA-Z0-9_-]{20,}$/.test(s) && !s.includes('akhilesh') && !s.includes('pioneer')) {
-      return true;
-    }
-
-    // 3. Known placeholder prefixes
-    const prefixes = [
-      'user_', 'pioneer_', 'mock_', 'pi_pioneer_', 'user_active_', 
-      'anon_', 'dev_', 'sys_', 'guest_', 'pi_addr_', 'addr_', 'test_'
-    ];
-    if (prefixes.some(p => s.startsWith(p))) {
-      return true;
-    }
-
-    // 4. Known placeholder exact values
-    const badValues = [
-      'pioneer', 'guest', 'unknown user', 'unknown_user', 'unknown', 
-      'pi pioneer', 'pi pioneer 88', 'pi_pioneer_88', 'null', 'undefined',
-      'pioneer merchant', 'pioneer user', 'pi_pioneer_user'
-    ];
-    if (badValues.includes(s)) {
-      return true;
-    }
-
     return false;
   }
 
