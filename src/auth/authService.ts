@@ -113,7 +113,7 @@ let piInitialized = false;
 export function isRealPiBrowser(): boolean {
   if (typeof window === 'undefined') return false;
   const isPiUA = typeof navigator !== 'undefined' && Boolean(navigator.userAgent) && /PiBrowser/i.test(navigator.userAgent);
-  return isPiUA;
+  return isPiUA || Boolean((window as any).Pi);
 }
 
 /**
@@ -176,8 +176,8 @@ export const authService = {
       return;
     }
 
-    const isSandbox = (import.meta as any).env.VITE_PI_SANDBOX === 'true' || 
-                      (import.meta as any).env.VITE_PI_SANDBOX === true;
+    const isSandbox = (import.meta as any).env.VITE_PI_SANDBOX !== 'false' && 
+                      (import.meta as any).env.VITE_PI_SANDBOX !== false;
 
     // Helper to safely execute window.Pi.init
     const performInit = () => {
