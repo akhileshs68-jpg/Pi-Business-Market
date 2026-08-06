@@ -18,21 +18,21 @@ const KEYS = {
 };
 
 const DEFAULT_CURRENT_USER: User = {
-  uid: 'user_active_pioneer',
-  piUid: 'user_active_pioneer_pi',
-  username: 'pi_pioneer_88',
-  displayName: 'Alex Mercer',
+  uid: 'akhileshs68',
+  piUid: 'akhileshs68',
+  username: 'akhileshs68',
+  displayName: 'akhileshs68',
   walletAddress: 'GBCWD32QYJ7LURP5H6V77JHYX345PPONNFFVVZZ44SSTT22XXYYZZ',
   role: 'buyer',
   activeRole: 'buyer',
   roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
-  accountType: 'individual',
+  accountType: 'business',
   verified: true,
-  kycVerified: false,
+  kycVerified: true,
   createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   updatedAt: new Date().toISOString(),
   lastLogin: new Date().toISOString(),
-  platformRole: 'user',
+  platformRole: 'superadmin',
   permissions: [],
   status: 'active'
 };

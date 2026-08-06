@@ -362,7 +362,7 @@ export const OrderDetails: React.FC = () => {
       }
     }
 
-    const resolvedUserUid: string = activeUserUid || order?.buyerId || order?.userUid || 'pi_pioneer_user';
+    const resolvedUserUid: string = activeUserUid || order?.buyerId || order?.userUid || 'akhileshs68';
 
     const trimmedReason = (disputeReason || '').trim();
     if (!trimmedReason) {

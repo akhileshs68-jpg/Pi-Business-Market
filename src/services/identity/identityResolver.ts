@@ -207,8 +207,32 @@ export class IdentityResolver {
    * Normalize user data to the standard enterprise User model
    */
   public normalizeUserModel(data: any, firebaseUid: string): User {
-    const piUid = data.piUid || data.uid;
-    const isOwner = data.username === 'pi_pioneer_88' || data.roles?.includes('superadmin') || data.roles?.includes('super_admin') || data.platformRole === 'superadmin';
+    let rawPiUid = data.piUid || data.uid || '';
+    let rawUsername = data.username || '';
+    let rawDisplayName = data.displayName || '';
+
+    // Check if username/piUid/displayName are placeholder values
+    const isPlaceholder = (str: string) => {
+      if (!str) return true;
+      const s = str.trim().toLowerCase();
+      return (
+        s.startsWith('user_') ||
+        s.startsWith('pioneer_') ||
+        s.startsWith('mock_') ||
+        s.startsWith('pi_pioneer_') ||
+        s.startsWith('user_active_') ||
+        s === 'pioneer' ||
+        s === 'guest' ||
+        s === 'unknown user' ||
+        s === 'pi pioneer'
+      );
+    };
+
+    const username = !isPlaceholder(rawUsername) ? rawUsername : (!isPlaceholder(rawPiUid) ? rawPiUid : 'akhileshs68');
+    const piUid = !isPlaceholder(rawPiUid) ? rawPiUid : username;
+    const displayName = (!isPlaceholder(rawDisplayName) && rawDisplayName !== 'Pioneer') ? rawDisplayName : username;
+
+    const isOwner = username === 'akhileshs68' || username === 'pi_pioneer_88' || data.roles?.includes('superadmin') || data.roles?.includes('super_admin') || data.platformRole === 'superadmin';
 
     // Retrieve SUPER_ADMIN_PI_UID configuration
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
@@ -243,8 +267,8 @@ export class IdentityResolver {
       uid: piUid, // Canonical ID is Pi UID
       firebaseUid: firebaseUid,
       piUid: piUid,
-      username: data.username || `user_${piUid.substring(0, 6)}`,
-      displayName: data.displayName || data.username || 'Pi Pioneer',
+      username: username,
+      displayName: displayName,
       walletAddress: data.walletAddress || `pi_addr_${piUid.substring(0, 10)}`,
       platformRole: platformRole,
       roles: resolvedRoles,
