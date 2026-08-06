@@ -182,7 +182,8 @@ export const productService = {
       try {
         const auth = getFirebaseAuth();
         if (auth?.currentUser?.uid) {
-          ownerId = localStorage.getItem('last_pi_uid') || auth.currentUser.uid;
+          const { authService } = await import('../auth/authService');
+          ownerId = authService.getLatestVerifiedUser()?.piUid || auth.currentUser.uid;
         }
       } catch (e) {
         // ignore
@@ -364,7 +365,8 @@ export const productService = {
       try {
         const auth = getFirebaseAuth();
         if (auth?.currentUser?.uid) {
-          ownerId = localStorage.getItem('last_pi_uid') || auth.currentUser.uid;
+          const { authService } = await import('../auth/authService');
+          ownerId = authService.getLatestVerifiedUser()?.piUid || auth.currentUser.uid;
         }
       } catch (e) {
         // ignore

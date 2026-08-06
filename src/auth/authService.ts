@@ -56,13 +56,15 @@ let piInitPromise: Promise<void> | null = null;
 let piAuthPromise: Promise<any> | null = null;
 let piAuthResult: any = null;
 let loginInProgressPromise: Promise<User> | null = null;
+let latestVerifiedPiUser: User | null = null;
 
 let piInitialized = false;
 
 export function isRealPiBrowser(): boolean {
   if (typeof window === 'undefined') return false;
   const isPiUA = typeof navigator !== 'undefined' && Boolean(navigator.userAgent) && /PiBrowser/i.test(navigator.userAgent);
-  return isPiUA || Boolean((window as any).Pi);
+  const isNativeHost = Boolean((window as any).PiIsNative) || Boolean((window as any).webkit?.messageHandlers?.pi) || Boolean((window as any).PiHost);
+  return isPiUA || isNativeHost;
 }
 
 /**
@@ -223,7 +225,13 @@ export const authService = {
     const scopes = Array.from(new Set(['username', 'payments', ...requestedScopes]));
     console.log('[DEBUG_TRACE] [authenticatePi] [STEP 6] Scopes assembled:', scopes);
     
-    // REDESIGN: Only return cached in-memory session if the native Pi SDK also possesses active payments scope
+    // If forceRefresh is requested, clear cached in-memory auth result
+    if (forceRefresh) {
+      piAuthResult = null;
+      piAuthPromise = null;
+    }
+
+    // ONLY return cached in-memory session if forceRefresh is false and native Pi SDK possesses active payments scope
     if (!forceRefresh && piAuthResult && piAuthResult.hasPaymentsScope && hasNativePaymentsScope()) {
       console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7a] Returning cached memory piAuthResult with verified native payments scope');
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT (cached memory)');
@@ -282,18 +290,22 @@ export const authService = {
         console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 12] isRealPiBrowser:', isRealPi);
 
         if (!isRealPi) {
-          console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 13a] Running outside PiBrowser, returning mock auth result');
-          const mockAuth = {
-            accessToken: 'mock_access_token_pioneer_123',
-            user: {
-              uid: 'dev_pioneer_mock',
-              username: 'dev_pioneer_mock'
-            },
-            hasPaymentsScope: true
-          };
-          piAuthResult = mockAuth;
-          console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (mock)');
-          return mockAuth;
+          if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true') {
+            console.log('[DEBUG_TRACE] [authenticatePi async worker] Explicit VITE_ENABLE_DEV_MOCK=true enabled, returning mock auth result');
+            const mockAuth = {
+              accessToken: 'mock_access_token_pioneer_123',
+              user: {
+                uid: 'dev_pioneer_mock',
+                username: 'dev_pioneer_mock'
+              },
+              hasPaymentsScope: true
+            };
+            piAuthResult = mockAuth;
+            console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (mock)');
+            return mockAuth;
+          }
+          console.error('[DEBUG_TRACE] [authenticatePi async worker] Not inside Pi Browser and VITE_ENABLE_DEV_MOCK is false');
+          throw new Error('Pi Browser authentication is required. No Pi account is available.');
         }
 
         if (window.Pi) {
@@ -315,7 +327,14 @@ export const authService = {
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 13d] Passing scopes:', JSON.stringify(scopes));
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 13e] Passing onIncompletePaymentFound callback function');
           
-          const result = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+          const authPromise = window.Pi.authenticate(scopes, onIncompletePaymentFound);
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Pi Network authentication request timed out after 15 seconds. Please check your Pi Browser connection.'));
+            }, 15000);
+          });
+
+          const result = await Promise.race([authPromise, timeoutPromise]);
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 14] IMMEDIATELY AFTER window.Pi.authenticate resolved! result:', JSON.stringify(result));
           
           const piAuth = {
@@ -382,6 +401,7 @@ export const authService = {
       try {
         console.log('[PI_VERIFY_STEP 1/10] Requesting authentication from window.Pi.authenticate...');
         piAuth = await this.authenticatePi(['username', 'payments'], forceRefresh);
+        console.log('[RAW_PI_SDK_RESPONSE]', JSON.stringify(piAuth));
         console.log('[PI_AUTH_DEBUG] Authentication successful: true');
         console.log('[PI_AUTH_DEBUG] Authentication response:', JSON.stringify(piAuth));
       } catch (authErr: any) {
@@ -394,6 +414,8 @@ export const authService = {
       if (piAuth?.user?.username && piAuth?.user?.uid) {
         piUid = piAuth.user.uid;
         username = piAuth.user.username; // Exact casing returned by Pi SDK
+        console.log('[UID_FROM_SDK]', piUid);
+        console.log('[USERNAME_FROM_SDK]', username);
         console.log('[PI_AUTH_DEBUG] Pi User ID:', piUid);
         console.log('[PI_AUTH_DEBUG] Pi Username:', username);
       } else if (piAuth?.accessToken) {
@@ -413,6 +435,8 @@ export const authService = {
           if (data?.user?.username && data?.user?.uid) {
             username = data.user.username; // Exact casing from Pi API
             piUid = data.user.uid;
+            console.log('[UID_FROM_SDK]', piUid);
+            console.log('[USERNAME_FROM_SDK]', username);
             console.log('[PI_AUTH_DEBUG] Pi User ID (via backend):', piUid);
             console.log('[PI_AUTH_DEBUG] Pi Username (via backend):', username);
           } else {
@@ -428,10 +452,18 @@ export const authService = {
       }
     } else {
       // Dev mode outside Pi Browser
-      console.log('[PI_VERIFY_STEP 1/10] Running in development mode outside Pi Browser - using dev mock credentials.');
-      piUid = 'dev_pioneer_mock';
-      username = 'dev_pioneer_mock';
-      piAuth = { accessToken: 'mock_access_token_dev', user: { uid: piUid, username }, hasPaymentsScope: true };
+      if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true') {
+        console.log('[PI_VERIFY_STEP 1/10] Running in explicit dev mode (VITE_ENABLE_DEV_MOCK=true) - using dev mock credentials.');
+        piUid = 'dev_pioneer_mock';
+        username = 'dev_pioneer_mock';
+        piAuth = { accessToken: 'mock_access_token_dev', user: { uid: piUid, username }, hasPaymentsScope: true };
+        console.log('[RAW_PI_SDK_RESPONSE]', JSON.stringify(piAuth));
+        console.log('[UID_FROM_SDK]', piUid);
+        console.log('[USERNAME_FROM_SDK]', username);
+      } else {
+        console.error('[PI_VERIFY_STEP 1/10] Not inside Pi Browser and VITE_ENABLE_DEV_MOCK is false.');
+        throw new Error('Pi Browser authentication is required. No Pi account is available.');
+      }
     }
 
     // Step 3: Validate Official Pi User ID (UID)
@@ -505,14 +537,15 @@ export const authService = {
 
     PiBusinessMarketDB.setCurrentUser(freshUser);
     localStorage.setItem('last_pi_uid', piUid);
+    latestVerifiedPiUser = freshUser;
 
-    // Sync Firestore document asynchronously if available
+    // Sync Firestore document synchronously and verify read back
     try {
-      const { getFirebaseDb } = await import('../firebase/config');
-      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const { getFirebaseDb, getFirebaseAuth } = await import('../firebase/config');
+      const { doc, setDoc, getDoc, serverTimestamp } = await import('firebase/firestore');
       const db = getFirebaseDb();
       if (db) {
-        await setDoc(doc(db, 'users', piUid), {
+        const firestoreSavePayload = {
           uid: piUid,
           piUid,
           username,
@@ -521,7 +554,31 @@ export const authService = {
           status: 'active',
           updatedAt: serverTimestamp(),
           lastLogin: serverTimestamp()
-        }, { merge: true }).catch((err) => console.warn('[PI_VERIFY_STEP 8/10] Firestore sync warning:', err));
+        };
+        console.log('[VALUE_SAVED_TO_FIRESTORE]', { uid: piUid, username });
+        await setDoc(doc(db, 'users', piUid), firestoreSavePayload, { merge: true });
+
+        // Synchronize active Firebase anonymous session pointer document to point to the live authenticated Pi user
+        const auth = getFirebaseAuth();
+        const firebaseUid = auth?.currentUser?.uid || localStorage.getItem('last_resolved_uid');
+        if (firebaseUid && firebaseUid !== piUid) {
+          const pointerRef = doc(db, 'users', firebaseUid);
+          await setDoc(pointerRef, {
+            uid: firebaseUid,
+            piUid: piUid,
+            firebaseUid: firebaseUid,
+            username: username,
+            displayName: username,
+            status: 'active',
+            pointer: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+
+        // Verify read back from Firestore
+        const readSnap = await getDoc(doc(db, 'users', piUid));
+        const readData = readSnap.exists() ? readSnap.data() : null;
+        console.log('[VALUE_READ_FROM_FIRESTORE]', readData);
       }
     } catch (fsErr) {
       console.warn('[PI_VERIFY_STEP 8/10] Firestore unavailable:', fsErr);
@@ -582,11 +639,31 @@ export const authService = {
   },
 
   /**
+   * Returns the latest live authenticated user from the Pi SDK
+   */
+  getLatestVerifiedUser(): User | null {
+    return latestVerifiedPiUser;
+  },
+
+  /**
    * Fetches the current user profile from Firestore under users/{uid}.
    * Multi-Tenant Isolation Invariant: Ensures users NEVER see another user's profile or avatar.
    */
   async getUserProfile(uid: string, piUid?: string): Promise<User | null> {
     console.log('[AuthService] getUserProfile() for uid:', uid, 'piUid:', piUid);
+
+    // 0. If a live authenticated user from Pi SDK is available, prioritize it as absolute source of truth
+    if (latestVerifiedPiUser) {
+      console.log('[AuthService] Returning live authenticated Pi user from SDK:', latestVerifiedPiUser.username, latestVerifiedPiUser.piUid);
+      return latestVerifiedPiUser;
+    }
+
+    // Outside Pi Browser without explicit dev mode: do NOT return any Pi user profile or mock data
+    if (!isRealPiBrowser() && (import.meta as any).env.VITE_ENABLE_DEV_MOCK !== 'true') {
+      console.log('[AuthService] Not inside Pi Browser and VITE_ENABLE_DEV_MOCK is false. Returning null profile.');
+      return null;
+    }
+
     try {
       const { identityResolver } = await import('../services/identity/identityResolver');
 
@@ -621,6 +698,7 @@ export const authService = {
       piAuthResult = null;
       piAuthPromise = null;
       loginInProgressPromise = null;
+      latestVerifiedPiUser = null;
 
       try { localStorage.removeItem('last_resolved_uid'); } catch (e) {}
       try { localStorage.removeItem('last_pi_uid'); } catch (e) {}

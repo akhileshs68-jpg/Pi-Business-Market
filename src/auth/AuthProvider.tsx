@@ -50,17 +50,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.log('[AuthProvider] Auto Pi Account verification successful for @' + verifiedUser.username);
               setUser(verifiedUser);
               setProfile(verifiedUser);
+              console.log('[VALUE_SHOWN_IN_UI]', { uid: verifiedUser.uid, username: verifiedUser.username });
               setLoading(false);
             }
           })
           .catch((err) => {
             console.warn('[AuthProvider] Auto Pi Account verification on mount notice:', err?.message || err);
+            if (isMounted) {
+              setError('Pi Browser authentication is required. No Pi account is available.');
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+            }
           });
+      } else if ((import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true') {
+        authService.verifyAndSynchronizePiAccount(false)
+          .then(({ verifiedUser }) => {
+            if (isMounted && verifiedUser) {
+              setUser(verifiedUser);
+              setProfile(verifiedUser);
+              setLoading(false);
+            }
+          })
+          .catch(() => {
+            if (isMounted) setLoading(false);
+          });
+      } else {
+        if (isMounted) {
+          setError('Pi Browser authentication is required. No Pi account is available.');
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
       }
     }).catch((err) => {
       console.error("[AuthProvider] Pi SDK init failed:", err);
       if (isMounted) {
-        setError("Unable to connect to Pi Network. Please try again.");
+        setError("Pi Browser authentication is required. No Pi account is available.");
+        setUser(null);
+        setProfile(null);
         setLoading(false);
       }
     });
@@ -86,8 +114,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (firebaseUser) {
           isProcessing.current = true;
           console.log('[DEBUG] [AuthProvider] Authenticated UID:', firebaseUser.uid);
-          const lastPiUid = localStorage.getItem('last_pi_uid');
-          let fetchedProfile = await authService.getUserProfile(firebaseUser.uid, lastPiUid || undefined);
+          // Check if we have a live authenticated user from Pi SDK first
+          const liveUser = authService.getLatestVerifiedUser();
+          let fetchedProfile = liveUser;
+          if (!fetchedProfile && (isRealPiBrowser() || (import.meta as any).env.VITE_ENABLE_DEV_MOCK === 'true')) {
+            fetchedProfile = await authService.getUserProfile(firebaseUser.uid);
+          }
+
           console.log('[DEBUG] [AuthProvider] Profile fetched:', fetchedProfile);
           if (fetchedProfile) {
             fetchedProfile = await migrateProfileIfNeeded(fetchedProfile);
@@ -96,28 +129,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (fetchedProfile) {
               setProfile(fetchedProfile);
               setUser(fetchedProfile);
-            } else if (lastPiUid) {
-              // Construct a normalized profile on the fly using the identityResolver if lastPiUid exists
-              const { identityResolver } = await import('../services/identity/identityResolver');
-              const canonicalPiUid = lastPiUid;
-              const canonicalUsername = canonicalPiUid;
-              
-              const freshUser = identityResolver.normalizeUserModel({
-                uid: canonicalPiUid,
-                piUid: canonicalPiUid,
-                username: canonicalUsername,
-                displayName: canonicalUsername,
-                roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
-                status: 'active'
-              }, firebaseUser.uid);
-              
-              setUser(freshUser);
-              setProfile(freshUser);
+              console.log('[VALUE_SHOWN_IN_UI]', { uid: fetchedProfile.uid, username: fetchedProfile.username });
+            } else {
+              setUser(null);
+              setProfile(null);
+              if (!isRealPiBrowser() && (import.meta as any).env.VITE_ENABLE_DEV_MOCK !== 'true') {
+                setError('Pi Browser authentication is required. No Pi account is available.');
+              }
             }
 
             // Resolve the canonical identity platform document if active identity exists
             const { identityResolver } = await import('../services/identity/identityResolver');
-            const activePiUid = fetchedProfile?.piUid || (lastPiUid ?? undefined);
+            const activePiUid = fetchedProfile?.piUid;
             const activeUsername = fetchedProfile?.username || activePiUid;
             const activeDisplayName = (fetchedProfile?.displayName && fetchedProfile.displayName !== 'Pioneer') ? fetchedProfile.displayName : (activeUsername ?? undefined);
 
@@ -171,14 +194,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (): Promise<User> => {
     console.log('[AuthProvider] login() called. current state:', { isProcessing: isProcessing.current, user: user?.uid });
-    if (isProcessing.current && user) {
-      console.log('[AuthProvider] login() already processing and user exists, returning current user');
-      return user;
-    }
-    if (isProcessing.current) {
-      console.log('[AuthProvider] login() already processing, throwing error');
-      throw new Error('Authentication already in progress');
-    }
     
     isProcessing.current = true;
     setLoading(true);
@@ -192,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setUser(loggedInUser);
       setProfile(loggedInUser);
+      console.log('[VALUE_SHOWN_IN_UI]', { uid: loggedInUser.uid, username: loggedInUser.username });
       return loggedInUser;
     } catch (err: any) {
       console.error('[AuthProvider] authService.loginWithPi() rejected:', err);

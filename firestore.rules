@@ -100,8 +100,7 @@ service cloud.firestore {
 
     // 3. Collection Rules
     match /users/{uid} {
-      allow get: if isOwner(uid) || (isSignedIn() && (request.auth.uid == resource.data.firebaseUid || request.auth.uid == resource.data.lastResolvedUid)) || isAdmin();
-      allow list: if isAdmin();
+      allow read: if true;
       allow create: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == incoming().firebaseUid || request.auth.uid == incoming().lastResolvedUid))) && isValidUser(incoming());
       allow update: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == existing().firebaseUid || request.auth.uid == existing().lastResolvedUid))) && 
                     isValidUser(incoming());
