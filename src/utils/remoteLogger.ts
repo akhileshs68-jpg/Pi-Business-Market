@@ -1,5 +1,5 @@
 // Client-side Remote Logger for debugging Mobile Pi Browser payment lifecycle
-// Intercepts all console calls and uncaught errors, forwarding them to the server-side log sink
+// Intercepts all console calls, uncaught errors, network requests, lifecycle events, and postMessage calls
 
 let isSending = false;
 
@@ -38,6 +38,8 @@ export function initRemoteLogger() {
         level,
         timestamp: new Date().toISOString(),
         url: window.location.href,
+        origin: window.location.origin,
+        referrer: document.referrer,
         userAgent: navigator.userAgent,
         message: formattedArgs.join(' '),
         details: formattedArgs
@@ -76,6 +78,118 @@ export function initRemoteLogger() {
     sendRemoteLog('info', args);
   };
 
+  // 1. INSTRUMENT GLOBAL FETCH
+  const originalFetch = window.fetch;
+  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const targetUrl = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : input.url);
+    const fetchStartTime = Date.now();
+
+    // Skip remote logging endpoint itself to avoid infinite loops
+    const isLogEndpoint = targetUrl.includes('/api/debug-log');
+
+    if (!isLogEndpoint) {
+      console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY BEFORE fetch() call to:', targetUrl, {
+        method: init?.method || 'GET',
+        hasHeaders: !!init?.headers,
+        hasBody: !!init?.body,
+        referrer: document.referrer,
+        origin: window.location.origin,
+        href: window.location.href
+      });
+    }
+
+    try {
+      const response = await originalFetch.apply(window, [input, init]);
+      const fetchEndTime = Date.now();
+
+      if (!isLogEndpoint) {
+        console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY AFTER fetch() response received from:', targetUrl, {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          resUrl: response.url,
+          durationMs: fetchEndTime - fetchStartTime,
+          referrer: document.referrer,
+          origin: window.location.origin,
+          href: window.location.href
+        });
+      }
+      return response;
+    } catch (fetchErr) {
+      const fetchErrTime = Date.now();
+      if (!isLogEndpoint) {
+        console.error('[DEBUG_TRACE] [fetch] IMMEDIATELY AFTER fetch() REJECTED with error for:', targetUrl, {
+          error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+          durationMs: fetchErrTime - fetchStartTime,
+          referrer: document.referrer,
+          origin: window.location.origin,
+          href: window.location.href
+        });
+      }
+      throw fetchErr;
+    }
+  };
+
+  // 2. INSTRUMENT WINDOW.POSTMESSAGE
+  const originalPostMessage = window.postMessage;
+  window.postMessage = function (message: any, targetOriginOrOptions?: any, transfer?: any): void {
+    console.log('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY BEFORE window.postMessage() call', {
+      message: typeof message === 'object' ? JSON.stringify(message) : String(message),
+      targetOrigin: typeof targetOriginOrOptions === 'string' ? targetOriginOrOptions : 'options_object',
+      referrer: document.referrer,
+      origin: window.location.origin,
+      href: window.location.href
+    });
+
+    try {
+      (originalPostMessage as Function).apply(window, arguments);
+      console.log('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY AFTER window.postMessage() execution completed');
+    } catch (postErr) {
+      console.error('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY AFTER window.postMessage() threw error:', postErr);
+      throw postErr;
+    }
+  };
+
+  // 3. INSTRUMENT WINDOW LIFECYCLE LISTENERS
+  window.addEventListener('message', (event) => {
+    console.log('[DEBUG_TRACE] [window.addEventListener("message")] EVENT RECEIVED:', {
+      origin: event.origin,
+      source: event.source ? (event.source === window ? 'self_window' : 'external_window/iframe') : 'null',
+      data: typeof event.data === 'object' ? JSON.stringify(event.data) : String(event.data),
+      referrer: document.referrer,
+      locationOrigin: window.location.origin,
+      locationHref: window.location.href
+    });
+  });
+
+  window.addEventListener('visibilitychange', () => {
+    console.log('[DEBUG_TRACE] [window.addEventListener("visibilitychange")] EVENT TRIGGERED:', {
+      visibilityState: document.visibilityState,
+      hidden: document.hidden,
+      referrer: document.referrer,
+      locationOrigin: window.location.origin,
+      locationHref: window.location.href
+    });
+  });
+
+  window.addEventListener('pagehide', (event) => {
+    console.log('[DEBUG_TRACE] [window.addEventListener("pagehide")] EVENT TRIGGERED:', {
+      persisted: event.persisted,
+      referrer: document.referrer,
+      locationOrigin: window.location.origin,
+      locationHref: window.location.href
+    });
+  });
+
+  window.addEventListener('beforeunload', (event) => {
+    console.log('[DEBUG_TRACE] [window.addEventListener("beforeunload")] EVENT TRIGGERED:', {
+      type: event.type,
+      referrer: document.referrer,
+      locationOrigin: window.location.origin,
+      locationHref: window.location.href
+    });
+  });
+
   window.addEventListener('error', (event) => {
     sendRemoteLog('fatal_uncaught_error', [
       {
@@ -83,7 +197,10 @@ export function initRemoteLogger() {
         filename: event.filename,
         lineno: event.lineno,
         colno: event.colno,
-        error: event.error
+        error: event.error,
+        referrer: document.referrer,
+        origin: window.location.origin,
+        href: window.location.href
       }
     ]);
   });
@@ -91,10 +208,21 @@ export function initRemoteLogger() {
   window.addEventListener('unhandledrejection', (event) => {
     sendRemoteLog('fatal_unhandled_promise', [
       {
-        reason: event.reason
+        reason: event.reason,
+        referrer: document.referrer,
+        origin: window.location.origin,
+        href: window.location.href
       }
     ]);
   });
 
-  console.log('[RemoteLogger] Client-side logging initialized.');
+  console.log('[RemoteLogger] Client-side remote logger & lifecycle instrumentation initialized.', {
+    documentReferrer: document.referrer,
+    windowLocationOrigin: window.location.origin,
+    windowLocationHref: window.location.href,
+    typeofWindowPi: typeof (window as any).Pi,
+    typeofPiCreatePayment: typeof (window as any).Pi?.createPayment,
+    typeofPiCompletePayment: typeof (window as any).Pi?.completePayment
+  });
 }
+
