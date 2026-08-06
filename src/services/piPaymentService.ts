@@ -73,24 +73,13 @@ export const piPaymentService = {
         rawPiAuthResponse: JSON.stringify(piAuth)
       });
 
-      // 1. Guard against dev mock user attempting to create payments
-      if (!isRealPiBrowser() || verifiedUser?.username === 'dev_pioneer_mock' || verifiedUser?.uid === 'dev_pioneer_mock' || verifiedUser?.piUid === 'dev_pioneer_mock') {
-        const mockErr = new Error("Pi payments require a real authenticated Pi Browser session.");
-        console.warn(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Aborting payment creation for mock/developer user session.`);
-        isPaymentInProgress = false;
-        if (callbacks.onError) {
-          await callbacks.onError(mockErr, 'mock_user_session_unsupported');
-        }
-        return;
-      }
-
       const piInstance = (window as any).Pi;
       const isPiSdkAvailable = typeof piInstance?.createPayment === 'function';
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 2: isPiSdkAvailable = ${isPiSdkAvailable}`);
 
       if (!isPiSdkAvailable) {
         const notAvailableErr = new Error(
-          "[Step 9 Failed] Official Pi Wallet SDK (window.Pi.createPayment) is not available in this browser environment. Please open inside official Pi Browser."
+          "Official Pi Wallet SDK (window.Pi.createPayment) is not available in this browser environment. Please open inside official Pi Browser or Sandbox."
         );
         console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] SDK unavailable error:`, notAvailableErr.message);
         isPaymentInProgress = false;
