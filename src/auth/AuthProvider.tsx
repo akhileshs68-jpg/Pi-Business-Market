@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { User } from '../types';
-import { authService } from './authService';
+import { authService, isRealPiBrowser } from './authService';
 import { AuthContext } from './AuthContext';
 import { isFirebaseConfigured } from '../firebase/config';
 import { EnterpriseIdentity, Permission } from '../services/identity/identityTypes';
@@ -40,8 +40,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
 
-    // Pre-initialize Pi SDK on mount
-    authService.initPi().catch((err) => {
+    // Pre-initialize Pi SDK on mount & auto-synchronize authenticated Pi account inside Pi Browser
+    authService.initPi().then(() => {
+      if (isRealPiBrowser()) {
+        console.log('[AuthProvider] Inside Pi Browser - auto-verifying live authenticated Pi account...');
+        authService.verifyAndSynchronizePiAccount(false)
+          .then(({ verifiedUser }) => {
+            if (isMounted && verifiedUser) {
+              console.log('[AuthProvider] Auto Pi Account verification successful for @' + verifiedUser.username);
+              setUser(verifiedUser);
+              setProfile(verifiedUser);
+              setLoading(false);
+            }
+          })
+          .catch((err) => {
+            console.warn('[AuthProvider] Auto Pi Account verification on mount notice:', err?.message || err);
+          });
+      }
+    }).catch((err) => {
       console.error("[AuthProvider] Pi SDK init failed:", err);
       if (isMounted) {
         setError("Unable to connect to Pi Network. Please try again.");

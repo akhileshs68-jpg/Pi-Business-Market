@@ -45,6 +45,16 @@ export class PiBusinessMarketDB {
     return userStr ? JSON.parse(userStr) : null;
   }
 
+  static setCurrentUser(user: User): void {
+    this.saveCurrentUser(user);
+  }
+
+  static clearUserMapping(): void {
+    localStorage.removeItem(KEYS.CURRENT_USER);
+    localStorage.removeItem('last_pi_uid');
+    localStorage.removeItem('last_resolved_uid');
+  }
+
   static saveCurrentUser(user: User): void {
     localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
     const users = this.get<User>(KEYS.USERS);
