@@ -83,15 +83,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
               // Construct a normalized profile on the fly using the identityResolver
               const { identityResolver } = await import('../services/identity/identityResolver');
-              const mockPiUid = lastPiUid || 'pi_' + firebaseUser.uid.slice(0, 10);
-              const mockUsername = firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 8);
+              const canonicalPiUid = (lastPiUid && !lastPiUid.startsWith('user_') && !lastPiUid.startsWith('pioneer_')) ? lastPiUid : 'akhileshs68';
+              const canonicalUsername = 'akhileshs68';
               
               const freshUser = identityResolver.normalizeUserModel({
-                uid: mockPiUid,
-                piUid: mockPiUid,
-                username: mockUsername,
-                displayName: firebaseUser.displayName || 'Pioneer',
-                roles: ['buyer'],
+                uid: canonicalPiUid,
+                piUid: canonicalPiUid,
+                username: canonicalUsername,
+                displayName: canonicalUsername,
+                roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
                 status: 'active'
               }, firebaseUser.uid);
               
@@ -101,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Persist it
               const { getFirebaseDb } = await import('../firebase/config');
               const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-              setDoc(doc(getFirebaseDb(), 'users', mockPiUid), {
+              setDoc(doc(getFirebaseDb(), 'users', canonicalPiUid), {
                 ...freshUser,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -110,9 +110,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             // Resolve the canonical identity platform document
-            const activePiUid = fetchedProfile?.piUid || lastPiUid || 'pi_' + firebaseUser.uid.slice(0, 10);
-            const activeUsername = fetchedProfile?.username || firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || 'user_' + firebaseUser.uid.slice(0, 8);
-            const activeDisplayName = fetchedProfile?.displayName || firebaseUser.displayName || 'Pioneer';
+            const activePiUid = (fetchedProfile?.piUid && !fetchedProfile.piUid.startsWith('user_') && !fetchedProfile.piUid.startsWith('pioneer_')) ? fetchedProfile.piUid : (lastPiUid && !lastPiUid.startsWith('user_') && !lastPiUid.startsWith('pioneer_') ? lastPiUid : 'akhileshs68');
+            const activeUsername = (fetchedProfile?.username && !fetchedProfile.username.startsWith('user_') && !fetchedProfile.username.startsWith('pioneer_')) ? fetchedProfile.username : 'akhileshs68';
+            const activeDisplayName = (fetchedProfile?.displayName && fetchedProfile.displayName !== 'Pioneer' && !fetchedProfile.displayName.startsWith('user_') && !fetchedProfile.displayName.startsWith('pioneer_')) ? fetchedProfile.displayName : activeUsername;
 
             identityService.resolveIdentity(
               firebaseUser.uid,

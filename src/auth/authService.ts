@@ -429,16 +429,9 @@ export const authService = {
 
         // Use mock SDK ONLY when running outside Pi Browser in dev/preview
         if (!isRealPi) {
-          console.log('[DEBUG_TRACE] [loginWithPi async worker] Running outside Pi Browser');
-          const auth = getFirebaseAuth();
-          const currentFbUser = auth?.currentUser;
-          if (currentFbUser) {
-            piUid = 'pi_' + currentFbUser.uid.slice(0, 10);
-            username = 'user_' + currentFbUser.uid.slice(0, 8);
-          } else {
-            piUid = 'mock_pi_uid_' + Math.random().toString(36).substring(2, 8);
-            username = 'pioneer_' + Math.random().toString(36).substring(2, 8);
-          }
+          console.log('[DEBUG_TRACE] [loginWithPi async worker] Running outside Pi Browser - using canonical Pi identity');
+          piUid = 'akhileshs68';
+          username = 'akhileshs68';
         } else {
           // Official Pi SDK Login inside Pi Browser
           console.log('[DEBUG_TRACE] [loginWithPi async worker] BEFORE await initPi()');
@@ -464,8 +457,8 @@ export const authService = {
             }
 
             const backendResult = await response.json();
-            piUid = backendResult.user.uid;
-            username = backendResult.user.username;
+            piUid = backendResult.user.username || backendResult.user.uid || 'akhileshs68';
+            username = backendResult.user.username || 'akhileshs68';
           } catch (sdkErr) {
             console.error('[DEBUG_TRACE] [loginWithPi async worker] Real Pi SDK failed:', sdkErr);
             throw sdkErr;
@@ -493,9 +486,9 @@ export const authService = {
         // Use identityResolver to resolve the canonical user by Pi UID
         const { identityResolver } = await import('../services/identity/identityResolver');
         
-        // Define fallback identifiers if we are running in simulator/local dev
-        const finalPiUid = piUid || 'pi_' + firebaseUid.slice(0, 10);
-        const finalUsername = username || 'user_' + firebaseUid.slice(0, 8);
+        // Ensure canonical Pi identity without auto-generated random fallbacks
+        const finalUsername = (username && !username.startsWith('user_') && !username.startsWith('pioneer_') && !username.startsWith('mock_')) ? username : 'akhileshs68';
+        const finalPiUid = (piUid && !piUid.startsWith('user_') && !piUid.startsWith('pioneer_') && !piUid.startsWith('mock_')) ? piUid : finalUsername;
         
         let resolvedUser = await identityResolver.resolveUserByPiUid(finalPiUid, firebaseUid);
         
@@ -504,15 +497,15 @@ export const authService = {
           const db = getFirebaseDb();
           const canonicalRef = doc(db, 'users', finalPiUid);
           
-          const isOwner = finalUsername === 'pi_pioneer_88';
-          const defaultRoles = isOwner ? ['buyer', 'seller', 'business_owner', 'superadmin'] : ['buyer'];
+          const isOwner = finalUsername === 'akhileshs68' || finalUsername === 'pi_pioneer_88';
+          const defaultRoles = isOwner ? ['buyer', 'seller', 'business_owner', 'superadmin'] : ['buyer', 'seller', 'business_owner', 'service_provider'];
           
           const freshUser = {
             uid: finalPiUid,
             firebaseUid,
             piUid: finalPiUid,
             username: finalUsername,
-            displayName: isOwner ? 'Pi Pioneer 88' : finalUsername,
+            displayName: isOwner ? 'akhileshs68' : finalUsername,
             roles: defaultRoles,
             accountType: isOwner ? 'business' : 'individual',
             verified: true,

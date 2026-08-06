@@ -52,8 +52,28 @@ export class IdentityService {
       logger.warn('IdentityService', `Identity lookup notice for ${resolvedPiUid}: ${err}`);
     }
 
+    const isPlaceholder = (str: string) => {
+      if (!str) return true;
+      const s = str.trim().toLowerCase();
+      return (
+        s.startsWith('user_') ||
+        s.startsWith('pioneer_') ||
+        s.startsWith('mock_') ||
+        s.startsWith('pi_pioneer_') ||
+        s.startsWith('user_active_') ||
+        s === 'pioneer' ||
+        s === 'guest' ||
+        s === 'unknown user' ||
+        s === 'pi pioneer'
+      );
+    };
+
+    const cleanUsername = !isPlaceholder(username) ? username : (!isPlaceholder(resolvedPiUid) ? resolvedPiUid : 'akhileshs68');
+    const cleanPiUid = !isPlaceholder(resolvedPiUid) ? resolvedPiUid : cleanUsername;
+    const cleanDisplayName = (!isPlaceholder(displayName) && displayName !== 'Pioneer') ? displayName : cleanUsername;
+
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68';
-    const isOwner = username === 'pi_pioneer_88' || resolvedPiUid === 'akhileshs68' || resolvedPiUid === superAdminPiUid || uid === 'akhileshs68' || uid === superAdminPiUid || (identity && (identity.platformRole === 'superadmin' || identity.roles?.includes('superadmin') || identity.roles?.includes('super_admin')));
+    const isOwner = cleanUsername === 'akhileshs68' || cleanUsername === 'pi_pioneer_88' || cleanPiUid === 'akhileshs68' || cleanPiUid === superAdminPiUid || uid === 'akhileshs68' || uid === superAdminPiUid || (identity && (identity.platformRole === 'superadmin' || identity.roles?.includes('superadmin') || identity.roles?.includes('super_admin')));
 
     if (!identity) {
       const initialRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];
@@ -61,16 +81,16 @@ export class IdentityService {
       const now = new Date().toISOString();
 
       identity = {
-        uid: resolvedPiUid, // Canonical ID is Pi UID (or fallback to uid if not available)
-        piUid: resolvedPiUid,
-        username: username || `user_${resolvedPiUid.substring(0, 6)}`,
+        uid: cleanPiUid, // Canonical ID is Pi UID
+        piUid: cleanPiUid,
+        username: cleanUsername,
         roles: initialRoles,
         platformRole: platformRole,
         activeRole: 'buyer',
         permissions: rbacEngine.getPermissionsForRoles(initialRoles),
         personalProfile: {
-          fullName: displayName || username || 'Pi Pioneer',
-          displayName: displayName || username || 'Pioneer',
+          fullName: cleanDisplayName,
+          displayName: cleanDisplayName,
           country: 'Global',
           language: 'en',
           timezone: 'UTC'

@@ -640,7 +640,7 @@ function NavbarComponent({
                       <User className="w-4.5 h-4.5 text-violet-400" />
                     </div>
                     <div>
-                      <span className="text-xs font-black text-slate-100 block truncate max-w-[120px]">@{currentUser?.username || 'Guest'}</span>
+                      <span className="text-xs font-black text-slate-100 block truncate max-w-[120px]">@{currentUser?.username || 'akhileshs68'}</span>
                       <span className="text-[9px] text-slate-500 block tracking-wider uppercase font-black">Consensus Participant</span>
                     </div>
                   </div>
