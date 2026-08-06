@@ -140,8 +140,10 @@ export const authService = {
     }
 
     const envSandbox = (import.meta as any).env.VITE_PI_SANDBOX;
-    // Default to sandbox: true unless explicitly disabled in production (VITE_PI_SANDBOX === 'false')
-    const isSandbox = envSandbox === 'false' || envSandbox === false ? false : true;
+    const isRealPi = isRealPiBrowser();
+    // Default to sandbox: true unless inside a real Pi Browser where we must use false to connect to the native bridge,
+    // or unless explicitly disabled in environment variables.
+    const isSandbox = isRealPi ? false : (envSandbox === 'false' || envSandbox === false ? false : true);
 
     // Helper to safely execute window.Pi.init
     const performInit = () => {
@@ -328,7 +330,8 @@ export const authService = {
           if (typeof window.Pi.init === 'function' && !piInitialized) {
             try {
               const envSandbox = (import.meta as any).env.VITE_PI_SANDBOX;
-              const isSandbox = envSandbox === 'false' || envSandbox === false ? false : true;
+              const isRealPi = isRealPiBrowser();
+              const isSandbox = isRealPi ? false : (envSandbox === 'false' || envSandbox === false ? false : true);
               console.log('[DEBUG_TRACE] [authenticatePi async worker] Inline window.Pi.init safeguard call...');
               window.Pi.init({ version: "2.0", sandbox: isSandbox });
               piInitialized = true;
