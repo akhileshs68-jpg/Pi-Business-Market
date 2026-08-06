@@ -343,12 +343,22 @@ export const authService = {
             }, 15000);
           });
 
-          const result = await Promise.race([authPromise, timeoutPromise]);
+          const result: any = await Promise.race([authPromise, timeoutPromise]);
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 14] IMMEDIATELY AFTER window.Pi.authenticate resolved! result:', JSON.stringify(result));
           
+          const grantedScopes = Array.isArray(result?.scopes) ? result.scopes : (Array.isArray((window as any).Pi?.consentedScopes) ? (window as any).Pi.consentedScopes : []);
+          const hasPayments = scopes.includes('payments') ? (grantedScopes.length === 0 || grantedScopes.includes('payments')) : true;
+
+          console.log('[DEBUG_TRACE] [authenticatePi async worker] Scope verification:', {
+            requestedScopes: scopes,
+            grantedScopesFromResponse: grantedScopes,
+            consentedScopesOnPi: (window as any).Pi?.consentedScopes,
+            hasPaymentsScopeVerified: hasPayments
+          });
+
           const piAuth = {
             ...result,
-            hasPaymentsScope: true
+            hasPaymentsScope: hasPayments
           };
 
           piAuthResult = piAuth;

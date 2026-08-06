@@ -58,6 +58,26 @@ export const piPaymentService = {
         return;
       }
 
+      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Authentication Check Details:`, {
+        isRealPiBrowser: isRealPiBrowser(),
+        verifiedUserUid: verifiedUser?.uid || verifiedUser?.piUid,
+        verifiedUsername: verifiedUser?.username,
+        hasPaymentsScope: piAuth?.hasPaymentsScope,
+        scopesRequested: ['username', 'payments'],
+        rawPiAuthResponse: JSON.stringify(piAuth)
+      });
+
+      // 1. Guard against dev mock user attempting to create payments
+      if (!isRealPiBrowser() || verifiedUser?.username === 'dev_pioneer_mock' || verifiedUser?.uid === 'dev_pioneer_mock' || verifiedUser?.piUid === 'dev_pioneer_mock') {
+        const mockErr = new Error("Pi payments require a real authenticated Pi Browser session.");
+        console.warn(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Aborting payment creation for mock/developer user session.`);
+        isPaymentInProgress = false;
+        if (callbacks.onError) {
+          await callbacks.onError(mockErr, 'mock_user_session_unsupported');
+        }
+        return;
+      }
+
       const piInstance = (window as any).Pi;
       const isPiSdkAvailable = typeof piInstance?.createPayment === 'function';
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 2: isPiSdkAvailable = ${isPiSdkAvailable}`);
@@ -74,70 +94,104 @@ export const piPaymentService = {
         return;
       }
 
-      const paymentPayload = {
-        amount: paymentData.amount,
-        memo: paymentData.memo,
-        metadata: {
+      // Sanitize and format payment data strictly according to official Pi Platform SDK specification
+      const rawAmount = paymentData.amount;
+      const parsedAmount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount));
+      const safeAmount = isNaN(parsedAmount) || parsedAmount <= 0 ? 0.01 : parsedAmount;
+      const safeMemo = (paymentData.memo && typeof paymentData.memo === 'string') ? paymentData.memo.trim() : 'Pi Market Purchase';
+      
+      let safeMetadata: Record<string, any> = {};
+      try {
+        safeMetadata = JSON.parse(JSON.stringify({
           ...paymentData.metadata,
-          buyerId: verifiedUser.piUid,
-          buyerUsername: verifiedUser.username
+          buyerId: verifiedUser?.piUid || verifiedUser?.uid || 'unknown_buyer',
+          buyerUsername: verifiedUser?.username || 'unknown_user'
+        }));
+      } catch (metaErr) {
+        console.warn(`[${new Date().toISOString()}] [PAYMENT_TRACE] Metadata stringify warning:`, metaErr);
+        safeMetadata = { buyerId: verifiedUser?.piUid || 'unknown' };
+      }
+
+      const paymentPayload = {
+        amount: safeAmount,
+        memo: safeMemo,
+        metadata: safeMetadata
+      };
+
+      const paymentCallbacks = {
+        onReadyForServerApproval: async (paymentId: string) => {
+          const cbTime = new Date().toISOString();
+          console.log(`[${cbTime}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerApproval FIRED by Pi SDK! PaymentID: "${paymentId}"`);
+          try {
+            await callbacks.onReadyForServerApproval(paymentId);
+            console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerApproval COMPLETED SUCCESSFULLY for paymentId: "${paymentId}"`);
+          } catch (err: any) {
+            console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerApproval EXCEPTION for paymentId: "${paymentId}":`, err);
+            throw err;
+          }
+        },
+        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+          const cbTime = new Date().toISOString();
+          console.log(`[${cbTime}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerCompletion FIRED by Pi SDK! PaymentID: "${paymentId}", TxID: "${txid}"`);
+          try {
+            await callbacks.onReadyForServerCompletion(paymentId, txid);
+            console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerCompletion COMPLETED SUCCESSFULLY for paymentId: "${paymentId}"`);
+          } catch (err: any) {
+            console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerCompletion EXCEPTION for paymentId: "${paymentId}":`, err);
+            throw err;
+          } finally {
+            isPaymentInProgress = false;
+          }
+        },
+        onCancel: async (paymentId: string) => {
+          isPaymentInProgress = false;
+          console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onCancel FIRED by Pi SDK! PaymentID: "${paymentId}"`);
+          try {
+            if (callbacks.onCancel) {
+              await callbacks.onCancel(paymentId);
+            }
+          } catch (err) {
+            console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onCancel error in inner callback:`, err);
+          }
+        },
+        onError: async (error: Error, paymentOrId?: any) => {
+          isPaymentInProgress = false;
+          console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onError FIRED by Pi SDK!`, {
+            errorMessage: error?.message || String(error),
+            errorName: error?.name,
+            errorStack: error?.stack,
+            paymentOrId: JSON.stringify(paymentOrId || null)
+          });
+          try {
+            if (callbacks.onError) {
+              await callbacks.onError(error, typeof paymentOrId === 'string' ? paymentOrId : paymentOrId?.identifier || paymentOrId?.id || 'unknown_payment_id');
+            }
+          } catch (err) {
+            console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onError error in inner callback:`, err);
+          }
         }
       };
 
-      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 3: Calling window.Pi.createPayment with payload:`, paymentPayload);
+      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 3: EXACT_PAYMENT_PAYLOAD_PASSED_TO_PI_SDK:`, JSON.stringify(paymentPayload, null, 2));
+      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 3: FIELD_TYPES:`, {
+        amountType: typeof paymentPayload.amount,
+        amountValue: paymentPayload.amount,
+        memoType: typeof paymentPayload.memo,
+        memoValue: paymentPayload.memo,
+        metadataType: typeof paymentPayload.metadata,
+        metadataKeys: Object.keys(paymentPayload.metadata),
+        callbacksDefined: Object.keys(paymentCallbacks)
+      });
 
-      piInstance.createPayment(
-        paymentPayload,
-        {
-          onReadyForServerApproval: async (paymentId: string) => {
-            const cbTime = new Date().toISOString();
-            console.log(`[${cbTime}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerApproval ENTERED for paymentId: ${paymentId}`);
-            try {
-              await callbacks.onReadyForServerApproval(paymentId);
-              console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerApproval COMPLETED SUCCESSFULLY for paymentId: ${paymentId}`);
-            } catch (err: any) {
-              console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerApproval EXCEPTION for paymentId: ${paymentId}:`, err);
-              throw err;
-            }
-          },
-          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-            const cbTime = new Date().toISOString();
-            console.log(`[${cbTime}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerCompletion ENTERED for paymentId: ${paymentId}, txid: ${txid}`);
-            try {
-              await callbacks.onReadyForServerCompletion(paymentId, txid);
-              console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerCompletion COMPLETED SUCCESSFULLY for paymentId: ${paymentId}`);
-            } catch (err: any) {
-              console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onReadyForServerCompletion EXCEPTION for paymentId: ${paymentId}:`, err);
-              throw err;
-            } finally {
-              isPaymentInProgress = false;
-            }
-          },
-          onCancel: async (paymentId: string) => {
-            isPaymentInProgress = false;
-            console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onCancel ENTERED for paymentId: ${paymentId}`);
-            try {
-              if (callbacks.onCancel) {
-                await callbacks.onCancel(paymentId);
-              }
-            } catch (err) {
-              console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onCancel error in inner callback:`, err);
-            }
-          },
-          onError: async (error: Error, paymentId: string) => {
-            isPaymentInProgress = false;
-            console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onError ENTERED for paymentId: ${paymentId}, error:`, error);
-            try {
-              if (callbacks.onError) {
-                await callbacks.onError(error, paymentId);
-              }
-            } catch (err) {
-              console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [CALLBACK] onError error in inner callback:`, err);
-            }
-          }
-        }
-      );
-      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 4: window.Pi.createPayment successfully dispatched synchronously.`);
+      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Invoking window.Pi.createPayment()...`);
+      let syncResult: any = undefined;
+      try {
+        syncResult = piInstance.createPayment(paymentPayload, paymentCallbacks);
+        console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 4: window.Pi.createPayment returned synchronously:`, syncResult);
+      } catch (syncErr: any) {
+        console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Synchronous exception during window.Pi.createPayment invocation:`, syncErr);
+        throw syncErr;
+      }
     } catch (err: any) {
       isPaymentInProgress = false;
       console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Initialization catch error:`, err);
