@@ -296,7 +296,11 @@ export const authService = {
     
     const onIncompletePaymentFound = async (payment: any) => {
       const cbStart = Date.now();
-      console.log('[DEBUG_TRACE] [onIncompletePaymentFound] ENTER at:', new Date().toISOString(), 'with payment:', JSON.stringify(payment));
+      console.log('[DEBUG_TRACE] [onIncompletePaymentFound] ENTERED callback with payment:', JSON.stringify(payment), {
+        referrer: document.referrer,
+        origin: window.location.origin,
+        href: window.location.href
+      });
       if (payment && payment.identifier) {
         try {
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -306,20 +310,20 @@ export const authService = {
             const token = await auth.currentUser.getIdToken().catch(() => null);
             if (token) headers['Authorization'] = `Bearer ${token}`;
           }
-          console.log('[DEBUG_TRACE] [onIncompletePaymentFound] BEFORE await fetch /api/payments/incomplete');
+          console.log('[DEBUG_TRACE] [onIncompletePaymentFound] IMMEDIATELY BEFORE fetch() to /api/payments/incomplete');
           const fetchRes = await fetch(getAbsoluteUrl('/api/payments/incomplete'), {
             method: 'POST',
             headers,
             body: JSON.stringify({ payment })
           });
-          console.log('[DEBUG_TRACE] [onIncompletePaymentFound] AFTER await fetch /api/payments/incomplete, status:', fetchRes.status);
+          console.log('[DEBUG_TRACE] [onIncompletePaymentFound] IMMEDIATELY AFTER fetch() response received, status:', fetchRes.status);
         } catch (err) {
           console.error('[DEBUG_TRACE] [onIncompletePaymentFound] Error notifying server of incomplete payment:', err);
         }
       } else {
         console.log('[DEBUG_TRACE] [onIncompletePaymentFound] No payment identifier in payload, skipping fetch.');
       }
-      console.log('[DEBUG_TRACE] [onIncompletePaymentFound] EXIT after duration:', Date.now() - cbStart, 'ms');
+      console.log('[DEBUG_TRACE] [onIncompletePaymentFound] EXITING callback after duration:', Date.now() - cbStart, 'ms');
     };
 
     piAuthPromise = (async () => {

@@ -22,8 +22,12 @@ export const piPaymentService = {
   ): Promise<void> {
     console.log('[DEBUG_TRACE] [createPayment] ENTER');
     console.log('[DEBUG_TRACE] [createPayment] paymentData:', paymentData);
+    console.log('[DEBUG_TRACE] [createPayment] document.referrer:', document.referrer);
+    console.log('[DEBUG_TRACE] [createPayment] window.location.origin:', window.location.origin);
+    console.log('[DEBUG_TRACE] [createPayment] window.location.href:', window.location.href);
     console.log('[DEBUG_TRACE] [createPayment] typeof window.Pi:', typeof (window as any).Pi);
     console.log('[DEBUG_TRACE] [createPayment] typeof window.Pi.createPayment:', typeof (window as any).Pi?.createPayment);
+    console.log('[DEBUG_TRACE] [createPayment] typeof window.Pi.completePayment:', typeof (window as any).Pi?.completePayment);
     console.log('[DEBUG_TRACE] [createPayment] isPaymentInProgress state:', isPaymentInProgress);
 
     if (isPaymentInProgress) {
@@ -57,9 +61,17 @@ export const piPaymentService = {
         await authService.authenticatePi(['username', 'payments'], !hasScope);
         console.log('[DEBUG_TRACE] [createPayment] AFTER await authService.authenticatePi()');
 
-        console.log('[DEBUG_TRACE] [createPayment] BEFORE callback registration & window.Pi.createPayment() call');
+        console.log('[DEBUG_TRACE] [createPayment] BEFORE callback registration & window.Pi.createPayment() call', {
+          amount: paymentData.amount,
+          memo: paymentData.memo,
+          metadata: paymentData.metadata,
+          referrer: document.referrer,
+          origin: window.location.origin,
+          href: window.location.href
+        });
         console.log('[DEBUG_TRACE] [createPayment] callbacks registered:', Object.keys(callbacks));
         
+        console.log('[DEBUG_TRACE] [createPayment] IMMEDIATELY BEFORE window.Pi.createPayment() call');
         window.Pi.createPayment(
           {
             amount: paymentData.amount,
@@ -68,7 +80,11 @@ export const piPaymentService = {
           },
           {
             onReadyForServerApproval: async (paymentId: string) => {
-              console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerApproval] ENTER for paymentId:', paymentId);
+              console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerApproval] ENTER for paymentId:', paymentId, {
+                referrer: document.referrer,
+                origin: window.location.origin,
+                href: window.location.href
+              });
               try {
                 console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerApproval] BEFORE await callbacks.onReadyForServerApproval');
                 await callbacks.onReadyForServerApproval(paymentId);
@@ -80,7 +96,11 @@ export const piPaymentService = {
               console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerApproval] EXIT');
             },
             onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-              console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerCompletion] ENTER for paymentId:', paymentId, 'txid:', txid);
+              console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerCompletion] ENTER for paymentId:', paymentId, 'txid:', txid, {
+                referrer: document.referrer,
+                origin: window.location.origin,
+                href: window.location.href
+              });
               try {
                 console.log('[DEBUG_TRACE] [piPaymentService.onReadyForServerCompletion] BEFORE await callbacks.onReadyForServerCompletion');
                 await callbacks.onReadyForServerCompletion(paymentId, txid);
@@ -123,7 +143,7 @@ export const piPaymentService = {
             }
           }
         );
-        console.log('[DEBUG_TRACE] [createPayment] AFTER window.Pi.createPayment() invocation');
+        console.log('[DEBUG_TRACE] [createPayment] IMMEDIATELY AFTER window.Pi.createPayment() call completed synchronous execution');
       } else {
         console.log('[DEBUG_TRACE] [createPayment] Web preview environment detected. Simulating Pi payment flow...');
         

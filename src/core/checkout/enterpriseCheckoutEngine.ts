@@ -317,7 +317,14 @@ export class EnterpriseCheckoutEngine {
     sessionId: string,
     metadata: any
   ): Promise<PiTestnetVerificationResult> {
-    console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering createPayment with amount:', amount, 'memo:', memo);
+    console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering createPayment with amount:', amount, 'memo:', memo, {
+      referrer: document.referrer,
+      origin: window.location.origin,
+      href: window.location.href,
+      typeofPi: typeof (window as any).Pi,
+      typeofCreatePayment: typeof (window as any).Pi?.createPayment,
+      typeofCompletePayment: typeof (window as any).Pi?.completePayment
+    });
 
     const requiredMetadata = ['sessionId', 'buyerId', 'sellerId', 'businessId', 'storeId', 'orderId'];
     for (const key of requiredMetadata) {
@@ -341,7 +348,11 @@ export class EnterpriseCheckoutEngine {
         { amount, memo, metadata: { ...metadata, sessionId, internalPaymentId } },
         {
           onReadyForServerApproval: async (piPaymentId: string) => {
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering onReadyForServerApproval with piPaymentId:', piPaymentId);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] ENTERED callback with piPaymentId:', piPaymentId, {
+              referrer: document.referrer,
+              origin: window.location.origin,
+              href: window.location.href
+            });
             try {
               let headers: any = { 'Content-Type': 'application/json' };
               try {
@@ -353,9 +364,9 @@ export class EnterpriseCheckoutEngine {
               const url = getAbsoluteUrl('/api/payments/approve');
               const bodyStr = JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata });
               const startTime = Date.now();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch URL:', url);
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] request body:', bodyStr);
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch start time:', startTime);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] fetch URL:', url);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] request body:', bodyStr);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY BEFORE fetch() call');
 
               const res = await fetch(url, {
                 method: 'POST',
@@ -363,11 +374,17 @@ export class EnterpriseCheckoutEngine {
                 body: bodyStr
               });
               const endTime = Date.now();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch finish time:', endTime, 'duration:', endTime - startTime, 'ms');
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response status:', res.status);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY AFTER fetch() response received:', {
+                status: res.status,
+                statusText: res.statusText,
+                ok: res.ok,
+                resUrl: res.url,
+                durationMs: endTime - startTime
+              });
 
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY BEFORE res.text()');
               const resText = await res.text();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response body:', resText);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY AFTER res.text() result:', resText);
               
               if (!res.ok) {
                 if (!piPaymentId.startsWith('SIM_')) {
@@ -384,10 +401,14 @@ export class EnterpriseCheckoutEngine {
                 throw err;
               }
             }
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment] callback exit: onReadyForServerApproval');
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] EXITING callback for piPaymentId:', piPaymentId);
           },
           onReadyForServerCompletion: async (piPaymentId: string, txid: string) => {
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment] entering onReadyForServerCompletion with piPaymentId:', piPaymentId, 'txid:', txid);
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] ENTERED callback with piPaymentId:', piPaymentId, 'txid:', txid, {
+              referrer: document.referrer,
+              origin: window.location.origin,
+              href: window.location.href
+            });
             try {
               let headers: any = { 'Content-Type': 'application/json' };
               try {
@@ -399,9 +420,9 @@ export class EnterpriseCheckoutEngine {
               const url = getAbsoluteUrl('/api/payments/complete');
               const bodyStr = JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata });
               const startTime = Date.now();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch URL:', url);
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] request body:', bodyStr);
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch start time:', startTime);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] fetch URL:', url);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] request body:', bodyStr);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] IMMEDIATELY BEFORE fetch() call');
 
               const res = await fetch(url, {
                 method: 'POST',
@@ -409,11 +430,17 @@ export class EnterpriseCheckoutEngine {
                 body: bodyStr
               });
               const endTime = Date.now();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] fetch finish time:', endTime, 'duration:', endTime - startTime, 'ms');
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response status:', res.status);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] IMMEDIATELY AFTER fetch() response received:', {
+                status: res.status,
+                statusText: res.statusText,
+                ok: res.ok,
+                resUrl: res.url,
+                durationMs: endTime - startTime
+              });
 
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] IMMEDIATELY BEFORE res.text()');
               const resText = await res.text();
-              console.log('[DEBUG_TRACE] [executePiTestnetPayment] response body:', resText);
+              console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] IMMEDIATELY AFTER res.text() result:', resText);
 
               let serverOrderId = '';
               try {
@@ -434,6 +461,13 @@ export class EnterpriseCheckoutEngine {
               const finalOrderId = serverOrderId || sessionId || ('ORD_' + Math.random().toString(36).substring(2, 10).toUpperCase());
 
               paymentService.updateTransactionStatus(internalPaymentId, 'Completed', txid).catch(console.error);
+
+              // Check window.Pi.completePayment existence / execution logging
+              if (typeof (window as any).Pi?.completePayment === 'function') {
+                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] typeof window.Pi.completePayment is function');
+              } else {
+                console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] typeof window.Pi.completePayment:', typeof (window as any).Pi?.completePayment);
+              }
 
               resolve({
                 verified: true,
@@ -462,7 +496,7 @@ export class EnterpriseCheckoutEngine {
                 throw err;
               }
             }
-            console.log('[DEBUG_TRACE] [executePiTestnetPayment] callback exit: onReadyForServerCompletion');
+            console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] EXITING callback for piPaymentId:', piPaymentId);
           },
           onCancel: async (piPaymentId: string) => {
             console.log('[DEBUG_TRACE] [executePiTestnetPayment] onCancel with piPaymentId:', piPaymentId);
