@@ -80,77 +80,109 @@ export function initRemoteLogger() {
     sendRemoteLog('info', args);
   };
 
-  // 1. INSTRUMENT GLOBAL FETCH
+  // 1. INSTRUMENT GLOBAL FETCH SAFELY
   const originalFetch = window.fetch;
-  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const targetUrl = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : input.url);
-    const fetchStartTime = Date.now();
+  if (typeof originalFetch === 'function') {
+    const wrappedFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+      const targetUrl = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : input.url);
+      const fetchStartTime = Date.now();
 
-    // Skip remote logging endpoint itself to avoid infinite loops
-    const isLogEndpoint = targetUrl.includes('/api/debug-log');
+      // Skip remote logging endpoint itself to avoid infinite loops
+      const isLogEndpoint = targetUrl.includes('/api/debug-log');
 
-    if (!isLogEndpoint) {
-      console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY BEFORE fetch() call to:', targetUrl, {
-        method: init?.method || 'GET',
-        hasHeaders: !!init?.headers,
-        hasBody: !!init?.body,
+      if (!isLogEndpoint) {
+        console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY BEFORE fetch() call to:', targetUrl, {
+          method: init?.method || 'GET',
+          hasHeaders: !!init?.headers,
+          hasBody: !!init?.body,
+          referrer: document.referrer,
+          origin: window.location.origin,
+          href: window.location.href
+        });
+      }
+
+      try {
+        const response = await originalFetch.apply(window, [input, init]);
+        const fetchEndTime = Date.now();
+
+        if (!isLogEndpoint) {
+          console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY AFTER fetch() response received from:', targetUrl, {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            resUrl: response.url,
+            durationMs: fetchEndTime - fetchStartTime,
+            referrer: document.referrer,
+            origin: window.location.origin,
+            href: window.location.href
+          });
+        }
+        return response;
+      } catch (fetchErr) {
+        const fetchErrTime = Date.now();
+        if (!isLogEndpoint) {
+          console.error('[DEBUG_TRACE] [fetch] IMMEDIATELY AFTER fetch() REJECTED with error for:', targetUrl, {
+            error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+            durationMs: fetchErrTime - fetchStartTime,
+            referrer: document.referrer,
+            origin: window.location.origin,
+            href: window.location.href
+          });
+        }
+        throw fetchErr;
+      }
+    };
+
+    try {
+      Object.defineProperty(window, 'fetch', {
+        value: wrappedFetch,
+        writable: true,
+        configurable: true
+      });
+    } catch (_err) {
+      try {
+        (window as any).fetch = wrappedFetch;
+      } catch (_e) {
+        console.warn('[RemoteLogger] Could not instrument window.fetch directly on window');
+      }
+    }
+  }
+
+  // 2. INSTRUMENT WINDOW.POSTMESSAGE SAFELY
+  const originalPostMessage = window.postMessage;
+  if (typeof originalPostMessage === 'function') {
+    const wrappedPostMessage = function (message: any, targetOriginOrOptions?: any, transfer?: any): void {
+      console.log('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY BEFORE window.postMessage() call', {
+        message: typeof message === 'object' ? JSON.stringify(message) : String(message),
+        targetOrigin: typeof targetOriginOrOptions === 'string' ? targetOriginOrOptions : 'options_object',
         referrer: document.referrer,
         origin: window.location.origin,
         href: window.location.href
       });
-    }
+
+      try {
+        (originalPostMessage as Function).apply(window, arguments);
+        console.log('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY AFTER window.postMessage() execution completed');
+      } catch (postErr) {
+        console.error('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY AFTER window.postMessage() threw error:', postErr);
+        throw postErr;
+      }
+    };
 
     try {
-      const response = await originalFetch.apply(window, [input, init]);
-      const fetchEndTime = Date.now();
-
-      if (!isLogEndpoint) {
-        console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY AFTER fetch() response received from:', targetUrl, {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok,
-          resUrl: response.url,
-          durationMs: fetchEndTime - fetchStartTime,
-          referrer: document.referrer,
-          origin: window.location.origin,
-          href: window.location.href
-        });
+      Object.defineProperty(window, 'postMessage', {
+        value: wrappedPostMessage,
+        writable: true,
+        configurable: true
+      });
+    } catch (_err) {
+      try {
+        (window as any).postMessage = wrappedPostMessage;
+      } catch (_e) {
+        console.warn('[RemoteLogger] Could not instrument window.postMessage directly on window');
       }
-      return response;
-    } catch (fetchErr) {
-      const fetchErrTime = Date.now();
-      if (!isLogEndpoint) {
-        console.error('[DEBUG_TRACE] [fetch] IMMEDIATELY AFTER fetch() REJECTED with error for:', targetUrl, {
-          error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
-          durationMs: fetchErrTime - fetchStartTime,
-          referrer: document.referrer,
-          origin: window.location.origin,
-          href: window.location.href
-        });
-      }
-      throw fetchErr;
     }
-  };
-
-  // 2. INSTRUMENT WINDOW.POSTMESSAGE
-  const originalPostMessage = window.postMessage;
-  window.postMessage = function (message: any, targetOriginOrOptions?: any, transfer?: any): void {
-    console.log('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY BEFORE window.postMessage() call', {
-      message: typeof message === 'object' ? JSON.stringify(message) : String(message),
-      targetOrigin: typeof targetOriginOrOptions === 'string' ? targetOriginOrOptions : 'options_object',
-      referrer: document.referrer,
-      origin: window.location.origin,
-      href: window.location.href
-    });
-
-    try {
-      (originalPostMessage as Function).apply(window, arguments);
-      console.log('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY AFTER window.postMessage() execution completed');
-    } catch (postErr) {
-      console.error('[DEBUG_TRACE] [window.postMessage] IMMEDIATELY AFTER window.postMessage() threw error:', postErr);
-      throw postErr;
-    }
-  };
+  }
 
   // 3. INSTRUMENT WINDOW LIFECYCLE LISTENERS
   window.addEventListener('message', (event) => {
