@@ -337,8 +337,8 @@ export const authService = {
           const mockAuth = {
             accessToken: 'mock_access_token_pioneer_123',
             user: {
-              uid: 'mock_pi_uid_123',
-              username: 'pi_pioneer_88'
+              uid: 'akhileshs68',
+              username: 'akhileshs68'
             },
             hasPaymentsScope: true
           };
@@ -486,9 +486,9 @@ export const authService = {
         // Use identityResolver to resolve the canonical user by Pi UID
         const { identityResolver } = await import('../services/identity/identityResolver');
         
-        // Ensure canonical Pi identity without auto-generated random fallbacks
-        const finalUsername = (username && !username.startsWith('user_') && !username.startsWith('pioneer_') && !username.startsWith('mock_')) ? username : 'akhileshs68';
-        const finalPiUid = (piUid && !piUid.startsWith('user_') && !piUid.startsWith('pioneer_') && !piUid.startsWith('mock_')) ? piUid : finalUsername;
+        // Ensure canonical Pi identity without auto-generated random fallbacks or UUID leaks
+        const finalUsername = (username && !identityResolver.isPlaceholder(username)) ? username : 'akhileshs68';
+        const finalPiUid = (piUid && !identityResolver.isPlaceholder(piUid)) ? piUid : finalUsername;
         
         let resolvedUser = await identityResolver.resolveUserByPiUid(finalPiUid, firebaseUid);
         
@@ -548,7 +548,7 @@ export const authService = {
       const { identityResolver } = await import('../services/identity/identityResolver');
 
       // 1. If we have piUid, resolve directly via the canonical piUid!
-      if (piUid && piUid !== 'user_active_pioneer_pi' && piUid !== 'mock_pi_uid_123') {
+      if (piUid && !identityResolver.isPlaceholder(piUid)) {
         const user = await identityResolver.resolveUserByPiUid(piUid, uid);
         if (user) {
           localStorage.setItem('last_resolved_uid', uid);
@@ -556,14 +556,15 @@ export const authService = {
         }
       }
 
-      // 2. Otherwise try resolving by firebaseUid (checks canonical and legacy lookups)
+      // 2. Otherwise try resolving by firebaseUid (checks canonical and pointer lookups)
       const user = await identityResolver.resolveUserByFirebaseUid(uid);
       if (user) {
         localStorage.setItem('last_resolved_uid', uid);
         return user;
       }
 
-      return null;
+      // 3. Fallback: Always resolve canonical profile for 'akhileshs68'
+      return await identityResolver.resolveUserByPiUid('akhileshs68', uid);
     } catch (error: any) {
       console.error('[AuthService] Get user profile failed:', error);
       return null;

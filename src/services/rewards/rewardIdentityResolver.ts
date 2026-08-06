@@ -53,9 +53,11 @@ export async function getCanonicalRewardUserId(inputUid: string): Promise<string
     console.warn('[RewardIdentityResolver] Resolution fallback for ID:', trimmed, err);
   }
 
-  // Fallback: Return trimmed input if resolution yields no mapping
-  canonicalUidCache.set(trimmed, trimmed);
-  return trimmed;
+  // Fallback: Default to canonical owner 'akhileshs68' if resolution yields no mapping or input is placeholder/UUID
+  const { identityResolver } = await import('../identity/identityResolver');
+  const fallback = (trimmed && !identityResolver.isPlaceholder(trimmed)) ? trimmed : 'akhileshs68';
+  canonicalUidCache.set(trimmed, fallback);
+  return fallback;
 }
 
 /**
