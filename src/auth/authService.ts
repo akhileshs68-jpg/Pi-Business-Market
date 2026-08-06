@@ -64,7 +64,10 @@ export function isRealPiBrowser(): boolean {
   if (typeof window === 'undefined') return false;
   const isPiUA = typeof navigator !== 'undefined' && Boolean(navigator.userAgent) && /PiBrowser/i.test(navigator.userAgent);
   const isNativeHost = Boolean((window as any).PiIsNative) || Boolean((window as any).webkit?.messageHandlers?.pi) || Boolean((window as any).PiHost);
-  return isPiUA || isNativeHost;
+  const isSandboxMode = Boolean((window as any).Pi?.sandbox) || 
+                        window.location.search.includes('sandbox=') || 
+                        document.referrer.includes('minepi.com');
+  return isPiUA || isNativeHost || isSandboxMode;
 }
 
 export function isDevMockAllowed(): boolean {
@@ -474,51 +477,61 @@ export const authService = {
         console.log('[RAW_PI_SDK_RESPONSE]', JSON.stringify(piAuth));
         console.log('[PI_AUTH_DEBUG] Authentication successful: true');
         console.log('[PI_AUTH_DEBUG] Authentication response:', JSON.stringify(piAuth));
-      } catch (authErr: any) {
-        console.error('[PI_AUTH_DEBUG] Authentication failed:', authErr);
-        throw new Error(`[Step 1 Failed] Pi Network authentication failed: ${authErr.message || authErr}`);
-      }
 
-      // Step 2, 3 & 4: Fetch user profile, UID, and Username
-      console.log('[PI_VERIFY_STEP 2/10] Fetching authenticated Pi user profile...');
-      if (piAuth?.user?.username && piAuth?.user?.uid) {
-        piUid = piAuth.user.uid;
-        username = piAuth.user.username; // Exact casing returned by Pi SDK
-        console.log('[UID_FROM_SDK]', piUid);
-        console.log('[USERNAME_FROM_SDK]', username);
-        console.log('[PI_AUTH_DEBUG] Pi User ID:', piUid);
-        console.log('[PI_AUTH_DEBUG] Pi Username:', username);
-      } else if (piAuth?.accessToken) {
-        console.warn('[PI_AUTH_DEBUG] Missing direct user profile in Pi SDK response. Validating accessToken via backend /api/auth/pi...');
-        try {
-          const res = await fetch(getAbsoluteUrl('/api/auth/pi'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accessToken: piAuth.accessToken })
-          });
-          if (!res.ok) {
-            const errJson = await res.json().catch(() => ({}));
-            throw new Error(errJson.error || `HTTP ${res.status}`);
+        // Step 2, 3 & 4: Fetch user profile, UID, and Username
+        console.log('[PI_VERIFY_STEP 2/10] Fetching authenticated Pi user profile...');
+        if (piAuth?.user?.username && piAuth?.user?.uid) {
+          piUid = piAuth.user.uid;
+          username = piAuth.user.username; // Exact casing returned by Pi SDK
+          console.log('[UID_FROM_SDK]', piUid);
+          console.log('[USERNAME_FROM_SDK]', username);
+          console.log('[PI_AUTH_DEBUG] Pi User ID:', piUid);
+          console.log('[PI_AUTH_DEBUG] Pi Username:', username);
+        } else if (piAuth?.accessToken) {
+          console.warn('[PI_AUTH_DEBUG] Missing direct user profile in Pi SDK response. Validating accessToken via backend /api/auth/pi...');
+          try {
+            const res = await fetch(getAbsoluteUrl('/api/auth/pi'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accessToken: piAuth.accessToken })
+            });
+            if (!res.ok) {
+              const errJson = await res.json().catch(() => ({}));
+              throw new Error(errJson.error || `HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            console.log('[PI_AUTH_DEBUG] Backend validation response:', data);
+            if (data?.user?.username && data?.user?.uid) {
+              username = data.user.username; // Exact casing from Pi API
+              piUid = data.user.uid;
+              console.log('[UID_FROM_SDK]', piUid);
+              console.log('[USERNAME_FROM_SDK]', username);
+              console.log('[PI_AUTH_DEBUG] Pi User ID (via backend):', piUid);
+              console.log('[PI_AUTH_DEBUG] Pi Username (via backend):', username);
+            } else {
+              throw new Error('Backend validation returned empty user object.');
+            }
+          } catch (fetchErr: any) {
+            console.error('[PI_AUTH_DEBUG] Backend validation failed:', fetchErr);
+            throw new Error(`[Step 2 Failed] Unable to fetch authenticated Pi user profile: ${fetchErr.message}`);
           }
-          const data = await res.json();
-          console.log('[PI_AUTH_DEBUG] Backend validation response:', data);
-          if (data?.user?.username && data?.user?.uid) {
-            username = data.user.username; // Exact casing from Pi API
-            piUid = data.user.uid;
-            console.log('[UID_FROM_SDK]', piUid);
-            console.log('[USERNAME_FROM_SDK]', username);
-            console.log('[PI_AUTH_DEBUG] Pi User ID (via backend):', piUid);
-            console.log('[PI_AUTH_DEBUG] Pi Username (via backend):', username);
-          } else {
-            throw new Error('Backend validation returned empty user object.');
-          }
-        } catch (fetchErr: any) {
-          console.error('[PI_AUTH_DEBUG] Backend validation failed:', fetchErr);
-          throw new Error(`[Step 2 Failed] Unable to fetch authenticated Pi user profile: ${fetchErr.message}`);
+        } else {
+          console.error('[PI_AUTH_DEBUG] Pi SDK response missing user and accessToken. Full response:', piAuth);
+          throw new Error('[Step 2 Failed] Pi SDK authentication response contained no user profile or access token.');
         }
-      } else {
-        console.error('[PI_AUTH_DEBUG] Pi SDK response missing user and accessToken. Full response:', piAuth);
-        throw new Error('[Step 2 Failed] Pi SDK authentication response contained no user profile or access token.');
+      } catch (authErr: any) {
+        console.warn('[PI_AUTH_DEBUG] Real Pi Authentication check failed:', authErr);
+        if (isDevMockAllowed()) {
+          console.log('[PI_VERIFY_STEP 1/10] Falling back to Dev/Mock credentials inside verifyAndSynchronizePiAccount...');
+          piUid = 'dev_pioneer_mock';
+          username = 'dev_pioneer_mock';
+          piAuth = { accessToken: 'mock_access_token_dev', user: { uid: piUid, username }, hasPaymentsScope: true };
+          console.log('[RAW_PI_SDK_RESPONSE]', JSON.stringify(piAuth));
+          console.log('[UID_FROM_SDK]', piUid);
+          console.log('[USERNAME_FROM_SDK]', username);
+        } else {
+          throw new Error(`[Step 1 Failed] Pi Network authentication failed: ${authErr.message || authErr}`);
+        }
       }
     } else {
       // Dev mode outside Pi Browser

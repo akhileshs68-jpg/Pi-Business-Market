@@ -1,56 +1,61 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import * as dotenv from 'dotenv';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs, query, orderBy, limit, initializeFirestore } from 'firebase/firestore';
 import * as fs from 'fs';
-import * as path from 'path';
 
-dotenv.config();
+const configData = JSON.parse(fs.readFileSync('firebase-applet-config.json', 'utf8'));
 
-const config: any = {
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "straight-modem-gw1xt",
+const config = {
+  apiKey: configData.apiKey,
+  authDomain: configData.authDomain,
+  projectId: configData.projectId,
+  storageBucket: configData.storageBucket,
+  messagingSenderId: configData.messagingSenderId,
+  appId: configData.appId,
 };
 
-const gac = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-const fsa = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-if (gac && fs.existsSync(gac)) {
-  config.credential = cert(gac);
-} else if (fsa) {
-  let serviceAccount: any;
-  try {
-    serviceAccount = typeof fsa === 'string' ? JSON.parse(fsa) : fsa;
-  } catch (e) {
-    serviceAccount = fsa;
-  }
-  config.credential = cert(serviceAccount);
-}
-
-initializeApp(config);
-
-const db = getFirestore("ai-studio-pibusinessmarket-77787f2f-7898-4843-8acf-68b0116d2c80");
+const app = initializeApp(config);
+const db = initializeFirestore(app, { experimentalForceLongPolling: true }, configData.firestoreDatabaseId);
 
 async function run() {
   try {
     console.log("=== RECENT CLIENT LOGS ===");
-    const clientLogsSnap = await db.collection("clientLogs").orderBy("timestamp", "desc").limit(30).get();
+    const clientLogsRef = collection(db, 'clientLogs');
+    const logsQuery = query(clientLogsRef, orderBy('timestamp', 'desc'), limit(40));
+    const clientLogsSnap = await getDocs(logsQuery);
     console.log(`Found ${clientLogsSnap.docs.length} client logs.`);
     for (const doc of clientLogsSnap.docs) {
       const data = doc.data();
-      console.log(`[${data.timestamp}] [${data.log?.level || 'INFO'}] ${data.log?.message || JSON.stringify(data.log)}`);
-      if (data.log?.details) {
-        console.log("  Details:", JSON.stringify(data.log.details));
+      const log = data.log || {};
+      console.log(`[${data.timestamp || 'N/A'}] [${log.level || 'INFO'}] ${log.message || JSON.stringify(log)}`);
+      if (log.details) {
+        console.log("  Details:", JSON.stringify(log.details));
       }
     }
 
     console.log("\n=== RECENT PAYMENTS ===");
-    const paymentsSnap = await db.collection("payments").orderBy("createdAt", "desc").limit(10).get();
+    const paymentsRef = collection(db, 'payments');
+    const paymentsQuery = query(paymentsRef, orderBy('createdAt', 'desc'), limit(20));
+    const paymentsSnap = await getDocs(paymentsQuery);
     console.log(`Found ${paymentsSnap.docs.length} payments.`);
     for (const doc of paymentsSnap.docs) {
       const data = doc.data();
-      console.log(`DocID: ${doc.id} => paymentId: ${data.paymentId}, status: ${data.status || data.paymentStatus}, amount: ${data.amount}, memo: ${data.memo}, buyer: ${data.metadata?.buyerUid || data.userUid || 'N/A'}`);
+      console.log(`DocID: ${doc.id} => paymentId: ${data.paymentId || 'N/A'}, status: ${data.status || data.paymentStatus || 'N/A'}, amount: ${data.amount || 'N/A'}, memo: ${data.memo || 'N/A'}, buyer: ${data.userUid || data.buyerId || 'N/A'}`);
     }
-  } catch(e: any) {
-    console.error("Error reading Firestore:", e);
+
+    console.log("\n=== RECENT ORDERS ===");
+    const ordersRef = collection(db, 'orders');
+    const ordersQuery = query(ordersRef, orderBy('createdAt', 'desc'), limit(10));
+    const ordersSnap = await getDocs(ordersQuery);
+    console.log(`Found ${ordersSnap.docs.length} orders.`);
+    for (const doc of ordersSnap.docs) {
+      const data = doc.data();
+      console.log(`OrderID: ${doc.id} => status: ${data.status || 'N/A'}, grandTotal: ${data.grandTotal || 'N/A'}, items: ${data.items ? data.items.length : 0}, txid: ${data.paymentTxId || data.txid || 'N/A'}`);
+    }
+    
+    process.exit(0);
+  } catch (e: any) {
+    console.error("Error running get_recent_logs:", e);
+    process.exit(1);
   }
 }
 
