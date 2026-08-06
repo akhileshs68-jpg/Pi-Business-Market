@@ -17,27 +17,7 @@ const KEYS = {
   CURRENT_USER: `${STORAGE_KEY_PREFIX}current_user`,
 };
 
-const DEFAULT_CURRENT_USER: User = {
-  uid: 'akhileshs68',
-  piUid: 'akhileshs68',
-  username: 'akhileshs68',
-  displayName: 'akhileshs68',
-  walletAddress: 'GBCWD32QYJ7LURP5H6V77JHYX345PPONNFFVVZZ44SSTT22XXYYZZ',
-  role: 'buyer',
-  activeRole: 'buyer',
-  roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
-  accountType: 'business',
-  verified: true,
-  kycVerified: true,
-  createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  updatedAt: new Date().toISOString(),
-  lastLogin: new Date().toISOString(),
-  platformRole: 'superadmin',
-  permissions: [],
-  status: 'active'
-};
-
-const SEED_USERS: User[] = [DEFAULT_CURRENT_USER];
+const SEED_USERS: User[] = [];
 
 export class PiBusinessMarketDB {
   static init() {

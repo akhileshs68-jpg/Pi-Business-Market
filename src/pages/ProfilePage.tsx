@@ -353,7 +353,7 @@ export const ProfilePage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-slate-500 text-xs font-semibold font-mono">@{user.username || 'akhileshs68'}</p>
+                <p className="text-slate-500 text-xs font-semibold font-mono">@{user.username || 'Pioneer'}</p>
                 <p className="text-[10px] text-slate-400 font-medium">{user.email || 'pioneer@pi-consensus.net'}</p>
               </div>
             </div>
