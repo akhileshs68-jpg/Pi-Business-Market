@@ -107,6 +107,10 @@ export const paymentService = {
         return snap.docs[0].id;
       }
     }
+
+    const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+    const canonicalUser = data.userId ? await getCanonicalRewardUserId(data.userId) : '';
+    const canonicalSeller = data.sellerId ? await getCanonicalRewardUserId(data.sellerId) : '';
     
     const paymentId = `PAY_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
     const paymentRef = doc(db, 'payments', paymentId);
@@ -114,8 +118,11 @@ export const paymentService = {
     const record = {
       paymentId,
       transactionId: '',
-      userId: data.userId,
-      sellerId: data.sellerId,
+      userId: canonicalUser || data.userId,
+      buyerId: canonicalUser || data.userId,
+      userUid: canonicalUser || data.userId,
+      piUid: canonicalUser || data.userId,
+      sellerId: canonicalSeller || data.sellerId,
       businessId: data.businessId,
       storeId: data.storeId,
       orderId: data.orderId || '',
@@ -169,16 +176,66 @@ export const paymentService = {
     }
   },
   async getBusinessPayments(businessId: string): Promise<any[]> {
+    if (!businessId) return [];
     const db = getFirebaseDb();
-    const q = query(collection(db, 'payments'), where('businessId', '==', businessId));
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+    const canonicalPiUid = await getCanonicalRewardUserId(businessId);
+    const targetUids = new Set<string>([businessId, canonicalPiUid]);
+    try {
+      const userSnap = await getDoc(doc(db, 'users', canonicalPiUid));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData.firebaseUid) targetUids.add(uData.firebaseUid);
+        if (uData.uid) targetUids.add(uData.uid);
+      }
+    } catch (e) {}
+
+    const map = new Map<string, any>();
+    for (const uid of Array.from(targetUids)) {
+      const q1 = query(collection(db, 'payments'), where('businessId', '==', uid));
+      const snap1 = await getDocs(q1);
+      snap1.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+
+      const q2 = query(collection(db, 'payments'), where('sellerId', '==', uid));
+      const snap2 = await getDocs(q2);
+      snap2.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+    }
+    return Array.from(map.values());
   },
   async getCustomerPayments(customerId: string): Promise<any[]> {
+    if (!customerId) return [];
     const db = getFirebaseDb();
-    const q = query(collection(db, 'payments'), where('userId', '==', customerId));
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+    const canonicalPiUid = await getCanonicalRewardUserId(customerId);
+    const targetUids = new Set<string>([customerId, canonicalPiUid]);
+    try {
+      const userSnap = await getDoc(doc(db, 'users', canonicalPiUid));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData.firebaseUid) targetUids.add(uData.firebaseUid);
+        if (uData.uid) targetUids.add(uData.uid);
+      }
+    } catch (e) {}
+
+    const map = new Map<string, any>();
+    for (const uid of Array.from(targetUids)) {
+      const q1 = query(collection(db, 'payments'), where('userId', '==', uid));
+      const snap1 = await getDocs(q1);
+      snap1.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+
+      const q2 = query(collection(db, 'payments'), where('buyerId', '==', uid));
+      const snap2 = await getDocs(q2);
+      snap2.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+
+      const q3 = query(collection(db, 'payments'), where('userUid', '==', uid));
+      const snap3 = await getDocs(q3);
+      snap3.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+
+      const q4 = query(collection(db, 'payments'), where('piUid', '==', uid));
+      const snap4 = await getDocs(q4);
+      snap4.docs.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+    }
+    return Array.from(map.values());
   },
 
   async getTransaction(paymentId: string): Promise<PaymentRecord | null> {

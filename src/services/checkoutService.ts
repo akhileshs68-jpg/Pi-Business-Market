@@ -190,7 +190,9 @@ export const checkoutService = {
 
     // Task 5: Before calling setDoc(), validate: uid, businessId, storeId, productId, sellerId, price
     // If any value is undefined, stop immediately and throw a user-friendly error
-    const uid = userUid;
+    const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+    const canonicalBuyerUid = userUid ? await getCanonicalRewardUserId(userUid) : userUid;
+    const uid = canonicalBuyerUid || userUid;
     if (
       uid === undefined ||
       businessId === undefined ||
@@ -243,6 +245,7 @@ export const checkoutService = {
       cartId: activeCartId,
       cartIds: cartIds || [activeCartId],
       userUid: uid,
+      piUid: uid,
       subtotal: cart.subtotal,
       discount: cart.discount,
       tax: cart.tax,
