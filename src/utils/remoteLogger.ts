@@ -47,8 +47,10 @@ export function initRemoteLogger() {
         details: formattedArgs
       };
 
-      // Use standard relative fetch - it will resolve relative to iframe base URL
-      await fetch(getAbsoluteUrl('/api/debug-log'), {
+      const debugUrl = getAbsoluteUrl('/api/debug-log');
+      originalLog(`[URL_TRACE] DEBUG_URL=${debugUrl}`);
+
+      await fetch(debugUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -87,8 +89,15 @@ export function initRemoteLogger() {
       const targetUrl = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : input.url);
       const fetchStartTime = Date.now();
 
-      // Skip remote logging endpoint itself to avoid infinite loops
       const isLogEndpoint = targetUrl.includes('/api/debug-log');
+
+      if (targetUrl.includes('/api/payments/approve')) {
+        originalLog(`[URL_TRACE] APPROVE_URL=${targetUrl}`);
+      } else if (targetUrl.includes('/api/payments/complete')) {
+        originalLog(`[URL_TRACE] COMPLETE_URL=${targetUrl}`);
+      } else if (isLogEndpoint) {
+        originalLog(`[URL_TRACE] DEBUG_URL=${targetUrl}`);
+      }
 
       if (!isLogEndpoint) {
         console.log('[DEBUG_TRACE] [fetch] IMMEDIATELY BEFORE fetch() call to:', targetUrl, {

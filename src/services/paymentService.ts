@@ -11,24 +11,41 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   try {
     const auth = getFirebaseAuth();
-    if (auth && auth.currentUser) {
-      console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase currentUser found:', auth.currentUser.uid);
-      const tokenPromise = auth.currentUser.getIdToken();
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
-      const token = await Promise.race([tokenPromise, timeoutPromise]);
-      if (token) {
-        console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase token successfully acquired');
-        headers['Authorization'] = `Bearer ${token}`;
+    if (auth) {
+      if (!auth.currentUser) {
+        console.log('[DEBUG_TRACE] [getAuthHeaders] No active currentUser (paymentService). Triggering signInAnonymously()...');
+        try {
+          const { signInAnonymously } = await import('firebase/auth');
+          const cred = await signInAnonymously(auth);
+          console.log('[DEBUG_TRACE] [getAuthHeaders] signInAnonymously succeeded (paymentService). UID:', cred?.user?.uid);
+        } catch (signInErr) {
+          console.error('[DEBUG_TRACE] [getAuthHeaders] signInAnonymously error (paymentService):', signInErr);
+        }
+      }
+
+      if (auth.currentUser) {
+        console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase currentUser found (paymentService). UID:', auth.currentUser.uid);
+        console.log('[DEBUG_TRACE] [getAuthHeaders] Token acquisition step: calling auth.currentUser.getIdToken(true)...');
+        const token = await auth.currentUser.getIdToken(true).catch((tokenErr) => {
+          console.error('[DEBUG_TRACE] [getAuthHeaders] getIdToken() failed (paymentService):', tokenErr);
+          return null;
+        });
+        if (token) {
+          console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase token successfully acquired (paymentService) (len:', token.length, ')');
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          console.warn('[DEBUG_TRACE] [getAuthHeaders] getIdToken() returned null or empty string (paymentService)');
+        }
       } else {
-        console.warn('[DEBUG_TRACE] [getAuthHeaders] Firebase ID token request timed out (1.2s timeout exceeded) or returned null');
+        console.warn('[DEBUG_TRACE] [getAuthHeaders] Still no active Firebase currentUser after auth attempt (paymentService)');
       }
     } else {
-      console.log('[DEBUG_TRACE] [getAuthHeaders] No active Firebase currentUser');
+      console.warn('[DEBUG_TRACE] [getAuthHeaders] getFirebaseAuth() returned null (paymentService)');
     }
   } catch (err) {
-    console.error('[DEBUG_TRACE] [getAuthHeaders] Error retrieving Firebase token:', err);
+    console.error('[DEBUG_TRACE] [getAuthHeaders] Error retrieving Firebase token (paymentService):', err);
   }
-  console.log('[DEBUG_TRACE] [getAuthHeaders] EXIT (paymentService)');
+  console.log('[DEBUG_TRACE] [getAuthHeaders] EXIT (paymentService). Has Authorization header:', !!headers['Authorization']);
   return headers;
 }
 

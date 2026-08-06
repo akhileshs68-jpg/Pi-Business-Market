@@ -35,32 +35,50 @@ import { masterLedgerService } from '../../services/blockchain/masterLedgerServi
 import { auditService } from '../../services/auditService';
 import { analyticsService } from '../../services/analyticsService';
 import { subscriptionService } from '../../services/blockchain/subscriptionService';
+import { authService } from '../../auth/authService';
 import { getAbsoluteUrl } from '../../utils/urlUtils';
 
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  console.log('[DEBUG_TRACE] [getAuthHeaders] ENTER');
+  console.log('[DEBUG_TRACE] [getAuthHeaders] ENTER (enterpriseCheckoutEngine)');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   try {
     const auth = getFirebaseAuth();
-    if (auth && auth.currentUser) {
-      console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase currentUser found:', auth.currentUser.uid);
-      const tokenPromise = auth.currentUser.getIdToken();
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
-      const token = await Promise.race([tokenPromise, timeoutPromise]);
-      if (token) {
-        console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase token successfully acquired');
-        headers['Authorization'] = `Bearer ${token}`;
+    if (auth) {
+      if (!auth.currentUser) {
+        console.log('[DEBUG_TRACE] [getAuthHeaders] No active currentUser. Triggering signInAnonymously()...');
+        try {
+          const { signInAnonymously } = await import('firebase/auth');
+          const cred = await signInAnonymously(auth);
+          console.log('[DEBUG_TRACE] [getAuthHeaders] signInAnonymously succeeded. UID:', cred?.user?.uid);
+        } catch (signInErr) {
+          console.error('[DEBUG_TRACE] [getAuthHeaders] signInAnonymously error:', signInErr);
+        }
+      }
+
+      if (auth.currentUser) {
+        console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase currentUser found. UID:', auth.currentUser.uid);
+        console.log('[DEBUG_TRACE] [getAuthHeaders] Token acquisition step: calling auth.currentUser.getIdToken(true)...');
+        const token = await auth.currentUser.getIdToken(true).catch((tokenErr) => {
+          console.error('[DEBUG_TRACE] [getAuthHeaders] getIdToken() failed:', tokenErr);
+          return null;
+        });
+        if (token) {
+          console.log('[DEBUG_TRACE] [getAuthHeaders] Firebase token successfully acquired (len:', token.length, ')');
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          console.warn('[DEBUG_TRACE] [getAuthHeaders] getIdToken() returned null or empty string');
+        }
       } else {
-        console.warn('[DEBUG_TRACE] [getAuthHeaders] Firebase ID token request timed out (1.2s timeout exceeded) or returned null');
+        console.warn('[DEBUG_TRACE] [getAuthHeaders] Still no active Firebase currentUser after auth attempt');
       }
     } else {
-      console.log('[DEBUG_TRACE] [getAuthHeaders] No active Firebase currentUser');
+      console.warn('[DEBUG_TRACE] [getAuthHeaders] getFirebaseAuth() returned null');
     }
   } catch (err) {
     console.error('[DEBUG_TRACE] [getAuthHeaders] Error retrieving Firebase token:', err);
   }
-  console.log('[DEBUG_TRACE] [getAuthHeaders] EXIT');
+  console.log('[DEBUG_TRACE] [getAuthHeaders] EXIT. Has Authorization header:', !!headers['Authorization']);
   return headers;
 }
 
@@ -288,8 +306,23 @@ export class EnterpriseCheckoutEngine {
       }
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const internalPaymentId = `PAY_PI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+      // Pre-flight auth state check and token acquisition test before createPayment
+      try {
+        const auth = getFirebaseAuth();
+        console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment user authentication state check:`, {
+          hasFirebaseAuth: !!auth,
+          currentUserUid: auth?.currentUser?.uid || 'null',
+          isAnonymous: auth?.currentUser?.isAnonymous || false,
+          latestVerifiedPiUser: authService.getLatestVerifiedUser()?.username || 'null'
+        });
+        const testHeaders = await getAuthHeaders();
+        console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment token acquisition result: Authorization attached =`, !!testHeaders['Authorization']);
+      } catch (preCheckErr) {
+        console.warn(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment auth check warning:`, preCheckErr);
+      }
 
       piPaymentService.createPayment(
         { amount, memo, metadata: { ...metadata, sessionId, internalPaymentId } },
@@ -306,6 +339,7 @@ export class EnterpriseCheckoutEngine {
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
               const url = getAbsoluteUrl('/api/payments/approve');
+              console.log(`[URL_TRACE] APPROVE_URL=${url}`);
               const bodyStr = JSON.stringify({ paymentId: piPaymentId, metadata: augmentedMetadata });
               const startTime = Date.now();
               console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [onReadyForServerApproval] Sending POST request to ${url}`);
@@ -367,6 +401,7 @@ export class EnterpriseCheckoutEngine {
               }
               const augmentedMetadata = { ...metadata, sessionId, internalPaymentId };
               const url = getAbsoluteUrl('/api/payments/complete');
+              console.log(`[URL_TRACE] COMPLETE_URL=${url}`);
               const bodyStr = JSON.stringify({ paymentId: piPaymentId, txid, metadata: augmentedMetadata });
               const startTime = Date.now();
               console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [onReadyForServerCompletion] Sending POST request to ${url}`);
