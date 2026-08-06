@@ -244,6 +244,7 @@ export const authService = {
     // ONLY return cached in-memory session if forceRefresh is false and native Pi SDK possesses active payments scope
     if (!forceRefresh && piAuthResult && piAuthResult.hasPaymentsScope && hasNativePaymentsScope()) {
       console.log('[DEBUG_TRACE] [authenticatePi] [STEP 7a] Returning cached memory piAuthResult with verified native payments scope');
+      console.log('[DIAGNOSTICS] [authenticatePi] Return path taken: Early exit (cached memory)');
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT (cached memory)');
       return piAuthResult;
     }
@@ -251,6 +252,7 @@ export const authService = {
     if (piAuthPromise && !forceRefresh) {
       console.log('[DEBUG_TRACE] [authenticatePi] [STEP 8] Returning existing piAuthPromise');
       console.log('[DEBUG_TRACE] [authenticatePi] BEFORE await existing piAuthPromise');
+      console.log('[DIAGNOSTICS] [authenticatePi] Return path taken: Early exit (existing promise re-use)');
       const res = await piAuthPromise;
       console.log('[DEBUG_TRACE] [authenticatePi] AFTER await existing piAuthPromise');
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT (promise re-use)');
@@ -311,6 +313,7 @@ export const authService = {
               hasPaymentsScope: true
             };
             piAuthResult = mockAuth;
+            console.log('[DIAGNOSTICS] [authenticatePi async worker] Return path taken: Dev Mock');
             console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (mock)');
             return mockAuth;
           }
@@ -337,14 +340,57 @@ export const authService = {
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 13d] Passing scopes:', JSON.stringify(scopes));
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 13e] Passing onIncompletePaymentFound callback function');
           
-          const authPromise = window.Pi.authenticate(scopes, onIncompletePaymentFound);
+          // DIAGNOSTICS LOGGING REQUESTED BY USER
+          console.log('[DIAGNOSTICS] [Pi.authenticate] System status details:', {
+            windowPiExists: typeof (window as any).Pi !== 'undefined',
+            nativeFeatures: (window as any).Pi?.nativeFeatures,
+            consentedScopes: (window as any).Pi?.consentedScopes,
+            visibilityState: document.visibilityState,
+            userAgent: navigator.userAgent
+          });
+
+          console.log('[DIAGNOSTICS] [Pi.authenticate] BEFORE calling window.Pi.authenticate()');
+          
+          let authPromise: any;
+          try {
+            authPromise = window.Pi.authenticate(scopes, onIncompletePaymentFound);
+            console.log('[DIAGNOSTICS] [Pi.authenticate] IMMEDIATELY after calling window.Pi.authenticate() returned a value:', typeof authPromise, !!authPromise);
+          } catch (syncErr: any) {
+            console.error('[DIAGNOSTICS] [Pi.authenticate] Synchronous error thrown by window.Pi.authenticate:', syncErr);
+            throw syncErr;
+          }
+
+          // Monitor for 5 second pending state
+          let isPromiseSettled = false;
+          const pendingTimer = setTimeout(() => {
+            if (!isPromiseSettled) {
+              console.warn('[DIAGNOSTICS] [Pi.authenticate] AUTH PROMISE STILL PENDING (5 seconds have passed without resolve or reject)');
+            }
+          }, 5000);
+
+          // Wrap authPromise to detect resolve/reject and settle state
+          const wrappedAuthPromise = authPromise.then(
+            (res: any) => {
+              isPromiseSettled = true;
+              clearTimeout(pendingTimer);
+              console.log('[DIAGNOSTICS] [Pi.authenticate] Promise RESOLVED. Response:', JSON.stringify(res));
+              return res;
+            },
+            (err: any) => {
+              isPromiseSettled = true;
+              clearTimeout(pendingTimer);
+              console.error('[DIAGNOSTICS] [Pi.authenticate] Promise REJECTED. Error:', err);
+              throw err;
+            }
+          );
+
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
               reject(new Error('Pi Network authentication request timed out after 15 seconds. Please check your Pi Browser connection.'));
             }, 15000);
           });
 
-          const result: any = await Promise.race([authPromise, timeoutPromise]);
+          const result: any = await Promise.race([wrappedAuthPromise, timeoutPromise]);
           console.log('[DEBUG_TRACE] [authenticatePi async worker] [STEP 14] IMMEDIATELY AFTER window.Pi.authenticate resolved! result:', JSON.stringify(result));
           
           const grantedScopes = Array.isArray(result?.scopes) ? result.scopes : (Array.isArray((window as any).Pi?.consentedScopes) ? (window as any).Pi.consentedScopes : []);
@@ -363,6 +409,9 @@ export const authService = {
           };
 
           piAuthResult = piAuth;
+          const envSandbox = (import.meta as any).env.VITE_PI_SANDBOX;
+          const isSandbox = envSandbox === 'false' || envSandbox === false ? false : true;
+          console.log(`[DIAGNOSTICS] [authenticatePi async worker] Return path taken: Native authenticate path (Real Pi Browser, ${isSandbox ? 'Sandbox' : 'Production'})`);
           console.log('[DEBUG_TRACE] [authenticatePi async worker] EXIT worker (native success)');
           return piAuth;
         } else {
@@ -383,6 +432,7 @@ export const authService = {
     try {
       const authRes = await piAuthPromise;
       console.log('[DEBUG_TRACE] [authenticatePi] [STEP 16] AFTER piAuthPromise resolves with authRes:', JSON.stringify(authRes));
+      console.log('[DIAGNOSTICS] [authenticatePi] Return path taken: Outer wrapper resolve');
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT (total duration:', Date.now() - startTime, 'ms)');
       return authRes;
     } catch (authErr) {
