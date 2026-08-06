@@ -13,16 +13,14 @@ export const PaymentSelector: React.FC<PaymentSelectorProps> = ({ selectedMethod
     <div className="space-y-4">
       <h3 className="text-lg font-bold text-white mb-4">Select Payment Method</h3>
       <div className="grid gap-4">
-        {PAYMENT_PROVIDERS.map((provider) => (
+        {PAYMENT_PROVIDERS.filter(p => p.enabled).map((provider) => (
           <button
             key={provider.id}
-            disabled={disabled || !provider.enabled}
+            disabled={disabled}
             onClick={() => onSelect(provider.id)}
             className={`w-full flex items-center p-4 rounded-xl border text-left transition-colors ${
               selectedMethod === provider.id
                 ? 'bg-violet-600/20 border-violet-500'
-                : !provider.enabled
-                ? 'bg-slate-900/40 border-slate-800 opacity-50 cursor-not-allowed'
                 : 'bg-slate-900 border-slate-700 hover:border-slate-500'
             }`}
           >
@@ -46,9 +44,6 @@ export const PaymentSelector: React.FC<PaymentSelectorProps> = ({ selectedMethod
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-            )}
-            {!provider.enabled && (
-              <span className="text-xs font-semibold text-slate-500 bg-slate-800 px-2 py-1 rounded">Coming Soon</span>
             )}
           </button>
         ))}

@@ -300,7 +300,7 @@ export const Checkout: React.FC = () => {
           console.log('[Checkout Navigation Trace] navigate() call executed.');
         }, 5000);
       } else {
-        throw new Error('Pi Testnet Pi is the ONLY active payment currency. BMP is for loyalty rewards only.');
+        throw new Error('Pi Testnet Pi is the ONLY active payment currency.');
       }
 
     } catch (err: any) {
@@ -580,7 +580,7 @@ export const Checkout: React.FC = () => {
                         <CreditCard className="w-3.5 h-3.5 text-emerald-400" /> Selected Payment
                       </h4>
                       <p className="text-xs font-bold text-white uppercase">
-                        {selectedPaymentMethod === 'pi_testnet' ? 'Pi Testnet Wallet (SDK)' : 'BMP Rewards Wallet'}
+                        Pi Testnet Wallet (SDK)
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
                         Server-Side Verified Consensus Transaction
