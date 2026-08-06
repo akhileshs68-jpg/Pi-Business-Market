@@ -48,6 +48,18 @@ export function getApiBaseUrl(): string {
     } catch (e) {}
   }
 
+  // 3c. Check URL search parameters (e.g. ?backendUrl= or ?appUrl=)
+  if (!rawUrl && typeof window !== 'undefined' && window.location && window.location.search) {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlParam = params.get('backendUrl') || params.get('appUrl') || params.get('origin');
+      if (urlParam && urlParam.startsWith('http') && !urlParam.includes('minepi.com')) {
+        rawUrl = urlParam;
+        try { localStorage.setItem('app_backend_url', rawUrl); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
   // 4. Inspect window.location
   if (!rawUrl && typeof window !== 'undefined' && window.location) {
     const origin = window.location.origin;
@@ -55,9 +67,10 @@ export function getApiBaseUrl(): string {
       const isPiCdnDomain = origin.includes('app-cdn.minepi.com') || 
                             origin.includes('sandbox.minepi.com') ||
                             origin.endsWith('.pi');
-      // If we are on standard host (Cloud Run, Vercel, localhost), use origin
+      // If we are on standard host (Cloud Run, Vercel, localhost), use origin and save to cache
       if (!isPiCdnDomain) {
         rawUrl = origin;
+        try { localStorage.setItem('app_backend_url', rawUrl); } catch (e) {}
       }
     }
 
@@ -67,6 +80,7 @@ export function getApiBaseUrl(): string {
         const anc = window.location.ancestorOrigins[i];
         if (anc && anc.startsWith('http') && !anc.includes('minepi.com') && !anc.endsWith('.pi')) {
           rawUrl = anc;
+          try { localStorage.setItem('app_backend_url', rawUrl); } catch (e) {}
           break;
         }
       }
@@ -77,6 +91,7 @@ export function getApiBaseUrl(): string {
         const refUrl = new URL(document.referrer);
         if (refUrl.origin && !refUrl.hostname.includes('minepi.com') && !refUrl.hostname.endsWith('.pi')) {
           rawUrl = refUrl.origin;
+          try { localStorage.setItem('app_backend_url', rawUrl); } catch (e) {}
         }
       } catch (e) {}
     }
@@ -104,11 +119,24 @@ export function getAbsoluteUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   let baseUrl = getApiBaseUrl();
 
-  if (baseUrl) {
-    if (baseUrl.startsWith('http://') && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1')) {
-      baseUrl = baseUrl.replace(/^http:\/\//, 'https://');
-    }
-    return `${baseUrl}${cleanPath}`;
+  // If baseUrl is empty or missing, try window.location.origin as fallback
+  if (!baseUrl && typeof window !== 'undefined' && window.location && window.location.origin) {
+    baseUrl = window.location.origin;
   }
+
+  if (baseUrl) {
+    let formattedBase = baseUrl.trim().replace(/\/+$/, '');
+    if (formattedBase.startsWith('http://') && !formattedBase.includes('localhost') && !formattedBase.includes('127.0.0.1')) {
+      formattedBase = formattedBase.replace(/^http:\/\//, 'https://');
+    }
+    return `${formattedBase}${cleanPath}`;
+  }
+  
+  // Ultimate fallback if window.location exists
+  if (typeof window !== 'undefined' && window.location) {
+    const fallbackOrigin = `${window.location.protocol}//${window.location.host}`;
+    return `${fallbackOrigin}${cleanPath}`;
+  }
+
   return cleanPath;
 }

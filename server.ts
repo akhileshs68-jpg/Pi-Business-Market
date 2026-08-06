@@ -184,66 +184,78 @@ const authenticatePaymentRequest = async (
   const isProd = process.env.NODE_ENV === 'production';
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split('Bearer ')[1]?.trim() : null;
 
-  // 1. Try Firebase Admin token verification if Bearer token present
+  // 1. Log Authorization Header Status
+  if (authHeader) {
+    const tokenPreview = token ? `Bearer ${token.substring(0, 15)}... (len: ${token.length})` : authHeader;
+    console.log(`[SERVER_AUTH_TRACE] Authorization: ${tokenPreview}`);
+  } else {
+    console.log(`[SERVER_AUTH_TRACE] Authorization: <missing>`);
+  }
+
+  // 2. Try Firebase Admin token verification if Bearer token present
   if (token) {
-    try {
-      let decodedToken: any = null;
-      if (getApps().length > 0) {
-        try {
-          decodedToken = await dbQueryWithTimeout(() => getAuth().verifyIdToken(token), 2500, null);
-        } catch (e) {
-          // Verify failed, fallback to payload decode below
-        }
-      }
+    let decodedToken: any = null;
 
-      if (!decodedToken) {
-        try {
-          const payloadBase64 = token.split('.')[1];
-          if (payloadBase64) {
-            const parsed = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
-            if (parsed && (parsed.sub || parsed.user_id || parsed.uid)) {
-              decodedToken = {
-                uid: parsed.user_id || parsed.sub || parsed.uid,
-                email: parsed.email || `${parsed.user_id || 'user'}@pi.network`
-              };
-              console.log(`[Security Note] ${endpoint}: Token verified via payload decoding fallback for UID: ${decodedToken.uid}`);
+    if (getApps().length > 0) {
+      try {
+        console.log(`[SERVER_AUTH_TRACE] Attempting Firebase Admin verifyIdToken()...`);
+        decodedToken = await dbQueryWithTimeout(() => getAuth().verifyIdToken(token), 5000, null);
+        if (decodedToken) {
+          console.log(`[SERVER_AUTH_TRACE] Firebase Admin verifyIdToken SUCCESS for UID: ${decodedToken.uid}`);
+        } else {
+          console.warn(`[SERVER_AUTH_TRACE] Firebase Admin verifyIdToken returned null (timeout or unverified).`);
+        }
+      } catch (e: any) {
+        console.error(`[SERVER_AUTH_TRACE] [Firebase Admin Verification Error]:`, e?.message || e);
+      }
+    }
+
+    if (!decodedToken) {
+      try {
+        console.log(`[SERVER_AUTH_TRACE] Attempting JWT payload decode fallback...`);
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+          const parsed = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+          if (parsed && (parsed.sub || parsed.user_id || parsed.uid)) {
+            decodedToken = {
+              uid: parsed.user_id || parsed.sub || parsed.uid,
+              email: parsed.email || `${parsed.user_id || parsed.sub || parsed.uid}@pi.network`
+            };
+            console.log(`[SERVER_AUTH_TRACE] Token verified via JWT payload fallback for UID: ${decodedToken.uid}`);
+          }
+        }
+      } catch (jwtErr: any) {
+        console.warn(`[SERVER_AUTH_TRACE] JWT payload parsing failed:`, jwtErr?.message || jwtErr);
+      }
+    }
+
+    if (decodedToken) {
+      let finalUid = decodedToken.uid;
+      try {
+        const db = getDb();
+        if (db) {
+          const userDoc: any = await dbQueryWithTimeout(() => db.collection('users').doc(decodedToken.uid).get(), 1000, null);
+          if (userDoc && userDoc.exists) {
+            const userData = userDoc.data();
+            if (userData && userData.piUid) {
+              console.log(`[SERVER_AUTH_TRACE] Mapped Firebase UID ${decodedToken.uid} to Canonical Pi UID: ${userData.piUid}`);
+              finalUid = userData.piUid;
             }
           }
-        } catch (jwtErr) {
-          console.warn(`[Security Warning] ${endpoint}: JWT payload parsing failed:`, jwtErr);
         }
+      } catch (dbErr: any) {
+        console.warn(`[SERVER_AUTH_TRACE] Failed to map Firebase UID to Pi UID:`, dbErr?.message);
       }
 
-      if (decodedToken) {
-        let finalUid = decodedToken.uid;
-        try {
-          const db = getDb();
-          if (db) {
-            const userDoc: any = await dbQueryWithTimeout(() => db.collection('users').doc(decodedToken.uid).get(), 1000, null);
-            if (userDoc && userDoc.exists) {
-              const userData = userDoc.data();
-              if (userData && userData.piUid) {
-                console.log(`[Security Note] ${endpoint}: Mapped Firebase UID ${decodedToken.uid} to Canonical Pi UID: ${userData.piUid}`);
-                finalUid = userData.piUid;
-              }
-            }
-          }
-        } catch (dbErr: any) {
-          console.warn(`[Security Warning] ${endpoint}: Failed to map Firebase UID to Pi UID:`, dbErr?.message);
-        }
-
-        (req as any).user = {
-          uid: finalUid,
-          email: decodedToken.email || `${finalUid}@pi.network`
-        };
-        return next();
-      }
-    } catch (err: any) {
-      console.warn(`[Security Warning] ${endpoint}: Token validation error: ${err.message}`);
+      (req as any).user = {
+        uid: finalUid,
+        email: decodedToken.email || `${finalUid}@pi.network`
+      };
+      return next();
     }
   }
 
-  // 2. Check for Pi SDK payment or order payload metadata (for Pi Browser users authenticated through Pi SDK)
+  // 3. Check for Pi SDK payment or order payload metadata (for Pi Browser users authenticated through Pi SDK)
   const reqBody = req.body || {};
   const paymentId = reqBody.paymentId || reqBody.transactionId || reqBody.identifier;
   const metadataBuyerUid = reqBody.metadata?.buyerUid || reqBody.metadata?.uid || reqBody.metadata?.userUid || reqBody.metadata?.buyerId || reqBody.buyerUid || reqBody.userUid || reqBody.buyerId;
@@ -251,7 +263,7 @@ const authenticatePaymentRequest = async (
 
   if (paymentId || metadataBuyerUid || reqOrderId) {
     const derivedUid = metadataBuyerUid || 'pi_browser_user';
-    console.log(`[Security Note] ${endpoint}: Request authenticated via Pi SDK payload metadata for UID: ${derivedUid} (PaymentID: ${paymentId || 'none'}, OrderID: ${reqOrderId || 'none'})`);
+    console.log(`[SERVER_AUTH_TRACE] Request authenticated via Pi SDK payload metadata for UID: ${derivedUid} (PaymentID: ${paymentId || 'none'}, OrderID: ${reqOrderId || 'none'})`);
     (req as any).user = {
       uid: derivedUid,
       email: `${derivedUid}@pi.network`,
@@ -260,14 +272,14 @@ const authenticatePaymentRequest = async (
     return next();
   }
 
-  // 3. Fallback for sandbox/development mode
+  // 4. Fallback for sandbox/development mode
   if (!isProd) {
-    console.warn(`[Security Notice] ${endpoint}: Proceeding in sandbox/development mode without token.`);
+    console.warn(`[SERVER_AUTH_TRACE] Proceeding in sandbox/development mode without token.`);
     (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
     return next();
   }
 
-  // 4. In production with no valid auth token and no valid payload metadata, reject with 401
+  // 5. In production with no valid auth token and no valid payload metadata, reject with 401
   console.error(`[Security Violation] ${endpoint}: Missing valid authentication credentials or payment metadata in production.`);
   return res.status(401).json({ error: "Unauthorized: Missing valid authentication credentials or payment metadata." });
 };
