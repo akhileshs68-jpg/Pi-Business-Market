@@ -44,18 +44,35 @@ export const piPaymentService = {
     isPaymentInProgress = true;
     
     try {
-      console.log('[DEBUG_TRACE] [createPayment] Initializing Pi SDK...');
-      await authService.initPi();
+      console.log('[PI_PAYMENT] [Step 1-8] Executing mandatory 10-step Pi Account Retrieval and Verification...');
+      
+      let verifiedUser: any;
+      let piAuth: any;
+      try {
+        const result = await authService.verifyAndSynchronizePiAccount(true);
+        verifiedUser = result.verifiedUser;
+        piAuth = result.piAuth;
+      } catch (verifyErr: any) {
+        console.error('[PI_PAYMENT FAILED] Pre-payment Pi Account Verification failed:', verifyErr);
+        isPaymentInProgress = false;
+        if (callbacks.onError) {
+          await callbacks.onError(
+            verifyErr instanceof Error ? verifyErr : new Error(`[Verification Failed] ${verifyErr}`),
+            'pre_payment_verification_failed'
+          );
+        }
+        return;
+      }
 
       const piInstance = (window as any).Pi;
       const isPiSdkAvailable = typeof piInstance?.createPayment === 'function';
-      console.log('[DEBUG_TRACE] [createPayment] isPiSdkAvailable:', isPiSdkAvailable);
+      console.log('[PI_PAYMENT] [Step 9] isPiSdkAvailable:', isPiSdkAvailable);
 
       if (!isPiSdkAvailable) {
         const notAvailableErr = new Error(
-          "Official Pi Wallet SDK is not available in this browser environment. Please open Pi Business Market inside the official Pi Browser to process payments with your Pi Testnet Wallet."
+          "[Step 9 Failed] Official Pi Wallet SDK (window.Pi.createPayment) is not available in this browser environment. Please open inside official Pi Browser."
         );
-        console.error('[DEBUG_TRACE] [createPayment]', notAvailableErr.message);
+        console.error('[PI_PAYMENT FAILED]', notAvailableErr.message);
         isPaymentInProgress = false;
         if (callbacks.onError) {
           await callbacks.onError(notAvailableErr, 'pi_sdk_unavailable');
@@ -63,56 +80,25 @@ export const piPaymentService = {
         return;
       }
 
-      // Check if native SDK has active payments scope
-      const hasScope = hasNativePaymentsScope();
-      console.log('[DEBUG_TRACE] [createPayment] hasNativePaymentsScope check:', hasScope);
-
-      console.log('[DEBUG_TRACE] [createPayment] BEFORE await authService.authenticatePi() with forceRefresh:', !hasScope);
-      const piAuth = await authService.authenticatePi(['username', 'payments'], !hasScope);
-      console.log('[DEBUG_TRACE] [createPayment] AFTER await authService.authenticatePi(), resolved auth:', piAuth);
-
-      const authenticatedUsername = piAuth?.user?.username;
-      const authenticatedPiUid = piAuth?.user?.uid || authenticatedUsername;
-
-      if (!authenticatedUsername) {
-        const noUsernameErr = new Error(
-          "Unable to verify Pi account username from Pi Network authentication response. Payment cancelled."
-        );
-        console.error('[DEBUG_TRACE] [createPayment]', noUsernameErr.message);
-        isPaymentInProgress = false;
-        if (callbacks.onError) {
-          await callbacks.onError(noUsernameErr, 'identity_verification_failed');
-        }
-        return;
-      }
-
-      // Verify that stored application account matches the currently authenticated Pi account
-      const { PiBusinessMarketDB } = await import('./storage');
-      const storedUser = PiBusinessMarketDB.getCurrentUser();
-
-      if (storedUser && storedUser.username && storedUser.username !== authenticatedUsername) {
-        const mismatchErr = new Error(
-          `Pi Account Mismatch: Currently authenticated Pi account (@${authenticatedUsername}) does not match registered user (@${storedUser.username}). Payment stopped.`
-        );
-        console.error('[DEBUG_TRACE] [createPayment]', mismatchErr.message);
-        isPaymentInProgress = false;
-        if (callbacks.onError) {
-          await callbacks.onError(mismatchErr, 'account_mismatch');
-        }
-        return;
-      }
-
-      console.log('[DEBUG_TRACE] [createPayment] Verified Pi Identity match for @' + authenticatedUsername + '. Calling window.Pi.createPayment with:', {
+      console.log(`[PI_PAYMENT] [Step 10] Pre-payment verification SUCCESSFUL for @${verifiedUser.username} (UID: ${verifiedUser.piUid}). Calling window.Pi.createPayment with payload:`, {
         amount: paymentData.amount,
         memo: paymentData.memo,
-        metadata: paymentData.metadata
+        metadata: {
+          ...paymentData.metadata,
+          buyerId: verifiedUser.piUid,
+          buyerUsername: verifiedUser.username
+        }
       });
 
       piInstance.createPayment(
         {
           amount: paymentData.amount,
           memo: paymentData.memo,
-          metadata: paymentData.metadata
+          metadata: {
+            ...paymentData.metadata,
+            buyerId: verifiedUser.piUid,
+            buyerUsername: verifiedUser.username
+          }
         },
         {
           onReadyForServerApproval: async (paymentId: string) => {
