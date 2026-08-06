@@ -4,6 +4,8 @@
  */
 
 export function getApiBaseUrl(): string {
+  let rawUrl = '';
+
   // 1. Check explicit environment variables
   const envUrl = (import.meta as any).env?.VITE_APP_URL || 
                  (import.meta as any).env?.VITE_BACKEND_URL || 
@@ -13,27 +15,28 @@ export function getApiBaseUrl(): string {
   if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '' && !envUrl.includes('MY_APP_URL')) {
     const trimmed = envUrl.trim().replace(/\/+$/, '');
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
+      rawUrl = trimmed;
     }
   }
 
   // 2. Check Vercel automatic deployment URL
-  const vercelUrl = (import.meta as any).env?.VITE_VERCEL_URL;
-  if (vercelUrl && typeof vercelUrl === 'string' && vercelUrl.trim() !== '') {
-    const formatted = vercelUrl.startsWith('http') ? vercelUrl : `https://${vercelUrl}`;
-    return formatted.replace(/\/+$/, '');
+  if (!rawUrl) {
+    const vercelUrl = (import.meta as any).env?.VITE_VERCEL_URL;
+    if (vercelUrl && typeof vercelUrl === 'string' && vercelUrl.trim() !== '') {
+      rawUrl = vercelUrl.startsWith('http') ? vercelUrl : `https://${vercelUrl}`;
+    }
   }
 
   // 3. Check window.__APP_URL__ injected dynamically by server.ts
-  if (typeof window !== 'undefined' && (window as any).__APP_URL__) {
+  if (!rawUrl && typeof window !== 'undefined' && (window as any).__APP_URL__) {
     const injected = (window as any).__APP_URL__;
     if (typeof injected === 'string' && injected.startsWith('http') && !injected.includes('minepi.com')) {
-      return injected.replace(/\/+$/, '');
+      rawUrl = injected;
     }
   }
 
   // 4. Inspect window.location
-  if (typeof window !== 'undefined' && window.location) {
+  if (!rawUrl && typeof window !== 'undefined' && window.location) {
     const origin = window.location.origin;
     if (origin && origin !== 'null' && !origin.startsWith('file:')) {
       const isPiCdnDomain = origin.includes('app-cdn.minepi.com') || 
@@ -41,39 +44,47 @@ export function getApiBaseUrl(): string {
                             origin.endsWith('.pi');
       // If we are on standard host (Cloud Run, Vercel, localhost), use origin
       if (!isPiCdnDomain) {
-        return origin.replace(/\/+$/, '');
+        rawUrl = origin;
       }
     }
 
     // 5. If running inside Pi Browser CDN iframe, check ancestor origins or referrer
-    if (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {
+    if (!rawUrl && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {
       for (let i = 0; i < window.location.ancestorOrigins.length; i++) {
         const anc = window.location.ancestorOrigins[i];
         if (anc && anc.startsWith('http') && !anc.includes('minepi.com') && !anc.endsWith('.pi')) {
-          return anc.replace(/\/+$/, '');
+          rawUrl = anc;
+          break;
         }
       }
     }
 
-    if (document.referrer) {
+    if (!rawUrl && document.referrer) {
       try {
         const refUrl = new URL(document.referrer);
         if (refUrl.origin && !refUrl.hostname.includes('minepi.com') && !refUrl.hostname.endsWith('.pi')) {
-          return refUrl.origin.replace(/\/+$/, '');
+          rawUrl = refUrl.origin;
         }
       } catch (e) {}
     }
   }
 
   // 6. Last resort fallback to window.location.origin if it is NOT a Pi CDN domain
-  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+  if (!rawUrl && typeof window !== 'undefined' && window.location && window.location.origin) {
     const origin = window.location.origin;
     if (!origin.includes('minepi.com') && !origin.endsWith('.pi')) {
-      return origin.replace(/\/+$/, '');
+      rawUrl = origin;
     }
   }
 
-  return '';
+  if (!rawUrl) return '';
+
+  let formatted = rawUrl.trim().replace(/\/+$/, '');
+  if (formatted.startsWith('http://') && !formatted.includes('localhost') && !formatted.includes('127.0.0.1')) {
+    formatted = formatted.replace(/^http:\/\//, 'https://');
+  }
+
+  return formatted;
 }
 
 export function getAbsoluteUrl(path: string): string {
