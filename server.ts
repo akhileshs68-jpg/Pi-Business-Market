@@ -246,7 +246,7 @@ const authenticatePaymentRequest = async (
   // 2. Check for Pi SDK payment or order payload metadata (for Pi Browser users authenticated through Pi SDK)
   const reqBody = req.body || {};
   const paymentId = reqBody.paymentId || reqBody.transactionId || reqBody.identifier;
-  const metadataBuyerUid = reqBody.metadata?.buyerUid || reqBody.metadata?.uid || reqBody.metadata?.userUid || reqBody.buyerUid || reqBody.userUid;
+  const metadataBuyerUid = reqBody.metadata?.buyerUid || reqBody.metadata?.uid || reqBody.metadata?.userUid || reqBody.metadata?.buyerId || reqBody.buyerUid || reqBody.userUid || reqBody.buyerId;
   const reqOrderId = reqBody.orderId || reqBody.metadata?.orderId;
 
   if (paymentId || metadataBuyerUid || reqOrderId) {
@@ -479,7 +479,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       // Authenticated User & Ownership check
       const user = (req as any).user;
       if (user && user.uid !== 'dev_user') {
-        const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid;
+        const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid || metadata?.buyerId;
         if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
           console.error(`[Security Violation] User ${user.uid} tried to approve payment owned by ${expectedBuyerUid}`);
           return res.status(403).json({ error: "Access Denied: Payment ownership mismatch.", logs: runtimeLogs });
