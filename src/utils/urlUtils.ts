@@ -65,9 +65,12 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  // 6. Last resort fallback to window.location.origin
+  // 6. Last resort fallback to window.location.origin if it is NOT a Pi CDN domain
   if (typeof window !== 'undefined' && window.location && window.location.origin) {
-    return window.location.origin.replace(/\/+$/, '');
+    const origin = window.location.origin;
+    if (!origin.includes('minepi.com') && !origin.endsWith('.pi')) {
+      return origin.replace(/\/+$/, '');
+    }
   }
 
   return '';

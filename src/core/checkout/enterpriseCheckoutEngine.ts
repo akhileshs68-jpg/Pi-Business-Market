@@ -315,11 +315,23 @@ export class EnterpriseCheckoutEngine {
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] request body:', bodyStr);
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY BEFORE fetch() call');
 
-              const res = await fetch(url, {
-                method: 'POST',
-                headers,
-                body: bodyStr
-              });
+              let res: Response;
+              try {
+                res = await fetch(url, {
+                  method: 'POST',
+                  headers,
+                  body: bodyStr
+                });
+              } catch (fetchErr: any) {
+                console.warn('[DEBUG_TRACE] [onReadyForServerApproval] Initial fetch attempt encountered network error:', fetchErr, 'Retrying fetch in 500ms...');
+                await new Promise((r) => setTimeout(r, 500));
+                res = await fetch(url, {
+                  method: 'POST',
+                  headers,
+                  body: bodyStr
+                });
+              }
+
               const endTime = Date.now();
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] IMMEDIATELY AFTER fetch() response received:', {
                 status: res.status,
@@ -336,6 +348,16 @@ export class EnterpriseCheckoutEngine {
               if (!res.ok) {
                 throw new Error(`Server payment approval failed (${res.status}): ${resText}`);
               }
+
+              let parsedRes: any = null;
+              try {
+                parsedRes = JSON.parse(resText);
+              } catch (e) {}
+
+              if (parsedRes && parsedRes.success === false) {
+                throw new Error(`Server payment approval rejected: ${parsedRes.error || resText}`);
+              }
+
               paymentService.updateTransactionStatus(internalPaymentId, 'Processing', piPaymentId).catch(console.error);
             } catch (err: any) {
               console.error('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerApproval] Exception:', err);
@@ -365,11 +387,22 @@ export class EnterpriseCheckoutEngine {
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] request body:', bodyStr);
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] IMMEDIATELY BEFORE fetch() call');
 
-              const res = await fetch(url, {
-                method: 'POST',
-                headers,
-                body: bodyStr
-              });
+              let res: Response;
+              try {
+                res = await fetch(url, {
+                  method: 'POST',
+                  headers,
+                  body: bodyStr
+                });
+              } catch (fetchErr: any) {
+                console.warn('[DEBUG_TRACE] [onReadyForServerCompletion] Initial fetch attempt encountered network error:', fetchErr, 'Retrying fetch in 500ms...');
+                await new Promise((r) => setTimeout(r, 500));
+                res = await fetch(url, {
+                  method: 'POST',
+                  headers,
+                  body: bodyStr
+                });
+              }
               const endTime = Date.now();
               console.log('[DEBUG_TRACE] [executePiTestnetPayment.onReadyForServerCompletion] IMMEDIATELY AFTER fetch() response received:', {
                 status: res.status,
