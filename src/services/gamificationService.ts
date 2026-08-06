@@ -21,6 +21,7 @@ import {
 import { getFirebaseDb } from '../firebase/config';
 import { bmpRewardsProvider } from './wallet/providers/bmpRewardsProvider';
 import { antiCheatEngine } from './rewards/antiCheatEngine';
+import { getCanonicalRewardUserId, isRewardDevOrSandboxMode } from './rewards/rewardIdentityResolver';
 
 export interface LevelInfo {
   level: number;
@@ -186,21 +187,22 @@ export const gamificationService = {
   },
 
   /**
-   * GET OR INITIALIZE USER GAMIFICATION PROFILE
+   * GET OR INITIALIZE USER GAMIFICATION PROFILE (Uses Canonical Pi UID)
    */
   async getUserProfile(userId: string): Promise<UserGamificationProfile> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
-    const docRef = doc(db, 'user_gamification', userId);
+    const docRef = doc(db, 'user_gamification', canonicalUserId);
     const snap = await getDoc(docRef);
 
     if (snap.exists()) {
       const data = snap.data() as any;
-      const walletBal = await bmpRewardsProvider.getBalance(userId);
+      const walletBal = await bmpRewardsProvider.getBalance(canonicalUserId);
       const lifetimeBmp = data.lifetimeBmp || walletBal || 0;
       const levelInfo = this.calculateLevel(lifetimeBmp);
 
       const profile: UserGamificationProfile = {
-        userId,
+        userId: canonicalUserId,
         bmpBalance: walletBal,
         lifetimeBmp,
         level: levelInfo.level,
@@ -208,7 +210,7 @@ export const gamificationService = {
         streakCount: data.streakCount || 0,
         lastCheckInTime: data.lastCheckInTime || 0,
         lastCheckInDate: data.lastCheckInDate || '',
-        referralCode: data.referralCode || this.generateReferralCode(userId),
+        referralCode: data.referralCode || this.generateReferralCode(canonicalUserId),
         referredBy: data.referredBy || null,
         badges: data.badges || [],
         claimedMissions: data.claimedMissions || [],
@@ -232,11 +234,43 @@ export const gamificationService = {
       return profile;
     }
 
-    // Initialize new profile
-    const walletBal = await bmpRewardsProvider.getBalance(userId);
-    const newReferralCode = this.generateReferralCode(userId);
+    // Check if legacy profile exists under raw userId before canonical migration
+    if (userId !== canonicalUserId) {
+      const legacyRef = doc(db, 'user_gamification', userId);
+      const legacySnap = await getDoc(legacyRef);
+      if (legacySnap.exists()) {
+        const legacyData = legacySnap.data() as any;
+        const walletBal = await bmpRewardsProvider.getBalance(canonicalUserId);
+        const lifetimeBmp = legacyData.lifetimeBmp || walletBal || 0;
+        const levelInfo = this.calculateLevel(lifetimeBmp);
+
+        const profile: UserGamificationProfile = {
+          ...legacyData,
+          userId: canonicalUserId,
+          bmpBalance: walletBal,
+          lifetimeBmp,
+          level: levelInfo.level,
+          levelName: levelInfo.levelName,
+          updatedAt: new Date().toISOString()
+        };
+
+        // Migrate to canonical ID document
+        await setDoc(docRef, {
+          ...profile,
+          userId: canonicalUserId,
+          updatedAt: serverTimestamp()
+        });
+
+        this.evaluateBadges(profile);
+        return profile;
+      }
+    }
+
+    // Initialize new profile under canonical user ID
+    const walletBal = await bmpRewardsProvider.getBalance(canonicalUserId);
+    const newReferralCode = this.generateReferralCode(canonicalUserId);
     const newProfile: UserGamificationProfile = {
-      userId,
+      userId: canonicalUserId,
       bmpBalance: walletBal,
       lifetimeBmp: walletBal,
       level: 1,
@@ -271,7 +305,7 @@ export const gamificationService = {
   },
 
   /**
-   * DAILY CHECK-IN (Strict 24h & Anti-Fraud Timestamp Validation)
+   * DAILY CHECK-IN (Uses Canonical Pi UID & Dev/Sandbox Safe Validation)
    */
   async checkIn(userId: string, telemetry: any = {}): Promise<{
     newBalance: number;
@@ -281,11 +315,13 @@ export const gamificationService = {
     newLevelName?: string;
     newBadges: string[];
   }> {
-    // Validate anti-cheat daily check-in rules
-    await antiCheatEngine.validateDailyCheckIn(userId, telemetry);
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
+
+    // Validate anti-cheat daily check-in rules with canonical identity & dev-safe rules
+    await antiCheatEngine.validateDailyCheckIn(canonicalUserId, telemetry);
 
     const db = getFirebaseDb();
-    const docRef = doc(db, 'user_gamification', userId);
+    const docRef = doc(db, 'user_gamification', canonicalUserId);
 
     let bmpEarned = 10; // Base daily reward
     let newStreak = 1;
@@ -333,7 +369,7 @@ export const gamificationService = {
         existingBadges = data.badges || [];
         if (data.stats) stats = { ...stats, ...data.stats };
 
-        // ANTI-FRAUD VERIFICATION
+        // Individual 24h Lock Verification
         const diffMs = nowMs - lastCheckInTime;
         const hoursPassed = diffMs / (1000 * 60 * 60);
 
@@ -387,9 +423,9 @@ export const gamificationService = {
         newBadges.push('daily_streak_30');
       }
 
-      // Save gamification state
+      // Save gamification state under canonical ID
       transaction.set(docRef, {
-        userId,
+        userId: canonicalUserId,
         lifetimeBmp: newLifetime,
         level: newLevelInfo.level,
         levelName: newLevelInfo.levelName,
@@ -405,13 +441,13 @@ export const gamificationService = {
 
     // Credit BMP wallet transaction
     await bmpRewardsProvider.credit(
-      userId, 
+      canonicalUserId, 
       bmpEarned, 
       'DAILY_REWARD', 
       `Daily Check-In Reward (Day ${newStreak})`
     );
 
-    const newBalance = await bmpRewardsProvider.getBalance(userId);
+    const newBalance = await bmpRewardsProvider.getBalance(canonicalUserId);
 
     return {
       newBalance,
@@ -427,12 +463,13 @@ export const gamificationService = {
    * PROCESS VERIFIED MARKETPLACE PURCHASE REWARD
    */
   async processOrderReward(userId: string, businessId: string, orderId: string, grandTotalPi: number): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
     
     // Idempotency check in wallet_transactions
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', orderId),
       where('source', '==', 'MARKETPLACE_ORDER')
     );
@@ -444,7 +481,7 @@ export const gamificationService = {
 
     // Credit buyer wallet
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       baseReward,
       'MARKETPLACE_ORDER',
       `Order #${orderId.slice(0, 8)} Purchase Reward`,
@@ -452,7 +489,7 @@ export const gamificationService = {
     );
 
     // Update buyer stats & achievement milestones
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -463,8 +500,7 @@ export const gamificationService = {
       const existingBadges = data.badges || [];
 
       let achievementBonus = 0;
-      // Milestone rewards
-      if (currentOrders === 1) achievementBonus += 50; // First Order
+      if (currentOrders === 1) achievementBonus += 50;
       if (currentOrders === 5) achievementBonus += 150;
       if (currentOrders === 10) achievementBonus += 300;
       if (currentOrders === 25) achievementBonus += 750;
@@ -495,7 +531,7 @@ export const gamificationService = {
 
       if (achievementBonus > 0) {
         await bmpRewardsProvider.credit(
-          userId,
+          canonicalUserId,
           achievementBonus,
           'CAMPAIGN',
           `Order Milestone Achievement Bonus (${currentOrders} Orders)`,
@@ -504,8 +540,8 @@ export const gamificationService = {
       }
     });
 
-    // Check if user was referred and this is their 1st purchase -> trigger referral bonus!
-    await this.verifyAndRewardReferral(userId);
+    // Check if user was referred and this is their 1st purchase -> trigger referral bonus
+    await this.verifyAndRewardReferral(canonicalUserId);
 
     return baseReward;
   },
@@ -514,41 +550,40 @@ export const gamificationService = {
    * PROCESS VERIFIED MERCHANT SALE REWARD
    */
   async processVerifiedSaleReward(sellerId: string, buyerId: string, orderId: string, grandTotalPi: number): Promise<number> {
+    const canonicalSellerId = await getCanonicalRewardUserId(sellerId);
+    const canonicalBuyerId = await getCanonicalRewardUserId(buyerId);
     const db = getFirebaseDb();
     
-    // Idempotency check in wallet_transactions
+    // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', sellerId),
+      where('userId', '==', canonicalSellerId),
       where('referenceId', '==', `SALE_${orderId}`),
       where('source', '==', 'MARKETPLACE_ORDER')
     );
     const snapTx = await getDocs(qTx);
-    if (!snapTx.empty) return 0; // Already rewarded
+    if (!snapTx.empty) return 0;
 
     // 5 BMP per 1 Pi of sale total (Minimum 10 BMP)
     const baseReward = Math.max(10, Math.floor(grandTotalPi * 5));
 
-    // Credit merchant/seller wallet
     await bmpRewardsProvider.credit(
-      sellerId,
+      canonicalSellerId,
       baseReward,
       'MARKETPLACE_ORDER',
       `Verified Sale #${orderId.slice(0, 8)} Reward`,
       `SALE_${orderId}`
     );
 
-    // Update seller stats & milestones
-    const profileRef = doc(db, 'user_gamification', sellerId);
+    const profileRef = doc(db, 'user_gamification', canonicalSellerId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       let data = snap.exists() ? snap.data() : null;
 
       if (!data) {
-        // Create basic profile if it doesn't exist yet
-        const newReferralCode = this.generateReferralCode(sellerId);
+        const newReferralCode = this.generateReferralCode(canonicalSellerId);
         data = {
-          userId: sellerId,
+          userId: canonicalSellerId,
           lifetimeBmp: 0,
           level: 1,
           levelName: 'Explorer',
@@ -577,7 +612,7 @@ export const gamificationService = {
       const existingBadges = data.badges || [];
 
       let achievementBonus = 0;
-      if (currentSales === 1) achievementBonus += 100; // First verified sale bonus
+      if (currentSales === 1) achievementBonus += 100;
       if (currentSales === 10) achievementBonus += 250;
       if (currentSales === 50) achievementBonus += 1000;
       if (currentSales === 100) achievementBonus += 2500;
@@ -594,7 +629,7 @@ export const gamificationService = {
       const levelInfo = this.calculateLevel(newLifetime);
 
       transaction.set(profileRef, {
-        userId: sellerId,
+        userId: canonicalSellerId,
         lifetimeBmp: newLifetime,
         level: levelInfo.level,
         levelName: levelInfo.levelName,
@@ -606,7 +641,7 @@ export const gamificationService = {
 
       if (achievementBonus > 0) {
         await bmpRewardsProvider.credit(
-          sellerId,
+          canonicalSellerId,
           achievementBonus,
           'CAMPAIGN',
           `Merchant Sales Milestone Bonus (${currentSales} Sales)`,
@@ -622,28 +657,29 @@ export const gamificationService = {
    * PROCESS VERIFIED SERVICE REVIEW REWARD
    */
   async processServiceReviewReward(userId: string, serviceId: string, orderId: string, reviewId: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
 
     // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', `SRV_REV_${reviewId}`)
     );
     const snapTx = await getDocs(qTx);
     if (!snapTx.empty) return 0;
 
-    const rewardBmp = 30; // 30 BMP for verified service review
+    const rewardBmp = 30;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'CAMPAIGN',
       `Verified Service Review Reward`,
       `SRV_REV_${reviewId}`
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -677,28 +713,29 @@ export const gamificationService = {
    * PROCESS VERIFIED BUSINESS REGISTRATION REWARD
    */
   async processBusinessRegistrationReward(userId: string, businessId: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
 
     // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', `BIZ_REG_${businessId}`)
     );
     const snapTx = await getDocs(qTx);
     if (!snapTx.empty) return 0;
 
-    const rewardBmp = 50; // 50 BMP on Registration
+    const rewardBmp = 50;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'CAMPAIGN',
       `Business Profile Registration Reward`,
       `BIZ_REG_${businessId}`
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -723,28 +760,29 @@ export const gamificationService = {
    * PROCESS VERIFIED BUSINESS APPROVAL REWARD
    */
   async processBusinessApprovalReward(userId: string, businessId: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
 
     // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', `BIZ_APP_${businessId}`)
     );
     const snapTx = await getDocs(qTx);
     if (!snapTx.empty) return 0;
 
-    const rewardBmp = 200; // 200 BMP on official approval
+    const rewardBmp = 200;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'CAMPAIGN',
       `Verified Business Official Approval Reward`,
       `BIZ_APP_${businessId}`
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -774,26 +812,27 @@ export const gamificationService = {
    * PROCESS GENERAL CAMPAIGN REWARD
    */
   async processCampaignReward(userId: string, campaignId: string, amount: number, memo: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
 
     // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', `CAMP_${campaignId}`)
     );
     const snapTx = await getDocs(qTx);
     if (!snapTx.empty) return 0;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       amount,
       'CAMPAIGN',
       memo,
       `CAMP_${campaignId}`
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -817,26 +856,27 @@ export const gamificationService = {
    * PROCESS FESTIVAL REWARD
    */
   async processFestivalReward(userId: string, eventId: string, amount: number, memo: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
 
     // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', `FEST_${eventId}`)
     );
     const snapTx = await getDocs(qTx);
     if (!snapTx.empty) return 0;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       amount,
       'CAMPAIGN',
       memo,
       `FEST_${eventId}`
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -860,18 +900,19 @@ export const gamificationService = {
    * PROCESS ADMIN PROMOTION REWARD
    */
   async processAdminPromotionReward(userId: string, amount: number, memo: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
     const referenceId = `ADMIN_PROMO_${Date.now()}`;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       amount,
       'ADJUSTMENT',
       memo,
       referenceId
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -892,14 +933,14 @@ export const gamificationService = {
   },
 
   /**
-   * STAKING ENGINE (Prepared for future activation)
+   * STAKING ENGINE
    */
   async processStakingReward(userId: string, stakeAmount: number): Promise<never> {
     throw new Error('Staking mechanism is prepared but currently disabled. BMP Token staking will be activated in the next Mainnet Phase.');
   },
 
   /**
-   * MISSION ARCHITECTURE (Prepared for future activation)
+   * MISSION ARCHITECTURE
    */
   async processFutureMission(userId: string, missionId: string): Promise<never> {
     throw new Error('Advanced missions are prepared but currently inactive. Wait for official system release.');
@@ -909,28 +950,29 @@ export const gamificationService = {
    * PROCESS VERIFIED PRODUCT REVIEW REWARD
    */
   async processReviewReward(userId: string, productId: string, orderId: string, reviewId: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
 
     // Idempotency check
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('referenceId', '==', reviewId)
     );
     const snapTx = await getDocs(qTx);
     if (!snapTx.empty) return 0;
 
-    const rewardBmp = 25; // 25 BMP per verified review
+    const rewardBmp = 25;
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'CAMPAIGN',
       `Verified Product Review Reward`,
       reviewId
     );
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -964,44 +1006,44 @@ export const gamificationService = {
    * REAL SOCIAL SHARING REWARD WITH ANTI-FRAUD
    */
   async processShareReward(userId: string, productId: string, platform: string, telemetry: any = {}): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Server Validation: Verify user exists and profile is active
-    if (!userId) {
+    if (!canonicalUserId) {
       throw new Error('Verification failed: Missing user ID.');
     }
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     const profileSnap = await getDoc(profileRef);
     if (!profileSnap.exists()) {
       throw new Error('Verification failed: Gamification profile not found.');
     }
 
-    // 2. Duplicate Detection: Check if user shared this exact entity to this exact platform within the last 10 minutes (replay/spam protection)
+    // Duplicate Detection within last 10 minutes
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const sharesRef = collection(db, 'share_events');
     const qDup = query(
       sharesRef,
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('entityId', '==', productId),
       where('platform', '==', platform),
       where('createdAt', '>=', tenMinutesAgo)
     );
     const snapDup = await getDocs(qDup);
     if (!snapDup.empty) {
-      await antiCheatEngine.logViolation(userId, 'SHARE_REPLAY_ATTEMPT', `Duplicate share of entity ${productId} to ${platform} within 10 mins.`, telemetry, 'WARNING');
+      await antiCheatEngine.logViolation(canonicalUserId, 'SHARE_REPLAY_ATTEMPT', `Duplicate share of entity ${productId} to ${platform} within 10 mins.`, telemetry, 'WARNING');
       throw new Error('Duplicate share action detected too quickly. Please wait before sharing this item to the same platform again.');
     }
 
-    // 3. Daily Limit Validation
-    await antiCheatEngine.validateSocialShare(userId, telemetry);
+    // Daily Limit Validation
+    await antiCheatEngine.validateSocialShare(canonicalUserId, telemetry);
 
-    // 4. Log verified share event
+    // Log verified share event
     const shareDocRef = doc(sharesRef);
     await setDoc(shareDocRef, {
-      userId,
+      userId: canonicalUserId,
       entityId: productId,
-      productId, // backward compatibility
+      productId,
       platform,
       shareDate: todayStr,
       rewarded: true,
@@ -1009,17 +1051,15 @@ export const gamificationService = {
       createdAt: serverTimestamp()
     });
 
-    // 5. Reward Engine: Credit the master ledger/wallet atomically
     const rewardBmp = 15;
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'SHARE',
       `Product Share Reward (${platform})`,
       productId
     );
 
-    // 6. Update stats, level, and weekly milestones
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -1039,11 +1079,10 @@ export const gamificationService = {
       });
     });
 
-    // 7. Send notification
     try {
       const { notificationService } = await import('./notificationService');
       await notificationService.notify(
-        userId,
+        canonicalUserId,
         'loyalty_reward',
         'Share Reward Confirmed! 🚀',
         `Earned +${rewardBmp} BMP for promoting on ${platform}. Keep sharing to earn more!`,
@@ -1060,16 +1099,15 @@ export const gamificationService = {
    * VERIFIED SHARE CLICK REWARD WITH ANTI-CHEAT & RATE LIMITING
    */
   async processVerifiedShareReward(userId: string, entityId: string, platform: string, shareId: string, telemetry: any = {}): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Server Validation
-    if (!userId) {
+    if (!canonicalUserId) {
       console.warn('[Anti-Cheat] Missing user ID for verified share reward.');
       return 0;
     }
 
-    // 2. Duplicate detection: Check if this shareId was already rewarded
     const shareDocRef = doc(db, 'share_events', shareId);
     const shareSnap = await getDoc(shareDocRef);
     if (shareSnap.exists() && shareSnap.data().rewarded) {
@@ -1077,33 +1115,30 @@ export const gamificationService = {
       return 0;
     }
 
-    // 3. Daily Limit Validation (max 5 verified click rewards per day)
     const sharesRef = collection(db, 'share_events');
     const qShares = query(
       sharesRef,
-      where('userId', '==', userId),
+      where('userId', '==', canonicalUserId),
       where('shareDate', '==', todayStr),
       where('rewarded', '==', true)
     );
     const snapShares = await getDocs(qShares);
 
     if (snapShares.size >= 5) {
-      console.warn('[Anti-Cheat] Daily verified share click reward cap reached (5/5) for user:', userId);
+      console.warn('[Anti-Cheat] Daily verified share click reward cap reached (5/5) for user:', canonicalUserId);
       return 0;
     }
 
-    // 4. Reward Engine: Credit the master ledger/wallet atomically
     const rewardBmp = 15;
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'SHARE',
       `Verified Share Engagement Reward (${platform})`,
       entityId
     );
 
-    // 5. Update user profile stats & level
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(profileRef);
       if (!snap.exists()) return;
@@ -1123,11 +1158,10 @@ export const gamificationService = {
       });
     });
 
-    // 6. Send notification
     try {
       const { notificationService } = await import('./notificationService');
       await notificationService.notify(
-        userId,
+        canonicalUserId,
         'loyalty_reward',
         'Viral Reach Reward! 🔥',
         `Your shared link was visited on ${platform}! Earned +${rewardBmp} BMP.`,
@@ -1144,10 +1178,10 @@ export const gamificationService = {
    * REFERRAL PROGRAM: BIND REFERRAL CODE
    */
   async bindReferralCode(userId: string, referralCode: string): Promise<boolean> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
     const cleanCode = referralCode.trim().toUpperCase();
 
-    // Query profile with this referral code
     const q = query(
       collection(db, 'user_gamification'),
       where('referralCode', '==', cleanCode),
@@ -1160,14 +1194,14 @@ export const gamificationService = {
     }
 
     const referrerDoc = snap.docs[0];
-    const referrerId = referrerDoc.id;
+    const rawReferrerId = referrerDoc.id;
+    const canonicalReferrerId = await getCanonicalRewardUserId(rawReferrerId);
 
-    // ANTI-FRAUD SELF REFERRAL GUARD
-    if (referrerId === userId) {
+    if (canonicalReferrerId === canonicalUserId) {
       throw new Error('Self-referrals are strictly prohibited.');
     }
 
-    const userProfileRef = doc(db, 'user_gamification', userId);
+    const userProfileRef = doc(db, 'user_gamification', canonicalUserId);
     const userSnap = await getDoc(userProfileRef);
 
     if (userSnap.exists() && userSnap.data().referredBy) {
@@ -1175,8 +1209,8 @@ export const gamificationService = {
     }
 
     await setDoc(userProfileRef, {
-      userId,
-      referredBy: referrerId,
+      userId: canonicalUserId,
+      referredBy: canonicalReferrerId,
       updatedAt: serverTimestamp()
     }, { merge: true });
 
@@ -1184,50 +1218,48 @@ export const gamificationService = {
   },
 
   /**
-   * REFERRAL PROGRAM: VERIFY AND REWARD (Triggered on 1st verified purchase)
+   * REFERRAL PROGRAM: VERIFY AND REWARD
    */
   async verifyAndRewardReferral(referredUserId: string): Promise<boolean> {
+    const canonicalReferredId = await getCanonicalRewardUserId(referredUserId);
     const db = getFirebaseDb();
-    const profileRef = doc(db, 'user_gamification', referredUserId);
+    const profileRef = doc(db, 'user_gamification', canonicalReferredId);
     const profileSnap = await getDoc(profileRef);
 
     if (!profileSnap.exists()) return false;
     const data = profileSnap.data();
-    const referrerId = data.referredBy;
+    const rawReferrerId = data.referredBy;
 
-    if (!referrerId) return false;
+    if (!rawReferrerId) return false;
+    const canonicalReferrerId = await getCanonicalRewardUserId(rawReferrerId);
 
-    // Check if referral reward was already granted for this referred user
     const qTx = query(
       collection(db, 'wallet_transactions'),
-      where('userId', '==', referrerId),
-      where('referenceId', '==', `REF_${referredUserId}`)
+      where('userId', '==', canonicalReferrerId),
+      where('referenceId', '==', `REF_${canonicalReferredId}`)
     );
     const snapTx = await getDocs(qTx);
-    if (!snapTx.empty) return false; // Already rewarded
+    if (!snapTx.empty) return false;
 
-    // Reward Referrer (+100 BMP)
     const referrerReward = 100;
     await bmpRewardsProvider.credit(
-      referrerId,
+      canonicalReferrerId,
       referrerReward,
       'REFERRAL',
       `Friend Referral Bonus`,
-      `REF_${referredUserId}`
+      `REF_${canonicalReferredId}`
     );
 
-    // Reward Referred Friend (+25 BMP Welcome Bonus)
     const friendReward = 25;
     await bmpRewardsProvider.credit(
-      referredUserId,
+      canonicalReferredId,
       friendReward,
       'REFERRAL',
       `Referral Welcome Bonus`,
-      `WELCOME_${referredUserId}`
+      `WELCOME_${canonicalReferredId}`
     );
 
-    // Update Referrer stats & badges
-    const referrerRef = doc(db, 'user_gamification', referrerId);
+    const referrerRef = doc(db, 'user_gamification', canonicalReferrerId);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(referrerRef);
       if (!snap.exists()) return;
@@ -1261,11 +1293,12 @@ export const gamificationService = {
    * CLAIM MISSION REWARD
    */
   async claimMissionReward(userId: string, missionId: string): Promise<number> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
     const mission = MISSIONS_LIST.find(m => m.id === missionId);
     if (!mission) throw new Error('Invalid mission');
 
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
     let rewardBmp = mission.rewardBmp;
 
     await runTransaction(db, async (transaction) => {
@@ -1298,7 +1331,7 @@ export const gamificationService = {
     });
 
     await bmpRewardsProvider.credit(
-      userId,
+      canonicalUserId,
       rewardBmp,
       'CAMPAIGN',
       `Completed Mission: ${mission.title}`,
@@ -1312,8 +1345,9 @@ export const gamificationService = {
    * TRACK ACTIVITY PROGRESS FOR MISSIONS
    */
   async trackActivity(userId: string, activityType: 'view' | 'wishlist' | 'share' | 'profile'): Promise<void> {
+    const canonicalUserId = await getCanonicalRewardUserId(userId);
     const db = getFirebaseDb();
-    const profileRef = doc(db, 'user_gamification', userId);
+    const profileRef = doc(db, 'user_gamification', canonicalUserId);
 
     const missionMap: Record<string, string> = {
       view: 'daily_view_products',
@@ -1353,7 +1387,6 @@ export const gamificationService = {
     if (profile.streakCount >= 7) currentBadges.add('daily_streak_7');
     if (profile.streakCount >= 30) currentBadges.add('daily_streak_30');
 
-    // Marketplace Veteran: >30 days account age
     const ageDays = (Date.now() - (stats.accountCreatedTime || Date.now())) / (1000 * 60 * 60 * 24);
     if (ageDays >= 30) currentBadges.add('veteran');
 
