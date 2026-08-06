@@ -2,6 +2,7 @@ import { collection, arrayUnion, doc, getDoc, getDocs, setDoc, updateDoc, query,
 import { getFirebaseDb } from '../firebase/config';
 import { notificationService } from './notificationService';
 import { OrderStatus } from '../types';
+import { getCanonicalRewardUserId } from './rewards/rewardIdentityResolver';
 
 export const orderService = {
   async createOrder(orderData: any): Promise<string> {
@@ -26,6 +27,20 @@ export const orderService = {
         }
       }
     });
+
+    // Resolve canonical Pi UIDs for buyer and seller
+    const rawBuyer = sanitizedData.buyerId || sanitizedData.userUid || '';
+    const rawSeller = sanitizedData.sellerId || sanitizedData.businessId || '';
+    if (rawBuyer) {
+      const canonicalBuyer = await getCanonicalRewardUserId(rawBuyer);
+      sanitizedData.buyerId = canonicalBuyer;
+      sanitizedData.userUid = canonicalBuyer;
+      sanitizedData.piUid = canonicalBuyer;
+    }
+    if (rawSeller) {
+      const canonicalSeller = await getCanonicalRewardUserId(rawSeller);
+      sanitizedData.sellerId = canonicalSeller;
+    }
 
     const nowIso = new Date().toISOString();
     const orderNumber = sanitizedData.orderNumber || 'ORD-' + Math.random().toString(36).substr(2, 6).toUpperCase();
@@ -301,34 +316,62 @@ export const orderService = {
   async getOrdersBySeller(sellerId: string): Promise<any[]> {
     if (!sellerId) return [];
     const db = getFirebaseDb();
-    // Query both sellerId and businessId for maximum flexibility
-    const q1 = query(collection(db, 'orders'), where('sellerId', '==', sellerId));
-    const snap1 = await getDocs(q1);
-    const list1 = snap1.docs.map(doc => ({ id: doc.id, orderId: doc.id, ...doc.data() } as any));
+    const canonicalPiUid = await getCanonicalRewardUserId(sellerId);
+    const targetUids = new Set<string>([sellerId, canonicalPiUid]);
+    try {
+      const userSnap = await getDoc(doc(db, 'users', canonicalPiUid));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData.firebaseUid) targetUids.add(uData.firebaseUid);
+        if (uData.uid) targetUids.add(uData.uid);
+      }
+    } catch (e) {}
 
-    const q2 = query(collection(db, 'orders'), where('businessId', '==', sellerId));
-    const snap2 = await getDocs(q2);
-    const list2 = snap2.docs.map(doc => ({ id: doc.id, orderId: doc.id, ...doc.data() } as any));
-
-    // Deduplicate by ID
     const map = new Map<string, any>();
-    [...list1, ...list2].forEach(item => map.set(item.id, item));
+    for (const uid of Array.from(targetUids)) {
+      const q1 = query(collection(db, 'orders'), where('sellerId', '==', uid));
+      const snap1 = await getDocs(q1);
+      snap1.docs.forEach(d => map.set(d.id, { id: d.id, orderId: d.id, ...d.data() }));
+
+      const q2 = query(collection(db, 'orders'), where('businessId', '==', uid));
+      const snap2 = await getDocs(q2);
+      snap2.docs.forEach(d => map.set(d.id, { id: d.id, orderId: d.id, ...d.data() }));
+
+      const q3 = query(collection(db, 'orders'), where('piUid', '==', uid));
+      const snap3 = await getDocs(q3);
+      snap3.docs.forEach(d => map.set(d.id, { id: d.id, orderId: d.id, ...d.data() }));
+    }
     return Array.from(map.values());
   },
 
   async getOrdersByBuyer(buyerId: string): Promise<any[]> {
     if (!buyerId) return [];
     const db = getFirebaseDb();
-    const q1 = query(collection(db, 'orders'), where('buyerId', '==', buyerId));
-    const snap1 = await getDocs(q1);
-    const list1 = snap1.docs.map(doc => ({ id: doc.id, orderId: doc.id, ...doc.data() } as any));
-
-    const q2 = query(collection(db, 'orders'), where('userUid', '==', buyerId));
-    const snap2 = await getDocs(q2);
-    const list2 = snap2.docs.map(doc => ({ id: doc.id, orderId: doc.id, ...doc.data() } as any));
+    const canonicalPiUid = await getCanonicalRewardUserId(buyerId);
+    const targetUids = new Set<string>([buyerId, canonicalPiUid]);
+    try {
+      const userSnap = await getDoc(doc(db, 'users', canonicalPiUid));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData.firebaseUid) targetUids.add(uData.firebaseUid);
+        if (uData.uid) targetUids.add(uData.uid);
+      }
+    } catch (e) {}
 
     const map = new Map<string, any>();
-    [...list1, ...list2].forEach(item => map.set(item.id, item));
+    for (const uid of Array.from(targetUids)) {
+      const q1 = query(collection(db, 'orders'), where('buyerId', '==', uid));
+      const snap1 = await getDocs(q1);
+      snap1.docs.forEach(d => map.set(d.id, { id: d.id, orderId: d.id, ...d.data() }));
+
+      const q2 = query(collection(db, 'orders'), where('userUid', '==', uid));
+      const snap2 = await getDocs(q2);
+      snap2.docs.forEach(d => map.set(d.id, { id: d.id, orderId: d.id, ...d.data() }));
+
+      const q3 = query(collection(db, 'orders'), where('piUid', '==', uid));
+      const snap3 = await getDocs(q3);
+      snap3.docs.forEach(d => map.set(d.id, { id: d.id, orderId: d.id, ...d.data() }));
+    }
     return Array.from(map.values());
   },
 

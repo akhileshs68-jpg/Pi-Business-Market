@@ -936,7 +936,23 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       const orderId = `ORD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       finalOrderId = orderId;
 
-      const effectiveBuyerId = sessionData.userUid || sessionData.buyerId || sessionData.userId || buyerId || 'unknown_user';
+      let canonicalBuyerUid = sessionData.userUid || sessionData.buyerId || sessionData.userId || buyerId || 'unknown_user';
+      try {
+        if (canonicalBuyerUid && canonicalBuyerUid !== 'unknown_user') {
+          const uSnap = await db.collection('users').doc(canonicalBuyerUid).get();
+          if (uSnap.exists && uSnap.data()?.piUid) {
+            canonicalBuyerUid = uSnap.data().piUid;
+          } else {
+            const uQuery = await db.collection('users').where('firebaseUid', '==', canonicalBuyerUid).limit(1).get();
+            if (!uQuery.empty && uQuery.docs[0].data()?.piUid) {
+              canonicalBuyerUid = uQuery.docs[0].data().piUid;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to resolve canonical buyer UID in server.ts:', e);
+      }
+      const effectiveBuyerId = canonicalBuyerUid;
 
       const nowIso = new Date().toISOString();
       const qrCode = sessionData.qrVerificationCode || `PI_QR_${orderId}_${Date.now()}`;
@@ -978,8 +994,10 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         paymentStatus: "completed",
 
         // Core business & user fields
-        buyerId: sessionData.buyerId || effectiveBuyerId,
-        userUid: sessionData.userUid || sessionData.buyerId || effectiveBuyerId,
+        buyerId: effectiveBuyerId,
+        userUid: effectiveBuyerId,
+        piUid: effectiveBuyerId,
+        firebaseUid: sessionData.userUid || sessionData.buyerId || buyerId,
         sellerId: sessionData.sellerId || sellerId,
         businessId: sessionData.businessId || 'PI-BIZ',
         storeId: sessionData.storeId || '',
