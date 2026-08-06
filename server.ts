@@ -273,6 +273,7 @@ const authenticatePaymentRequest = async (
 };
 
 export const app = express();
+app.set("trust proxy", true);
 
 app.use(express.json());
 
@@ -390,7 +391,11 @@ async function startServer() {
     app.use(async (req, res, next) => {
       if (req.method === 'GET' && (req.headers.accept?.includes('text/html') || req.url === '/' || req.url === '/index.html')) {
         const host = req.get("host") || req.headers.host || "";
-        const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+        let protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+        if (Array.isArray(protocol)) protocol = protocol[0];
+        if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
+          protocol = "https";
+        }
         const appUrl = `${protocol}://${host}`;
         try {
           const indexPath = path.join(process.cwd(), "index.html");
@@ -411,7 +416,11 @@ async function startServer() {
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       const host = req.get("host") || req.headers.host || "";
-      const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+      let protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      if (Array.isArray(protocol)) protocol = protocol[0];
+      if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
+        protocol = "https";
+      }
       const appUrl = `${protocol}://${host}`;
       const indexPath = path.join(distPath, "index.html");
       if (fs.existsSync(indexPath)) {
