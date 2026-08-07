@@ -72,7 +72,7 @@ export function isRewardDevOrSandboxMode(userId?: string): boolean {
   // Check URL/Hostname (AI Studio preview, dev environment, localhost)
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase();
-    if (host === 'localhost' || host === '127.0.0.1' || host.includes('ais-dev') || host.includes('ais-pre') || host.includes('run.app')) {
+    if (host === 'localhost' || host === '127.0.0.1') {
       return true;
     }
   }
