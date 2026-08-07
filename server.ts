@@ -2169,6 +2169,10 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     }
   });
 
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   app.get("/api/debug-env", (req, res) => {
     res.json({
       env: Object.keys(process.env).filter(
