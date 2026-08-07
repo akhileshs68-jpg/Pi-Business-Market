@@ -3,7 +3,8 @@
 
 import { getAbsoluteUrl } from './urlUtils';
 
-let isSending = false;
+const logQueue: any[] = [];
+let isProcessingQueue = false;
 
 export function initRemoteLogger() {
   if (typeof window === 'undefined') return;
@@ -12,11 +13,9 @@ export function initRemoteLogger() {
   const originalWarn = console.warn;
   const originalError = console.error;
   const originalInfo = console.info;
+  const originalFetch = window.fetch;
 
-  const sendRemoteLog = async (level: string, args: any[]) => {
-    if (isSending) return;
-    isSending = true;
-
+  const sendRemoteLog = (level: string, args: any[]) => {
     try {
       const formattedArgs = args.map(arg => {
         if (arg instanceof Error) {
@@ -47,19 +46,37 @@ export function initRemoteLogger() {
         details: formattedArgs
       };
 
-      const debugUrl = getAbsoluteUrl('/api/debug-log');
-      originalLog(`[URL_TRACE] DEBUG_URL=${debugUrl}`);
-
-      await fetch(debugUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => {});
+      logQueue.push(payload);
+      processQueue();
     } catch (err) {
       // Avoid printing to intercepted console to prevent loops
-    } finally {
-      isSending = false;
     }
+  };
+
+  const processQueue = async () => {
+    if (isProcessingQueue || logQueue.length === 0) return;
+    isProcessingQueue = true;
+
+    while (logQueue.length > 0) {
+      const payload = logQueue[0];
+      try {
+        const debugUrl = getAbsoluteUrl('/api/debug-log');
+        const fetchToUse = originalFetch || window.fetch;
+        
+        await fetchToUse(debugUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        logQueue.shift();
+      } catch (err) {
+        originalError('[RemoteLogger] Failed to send log:', err);
+        logQueue.shift(); // Remove to prevent blocking queue
+      }
+    }
+
+    isProcessingQueue = false;
   };
 
   console.log = (...args: any[]) => {
@@ -83,7 +100,6 @@ export function initRemoteLogger() {
   };
 
   // 1. INSTRUMENT GLOBAL FETCH SAFELY
-  const originalFetch = window.fetch;
   if (typeof originalFetch === 'function') {
     const wrappedFetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
       const targetUrl = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : input.url);
