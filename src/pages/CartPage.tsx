@@ -39,6 +39,8 @@ export const CartPage: React.FC = () => {
     const wishlistQuery = query(collection(db, 'wishlists'), where('userUid', '==', user.uid));
     const unsubWishlist = onSnapshot(wishlistQuery, (snapshot) => {
       setWishlistCount(snapshot.size);
+    }, (err) => {
+      console.warn('[CartPage] Wishlist snapshot error:', err);
     });
 
     // Carts snapshot
@@ -71,9 +73,13 @@ export const CartPage: React.FC = () => {
             total += count;
           }
           setCartCount(total);
+        }, (err) => {
+          console.warn('[CartPage] Cart items snapshot error:', err);
         });
         unsubsItems.push(unsub);
       });
+    }, (err) => {
+      console.warn('[CartPage] Carts snapshot error:', err);
     });
 
     return () => {

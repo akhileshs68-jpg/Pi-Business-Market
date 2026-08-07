@@ -101,21 +101,21 @@ service cloud.firestore {
     // 3. Collection Rules
     match /users/{uid} {
       allow read: if true;
-      allow create: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == incoming().firebaseUid || request.auth.uid == incoming().lastResolvedUid))) && isValidUser(incoming());
-      allow update: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == existing().firebaseUid || request.auth.uid == existing().lastResolvedUid))) && 
+      allow create: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == incoming().firebaseUid || request.auth.uid == incoming().lastResolvedUid || getPiUid() == incoming().firebaseUid))) && isValidUser(incoming());
+      allow update: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == existing().firebaseUid || request.auth.uid == existing().lastResolvedUid || getPiUid() == existing().firebaseUid))) && 
                     isValidUser(incoming());
     }
 
     // New Business Identity Rules
     match /businesses/{businessId} {
       allow read: if true;
-      allow create: if isSignedIn() && incoming().ownerUid == request.auth.uid;
+      allow create: if isSignedIn() && isOwner(incoming().ownerUid);
       allow update: if isSignedIn() && (isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']));
       allow delete: if isSignedIn() && (isBusinessOwner(businessId) || isSuperAdmin());
     }
 
     match /businessMembers/{memberId} {
-      allow read: if isSignedIn() && (resource.data.userUid == request.auth.uid || isBusinessMember(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (isOwner(resource.data.userUid) || isBusinessMember(resource.data.businessId) || isAdmin());
       allow create: if isSignedIn(); // Usually via transaction or invite
       allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR']));
     }
@@ -152,17 +152,17 @@ service cloud.firestore {
     // Legacy/Compatibility support for existing modules
     match /businessProfiles/{businessId} {
       allow read: if true;
-      allow create: if isSignedIn() && request.auth.uid == incoming().ownerUid && incoming().businessId == businessId;
-      allow update, delete: if isSignedIn() && (request.auth.uid == existing().ownerUid || isAdmin());
+      allow create: if isSignedIn() && isOwner(incoming().ownerUid) && incoming().businessId == businessId;
+      allow update, delete: if isSignedIn() && (isOwner(existing().ownerUid) || isAdmin());
     }
 
     match /stores/{storeId} {
       allow read: if true;
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
-        resource.data.userId == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
+        isOwner(resource.data.userId) || 
+        isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
@@ -172,7 +172,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
         isAdmin()
       );
     }
@@ -181,8 +181,8 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
+        isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
@@ -192,15 +192,15 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
+        isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin() ||
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))
       );
       allow delete: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
+        isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
@@ -209,8 +209,8 @@ service cloud.firestore {
     match /carts/{cartId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.userUid == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isOwner(incoming().userUid) || 
         isAdmin()
       );
     }
@@ -222,22 +222,22 @@ service cloud.firestore {
     match /wishlists/{wishlistId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.userUid == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isOwner(incoming().userUid) || 
         isAdmin()
       );
     }
 
     match /bookings/{bookingId} {
       allow read: if isSignedIn() && (
-        resource.data.buyerId == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.buyerId) || 
+        isOwner(resource.data.sellerId) || 
         isAdmin()
       );
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (
-        resource.data.buyerId == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.buyerId) || 
+        isOwner(resource.data.sellerId) || 
         isAdmin()
       );
     }
@@ -280,7 +280,7 @@ service cloud.firestore {
     }
 
     match /loyaltyTransactions/{txId} {
-      allow read: if isSignedIn() && (resource.data.userUid == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (isOwner(resource.data.userUid) || isAdmin());
       allow create: if isSignedIn();
     }
 
@@ -331,12 +331,12 @@ service cloud.firestore {
     match /checkoutSessions/{sessionId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.buyerId == request.auth.uid || 
-        resource.data.userUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
-        incoming().buyerId == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
-        incoming().sellerId == request.auth.uid || 
+        isOwner(resource.data.buyerId) || 
+        isOwner(resource.data.userUid) || 
+        isOwner(resource.data.sellerId) || 
+        isOwner(incoming().buyerId) || 
+        isOwner(incoming().userUid) || 
+        isOwner(incoming().sellerId) || 
         isAdmin()
       );
     }
@@ -344,10 +344,10 @@ service cloud.firestore {
     match /orderDrafts/{draftId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.buyerId == request.auth.uid || 
-        resource.data.userUid == request.auth.uid || 
-        incoming().buyerId == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
+        isOwner(resource.data.buyerId) || 
+        isOwner(resource.data.userUid) || 
+        isOwner(incoming().buyerId) || 
+        isOwner(incoming().userUid) || 
         isAdmin()
       );
     }
@@ -355,8 +355,8 @@ service cloud.firestore {
     match /userAddresses/{addressId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.userUid == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isOwner(incoming().userUid) || 
         isAdmin()
       );
     }
@@ -364,23 +364,23 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isSignedIn() && (
         resource == null ||
-        resource.data.buyerId == request.auth.uid ||
-        resource.data.userUid == request.auth.uid ||
-        resource.data.sellerId == request.auth.uid ||
-        resource.data.businessId == request.auth.uid ||
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.sellerId) ||
+        isOwner(resource.data.businessId) ||
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
       allow write: if isSignedIn() && (
         resource == null ||
-        incoming().buyerId == request.auth.uid ||
-        incoming().userUid == request.auth.uid ||
-        incoming().sellerId == request.auth.uid ||
-        incoming().businessId == request.auth.uid ||
-        resource.data.buyerId == request.auth.uid ||
-        resource.data.userUid == request.auth.uid ||
-        resource.data.sellerId == request.auth.uid ||
-        resource.data.businessId == request.auth.uid ||
+        isOwner(incoming().buyerId) ||
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().sellerId) ||
+        isOwner(incoming().businessId) ||
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.sellerId) ||
+        isOwner(resource.data.businessId) ||
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
@@ -390,9 +390,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (
         resource == null || 
-        resource.data.userId == request.auth.uid || 
-        incoming().userId == request.auth.uid ||
+        isOwner(resource.data.userId) || 
+        isOwner(incoming().userId) || 
         walletId.startsWith(request.auth.uid + "_") ||
+        walletId.startsWith(getPiUid() + "_") ||
         isAdmin() ||
         (incoming().userId == (resource == null ? incoming().userId : resource.data.userId) &&
          incoming().balance >= (resource == null ? 0.0 : resource.data.balance))
@@ -403,8 +404,8 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (
         resource == null || 
-        resource.data.userId == request.auth.uid || 
-        incoming().userId == request.auth.uid || 
+        isOwner(resource.data.userId) || 
+        isOwner(incoming().userId) || 
         isAdmin() ||
         (incoming().type == 'CREDIT')
       );
@@ -414,8 +415,8 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (
         resource == null || 
-        resource.data.userId == request.auth.uid || 
-        incoming().userId == request.auth.uid || 
+        isOwner(resource.data.userId) || 
+        isOwner(incoming().userId) || 
         isAdmin() ||
         (incoming().userId == (resource == null ? incoming().userId : resource.data.userId) &&
          incoming().piTestnetBalance >= (resource == null ? 0.0 : resource.data.piTestnetBalance))
@@ -437,8 +438,8 @@ service cloud.firestore {
     match /user_gamification/{docId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.userUid == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isOwner(incoming().userUid) || 
         isAdmin()
       );
     }
@@ -446,8 +447,8 @@ service cloud.firestore {
     match /user_active_pioneer/{docId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.userUid == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isOwner(incoming().userUid) || 
         isAdmin()
       );
     }
@@ -455,15 +456,15 @@ service cloud.firestore {
     match /merchantSettlements/{docId} {
       allow read: if isSignedIn() && (
         resource == null || 
-        resource.data.userUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid ||
+        isOwner(resource.data.userUid) || 
+        isOwner(resource.data.sellerId) ||
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
-        resource.data.userUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) ||
         isAdmin()
       );
@@ -473,12 +474,12 @@ service cloud.firestore {
     match /orderItems/{itemId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.buyerId == request.auth.uid || 
-        resource.data.userUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
-        incoming().buyerId == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
-        incoming().sellerId == request.auth.uid || 
+        isOwner(resource.data.buyerId) || 
+        isOwner(resource.data.userUid) || 
+        isOwner(resource.data.sellerId) || 
+        isOwner(incoming().buyerId) || 
+        isOwner(incoming().userUid) || 
+        isOwner(incoming().sellerId) || 
         isAdmin()
       );
     }
@@ -486,12 +487,12 @@ service cloud.firestore {
     match /orderTimeline/{eventId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
-        resource.data.buyerId == request.auth.uid || 
-        resource.data.userUid == request.auth.uid || 
-        resource.data.sellerId == request.auth.uid || 
-        incoming().buyerId == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
-        incoming().sellerId == request.auth.uid || 
+        isOwner(resource.data.buyerId) || 
+        isOwner(resource.data.userUid) || 
+        isOwner(resource.data.sellerId) || 
+        isOwner(incoming().buyerId) || 
+        isOwner(incoming().userUid) || 
+        isOwner(incoming().sellerId) || 
         isAdmin()
       );
     }
@@ -499,17 +500,18 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read: if isSignedIn() && (
         resource == null || 
-        resource.data.uid == request.auth.uid || 
-        resource.data.userId == request.auth.uid || 
+        isOwner(resource.data.uid) || 
+        isOwner(resource.data.userId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
       allow create: if isSignedIn() && (
-        incoming().uid == request.auth.uid || 
-        incoming().userId == request.auth.uid
+        isOwner(incoming().uid) || 
+        isOwner(incoming().userId)
       );
       allow update: if isSignedIn() && (
-        (resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid) || 
+        isOwner(resource.data.uid) || 
+        isOwner(resource.data.userId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
@@ -519,32 +521,26 @@ service cloud.firestore {
     match /paymentHistory/{historyId} {
       allow read: if isSignedIn() && (
         resource == null || 
-        resource.data.uid == request.auth.uid || 
-        resource.data.userId == request.auth.uid || 
+        isOwner(resource.data.uid) || 
+        isOwner(resource.data.userId) || 
         isAdmin()
       );
       allow write: if isAdmin();
     }
 
     match /notifications/{notifId} {
-      allow read: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
-      allow create: if isSignedIn(); // Can be system or user
-      allow update: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+      allow read, create, update, delete: if isSignedIn();
     }
 
     match /notificationPreferences/{userUid} {
-      allow read, write: if isOwner(userUid);
+      allow read, write: if isSignedIn();
     }
 
     match /conversations/{convId} {
-      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
-      allow create: if isSignedIn() && request.auth.uid in incoming().participants;
-      allow update: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow read, create, update, delete: if isSignedIn();
       
       match /messages/{msgId} {
-        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
-        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        allow read, create, update, delete: if isSignedIn();
       }
     }
 
@@ -556,14 +552,14 @@ service cloud.firestore {
     }
 
     match /jobApplications/{appId} {
-      allow read: if isSignedIn() && (resource.data.candidateId == request.auth.uid || isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (isOwner(resource.data.candidateId) || isBusinessOwner(resource.data.businessId) || isAdmin());
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
     }
 
     match /candidateProfiles/{profileId} {
       allow read: if true;
-      allow write: if isOwner(resource.data.userUid || incoming().userUid);
+      allow write: if isOwner(resource.data.userUid) || isOwner(incoming().userUid);
     }
 
     match /inventory/{invId} {
@@ -584,7 +580,7 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.reviewerUid || isAdmin());
+      allow update, delete: if isSignedIn() && (isOwner(resource.data.reviewerUid) || isAdmin());
     }
 
     match /reputationScores/{entityId} {
@@ -627,14 +623,14 @@ service cloud.firestore {
 
     match /media/{mediaId} {
       allow read: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
         resource.data.visibility == 'public' || 
         isAdmin() ||
         (resource.data.businessId != null && isBusinessMember(resource.data.businessId))
       );
-      allow create: if isSignedIn() && incoming().ownerUid == request.auth.uid;
+      allow create: if isSignedIn() && isOwner(incoming().ownerUid);
       allow update, delete: if isSignedIn() && (
-        resource.data.ownerUid == request.auth.uid || 
+        isOwner(resource.data.ownerUid) || 
         isAdmin() ||
         (resource.data.businessId != null && hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin']))
       );

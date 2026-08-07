@@ -21,6 +21,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
+import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { 
   Notification, 
   EnterpriseNotificationType, 
@@ -118,6 +119,9 @@ export const notificationService = {
         })
         .slice(0, 100); // Expanded capacity from 50 to 100 for enterprise dashboard view
       callback(filteredAndSorted);
+    }, (error) => {
+      console.warn('[NotificationService] onSnapshot error:', error);
+      handleFirestoreError(error, OperationType.GET, 'notifications');
     });
   },
 
