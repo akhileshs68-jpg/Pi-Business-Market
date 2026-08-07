@@ -289,7 +289,9 @@ export const authService = {
             if (token) headers['Authorization'] = `Bearer ${token}`;
           }
           console.log('[DEBUG_TRACE] [onIncompletePaymentFound] IMMEDIATELY BEFORE fetch() to /api/payments/incomplete');
-          const fetchRes = await fetch(getAbsoluteUrl('/api/payments/incomplete'), {
+          const url = getAbsoluteUrl('/api/payments/incomplete');
+          console.log(`[URL_TRACE] INCOMPLETE_URL=${url}`);
+          const fetchRes = await fetch(url, {
             method: 'POST',
             headers,
             body: JSON.stringify({ payment })
