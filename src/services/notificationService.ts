@@ -62,25 +62,23 @@ export const notificationService = {
       console.warn('Could not load user notification preferences, falling back to delivery.', e);
     }
 
-    const newNotification: Notification = {
+    const payload: Record<string, any> = {
       notificationId,
       recipientUid,
       type,
       title,
       body,
-      entityType: options?.entityType,
-      entityId: options?.entityId,
       priority: options?.priority || 'medium',
       status: 'unread',
-      linkTo: options?.linkTo,
       pinned: options?.pinned || false,
-      createdAt: new Date().toISOString()
+      createdAt: serverTimestamp()
     };
 
-    await setDoc(notificationRef, {
-      ...newNotification,
-      createdAt: serverTimestamp()
-    });
+    if (options?.entityType !== undefined) payload.entityType = options.entityType;
+    if (options?.entityId !== undefined) payload.entityId = options.entityId;
+    if (options?.linkTo !== undefined) payload.linkTo = options.linkTo;
+
+    await setDoc(notificationRef, payload);
 
     return notificationId;
   },

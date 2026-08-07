@@ -44,6 +44,7 @@ import { getFirebaseDb } from '../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { WalletTransaction, WalletBalance } from '../services/wallet/walletTypes';
 import { MasterLedgerEntry, WalletAccount } from '../services/blockchain/blockchainTypes';
+import { BmpWalletDashboard } from '../components/bmp/BmpWalletDashboard';
 
 export const WalletPage: React.FC = () => {
   const { user } = useAuth();
@@ -368,6 +369,9 @@ export const WalletPage: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* BMP TOKEN ECOSYSTEM DASHBOARD */}
+        <BmpWalletDashboard currentUserUid={user.uid} />
 
         {/* MAIN MASTER BALANCES GRID */}
         <div className="space-y-4">

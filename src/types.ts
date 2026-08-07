@@ -306,6 +306,7 @@ export interface LogisticsDetails {
 export type DeliveryMethod = 'shipping' | 'pickup' | 'self_delivery' | 'store_pickup' | 'local_delivery' | 'third_party_courier';
 
 export interface Order {
+  id?: string;
   orderId: string;
   orderNumber: string;
   checkoutSessionId?: string;
@@ -313,6 +314,7 @@ export interface Order {
   userUid: string;
   businessId: string;
   storeId?: string;
+  disputeId?: string;
   
   currency: string;
   subtotal: number;
@@ -459,6 +461,7 @@ export type EnterpriseNotificationType =
   | 'order_update'
   | 'payment_update'
   | 'shipment_update'
+  | 'dispute_update'
   | 'review_reply'
   | 'loyalty_reward'
   | 'system_alert'

@@ -43,6 +43,8 @@ import { EnterpriseInvoiceModal } from '../components/billing/EnterpriseInvoiceM
 import { ProfessionalReceiptModal } from '../components/billing/ProfessionalReceiptModal';
 import { QRVerificationModal } from '../components/billing/QRVerificationModal';
 import { EnterpriseInvoice, ProfessionalReceipt } from '../types/billing';
+import { OpenDisputeModal } from '../components/dispute/OpenDisputeModal';
+import { DisputeDetailView } from '../components/dispute/DisputeDetailView';
 
 export const OrderDetails: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -983,69 +985,31 @@ export const OrderDetails: React.FC = () => {
           </div>
         )}
 
-        {/* Dispute Modal */}
-        {showDisputeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md space-y-6">
-              <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-500" /> Raise Order Dispute
-              </h2>
-              
-              <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dispute Details</label>
-                <textarea 
-                  value={disputeReason}
-                  onChange={(e) => {
-                    setDisputeReason(e.target.value);
-                    if (disputeError) setDisputeError(null);
-                  }}
-                  placeholder="Explain transaction issue or non-delivery for platform mediation..."
-                  rows={4}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-medium text-white focus:outline-none focus:border-rose-500 disabled:opacity-50"
-                  disabled={isDisputing}
-                />
-              </div>
+        {/* Open Dispute Modal */}
+        {showDisputeModal && order && (
+          <OpenDisputeModal
+            isOpen={showDisputeModal}
+            onClose={() => setShowDisputeModal(false)}
+            order={order}
+            currentUserUid={user?.uid || 'user'}
+            onDisputeCreated={(createdDisputeId) => {
+              setShowDisputeModal(false);
+              setOrder(prev => prev ? ({ ...prev, disputeId: createdDisputeId, disputeStatus: 'opened', orderStatus: OrderStatus.DISPUTED }) : prev);
+            }}
+          />
+        )}
 
-              {disputeError && (
-                <div className="p-3 bg-rose-950/50 border border-rose-800/60 rounded-xl text-rose-300 text-xs font-medium">
-                  {disputeError}
-                </div>
-              )}
-              
-              <div className="flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    console.log('[OrderDetails Dispute Modal] Cancel clicked.');
-                    setShowDisputeModal(false);
-                    setDisputeError(null);
-                  }} 
-                  disabled={isDisputing}
-                  className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    console.log('[OrderDetails Dispute Modal] Open Case button clicked.');
-                    handleRaiseDispute();
-                  }} 
-                  disabled={!disputeReason.trim() || isDisputing} 
-                  className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-all"
-                >
-                  {isDisputing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Opening...</span>
-                    </>
-                  ) : (
-                    <span>Open Case</span>
-                  )}
-                </button>
-              </div>
-            </div>
+        {/* Existing Dispute Case Detailed View */}
+        {order?.disputeId && (
+          <div className="mt-8 pt-8 border-t border-slate-800">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-500" /> Active Dispute Arbitration
+            </h3>
+            <DisputeDetailView
+              disputeId={order.disputeId}
+              currentUserUid={user?.uid || ''}
+              currentUserRole={isMerchant ? 'SELLER' : 'BUYER'}
+            />
           </div>
         )}
 

@@ -10,7 +10,7 @@ let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
 const getRawConfig = () => {
-  const envKey = (import.meta as any).env.VITE_FIREBASE_API_KEY;
+  const envKey = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_FIREBASE_API_KEY;
   if (envKey) {
     return {
       apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY,

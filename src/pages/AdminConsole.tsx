@@ -17,6 +17,8 @@ import { useAuth } from '../auth/useAuth';
 import { RoleResolver } from '../services/identity/RoleResolver';
 import Navbar from '../components/Navbar';
 import { BlockchainAdminDashboard } from '../components/admin/BlockchainAdminDashboard';
+import { DisputeManager } from '../components/dispute/DisputeManager';
+import { BmpAdminDashboard } from '../components/bmp/BmpAdminDashboard';
 import { 
   DashboardPanel, UserManagementPanel, BusinessManagementPanel, StoreManagementPanel,
   ProductManagementPanel, ServiceManagementPanel, OrderAnalyticsPanel, PaymentAnalyticsPanel,
@@ -26,7 +28,7 @@ import {
 
 type AdminTab = 
   | 'dashboard' | 'users' | 'businesses' | 'stores' | 'products' | 'services'
-  | 'orders' | 'payments' | 'bmp' | 'community' | 'marketing' | 'ad_moderation' | 'blockchain' 
+  | 'orders' | 'disputes' | 'payments' | 'bmp' | 'community' | 'marketing' | 'ad_moderation' | 'blockchain' 
   | 'health' | 'flags' | 'security' | 'backup' | 'governance' | 'settings';
 
 export const AdminConsole: React.FC = () => {
@@ -119,6 +121,7 @@ export const AdminConsole: React.FC = () => {
       title: 'Analytics & Insights',
       items: [
         { id: 'orders', label: 'Orders', icon: ShoppingBag },
+        { id: 'disputes', label: 'Disputes & Claims', icon: ShieldAlert },
         { id: 'payments', label: 'Payments', icon: CreditCard },
         { id: 'bmp', label: 'BMP Rewards', icon: Award },
         { id: 'marketing', label: 'Marketing', icon: Megaphone },
@@ -234,8 +237,9 @@ export const AdminConsole: React.FC = () => {
               {activeTab === 'products' && <ProductManagementPanel />}
               {activeTab === 'services' && <ServiceManagementPanel />}
               {activeTab === 'orders' && <OrderAnalyticsPanel />}
+              {activeTab === 'disputes' && <DisputeManager currentUserUid={user?.uid || ''} currentUserRole="ADMIN" />}
               {activeTab === 'payments' && <PaymentAnalyticsPanel />}
-              {activeTab === 'bmp' && <BmpAnalyticsPanel />}
+              {activeTab === 'bmp' && <BmpAdminDashboard adminUid={user?.uid || ''} />}
               {activeTab === 'community' && <CommunityAnalyticsPanel />}
               {activeTab === 'marketing' && <MarketingAnalyticsPanel />}
               {activeTab === 'ad_moderation' && <AdModerationPanel />}
