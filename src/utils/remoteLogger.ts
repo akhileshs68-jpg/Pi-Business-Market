@@ -71,7 +71,7 @@ export function initRemoteLogger() {
         
         logQueue.shift();
       } catch (err) {
-        originalError('[RemoteLogger] Failed to send log:', err);
+        // Silently drop or warn quietly to avoid error spam
         logQueue.shift(); // Remove to prevent blocking queue
       }
     }

@@ -114,6 +114,9 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
         if (loads >= cartIds.length) {
           setLoading(false);
         }
+      }, (err) => {
+        console.warn('Error listening to cart items:', err);
+        setLoading(false);
       });
       unsubs.push(unsub);
     });

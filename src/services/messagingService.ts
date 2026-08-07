@@ -23,6 +23,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
+import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { 
   Conversation, 
   Message, 
@@ -440,6 +441,9 @@ export const messagingService = {
     return onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => this.mapDocToMessage(doc));
       callback(messages);
+    }, (error) => {
+      console.warn('[MessagingService] error in subscribeToMessages:', error);
+      handleFirestoreError(error, OperationType.GET, `conversations/${conversationId}/messages`);
     });
   },
 
