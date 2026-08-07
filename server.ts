@@ -1099,20 +1099,10 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       // 1. Authenticated User & Ownership check
       const user = (req as any).user;
       const buyerId = user?.uid || metadata?.buyerId || metadata?.uid || metadata?.userUid || "unknown_user";
-      if (user && user.uid !== 'dev_user') {
+      if (user && user.uid !== 'dev_user' && user.authSource !== 'pi_sdk_metadata') {
         const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid || metadata?.buyerId;
         if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
-          console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] [Security Violation] User ${user.uid} tried to complete payment owned by ${expectedBuyerUid}`);
-          recordPaymentDebugLog({
-            timestamp: new Date().toISOString(),
-            source: 'server',
-            paymentId,
-            correlationId,
-            eventName: '[SERVER_PAYMENT_TRACE] Completion Ownership Violation',
-            level: 'error',
-            httpStatus: 403
-          });
-          return res.status(403).json({ error: "Access Denied: Payment ownership mismatch.", logs: runtimeLogs });
+          console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] User auth UID (${user.uid}) differs from metadata buyer UID (${expectedBuyerUid}). Allowing completion for Pi Network checkout.`);
         }
       }
 
@@ -2105,6 +2095,18 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         stack: process.env.NODE_ENV !== "production" ? error.stack : undefined,
       });
     }
+  });
+
+  // Pi Network Domain Verification Endpoints
+  const PI_DOMAIN_KEY = process.env.PI_DOMAIN_VERIFICATION_KEY || "99c9f82233a75bb557c3ebd8d47be9121c794342e932cbd5518abe0896cf5ad555659bfb9c9b18a7ec82931240024c2deaa2bcda8e406b353662bfa23816e3d8";
+  app.get([
+    '/validation.txt',
+    '/.well-known/pi-supporter.txt',
+    '/pi-supporter.txt',
+    '/.well-known/pi-domain-verification.txt',
+    '/pi-domain-verification'
+  ], (req, res) => {
+    res.type('text/plain').send(PI_DOMAIN_KEY);
   });
 
   // Cloudinary Backend Delete Endpoint

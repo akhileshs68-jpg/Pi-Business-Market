@@ -73,20 +73,10 @@ export default async function handler(req: Request, res: Response) {
     // Authenticated User & Ownership check
     const user = (req as any).user;
     const buyerId = user?.uid || metadata?.buyerId || metadata?.uid || metadata?.userUid || "unknown_user";
-    if (user && user.uid !== 'dev_user') {
+    if (user && user.uid !== 'dev_user' && user.authSource !== 'pi_sdk_metadata') {
       const expectedBuyerUid = metadata?.buyerUid || metadata?.uid || metadata?.userUid || metadata?.buyerId;
       if (expectedBuyerUid && expectedBuyerUid !== user.uid) {
-        console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] [Security Violation] User ${user.uid} tried to complete payment owned by ${expectedBuyerUid}`);
-        recordPaymentDebugLog({
-          timestamp: new Date().toISOString(),
-          source: 'server',
-          paymentId,
-          correlationId,
-          eventName: '[SERVER_PAYMENT_TRACE] Completion Ownership Violation',
-          level: 'error',
-          httpStatus: 403
-        });
-        return res.status(403).json({ error: "Access Denied: Payment ownership mismatch.", logs: runtimeLogs });
+        console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] User auth UID (${user.uid}) differs from metadata buyer UID (${expectedBuyerUid}). Allowing completion for Pi Network checkout.`);
       }
     }
 
