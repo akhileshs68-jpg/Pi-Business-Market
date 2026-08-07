@@ -1,7 +1,7 @@
 import { initializeApp, getApps, applicationDefault, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { deleteEngine } from './server/deleteEngine';
+import { deleteEngine } from './server/deleteEngine.js';
 
 // Prevent unhandled promise rejections and uncaught exceptions from terminating the Node process
 process.on('unhandledRejection', (reason, promise) => {
