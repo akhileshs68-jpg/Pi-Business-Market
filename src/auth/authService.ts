@@ -259,13 +259,18 @@ export const authService = {
     }
 
     if (piAuthPromise && !forceRefresh) {
-      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 8] Returning existing piAuthPromise');
+      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 8] Checking existing piAuthPromise');
       console.log('[DEBUG_TRACE] [authenticatePi] BEFORE await existing piAuthPromise');
       console.log('[DIAGNOSTICS] [authenticatePi] Return path taken: Early exit (existing promise re-use)');
-      const res = await piAuthPromise;
-      console.log('[DEBUG_TRACE] [authenticatePi] AFTER await existing piAuthPromise');
-      console.log('[DEBUG_TRACE] [authenticatePi] EXIT (promise re-use)');
-      return res;
+      const res = await piAuthPromise.catch(() => null);
+      if (res && res.hasPaymentsScope && hasNativePaymentsScope()) {
+        console.log('[DEBUG_TRACE] [authenticatePi] AFTER await existing piAuthPromise');
+        console.log('[DEBUG_TRACE] [authenticatePi] EXIT (promise re-use)');
+        return res;
+      }
+      console.warn('[DEBUG_TRACE] [authenticatePi] Cached promise result lacks payments scope or failed. Clearing and forcing fresh authentication...');
+      piAuthPromise = null;
+      piAuthResult = null;
     }
 
     console.log('[DEBUG_TRACE] [authenticatePi] [STEP 9] BEFORE await initPi()');
@@ -446,11 +451,12 @@ export const authService = {
 
     console.log('[DEBUG_TRACE] [authenticatePi] [STEP 15] BEFORE await piAuthPromise wrapper');
     try {
-      const authRes = await piAuthPromise;
-      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 16] AFTER piAuthPromise resolves with authRes:', JSON.stringify(authRes));
+      const authResult = await piAuthPromise;
+      console.log("[PI_DEBUG] auth result =", authResult);
+      console.log('[DEBUG_TRACE] [authenticatePi] [STEP 16] AFTER piAuthPromise resolves with authRes:', JSON.stringify(authResult));
       console.log('[DIAGNOSTICS] [authenticatePi] Return path taken: Outer wrapper resolve');
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT (total duration:', Date.now() - startTime, 'ms)');
-      return authRes;
+      return authResult;
     } catch (authErr) {
       console.error('[DEBUG_TRACE] [authenticatePi] [STEP 16 Error] AFTER piAuthPromise rejects with authErr:', authErr);
       console.log('[DEBUG_TRACE] [authenticatePi] EXIT with error (total duration:', Date.now() - startTime, 'ms)');
