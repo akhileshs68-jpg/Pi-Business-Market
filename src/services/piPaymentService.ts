@@ -27,6 +27,13 @@ export const piPaymentService = {
     console.log(`[${enterTime}] [PAYMENT_TRACE] [createPayment] typeof window.Pi.createPayment:`, typeof (window as any).Pi?.createPayment);
     console.log(`[${enterTime}] [PAYMENT_TRACE] [createPayment] isPaymentInProgress state:`, isPaymentInProgress);
 
+    // STATIC PI INSTANCE DEBUG LOGS PLACED BEFORE THE FIRST POSSIBLE RETURN/THROW
+    console.log("[PI_DEBUG_EARLY] window.Pi:", (window as any).Pi);
+    console.log("[PI_DEBUG_EARLY] window.Pi.consentedScopes:", (window as any).Pi?.consentedScopes);
+    console.log("[PI_DEBUG_EARLY] window.Pi.user:", (window as any).Pi?.user);
+    console.log("[PI_DEBUG_EARLY] window.Pi.createPayment:", (window as any).Pi?.createPayment);
+    console.log("[PI_DEBUG_EARLY] exact same window.Pi object reference is used:", (window as any).Pi === (window as any).Pi);
+
     if (isPaymentInProgress) {
       console.warn(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Payment already in progress. Ignoring duplicate request.`);
       if (callbacks.onError) {
@@ -38,31 +45,46 @@ export const piPaymentService = {
     isPaymentInProgress = true;
     
     try {
-      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 1: Pre-payment account check...`);
+      const authPi = (window as any).Pi;
+      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 1: Mandatory fresh Pi SDK authentication prior to payment (forceRefresh=true)...`);
       
-      let verifiedUser: any = authService.getLatestVerifiedUser();
-      let piAuth: any = authService.getLatestPiAuth();
+      let piAuth: any = null;
+      let verifiedUser: any = null;
 
-      if (!verifiedUser || !piAuth) {
-        try {
-          console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] No cached user session found, running account synchronization...`);
-          const result = await authService.verifyAndSynchronizePiAccount(false);
-          verifiedUser = result.verifiedUser;
-          piAuth = result.piAuth;
-        } catch (verifyErr: any) {
-          console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment verification failed:`, verifyErr);
-          isPaymentInProgress = false;
-          if (callbacks.onError) {
-            await callbacks.onError(
-              verifyErr instanceof Error ? verifyErr : new Error(`[Verification Failed] ${verifyErr}`),
-              'pre_payment_verification_failed'
-            );
-          }
-          return;
+      try {
+        // ALWAYS force fresh authentication before every payment creation to establish active consented scope session with window.Pi SDK
+        piAuth = await authService.authenticatePi(['username', 'payments'], true);
+        console.log("[PI_DEBUG] auth result =", piAuth);
+        console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Fresh Pi authentication completed:`, {
+          hasPaymentsScope: piAuth?.hasPaymentsScope,
+          username: piAuth?.user?.username,
+          uid: piAuth?.user?.uid,
+          scopesReturned: piAuth?.scopes || piAuth?.user?.scopes
+        });
+
+        const syncResult = await authService.verifyAndSynchronizePiAccount(true);
+        verifiedUser = syncResult.verifiedUser;
+      } catch (authErr: any) {
+        console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] Pre-payment fresh authentication failed:`, authErr);
+        
+        // LOGS ADDED INSIDE CATCH TO ENSURE EXECUTION REGARDLESS OF THROWN EXCEPTIONS
+        console.log("[PI_DEBUG_CATCH] auth result = null (failed)");
+        console.log("[PI_DEBUG_CATCH] authenticated = false");
+        console.log("[PI_DEBUG_CATCH] scopes = undefined");
+        console.log("[PI_DEBUG_CATCH] verifiedUser = null");
+
+        isPaymentInProgress = false;
+        if (callbacks.onError) {
+          await callbacks.onError(
+            authErr instanceof Error ? authErr : new Error(`[Authentication Failed] ${authErr}`),
+            'pre_payment_auth_failed'
+          );
         }
-      } else {
-        console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Reusing existing verified user session (@${verifiedUser.username}). Skipping re-authentication.`);
+        return;
       }
+
+      const piInstance = (window as any).Pi;
+      const nativeConsentedScopes = piInstance?.consentedScopes;
 
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Authentication Check Details:`, {
         isRealPiBrowser: isRealPiBrowser(),
@@ -70,10 +92,10 @@ export const piPaymentService = {
         verifiedUsername: verifiedUser?.username,
         hasPaymentsScope: piAuth?.hasPaymentsScope,
         scopesRequested: ['username', 'payments'],
+        nativeConsentedScopes: nativeConsentedScopes,
         rawPiAuthResponse: JSON.stringify(piAuth)
       });
 
-      const piInstance = (window as any).Pi;
       const isPiSdkAvailable = typeof piInstance?.createPayment === 'function';
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Step 2: isPiSdkAvailable = ${isPiSdkAvailable}`);
 
@@ -82,6 +104,13 @@ export const piPaymentService = {
           "Official Pi Wallet SDK (window.Pi.createPayment) is not available in this browser environment. Please open inside official Pi Browser or Sandbox."
         );
         console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] SDK unavailable error:`, notAvailableErr.message);
+        
+        // LOGS ADDED BEFORE return TO ENSURE EXECUTION
+        console.log("[PI_DEBUG_UNAVAILABLE] auth result =", piAuth);
+        console.log("[PI_DEBUG_UNAVAILABLE] authenticated =", !!piAuth);
+        console.log("[PI_DEBUG_UNAVAILABLE] scopes =", piAuth?.scopes);
+        console.log("[PI_DEBUG_UNAVAILABLE] verifiedUser =", verifiedUser);
+
         isPaymentInProgress = false;
         if (callbacks.onError) {
           await callbacks.onError(notAvailableErr, 'pi_sdk_unavailable');
@@ -177,6 +206,48 @@ export const piPaymentService = {
         metadataKeys: Object.keys(paymentPayload.metadata),
         callbacksDefined: Object.keys(paymentCallbacks)
       });
+
+      // Verification immediately before createPayment() that the authenticated session contains the payment permission
+      const hasPaymentPermission = Boolean(
+        piAuth?.hasPaymentsScope || 
+        (Array.isArray(piAuth?.scopes) && piAuth.scopes.includes('payments')) ||
+        (Array.isArray((window as any).Pi?.consentedScopes) && (window as any).Pi.consentedScopes.includes('payments')) ||
+        hasNativePaymentsScope()
+      );
+
+      console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Verification immediately before createPayment(): hasPaymentPermission = ${hasPaymentPermission}`, {
+        piAuthHasPaymentsScope: piAuth?.hasPaymentsScope,
+        piAuthScopes: piAuth?.scopes,
+        nativeConsentedScopes: (window as any).Pi?.consentedScopes,
+        hasNativePaymentsScope: hasNativePaymentsScope()
+      });
+
+      if (!hasPaymentPermission) {
+        const missingScopeErr = new Error("Authenticated Pi session is missing the required 'payments' permission scope.");
+        console.error(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Missing payment permission:`, missingScopeErr.message);
+        
+        // LOGS ADDED BEFORE return TO ENSURE EXECUTION
+        console.log("[PI_DEBUG_PERMISSION] auth result =", piAuth);
+        console.log("[PI_DEBUG_PERMISSION] authenticated =", !!piAuth);
+        console.log("[PI_DEBUG_PERMISSION] scopes =", piAuth?.scopes);
+        console.log("[PI_DEBUG_PERMISSION] verifiedUser =", verifiedUser);
+
+        isPaymentInProgress = false;
+        if (callbacks.onError) {
+          await callbacks.onError(missingScopeErr, 'missing_payments_scope');
+        }
+        return;
+      }
+
+      console.log("[PI_DEBUG] authenticated =", !!piAuth);
+      console.log("[PI_DEBUG] scopes =", piAuth?.scopes);
+      console.log("[PI_DEBUG] verifiedUser =", verifiedUser);
+
+      console.log(window.Pi);
+      console.log((window as any).Pi?.consentedScopes);
+      console.log((window as any).Pi?.user);
+      console.log((window as any).Pi?.createPayment);
+      console.log("[PI_DEBUG] exact same window.Pi object reference is used:", authPi === (window as any).Pi);
 
       console.log(`[${new Date().toISOString()}] [PAYMENT_TRACE] [createPayment] Invoking window.Pi.createPayment()...`);
       let syncResult: any = undefined;
