@@ -51,7 +51,7 @@ export class EnterpriseCartEngine {
     const groupsMap = new Map<string, CartSellerGroup>();
 
     items.forEach((item) => {
-      const sellerKey = item.storeId || item.businessId || item.ownerId || 'default_seller';
+      const sellerKey = item.sellerId || item.storeId || item.businessId || item.ownerId || 'default_seller';
       const sellerName = item.sellerName || item.storeName || item.businessName || 'Pi Pioneer Merchant';
 
       if (!groupsMap.has(sellerKey)) {
@@ -100,13 +100,31 @@ export class EnterpriseCartEngine {
   static calculateCartSummary(items: ExtendedCartItem[], appliedCoupon?: CartCoupon): CartPriceSummary {
     let productSubtotal = 0;
     let serviceSubtotal = 0;
+    let hasExchangeItems = false;
+    let hasCommunityItems = false;
+    let hasLegacyItems = false;
+    const localCurrencyTotals: Record<string, number> = {};
 
     items.forEach((item) => {
-      const itemPrice = (item.unitPrice || item.price || 0) * (item.quantity || 1);
+      const piUnitPrice = item.piUnitPrice ?? item.unitPrice ?? item.price ?? 0;
+      const itemPrice = piUnitPrice * (item.quantity || 1);
+
       if (item.type === 'service' || (item.name && item.name.toLowerCase().includes('service'))) {
         serviceSubtotal += itemPrice;
       } else {
         productSubtotal += itemPrice;
+      }
+
+      if (item.pricingMode === 'EXCHANGE') {
+        hasExchangeItems = true;
+        if (item.localCurrency && item.localAmount) {
+          const code = item.localCurrency.toUpperCase();
+          localCurrencyTotals[code] = (localCurrencyTotals[code] || 0) + (item.localAmount * (item.quantity || 1));
+        }
+      } else if (item.pricingMode === 'COMMUNITY') {
+        hasCommunityItems = true;
+      } else {
+        hasLegacyItems = true;
       }
     });
 
@@ -143,7 +161,11 @@ export class EnterpriseCartEngine {
       grandTotal,
       bmpRewardsEstimate,
       piTestnetAmount: Number(grandTotal.toFixed(4)),
-      currency: 'π'
+      currency: 'π',
+      hasExchangeItems,
+      hasCommunityItems,
+      hasLegacyItems,
+      localCurrencyTotals
     };
   }
 

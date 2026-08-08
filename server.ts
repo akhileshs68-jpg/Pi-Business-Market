@@ -1537,6 +1537,42 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         return cleanItem;
       });
 
+      const pricingSnapshot = sessionData.pricingSnapshot || null;
+      const pricingQuoteId = sessionData.pricingQuoteId || pricingSnapshot?.quoteId || '';
+      const pricingEngineVersion = sessionData.pricingEngineVersion || pricingSnapshot?.pricingEngineVersion || '1.0.0';
+      const pricingMode = sessionData.pricingMode || pricingSnapshot?.pricingMode || (sessionData.currency === 'INR' || sessionData.currency === 'USD' || sessionData.currency === 'EUR' ? 'EXCHANGE' : 'COMMUNITY');
+      const rateUsed = pricingSnapshot?.rateUsed ?? null;
+      const rateSource = pricingSnapshot?.rateSource || 'Checkout Session Quote';
+      const rateTimestamp = pricingSnapshot?.rateTimestamp || sessionData.createdAt || nowIso;
+      const localCurrency = pricingSnapshot?.localCurrency || sessionData.currency || 'INR';
+      const localAmount = pricingSnapshot?.localAmount ?? sessionData.subtotal ?? grandTotal;
+      const piAmount = pricingSnapshot?.piAmount ?? grandTotal;
+
+      const orderItemsWithSnapshot = sanitizedCartItems.map((item: any) => {
+        const cleanItem = { ...item };
+        cleanItem.pricingMode = item.pricingMode || pricingMode;
+        cleanItem.localCurrency = item.localCurrency || localCurrency;
+        cleanItem.localAmount = item.localAmount !== undefined ? Number(item.localAmount) : (item.unitPrice || item.price || 0);
+        cleanItem.piUnitPrice = item.piUnitPrice !== undefined ? Number(item.piUnitPrice) : (item.unitPrice || item.price || 0);
+        cleanItem.rateUsed = item.rateUsed !== undefined ? item.rateUsed : rateUsed;
+        cleanItem.rateSource = item.rateSource || rateSource;
+        cleanItem.rateTimestamp = item.rateTimestamp || rateTimestamp;
+        return cleanItem;
+      });
+
+      const effectivePricingSnapshot = pricingSnapshot || {
+        pricingMode,
+        localCurrency,
+        localAmount,
+        piAmount,
+        rateUsed,
+        rateSource,
+        rateTimestamp,
+        quoteId: pricingQuoteId,
+        pricingEngineVersion,
+        capturedAt: nowIso
+      };
+
       const orderData: any = {
         // Clone ALL checkout session data first
         ...sessionData,
@@ -1549,6 +1585,18 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         status: "paid",
         paymentStatus: "completed",
 
+        // Phase 8 Immutable Financial Pricing Snapshot
+        pricingSnapshot: effectivePricingSnapshot,
+        pricingQuoteId,
+        pricingEngineVersion,
+        pricingMode,
+        rateUsed,
+        rateSource,
+        rateTimestamp,
+        localCurrency,
+        localAmount,
+        piAmount,
+
         // Core business & user fields
         buyerId: effectiveBuyerId,
         userUid: effectiveBuyerId,
@@ -1559,8 +1607,8 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         storeId: sessionData.storeId || '',
 
         // Items
-        items: sessionData.items || sanitizedCartItems,
-        cartItems: sessionData.cartItems || sanitizedCartItems,
+        items: orderItemsWithSnapshot,
+        cartItems: orderItemsWithSnapshot,
 
         // Pricing breakdown
         subtotal: sessionData.subtotal ?? grandTotal,
@@ -1692,6 +1740,10 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             source: 'CHECKOUT',
             description: `Payment debit for marketplace order #${orderId}`,
             referenceId: orderId,
+            pricingQuoteId,
+            pricingSnapshot: effectivePricingSnapshot,
+            rateUsed,
+            rateTimestamp,
             createdAt: FieldValue.serverTimestamp()
           }));
 
@@ -1707,6 +1759,10 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             source: 'CHECKOUT',
             description: `Sale credit for marketplace order #${orderId}`,
             referenceId: orderId,
+            pricingQuoteId,
+            pricingSnapshot: effectivePricingSnapshot,
+            rateUsed,
+            rateTimestamp,
             createdAt: FieldValue.serverTimestamp()
           }));
 
@@ -1726,6 +1782,11 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             source: 'CHECKOUT',
             status: 'CONFIRMED',
             memo: `Payment debit for marketplace order #${orderId}`,
+            pricingQuoteId,
+            pricingSnapshot: effectivePricingSnapshot,
+            pricingMode,
+            rateUsed,
+            rateTimestamp,
             timestamp: new Date().toISOString(),
             createdAt: FieldValue.serverTimestamp()
           }));
@@ -1745,6 +1806,11 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             source: 'CHECKOUT',
             status: 'CONFIRMED',
             memo: `Sale credit for marketplace order #${orderId}`,
+            pricingQuoteId,
+            pricingSnapshot: effectivePricingSnapshot,
+            pricingMode,
+            rateUsed,
+            rateTimestamp,
             timestamp: new Date().toISOString(),
             createdAt: FieldValue.serverTimestamp()
           }));
@@ -1773,15 +1839,29 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           const settlementRef = db.collection('merchantSettlements').doc(settlementId);
           const releaseDate = new Date();
           releaseDate.setDate(releaseDate.getDate() + 7);
+
+          const grossAmount = grandTotal;
+          const commission = grossAmount * 0.05;
+          const merchantAmount = grossAmount - commission;
+
           await logTx(settlementRef, () => transaction.set(settlementRef, {
             settlementId,
             orderId,
+            paymentId,
+            txid,
             businessId: sessionData.businessId || 'PI-BIZ',
             storeId: sessionData.storeId || '',
             sellerId: sellerId,
-            amount: grandTotal * 0.95,
+            grossAmount,
+            commission,
+            merchantAmount,
+            amount: merchantAmount,
             currency: sessionData.currency || 'Pi',
             status: 'PENDING',
+            pricingQuoteId,
+            pricingSnapshot: effectivePricingSnapshot,
+            rateUsed,
+            rateTimestamp,
             createdAt: new Date().toISOString(),
             releaseEligibleAt: releaseDate.toISOString()
           }));
@@ -1795,12 +1875,26 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
             paymentId,
             txid,
             uid: buyerId,
+            buyerId: effectiveBuyerId,
+            sellerId: sellerId,
             businessId: sessionData.businessId || "PI-CORP-001",
             storeId: sessionData.storeId || "PI-STORE-001",
             amount: grandTotal,
+            piAmount: grandTotal,
+            currency: sessionData.currency || 'Pi',
             memo: metadata?.memo || paymentData?.memo || `Payment for order #${orderNumber}`,
             paymentStatus: "completed",
+            status: "Completed",
             orderId: orderId,
+            pricingQuoteId,
+            pricingSnapshot: effectivePricingSnapshot,
+            pricingEngineVersion,
+            pricingMode,
+            localCurrency,
+            localAmount,
+            rateUsed,
+            rateSource,
+            rateTimestamp,
             createdAt: FieldValue.serverTimestamp()
           };
           await logTx(paymentRef, () => transaction.set(paymentRef, transactionData));

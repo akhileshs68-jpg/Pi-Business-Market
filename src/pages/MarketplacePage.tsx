@@ -38,6 +38,7 @@ import { searchService } from '../services/searchService';
 import { WishlistService } from '../services/wishlistService';
 import { RatingStars } from '../components/RatingStars';
 import { SearchIndexEntry, SearchEntityType } from '../types';
+import { PriceDisplay } from '../components/pricing/PriceDisplay';
 
 export const MarketplacePage: React.FC = () => {
   const { user } = useAuth();
@@ -450,7 +451,11 @@ export const MarketplacePage: React.FC = () => {
                                 <div className="flex items-center justify-between pt-4 border-t border-slate-800/50 mt-auto">
                                   <div className="flex items-center gap-3">
                                     {item.price !== undefined && (
-                                      <p className="text-lg font-black text-white">{item.price} {item.currency}</p>
+                                      <PriceDisplay 
+                                        item={item} 
+                                        type={item.entityType === 'service' ? 'service' : 'product'} 
+                                        size="md" 
+                                      />
                                     )}
                                     {item.location && (
                                       <div className="flex items-center gap-1 text-[10px] font-bold text-slate-600 uppercase">

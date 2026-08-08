@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import { PriceDisplay } from '../pricing/PriceDisplay';
 
 export interface DirectoryListing {
   id: string;
@@ -436,10 +437,11 @@ export const BusinessDirectory: React.FC = () => {
               </div>
 
               {item.consultationFeePi ? (
-                <div className="font-mono text-xs font-black text-white">
-                  {item.consultationFeePi} <span className="text-violet-400 font-bold">π</span>
-                  <span className="text-[9px] font-normal text-slate-500 ml-1">/ session</span>
-                </div>
+                <PriceDisplay 
+                  item={{ price: item.consultationFeePi, currency: 'Pi', serviceName: item.titleOrSpecialty, pricingType: 'session' }} 
+                  type="service" 
+                  size="sm" 
+                />
               ) : (
                 <span className="text-[10px] font-bold text-violet-400 group-hover:underline flex items-center gap-0.5">
                   <span>View Details</span>

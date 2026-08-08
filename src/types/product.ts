@@ -14,6 +14,10 @@ export interface ProductBase {
   price: number;
   discount?: number;
   currency?: string;
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
   stock?: number;
   sku?: string;
   brand?: string;

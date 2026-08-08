@@ -11,6 +11,11 @@ export interface ServiceBase {
   description: string;
   images?: string[];
   price: number;
+  currency?: string;
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
   duration?: string;
   bookingRequired?: boolean;
   availableDays?: string;

@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { Cart, CartItem, WishlistItem, SearchEntityType } from '../types';
+import { resolveProductPricing, resolveVariantPricing } from './pricing/pricingCompatibility';
 
 export const cartService = {
   /**
@@ -150,12 +151,54 @@ export const cartService = {
 
     const requestedQty = Math.max(1, Math.min(item.quantity || 1, stock));
 
+    // Resolve central pricing metadata if not already provided
+    let pricingMode = item.pricingMode;
+    let localCurrency = item.localCurrency;
+    let localAmount = item.localAmount;
+    let communityPiAmount = item.communityPiAmount;
+    let piUnitPrice = item.piUnitPrice ?? item.unitPrice;
+    let pricingRateUsed = item.pricingRateUsed;
+    let pricingRateSource = item.pricingRateSource;
+    let pricingRateTimestamp = item.pricingRateTimestamp;
+
+    if (!pricingMode && productSnap.exists()) {
+      const pData = productSnap.data();
+      let resolvedPricing;
+      if (item.variantId && pData.variants) {
+        const vMatch = pData.variants.find((v: any) => v.variantId === item.variantId || v.id === item.variantId);
+        if (vMatch) {
+          resolvedPricing = await resolveVariantPricing(vMatch, pData);
+        } else {
+          resolvedPricing = await resolveProductPricing(pData);
+        }
+      } else {
+        resolvedPricing = await resolveProductPricing(pData);
+      }
+
+      pricingMode = resolvedPricing.mode;
+      localCurrency = resolvedPricing.localCurrency ?? undefined;
+      localAmount = resolvedPricing.localAmount ?? undefined;
+      communityPiAmount = resolvedPricing.mode === 'COMMUNITY' ? (resolvedPricing.piAmount ?? undefined) : undefined;
+      piUnitPrice = resolvedPricing.piAmount ?? item.unitPrice;
+      pricingRateUsed = resolvedPricing.rateUsed ?? undefined;
+      pricingRateSource = resolvedPricing.rateSource ?? undefined;
+      pricingRateTimestamp = resolvedPricing.rateTimestamp ?? undefined;
+    }
+
+    if (!pricingMode) {
+      pricingMode = 'LEGACY_PI';
+    }
+
+    const effectiveUnitPrice = piUnitPrice ?? item.unitPrice;
+
     if (itemSnap.exists()) {
       const current = itemSnap.data() as CartItem;
       const newQuantity = Math.min(current.quantity + requestedQty, stock);
       await updateDoc(itemRef, {
         quantity: newQuantity,
-        subtotal: item.unitPrice * newQuantity,
+        unitPrice: effectiveUnitPrice,
+        piUnitPrice: effectiveUnitPrice,
+        subtotal: effectiveUnitPrice * newQuantity,
         stock: stock,
         ownerId,
         ownerUid: ownerId,
@@ -163,6 +206,13 @@ export const cartService = {
         merchantId: ownerId,
         businessId,
         storeId,
+        pricingMode,
+        localCurrency: localCurrency ?? current.localCurrency ?? null,
+        localAmount: localAmount ?? current.localAmount ?? null,
+        communityPiAmount: communityPiAmount ?? current.communityPiAmount ?? null,
+        pricingRateUsed: pricingRateUsed ?? current.pricingRateUsed ?? null,
+        pricingRateSource: pricingRateSource ?? current.pricingRateSource ?? null,
+        pricingRateTimestamp: pricingRateTimestamp ?? current.pricingRateTimestamp ?? null,
         updatedAt: new Date().toISOString()
       });
     } else {
@@ -178,12 +228,21 @@ export const cartService = {
         businessId,
         storeId,
         productName: item.name,
-        price: item.unitPrice,
+        price: effectiveUnitPrice,
+        unitPrice: effectiveUnitPrice,
+        piUnitPrice: effectiveUnitPrice,
         currency: item.currency || 'Pi',
         quantity: requestedQty,
         stock: stock,
-        subtotal: item.unitPrice * requestedQty,
+        subtotal: effectiveUnitPrice * requestedQty,
         status: 'active',
+        pricingMode,
+        localCurrency: localCurrency || null,
+        localAmount: localAmount ?? null,
+        communityPiAmount: communityPiAmount ?? null,
+        pricingRateUsed: pricingRateUsed ?? null,
+        pricingRateSource: pricingRateSource || null,
+        pricingRateTimestamp: pricingRateTimestamp || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -200,13 +259,14 @@ export const cartService = {
     if (itemSnap.exists()) {
       const data = itemSnap.data() as CartItem;
       const maxStock = data.stock || 999;
+      const unitPrice = data.piUnitPrice ?? data.unitPrice ?? data.price ?? 0;
       if (quantity <= 0) {
         await deleteDoc(itemRef);
       } else {
         const safeQty = Math.min(quantity, maxStock);
         await updateDoc(itemRef, {
           quantity: safeQty,
-          subtotal: data.unitPrice * safeQty,
+          subtotal: unitPrice * safeQty,
           updatedAt: new Date().toISOString()
         });
       }

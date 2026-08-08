@@ -34,6 +34,10 @@ export interface ServicePricingModel {
   pricingType: ServicePricingType | 'daily' | 'weekly' | 'monthly' | 'quote' | 'free_consultation';
   basePrice: number;
   currency: string;
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
   hourlyRate?: number;
   dailyRate?: number;
   weeklyRate?: number;

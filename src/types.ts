@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { PricingSnapshot, PricingQuote } from './services/pricing/pricingTypes';
+
 // ==========================================
 // USER & WALLET DOMAIN
 // ==========================================
@@ -91,6 +93,10 @@ export interface ProductPricing {
   comparePrice?: number;
   currency: string;
   taxClass: string;
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
 }
 
 export interface ProductSEO {
@@ -125,6 +131,10 @@ export interface Product {
   comparePrice?: number;
   currency: string;
   taxClass: string;
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
   
   // Inventory
   stock: number;
@@ -1357,6 +1367,10 @@ export interface ProductVariant {
   price: number;
   comparePrice?: number;
   currency: string;
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
   stock: number;
   reservedStock: number;
   weight?: number;
@@ -1703,6 +1717,18 @@ export interface CartItem {
   unitPrice: number;
   subtotal: number;
   status: 'active' | 'out-of-stock' | 'price-changed';
+
+  // Phase 6 Central Pricing Metadata (Additive)
+  pricingMode?: 'EXCHANGE' | 'COMMUNITY' | 'LEGACY_PI';
+  localCurrency?: string;
+  localAmount?: number;
+  communityPiAmount?: number;
+  piUnitPrice?: number;
+  pricingRateUsed?: number | null;
+  pricingRateSource?: string | null;
+  pricingRateTimestamp?: string | null;
+  pricingQuoteId?: string;
+  pricingEngineVersion?: string;
 }
 
 export interface Cart {
@@ -1754,6 +1780,15 @@ export interface CheckoutSession {
   grandTotal: number;
   status: 'pending' | 'completed' | 'expired';
   expiresAt: string;
+  // Phase 7 Additions: Authoritative Checkout Quote System
+  pricingQuoteId?: string;
+  pricingSnapshot?: PricingSnapshot;
+  quoteCreatedAt?: string;
+  quoteExpiresAt?: string;
+  quotePriceChanged?: boolean;
+  priceChangeNotice?: string;
+  itemQuotes?: Record<string, PricingQuote>;
+  pricingEngineVersion?: string;
 }
 
 export interface OrderDraft {

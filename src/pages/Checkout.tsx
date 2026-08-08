@@ -84,6 +84,8 @@ export const Checkout: React.FC = () => {
     postalCode: '94301'
   });
 
+  const [quoteNotice, setQuoteNotice] = useState<string>('');
+
   useEffect(() => {
     if (sessionId) {
       fetchSession();
@@ -115,8 +117,23 @@ export const Checkout: React.FC = () => {
   const fetchSession = async () => {
     setLoading(true);
     try {
-      const data = await checkoutService.getSession(sessionId!);
+      let data = await checkoutService.getSession(sessionId!);
       if (data) {
+        // Phase 7: Validate Quote Freshness (15 min TTL)
+        const nowMs = Date.now();
+        const expiresMs = data.quoteExpiresAt ? new Date(data.quoteExpiresAt).getTime() : 0;
+        if (!data.pricingSnapshot || !data.pricingQuoteId || isNaN(expiresMs) || nowMs >= expiresMs) {
+          console.log('[Checkout] Pricing quote missing or expired. Refreshing quote with live rates...');
+          try {
+            data = await checkoutService.refreshSessionQuote(sessionId!);
+            setQuoteNotice('Checkout pricing quote refreshed with live rate.');
+          } catch (rErr) {
+            console.warn('[Checkout] Refresh quote error:', rErr);
+          }
+        } else if (data.quotePriceChanged && data.priceChangeNotice) {
+          setQuoteNotice(data.priceChangeNotice);
+        }
+
         setSession(data);
         const sessionCartIds = data.cartIds || [data.cartId];
         const allItems: CartItem[] = [];
@@ -210,7 +227,9 @@ export const Checkout: React.FC = () => {
             storeId: session.storeId,
             walletAddress: user.walletAddress || '',
             notes: customerNotes,
-            orderId: session.sessionId
+            orderId: session.sessionId,
+            pricingQuoteId: session.pricingQuoteId,
+            pricingSnapshot: session.pricingSnapshot
           }
         );
         console.log('[DEBUG_TRACE] [handlePlaceOrder] AFTER await EnterpriseCheckoutEngine.executePiTestnetPayment, result:', verification);
@@ -718,6 +737,37 @@ export const Checkout: React.FC = () => {
                     +{summaryBreakdown?.bmpRewardsEstimate || 0} BMP
                   </span>
                 </div>
+
+                {/* Authoritative Pricing Quote Info */}
+                {session.pricingSnapshot && (
+                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between font-bold text-slate-300">
+                      <span className="flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Quote #{session.pricingQuoteId?.slice(0, 12)}...
+                      </span>
+                      <span className="text-[10px] text-emerald-400 uppercase font-mono font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">
+                        {session.pricingSnapshot.pricingMode} Mode
+                      </span>
+                    </div>
+                    {session.pricingSnapshot.rateUsed && (
+                      <div className="flex justify-between text-slate-400">
+                        <span>Rate Used:</span>
+                        <span className="font-mono text-slate-200">1 Pi = {(1 / session.pricingSnapshot.rateUsed).toFixed(2)} {session.pricingSnapshot.localCurrency}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-slate-500 pt-1 border-t border-slate-900">
+                      <span>Rate Source:</span>
+                      <span className="truncate max-w-[130px] font-mono text-slate-400">{session.pricingSnapshot.rateSource}</span>
+                    </div>
+                  </div>
+                )}
+
+                {quoteNotice && (
+                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-[11px] flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{quoteNotice}</span>
+                  </div>
+                )}
 
                 <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
                   <span className="font-bold text-white uppercase">Grand Total</span>

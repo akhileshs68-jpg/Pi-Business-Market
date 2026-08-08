@@ -20,6 +20,8 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { CheckoutSession, OrderDraft, Cart, CartItem, Address } from '../types';
+import { pricingEngine } from './pricing/pricingEngine';
+import { PricingInput, PricingQuote, PricingSnapshot } from './pricing/pricingTypes';
 
 export const checkoutService = {
   async createSession(cart: Cart, userUid: string, cartIds?: string[]): Promise<string> {
@@ -226,6 +228,52 @@ export const checkoutService = {
       throw new Error(`Checkout aborted: required fields are undefined or invalid (${missingFields.join(', ')}).`);
     }
 
+    // Phase 7: Generate Authoritative Checkout Quote & Snapshot
+    let pricingQuote: PricingQuote | null = null;
+    let pricingSnapshot: PricingSnapshot | null = null;
+
+    try {
+      const cartCurr = (cart.currency || 'PI').toUpperCase();
+      let input: PricingInput;
+      if (cartCurr === 'PI') {
+        input = {
+          mode: 'COMMUNITY',
+          communityPiAmount: cart.grandTotal,
+          localCurrency: 'PI',
+          localAmount: cart.grandTotal,
+        };
+      } else {
+        input = {
+          mode: 'EXCHANGE',
+          localCurrency: cart.currency || 'USD',
+          localAmount: cart.grandTotal,
+        };
+      }
+
+      pricingQuote = await pricingEngine.createQuote(input);
+      pricingSnapshot = pricingEngine.createPricingSnapshot(pricingQuote);
+    } catch (quoteErr) {
+      console.warn('[checkoutService.createSession] Quote generation fallback:', quoteErr);
+      const nowMs = Date.now();
+      pricingQuote = {
+        quoteId: `q_${nowMs}_${Math.random().toString(36).substring(2, 9)}`,
+        pricingMode: 'COMMUNITY',
+        localCurrency: cart.currency || 'PI',
+        localAmount: cart.grandTotal,
+        piAmount: cart.grandTotal,
+        rateUsed: null,
+        rateSource: 'Cart Direct Valuation',
+        rateProvider: 'cart_authoritative',
+        rateTimestamp: new Date().toISOString(),
+        rateStatus: 'AVAILABLE',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(nowMs + 900000).toISOString(),
+        pricingEngineVersion: pricingEngine.version,
+        status: 'ACTIVE',
+      };
+      pricingSnapshot = pricingEngine.createPricingSnapshot(pricingQuote);
+    }
+
     const sessionData: any = {
       // Required checkout session fields from task 7
       sessionId,
@@ -241,6 +289,14 @@ export const checkoutService = {
       createdAt: new Date().toISOString(),
       expiresAt: Timestamp.fromDate(expiresAt),
 
+      // Phase 7 Quote Snapshot fields
+      pricingQuoteId: pricingQuote?.quoteId,
+      pricingSnapshot,
+      quoteCreatedAt: pricingQuote?.createdAt,
+      quoteExpiresAt: pricingQuote?.expiresAt,
+      quotePriceChanged: false,
+      pricingEngineVersion: pricingEngine.version,
+
       // Legacy/Compatibility fields
       cartId: activeCartId,
       cartIds: cartIds || [activeCartId],
@@ -250,7 +306,7 @@ export const checkoutService = {
       discount: cart.discount,
       tax: cart.tax,
       shipping: cart.shipping,
-      grandTotal: cart.grandTotal,
+      grandTotal: pricingSnapshot?.piAmount ?? cart.grandTotal,
       couponCodes: []
     };
 
@@ -273,6 +329,59 @@ export const checkoutService = {
     }
 
     return sessionId;
+  },
+
+  async refreshSessionQuote(sessionId: string): Promise<CheckoutSession> {
+    const session = await this.getSession(sessionId);
+    if (!session) {
+      throw new Error(`Checkout session ${sessionId} not found.`);
+    }
+
+    const previousPiAmount = session.pricingSnapshot?.piAmount ?? session.grandTotal;
+    const cartCurr = (session.currency || 'PI').toUpperCase();
+    let input: PricingInput;
+
+    if (cartCurr === 'PI') {
+      input = {
+        mode: 'COMMUNITY',
+        communityPiAmount: session.subtotal || session.grandTotal,
+        localCurrency: 'PI',
+        localAmount: session.subtotal || session.grandTotal,
+      };
+    } else {
+      input = {
+        mode: 'EXCHANGE',
+        localCurrency: session.currency || 'USD',
+        localAmount: session.subtotal || session.grandTotal,
+      };
+    }
+
+    const newQuote = await pricingEngine.createQuote(input);
+    const newSnapshot = pricingEngine.createPricingSnapshot(newQuote);
+
+    const effectiveGrandTotal = newSnapshot.piAmount + (session.shipping || 0) + (session.tax || 0) - (session.discount || 0);
+    const priceChanged = Math.abs(effectiveGrandTotal - previousPiAmount) > 0.000001;
+    let notice: string | undefined = undefined;
+    if (priceChanged) {
+      notice = `Rate updated: total adjusted from ${previousPiAmount.toFixed(4)} Pi to ${effectiveGrandTotal.toFixed(4)} Pi.`;
+    }
+
+    const updates: Partial<CheckoutSession> = {
+      pricingQuoteId: newQuote.quoteId,
+      pricingSnapshot: newSnapshot,
+      quoteCreatedAt: newQuote.createdAt,
+      quoteExpiresAt: newQuote.expiresAt,
+      quotePriceChanged: priceChanged,
+      priceChangeNotice: notice,
+      grandTotal: effectiveGrandTotal,
+    };
+
+    await this.updateSession(sessionId, updates);
+    return {
+      ...session,
+      ...updates,
+      grandTotal: effectiveGrandTotal,
+    };
   },
 
   async getSession(sessionId: string): Promise<CheckoutSession | null> {

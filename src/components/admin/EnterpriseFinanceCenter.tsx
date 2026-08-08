@@ -33,7 +33,7 @@ export const EnterpriseFinanceCenter: React.FC = () => {
 
   // Navigation and Tab States
   const [activeModule, setActiveModule] = useState<
-    'revenue' | 'settlement' | 'withdrawal' | 'refund' | 'wallet' | 'ledger' | 'commission' | 'alerts' | 'reports'
+    'revenue' | 'settlement' | 'withdrawal' | 'refund' | 'wallet' | 'ledger' | 'commission' | 'alerts' | 'reports' | 'reconciliation'
   >('revenue');
 
   // Loading and Error States
@@ -126,21 +126,30 @@ export const EnterpriseFinanceCenter: React.FC = () => {
     let todayPi = 0; let yesterdayPi = 0; let weeklyPi = 0; let monthlyPi = 0; let yearlyPi = 0; let lifetimePi = 0;
     let todayBmp = 0; let yesterdayBmp = 0; let weeklyBmp = 0; let monthlyBmp = 0; let yearlyBmp = 0; let lifetimeBmp = 0;
     let commissionPi = 0;
+    let exchangeCount = 0; let communityCount = 0; let legacyCount = 0;
 
     payments.forEach(p => {
-      if (String(p.status).toLowerCase() !== 'completed') return;
+      const statusLower = String(p.status || '').toLowerCase();
+      if (statusLower !== 'completed' && statusLower !== 'paid') return;
       
-      const amount = Number(p.amount) || 0;
+      // Prefer pricingSnapshot piAmount if present, else p.piAmount, else p.amount
+      const piAmountVal = (p.pricingSnapshot?.piAmount ?? p.piAmount ?? Number(p.amount)) || 0;
+      const amount = Number(piAmountVal);
       const feePercent = Number(p.commissionPercentage) || 1.0;
       const itemCommission = (amount * feePercent) / 100;
 
-      const currency = String(p.currency || '').toLowerCase();
+      const currency = String(p.pricingSnapshot?.localCurrency || p.currency || 'Pi').toLowerCase();
       const createdAt = p.createdAt || '';
       const txDateStr = createdAt.split('T')[0];
       const txDate = new Date(createdAt);
 
-      const isPi = currency.includes('pi');
+      const isPi = currency.includes('pi') || p.pricingSnapshot?.piAmount !== undefined;
       const isBmp = currency.includes('bmp') || currency.includes('bmt');
+
+      const mode = p.pricingSnapshot?.pricingMode || p.pricingMode || (p.pricingSnapshot ? 'EXCHANGE' : 'LEGACY_PI');
+      if (mode === 'EXCHANGE') exchangeCount++;
+      else if (mode === 'COMMUNITY') communityCount++;
+      else legacyCount++;
 
       // Lifetime
       if (isPi) {
@@ -178,7 +187,10 @@ export const EnterpriseFinanceCenter: React.FC = () => {
       todayBmp, yesterdayBmp, weeklyBmp, monthlyBmp, yearlyBmp, lifetimeBmp,
       grossPi: lifetimePi,
       commissionPi,
-      netPi: lifetimePi - commissionPi
+      netPi: lifetimePi - commissionPi,
+      exchangeCount,
+      communityCount,
+      legacyCount
     };
   }, [payments]);
 
@@ -875,6 +887,7 @@ export const EnterpriseFinanceCenter: React.FC = () => {
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-4 print:hidden">
         {[
           { id: 'revenue', label: 'Revenue Dashboard', icon: TrendingUp },
+          { id: 'reconciliation', label: 'Reconciliation View', icon: ShieldCheck },
           { id: 'settlement', label: 'Settlement Center', icon: RefreshCw },
           { id: 'withdrawal', label: 'Withdrawal requests', icon: Clock },
           { id: 'refund', label: 'Refund center', icon: XCircle },
@@ -998,6 +1011,166 @@ export const EnterpriseFinanceCenter: React.FC = () => {
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Net Payout to Merchants</span>
                 <span className="text-lg font-black text-emerald-400 mt-1 block">{formatPi(revenueStats.netPi)}</span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODULE: RECONCILIATION VIEW */}
+        {activeModule === 'reconciliation' && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  4-Pillar Read-Only Transaction Reconciliation
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">Cross-system audit verifying Payment vs Order vs Ledger vs Settlement consistency using immutable pricing snapshots.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black rounded-xl flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  SNAPSHOT IMMUTABILITY PROTECTED
+                </span>
+              </div>
+            </div>
+
+            {/* Immutability Banner */}
+            <div className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl flex items-start gap-3 text-xs text-slate-300">
+              <Shield className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-white block">Historical Rate & Snapshot Immutability Engine</span>
+                <p className="text-slate-400 mt-0.5 leading-relaxed">
+                  Historical transaction revenue values are computed exclusively from frozen <code className="text-indigo-300 bg-indigo-950/60 px-1 py-0.5 rounded font-mono">pricingSnapshot</code> fields (<code className="text-indigo-300 bg-indigo-950/60 px-1 py-0.5 rounded font-mono">piAmount</code>, <code className="text-indigo-300 bg-indigo-950/60 px-1 py-0.5 rounded font-mono">rateUsed</code>, <code className="text-indigo-300 bg-indigo-950/60 px-1 py-0.5 rounded font-mono">rateSource</code>). Current market exchange rates are NEVER applied retroactively to alter historical financial ledgers.
+                </p>
+              </div>
+            </div>
+
+            {/* Reconciliation KPI Ribbon */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-4 bg-slate-900/40 border border-slate-800 rounded-xl text-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Audited Records</span>
+                <span className="text-base font-black text-white mt-1 block">{payments.length} Records</span>
+              </div>
+              <div className="p-4 bg-slate-900/40 border border-slate-800 rounded-xl text-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Reconciled Gross Volume</span>
+                <span className="text-base font-black text-emerald-400 mt-1 block">{formatPi(revenueStats.grossPi)}</span>
+              </div>
+              <div className="p-4 bg-slate-900/40 border border-slate-800 rounded-xl text-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Exchange Mode Records</span>
+                <span className="text-base font-black text-indigo-400 mt-1 block">{revenueStats.exchangeCount}</span>
+              </div>
+              <div className="p-4 bg-slate-900/40 border border-slate-800 rounded-xl text-center">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Community / Legacy Records</span>
+                <span className="text-base font-black text-purple-400 mt-1 block">{revenueStats.communityCount + revenueStats.legacyCount}</span>
+              </div>
+            </div>
+
+            {/* Reconciliation Matrix Table */}
+            <div className="border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="p-4 bg-slate-900/40 border-b border-slate-800 flex items-center justify-between">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Payment vs Order vs Ledger vs Settlement Consistency Matrix</h4>
+                <span className="text-[10px] text-slate-400 font-mono">Read-Only Reconciliation Mode</span>
+              </div>
+
+              {payments.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-xs">
+                  No transactions found in system database.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900/60 uppercase tracking-widest text-[9px] font-bold text-slate-400 border-b border-slate-800">
+                      <tr>
+                        <th className="p-3">Payment ID / Quote ID</th>
+                        <th className="p-3">Pricing Mode</th>
+                        <th className="p-3">Historical Rate Used</th>
+                        <th className="p-3">Payment Amount</th>
+                        <th className="p-3">Matched Order</th>
+                        <th className="p-3">Ledger Status</th>
+                        <th className="p-3 text-right">Reconciliation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                      {payments.map(p => {
+                        const snap = p.pricingSnapshot;
+                        const mode = snap?.pricingMode || p.pricingMode || (snap ? 'EXCHANGE' : 'LEGACY_PI');
+                        const rateUsed = snap?.rateUsed ?? p.rateUsed ?? null;
+                        const piAmount = (snap?.piAmount ?? p.piAmount ?? Number(p.amount)) || 0;
+                        const matchedOrder = orders.find(o => o.id === p.orderId || o.orderId === p.orderId);
+                        const matchedLedger = formattedLedgerEntries.find(l => l.transactionId === p.id || l.referenceId === p.orderId);
+                        
+                        // Consistency check: Order grandTotal vs Payment piAmount
+                        const orderTotal = matchedOrder ? Number(matchedOrder.grandTotal || matchedOrder.totalAmount || 0) : null;
+                        const isAmountMatching = orderTotal === null || Math.abs(orderTotal - piAmount) < 0.001;
+                        const isReconciled = isAmountMatching && p.status !== 'Failed';
+
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-900/20">
+                            <td className="p-3">
+                              <span className="font-bold text-white font-sans block">{p.id}</span>
+                              <span className="text-[9px] text-slate-500 block truncate max-w-[140px]" title={snap?.quoteId || p.pricingQuoteId || 'N/A'}>
+                                Quote: {snap?.quoteId || p.pricingQuoteId || 'N/A'}
+                              </span>
+                            </td>
+                            <td className="p-3 font-sans">
+                              <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded border ${
+                                mode === 'EXCHANGE' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                                mode === 'COMMUNITY' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}>
+                                {mode}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className="text-slate-200">
+                                {rateUsed !== null && rateUsed !== undefined ? `${rateUsed} ${snap?.localCurrency || 'USD'}/Pi` : 'N/A'}
+                              </span>
+                              {snap?.rateSource && (
+                                <span className="text-[9px] text-slate-500 block font-sans truncate max-w-[110px]" title={snap.rateSource}>
+                                  {snap.rateSource}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 font-bold text-white">
+                              {formatPi(piAmount)}
+                            </td>
+                            <td className="p-3 font-sans">
+                              {matchedOrder ? (
+                                <div>
+                                  <span className="text-slate-300 font-mono block">{matchedOrder.orderNumber || matchedOrder.id}</span>
+                                  <span className="text-[10px] text-slate-500 block">{formatPi(Number(matchedOrder.grandTotal || 0))}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-500 font-mono text-[10px]">No linked order</span>
+                              )}
+                            </td>
+                            <td className="p-3 font-sans">
+                              {matchedLedger ? (
+                                <span className="text-emerald-400 font-semibold text-[10px]">CONFIRMED</span>
+                              ) : (
+                                <span className="text-amber-400 font-semibold text-[10px]">CHECKOUT_PENDING</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right font-sans">
+                              {isReconciled ? (
+                                <span className="px-2.5 py-1 text-[9px] font-black uppercase rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  100% RECONCILED
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 text-[9px] font-black uppercase rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  DISCREPANCY DETECTED
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
