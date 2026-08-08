@@ -4,11 +4,12 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Archive, Pause, Play, Eye, 
   Search, Loader2, Tag, Layers, Sliders, CheckCircle2,
   AlertCircle, ChevronDown, Check, Globe, RefreshCw, X,
-  Upload, Star, Image as ImageIcon, Link as LinkIcon
+  Upload, Star, Image as ImageIcon, Link as LinkIcon, Share2
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
 import { useAuth } from '../../auth/useAuth';
@@ -324,91 +325,250 @@ const ProductCardItem = React.memo<{
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
 }>(({ p, linkedStoreName, actionLoading, onToggleStatus, onOpenEdit, onArchive, onDelete }) => {
-  const displayImage = p.mainImage || (p.imageUrls && p.imageUrls[0]) || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+  const navigate = useNavigate();
+  const [imgIdx, setImgIdx] = React.useState(0);
+  const [selectedVariantId, setSelectedVariantId] = React.useState<string | null>(p.variants && p.variants.length > 0 ? p.variants[0].variantId : null);
+  
+  const hasVariants = p.variants && p.variants.length > 0;
+  const activeVariant = hasVariants ? p.variants!.find(v => v.variantId === selectedVariantId) || p.variants![0] : null;
 
-  return (
-    <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-5 space-y-4 hover:border-slate-700/80 transition-all flex flex-col justify-between">
-      <div className="space-y-3">
-        <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
-          <img 
-            src={displayImage} 
-            alt={p.productName} 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-            <span className={`px-2.5 py-1 text-[9px] font-bold rounded-full border ${
-              p.status === 'published' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-              p.status === 'draft' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' :
-              'bg-amber-500/10 text-amber-400 border-amber-500/20'
-            }`}>
-              {p.status}
-            </span>
+  const displayPrice = activeVariant?.price || p.price;
+  const displayStock = activeVariant?.stock ?? p.stock;
+  
+  // Collect images
+  let gallery = (p.imageUrls && p.imageUrls.length > 0) ? p.imageUrls : (p.mainImage ? [p.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500']);
+  if (activeVariant?.imageUrls && activeVariant.imageUrls.length > 0) {
+    gallery = activeVariant.imageUrls;
+  }
+  
+  // Ensure imgIdx is within bounds
+  React.useEffect(() => {
+    if (imgIdx >= gallery.length) {
+      setImgIdx(0);
+    }
+  }, [gallery.length, imgIdx]);
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgIdx((prev) => (prev + 1) % gallery.length);
+  };
+  
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgIdx((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
+  let variantPreview = null;
+  if (hasVariants) {
+    const attrNames = new Set<string>();
+    p.variants!.forEach(v => {
+      Object.keys(v.attributes).forEach(k => attrNames.add(k));
+    });
+    
+    variantPreview = Array.from(attrNames).map(attrName => {
+      const isColor = attrName.toLowerCase().includes('color');
+      const values = Array.from(new Set(p.variants!.map(v => v.attributes[attrName])));
+      
+      return (
+        <div key={attrName} className="text-[10px] text-slate-400 mt-2">
+          <span className="font-bold block mb-1 uppercase tracking-wider">{attrName}:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {values.map(val => {
+              // Find first variant that has this attribute value
+              const matchingVariant = p.variants!.find(v => v.attributes[attrName] === val);
+              const isSelected = activeVariant?.attributes[attrName] === val;
+              
+              if (isColor) {
+                 const colorsMap: Record<string, string> = {
+                  black: '#0f172a', white: '#f8fafc', blue: '#2563eb', red: '#dc2626',
+                  green: '#16a34a', yellow: '#eab308', pink: '#db2777', purple: '#9333ea',
+                  orange: '#ea580c', gray: '#4b5563', silver: '#cbd5e1', gold: '#fbbf24',
+                };
+                const visualColor = colorsMap[val.toLowerCase().trim()] || val;
+                return (
+                  <button
+                    key={val}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
+                    }}
+                    style={{ backgroundColor: visualColor }}
+                    className={`w-5 h-5 rounded-full border ${isSelected ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-slate-700'}`}
+                    title={val}
+                  />
+                );
+              }
+              
+              return (
+                <button
+                  key={val}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
+                  }}
+                  className={`px-2 py-0.5 rounded text-[9px] font-bold border ${isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'}`}
+                >
+                  {val}
+                </button>
+              );
+            })}
           </div>
         </div>
+      );
+    });
+  }
 
-        <div>
-          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{p.category || 'Uncategorized'}</span>
-          <h4 className="text-sm font-extrabold text-white line-clamp-1 mt-0.5">{p.productName}</h4>
-          <p className="text-xs text-slate-400 line-clamp-2 mt-1">{p.shortDescription || p.description}</p>
+  // Touch swipe support
+  const [touchStart, setTouchStart] = React.useState(0);
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.targetTouches[0].clientX);
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEnd = e.changedTouches[0].clientX;
+    if (touchStart - touchEnd > 30) {
+      setImgIdx((prev) => (prev + 1) % gallery.length);
+    } else if (touchStart - touchEnd < -30) {
+      setImgIdx((prev) => (prev - 1 + gallery.length) % gallery.length);
+    }
+  };
+
+  return (
+    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700/80 transition-all flex flex-col sm:flex-row group w-full">
+      {/* Left: Image Gallery */}
+      <div className="w-full sm:w-[40%] relative bg-slate-950 border-b sm:border-b-0 sm:border-r border-slate-800 shrink-0 aspect-[4/3] sm:aspect-auto sm:min-h-[220px]">
+        <div 
+          className="w-full h-full relative overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <img 
+            src={gallery[imgIdx]} 
+            alt={p.productName} 
+            className="w-full h-full object-cover transition-transform duration-500 ease-out"
+            referrerPolicy="no-referrer"
+          />
+          
+          {/* Gallery controls */}
+          {gallery.length > 1 && (
+            <>
+              <div className="absolute inset-x-0 bottom-2 flex justify-center z-10 gap-1.5">
+                {gallery.map((_, i) => (
+                  <button 
+                    key={i} 
+                    onClick={(e) => { e.stopPropagation(); setImgIdx(i); }}
+                    className={`h-1.5 rounded-full transition-all ${i === imgIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                  />
+                ))}
+              </div>
+              <div className="absolute top-2 left-2 bg-black/60 text-white text-[8px] font-black px-1.5 py-0.5 rounded backdrop-blur-sm z-10">
+                {imgIdx + 1} / {gallery.length}
+              </div>
+              
+              {/* Prev / Next buttons */}
+              <button onClick={handlePrev} className="absolute left-1 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 hover:bg-black/80 rounded-full text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <button onClick={handleNext} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-black/40 hover:bg-black/80 rounded-full text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-20 pointer-events-none">
+          <span className={`px-2 py-0.5 text-[8px] font-black rounded border uppercase tracking-widest backdrop-blur-md ${
+            p.status === 'published' ? 'bg-emerald-500/80 text-white border-emerald-400' :
+            p.status === 'draft' ? 'bg-slate-500/80 text-white border-slate-400' :
+            'bg-amber-500/80 text-white border-amber-400'
+          }`}>
+            {p.status}
+          </span>
         </div>
       </div>
 
-      <div className="pt-4 border-t border-slate-800/80 space-y-3.5 mt-auto">
-        <div className="flex items-center justify-between text-xs">
-          <div>
-            <span className="text-slate-500 text-[10px] font-medium block">Price</span>
-            <span className="text-sm font-black text-white">{p.price} π</span>
+      {/* Right: Details & Actions */}
+      <div className="w-full sm:w-[60%] flex flex-col justify-between p-3 sm:p-4 bg-slate-900/50">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider truncate">{p.category || 'Uncategorized'}</span>
+            {linkedStoreName && (
+              <span className="text-[9px] text-indigo-400 font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded truncate max-w-[100px]">
+                {linkedStoreName}
+              </span>
+            )}
           </div>
-          <div className="text-right">
-            <span className="text-slate-500 text-[10px] font-medium block">Stock Inventory</span>
-            <span className={`font-bold ${p.stock > 10 ? 'text-emerald-400' : 'text-amber-400'}`}>{p.stock} units</span>
+          
+          <h4 
+            onClick={() => navigate(`/product/${p.productId}`)} 
+            className="text-sm font-extrabold text-white line-clamp-1 cursor-pointer hover:text-indigo-400 transition-colors"
+          >
+            {p.productName}
+          </h4>
+          <p className="text-[10px] text-slate-400 line-clamp-1">{p.shortDescription || p.description}</p>
+          
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <span className="text-sm font-black text-white">{displayPrice} π</span>
+            <span className={`text-[10px] font-bold ${displayStock > 10 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {displayStock} units
+            </span>
           </div>
+          
+          {hasVariants && (
+            <div className="pt-1">
+              {variantPreview}
+            </div>
+          )}
         </div>
 
-        {linkedStoreName && (
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 bg-slate-950/40 p-2 rounded-xl border border-slate-800">
-            <Layers className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="truncate">Store: {linkedStoreName}</span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between gap-2">
+        {/* Bottom Actions */}
+        <div className="pt-3 mt-3 border-t border-slate-800/80 flex flex-wrap gap-2">
+          <button
+            onClick={() => navigate(`/product/${p.productId}`)}
+            className="p-1.5 bg-slate-950 hover:bg-violet-600/10 border border-slate-800 hover:border-violet-500/20 text-violet-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
+            title="View Product Details"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(`${window.location.origin}/product/${p.productId}`);
+              alert('Product Link Copied!');
+            }}
+            className="px-2 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            title="Share Product Link"
+          >
+            <Share2 className="w-3.5 h-3.5" /> Share
+          </button>
+          
+          <div className="flex-1" />
+          
           <button
             onClick={() => onToggleStatus(p)}
             disabled={actionLoading === p.productId}
-            className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 flex-1 cursor-pointer"
+            className="p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-lg transition-all flex items-center justify-center cursor-pointer"
+            title={p.status === 'published' ? 'Pause' : 'Resume'}
           >
-            {p.status === 'published' ? (
-              <>
-                <Pause className="w-3.5 h-3.5" /> Pause
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5" /> Resume
-              </>
-            )}
+            {p.status === 'published' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           </button>
-
           <button
             onClick={() => onOpenEdit(p)}
-            className="p-2 bg-slate-950 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/20 text-indigo-400 rounded-xl transition-all cursor-pointer"
+            className="p-1.5 bg-slate-950 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/20 text-indigo-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
+            title="Edit"
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
-
           <button
             onClick={() => onArchive(p.productId)}
-            className="p-2 bg-slate-950 hover:bg-amber-600/10 border border-slate-800 hover:border-amber-500/20 text-amber-400 rounded-xl transition-all cursor-pointer"
+            className="p-1.5 bg-slate-950 hover:bg-amber-600/10 border border-slate-800 hover:border-amber-500/20 text-amber-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
+            title="Archive"
           >
-            <Archive className="w-4 h-4" />
+            <Archive className="w-3.5 h-3.5" />
           </button>
-
           <button
             onClick={() => onDelete(p.productId)}
-            className="p-2 bg-slate-950 hover:bg-rose-600/10 border border-slate-800 hover:border-rose-500/20 text-rose-400 rounded-xl transition-all cursor-pointer"
+            className="p-1.5 bg-slate-950 hover:bg-rose-600/10 border border-slate-800 hover:border-rose-500/20 text-rose-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
+            title="Delete"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

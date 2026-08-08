@@ -37,7 +37,9 @@ import {
   Globe,
   Coins,
   ThumbsUp,
-  X
+  X,
+  Share2,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserType } from '../../types';
@@ -177,6 +179,330 @@ const PI_ECOSYSTEM_NEWS = [
     imageUrl: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=400'
   }
 ];
+
+interface CompactMarketplaceCardProps {
+  prod: any;
+  isCarousel?: boolean;
+  isSaved: boolean;
+  onToggleWishlist: (id: string, e: React.MouseEvent) => void;
+  onAddToCart: (prod: any, e: React.MouseEvent) => void;
+  onNavigate: (path: string) => void;
+  setRecentlyViewed: (val: any) => void;
+  recentlyViewed: any[];
+  setToastMessage?: (msg: string | null) => void;
+}
+
+const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
+  prod,
+  isCarousel = false,
+  isSaved,
+  onToggleWishlist,
+  onAddToCart,
+  onNavigate,
+  setRecentlyViewed,
+  recentlyViewed,
+  setToastMessage
+}) => {
+  const [imgIdx, setImgIdx] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+
+  // Extract Gallery Images Safely
+  const gallery = useMemo(() => {
+    const list: string[] = [];
+    if (Array.isArray(prod.imageUrls) && prod.imageUrls.length > 0) {
+      prod.imageUrls.forEach((url: any) => {
+        if (typeof url === 'string' && url.trim()) list.push(url.trim());
+      });
+    }
+    if (list.length === 0 && Array.isArray(prod.images) && prod.images.length > 0) {
+      prod.images.forEach((img: any) => {
+        const url = typeof img === 'string' ? img : img?.url;
+        if (url && typeof url === 'string' && url.trim()) list.push(url.trim());
+      });
+    }
+    if (list.length === 0) {
+      const main = prod.mainImage || prod.image || prod.coverImage || getProductImageUrl(prod);
+      if (main) list.push(main);
+    }
+    return list.length > 0 ? list : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500'];
+  }, [prod]);
+
+  const handleNextImg = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgIdx((prev) => (prev + 1) % gallery.length);
+  };
+
+  const handlePrevImg = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgIdx((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+    if (diff > 30 && gallery.length > 1) {
+      setImgIdx((prev) => (prev + 1) % gallery.length);
+    } else if (diff < -30 && gallery.length > 1) {
+      setImgIdx((prev) => (prev - 1 + gallery.length) % gallery.length);
+    }
+    setTouchStart(null);
+  };
+
+  const hasDiscount = Boolean(prod.oldPrice && prod.oldPrice > prod.price);
+  const discountPercent = hasDiscount 
+    ? Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100) 
+    : 0;
+
+  // Variants preview
+  const variantChips = useMemo(() => {
+    const chips: string[] = [];
+    if (Array.isArray(prod.variants) && prod.variants.length > 0) {
+      const seen = new Set<string>();
+      for (const v of prod.variants) {
+        if (v.attributes && typeof v.attributes === 'object') {
+          Object.values(v.attributes).forEach((val: any) => {
+            if (val && typeof val === 'string' && !seen.has(val.trim())) {
+              seen.add(val.trim());
+              chips.push(val.trim());
+            }
+          });
+        }
+      }
+    }
+    if (chips.length === 0) {
+      if (Array.isArray(prod.colors) && prod.colors.length > 0) {
+        prod.colors.forEach((c: any) => typeof c === 'string' && chips.push(c));
+      }
+      if (Array.isArray(prod.sizes) && prod.sizes.length > 0) {
+        prod.sizes.forEach((s: any) => typeof s === 'string' && chips.push(s));
+      }
+    }
+    return chips;
+  }, [prod]);
+
+  // Stock details
+  const stockCount = typeof prod.stock === 'number' 
+    ? prod.stock 
+    : (typeof prod.inventory?.quantity === 'number' ? prod.inventory.quantity : 50);
+  const isOutOfStock = stockCount <= 0;
+  const isLowStock = stockCount > 0 && stockCount <= 5;
+
+  // Share action
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const productUrl = `${window.location.origin}/product/${prod.id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: prod.title || prod.productName || 'Pi Product',
+          text: `Check out ${prod.title || 'this product'} on Pi Business Market!`,
+          url: productUrl,
+        });
+        return;
+      } catch (err) {
+        // Fallback to clipboard if share canceled or failed
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(productUrl);
+      if (setToastMessage) setToastMessage("Product link copied to clipboard!");
+    } catch (err) {
+      console.error("Clipboard write error:", err);
+    }
+  };
+
+  const handleCardClick = () => {
+    const freshRecent = [prod, ...recentlyViewed.filter(p => p.id !== prod.id)].slice(0, 8);
+    setRecentlyViewed(freshRecent);
+    localStorage.setItem('pi_marketplace_recent_viewed', JSON.stringify(freshRecent));
+    onNavigate(`product/${prod.id}`);
+  };
+
+  return (
+    <motion.div
+      whileHover={{ y: -3 }}
+      onClick={handleCardClick}
+      className={`group bg-slate-900/60 hover:bg-slate-900 border border-slate-800/90 hover:border-violet-500/50 rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer flex flex-col shadow-lg relative ${
+        isCarousel 
+          ? 'w-[165px] xs:w-[185px] sm:w-[210px] shrink-0 snap-start' 
+          : 'w-full'
+      }`}
+    >
+      {/* 1. COMPACT IMAGE AREA WITH CAROUSEL */}
+      <div 
+        className="relative w-full aspect-[4/3] sm:aspect-square max-h-[160px] overflow-hidden bg-slate-950 shrink-0 select-none"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <LazyImage 
+          src={gallery[imgIdx] || gallery[0]} 
+          alt={prod.title || 'Product'} 
+        />
+
+        {/* Multi-Image Navigation arrows */}
+        {gallery.length > 1 && (
+          <>
+            <button
+              onClick={handlePrevImg}
+              className="absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10 border border-slate-800 cursor-pointer"
+              title="Previous Image"
+            >
+              <ChevronLeft className="w-3 h-3" />
+            </button>
+            <button
+              onClick={handleNextImg}
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10 border border-slate-800 cursor-pointer"
+              title="Next Image"
+            >
+              <ChevronRight className="w-3 h-3" />
+            </button>
+
+            {/* Pagination Dots */}
+            <div className="absolute bottom-1.5 inset-x-0 flex justify-center items-center gap-1 z-10 pointer-events-none">
+              {gallery.slice(0, 5).map((_, idx) => (
+                <span
+                  key={idx}
+                  className={`h-1 rounded-full transition-all ${
+                    idx === imgIdx ? 'w-3 bg-violet-400' : 'w-1 bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Badges Top-Left */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+          {hasDiscount && (
+            <span className="bg-rose-600 text-white font-black text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow">
+              -{discountPercent}%
+            </span>
+          )}
+          {prod.isTrending && !hasDiscount && (
+            <span className="bg-amber-500 text-slate-950 font-black text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow">
+              🔥 Trending
+            </span>
+          )}
+        </div>
+
+        {/* Wishlist Button Top-Right */}
+        <motion.button
+          whileTap={{ scale: 0.85 }}
+          whileHover={{ scale: 1.1 }}
+          onClick={(e) => onToggleWishlist(prod.id, e)}
+          className="absolute top-2 right-2 p-1.5 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800/80 z-10 shadow-md cursor-pointer"
+          title={isSaved ? "Remove from Wishlist" : "Add to Wishlist"}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}`} />
+        </motion.button>
+      </div>
+
+      {/* 2. COMPACT PRODUCT INFORMATION */}
+      <div className="p-2.5 sm:p-3 flex flex-col flex-1 gap-1 bg-slate-900/30 text-left">
+        {/* Category & Title */}
+        <div className="flex flex-col gap-0.5">
+          {prod.category && (
+            <span className="text-[9px] font-black uppercase text-violet-400 tracking-wider truncate">
+              {prod.category}
+            </span>
+          )}
+          <h3 className="text-xs font-bold text-slate-100 line-clamp-2 leading-snug group-hover:text-violet-400 transition-colors h-[2.2rem] overflow-hidden">
+            {prod.title || prod.productName}
+          </h3>
+        </div>
+
+        {/* Rating & Reviews */}
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
+          <div className="flex items-center text-amber-400 font-bold">
+            <Star className="w-3 h-3 fill-amber-400 mr-0.5" />
+            <span>{typeof prod.rating === 'number' ? prod.rating.toFixed(1) : '4.8'}</span>
+          </div>
+          <span className="text-slate-700">•</span>
+          <span>({prod.reviews || 12})</span>
+        </div>
+
+        {/* Merchant Name */}
+        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium truncate">
+          <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
+          <span className="truncate">{prod.seller || 'Verified Merchant'}</span>
+          {prod.verified && <ShieldCheck className="w-3 h-3 text-indigo-400 shrink-0" />}
+        </div>
+
+        {/* Variant Chips */}
+        {variantChips.length > 0 && (
+          <div className="flex items-center gap-1 pt-0.5 overflow-hidden">
+            {variantChips.slice(0, 2).map((chip, idx) => (
+              <span key={idx} className="px-1.5 py-0.2 bg-slate-800/80 border border-slate-700/60 rounded text-[8px] font-semibold text-slate-300 truncate">
+                {chip}
+              </span>
+            ))}
+            {variantChips.length > 2 && (
+              <span className="text-[8px] text-slate-400 font-bold">
+                +{variantChips.length - 2}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Stock Status */}
+        <div className="pt-1 flex items-center justify-between text-[9px] font-semibold">
+          {isOutOfStock ? (
+            <span className="text-rose-400 font-bold">Out of Stock</span>
+          ) : isLowStock ? (
+            <span className="text-amber-400 font-bold">Only {stockCount} left</span>
+          ) : (
+            <span className="text-slate-400">{stockCount} units available</span>
+          )}
+        </div>
+
+        {/* Price & Actions Row */}
+        <div className="pt-1.5 border-t border-slate-800/70 flex items-center justify-between gap-1">
+          {/* Price */}
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-0.5 font-mono text-sm sm:text-base font-black text-white leading-tight">
+              <span>{prod.price}</span>
+              <span className="text-violet-400 text-xs font-black">π</span>
+            </div>
+            {hasDiscount && (
+              <span className="text-[9px] font-semibold text-slate-500 line-through font-mono">
+                {prod.oldPrice}π
+              </span>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleShare}
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all border border-slate-700/60 cursor-pointer"
+              title="Share Product"
+            >
+              <Share2 className="w-3 h-3" />
+            </button>
+            <motion.button
+              whileTap={{ scale: 0.88 }}
+              whileHover={{ scale: 1.05 }}
+              onClick={(e) => onAddToCart(prod, e)}
+              disabled={isOutOfStock}
+              className="p-1.5 sm:px-2.5 sm:py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg transition-all shadow-md flex items-center gap-1 text-[10px] font-bold cursor-pointer"
+              title="Add to Cart"
+            >
+              <ShoppingBag className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add</span>
+            </motion.button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 export const BuyerHome: React.FC<BuyerHomeProps> = ({ 
   user, 
@@ -516,99 +842,21 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
     }, 700);
   };
 
-  // Render Product Card
+  // Render Product Card using Amazon/Flipkart compact e-commerce layout
   const renderProductCard = (prod: any, isCarousel = false) => {
-    const isSaved = wishlist.includes(prod.id);
-    const hasDiscount = prod.oldPrice && prod.oldPrice > prod.price;
-    const discountPercent = hasDiscount ? Math.round(((prod.oldPrice - prod.price) / prod.oldPrice) * 100) : 0;
-
     return (
-      <motion.div 
+      <CompactMarketplaceCard
         key={prod.id}
-        whileHover={{ y: -4 }}
-        onClick={() => {
-          const freshRecent = [prod, ...recentlyViewed.filter(p => p.id !== prod.id)].slice(0, 8);
-          setRecentlyViewed(freshRecent);
-          localStorage.setItem('pi_marketplace_recent_viewed', JSON.stringify(freshRecent));
-          onNavigate(`product/${prod.id}`);
-        }}
-        className={`group bg-slate-900/50 hover:bg-slate-900 border border-slate-800/80 hover:border-violet-500/40 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col shadow-lg relative ${isCarousel ? 'w-[190px] xs:w-[210px] sm:w-[220px] shrink-0 snap-start' : 'w-full'}`}
-      >
-        <div className="relative w-full aspect-square overflow-hidden bg-slate-950 shrink-0">
-          <div className="w-full h-full transform group-hover:scale-105 transition-transform duration-500 ease-out">
-            <LazyImage src={getProductImageUrl(prod)} alt={prod.title} />
-          </div>
-          
-          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
-            {prod.isTrending && (
-              <span className="bg-amber-500/95 text-slate-950 font-black text-[8px] sm:text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow">
-                🔥 Trending
-              </span>
-            )}
-            {hasDiscount && (
-              <span className="bg-rose-600 text-white font-black text-[8px] sm:text-[9px] px-2 py-0.5 rounded uppercase tracking-wider shadow">
-                {discountPercent}% OFF
-              </span>
-            )}
-          </div>
-
-          <motion.button 
-            whileTap={{ scale: 0.8 }}
-            whileHover={{ scale: 1.1 }}
-            onClick={(e) => toggleWishlist(prod.id, e)}
-            className="absolute top-2.5 right-2.5 p-2 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800 z-10 shadow-lg"
-          >
-            <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}`} />
-          </motion.button>
-        </div>
-        
-        <div className="p-3 flex flex-col flex-1 gap-2 bg-slate-900/20">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-200 line-clamp-2 leading-snug group-hover:text-violet-400 transition-colors h-[2.4rem] overflow-hidden">
-              {prod.title}
-            </h3>
-
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-              <div className="flex items-center text-amber-400">
-                <Star className="w-3 h-3 fill-amber-400 mr-0.5" />
-                <span>{prod.rating.toFixed(1)}</span>
-              </div>
-              <span className="text-slate-700">•</span>
-              <span>({prod.reviews})</span>
-            </div>
-
-            <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium truncate">
-              <Building2 className="w-3 h-3 text-slate-600 shrink-0" />
-              <span className="truncate">{prod.seller}</span>
-            </div>
-          </div>
-
-          <div className="flex-1" />
-
-          <div className="pt-2 border-t border-slate-800/60 flex items-end justify-between">
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1 font-mono text-base sm:text-lg font-black text-white leading-none">
-                {prod.price} <span className="text-violet-400 text-xs sm:text-sm font-black">π</span>
-              </div>
-              {hasDiscount && (
-                <span className="text-[10px] font-semibold text-slate-500 line-through font-mono mt-0.5">
-                  {prod.oldPrice}π
-                </span>
-              )}
-            </div>
-
-            <motion.button 
-              whileTap={{ scale: 0.85 }}
-              whileHover={{ scale: 1.08 }}
-              onClick={(e) => handleAddToCart(prod, e)}
-              className="p-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-all shadow-md shrink-0 cursor-pointer z-10"
-              title="Add to Cart"
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-            </motion.button>
-          </div>
-        </div>
-      </motion.div>
+        prod={prod}
+        isCarousel={isCarousel}
+        isSaved={wishlist.includes(prod.id)}
+        onToggleWishlist={toggleWishlist}
+        onAddToCart={handleAddToCart}
+        onNavigate={onNavigate}
+        setRecentlyViewed={setRecentlyViewed}
+        recentlyViewed={recentlyViewed}
+        setToastMessage={setToastMessage}
+      />
     );
   };
 
@@ -1456,7 +1704,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           Continuous Offerings Feed
         </h2>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-4">
           {feedProducts.map(prod => renderProductCard(prod, false))}
         </div>
 

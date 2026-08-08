@@ -171,6 +171,7 @@ export interface Product {
     lastViewed?: string;
     performanceScore: number;
   };
+  variants?: ProductVariant[];
 }
 
 // ==========================================

@@ -1,0 +1,89 @@
+--- src/components/business/ProductManager.tsx
++++ src/components/business/ProductManager.tsx
+@@ -325,18 +325,18 @@
+   onDelete: (id: string) => void;
+ }>(({ p, linkedStoreName, actionLoading, onToggleStatus, onOpenEdit, onArchive, onDelete }) => {
+   const [imgIdx, setImgIdx] = React.useState(0);
+-  const [selectedVariantId, setSelectedVariantId] = React.useState<string | null>(p.variants && p.variants.length > 0 ? p.variants[0].id : null);
++  const [selectedVariantId, setSelectedVariantId] = React.useState<string | null>(p.variants && p.variants.length > 0 ? p.variants[0].variantId : null);
+   
+   const hasVariants = p.variants && p.variants.length > 0;
+-  const activeVariant = hasVariants ? p.variants!.find(v => v.id === selectedVariantId) || p.variants![0] : null;
++  const activeVariant = hasVariants ? p.variants!.find(v => v.variantId === selectedVariantId) || p.variants![0] : null;
+ 
+   const displayPrice = activeVariant?.price || p.price;
+   const displayStock = activeVariant?.stock ?? p.stock;
+   
+   // Collect images
+   let gallery = (p.imageUrls && p.imageUrls.length > 0) ? p.imageUrls : (p.mainImage ? [p.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500']);
+-  if (activeVariant?.images && activeVariant.images.length > 0) {
+-    gallery = activeVariant.images;
++  if (activeVariant?.imageUrls && activeVariant.imageUrls.length > 0) {
++    gallery = activeVariant.imageUrls;
+   }
+   
+   // Ensure imgIdx is within bounds
+@@ -387,7 +387,7 @@
+                     key={val}
+                     onClick={(e) => {
+                       e.stopPropagation();
+-                      if (matchingVariant) setSelectedVariantId(matchingVariant.id);
++                      if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
+                     }}
+                     style={{ backgroundColor: visualColor }}
+                     className={`w-5 h-5 rounded-full border ${isSelected ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-slate-700'}`}
+@@ -401,7 +401,7 @@
+                   key={val}
+                   onClick={(e) => {
+                     e.stopPropagation();
+-                    if (matchingVariant) setSelectedVariantId(matchingVariant.id);
++                    if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
+                   }}
+                   className={`px-2 py-0.5 rounded text-[9px] font-bold border ${isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'}`}
+                 >
+--- src/components/product/ProductCard.tsx
++++ src/components/product/ProductCard.tsx
+@@ -43,18 +43,18 @@
+   
+   // Variants
+   const hasVariants = product.variants && product.variants.length > 0;
+   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
+-    hasVariants ? product.variants![0].id : null
++    hasVariants ? product.variants![0].variantId : null
+   );
+   
+-  const activeVariant = hasVariants ? product.variants!.find(v => v.id === selectedVariantId) || product.variants![0] : null;
++  const activeVariant = hasVariants ? product.variants!.find(v => v.variantId === selectedVariantId) || product.variants![0] : null;
+   const displayPrice = activeVariant?.price || product.price || 0;
+   const displayStock = activeVariant?.stock ?? (product.stock || 0);
+   
+   // Images
+   let gallery = (product.imageUrls && product.imageUrls.length > 0) 
+     ? product.imageUrls 
+     : (product.mainImage ? [product.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500']);
+     
+-  if (activeVariant?.images && activeVariant.images.length > 0) {
+-    gallery = activeVariant.images;
++  if (activeVariant?.imageUrls && activeVariant.imageUrls.length > 0) {
++    gallery = activeVariant.imageUrls;
+   }
+   
+   useEffect(() => {
+@@ -174,7 +174,7 @@
+                     key={val}
+                     onClick={(e) => {
+                       e.stopPropagation();
+-                      if (matchingVariant) setSelectedVariantId(matchingVariant.id);
++                      if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
+                     }}
+                     style={{ backgroundColor: visualColor }}
+                     className={`w-5 h-5 rounded-full border ${isSelected ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-slate-700'}`}
+@@ -188,7 +188,7 @@
+                   key={val}
+                   onClick={(e) => {
+                     e.stopPropagation();
+-                    if (matchingVariant) setSelectedVariantId(matchingVariant.id);
++                    if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
+                   }}
+                   className={`px-2 py-0.5 rounded text-[9px] font-bold border ${isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'}`}
+                 >
