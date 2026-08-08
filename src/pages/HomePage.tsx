@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import Navbar from '../components/Navbar';
 import { BuyerHome } from '../components/marketplace/BuyerHome';
+import { HomeCommandCenter } from '../components/home/HomeCommandCenter';
 
 export const HomePage: React.FC = () => {
   const { user } = useAuth();
@@ -27,15 +28,19 @@ export const HomePage: React.FC = () => {
           }
         }}
       />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-28 sm:pb-28 lg:pb-28">
-        <BuyerHome 
-          user={user} 
-          onSearchSubmit={(val) => navigate('/marketplace', { state: { query: val } })}
-          onNavigate={(view) => navigate(`/${view}`)}
-          onCategorySelect={(catId) => {
-            navigate('/marketplace', { state: { category: catId } });
-          }}
-        />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 sm:pb-28 lg:pb-28 space-y-6">
+        <HomeCommandCenter />
+        
+        <div>
+          <BuyerHome 
+            user={user} 
+            onSearchSubmit={(val) => navigate('/marketplace', { state: { query: val } })}
+            onNavigate={(view) => navigate(`/${view}`)}
+            onCategorySelect={(catId) => {
+              navigate('/marketplace', { state: { category: catId } });
+            }}
+          />
+        </div>
       </main>
     </div>
   );

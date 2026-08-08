@@ -36,7 +36,12 @@ import {
   ShieldAlert,
   Terminal,
   BookOpen,
-  Loader2
+  Loader2,
+  Zap,
+  Building2,
+  Coins,
+  Globe,
+  HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../auth/useAuth';
@@ -187,7 +192,12 @@ function NavbarComponent({
       Users,
       Award,
       BookOpen,
-      Sparkles
+      Sparkles,
+      Zap,
+      Building2,
+      Coins,
+      Globe,
+      HelpCircle
     };
     return icons[iconName] || Compass;
   };
@@ -195,36 +205,27 @@ function NavbarComponent({
   const getBottomNavItems = () => {
     return [
       { id: 'home', label: 'Home', iconName: 'Home', view: 'home' },
-      { id: 'marketplace', label: 'Marketplace', iconName: 'Store', view: 'discovery' },
+      { id: 'marketplace', label: 'Marketplace', iconName: 'Store', view: 'marketplace' },
       { id: 'orders', label: 'Orders', iconName: 'Clock', view: 'orders' },
-      { id: 'inbox', label: 'Inbox', iconName: 'MessageSquare', view: 'inbox' },
-      { id: 'account', label: 'Profile', iconName: 'User', view: 'profile' }
+      { id: 'business', label: 'My Business', iconName: 'Briefcase', view: 'my-business' },
+      { id: 'profile', label: 'Profile', iconName: 'User', view: 'profile' }
     ];
   };
 
-    const getActiveTab = () => {
+  const getActiveTab = () => {
     const path = location.pathname;
-    if (path === '/inbox') return 'inbox';
-    if (path === '/profile') return 'account';
-    if (path.startsWith('/orders') || path.startsWith('/business-orders')) return 'orders';
-    if (path.startsWith('/discovery')) return 'marketplace';
     if (path === '/' || path === '/home') return 'home';
+    if (path.startsWith('/marketplace') || path.startsWith('/discovery')) return 'marketplace';
+    if (path.startsWith('/orders') || path.startsWith('/business-orders') || path.startsWith('/bookings') || path.startsWith('/order-details')) return 'orders';
+    if (path.startsWith('/my-business') || path.startsWith('/business-center') || path.startsWith('/seller-dashboard') || path.startsWith('/services')) return 'business';
+    if (path.startsWith('/profile') || path.startsWith('/wallet')) return 'profile';
 
     // Fallbacks using currentView
-    if (currentView === 'inbox') return 'inbox';
+    if (currentView === 'home') return 'home';
+    if (currentView === 'marketplace' || currentView === 'discovery') return 'marketplace';
+    if (currentView === 'orders') return 'orders';
+    if (currentView === 'business' || currentView === 'business_dashboard' || currentView === 'seller_dashboard') return 'business';
     if (currentView === 'profile') return 'profile';
-    if (
-      currentView === 'store-dashboard' || 
-      currentView === 'dashboard' || 
-      currentView === 'catalog' || 
-      currentView === 'business_dashboard'
-    ) {
-      return 'sell';
-    }
-    if (currentView === 'discovery') {
-      const hasQuery = searchQuery && searchQuery.trim() !== '';
-      return hasQuery ? 'discover' : 'home';
-    }
     return 'home';
   };
 
@@ -313,6 +314,17 @@ function NavbarComponent({
     <header className="sticky top-0 z-50 w-full bg-slate-950/80 backdrop-blur-md border-b border-slate-900 shadow-lg shadow-violet-950/5 overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2.5 sm:gap-4">
         
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          {/* MENU DRAWER TOGGLE BUTTON FOR ALL NAVIGATION (ADMIN, BIZ CENTER, ETC) */}
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 transition-all border border-slate-800 flex items-center gap-1 cursor-pointer"
+            id="nav_menu_button"
+            title="Navigation Menu"
+          >
+            <Menu className="w-4 h-4 text-violet-400" />
+            <span className="hidden md:inline text-xs font-bold text-slate-300">Menu</span>
+          </button>
         {/* LOGO SECTION */}
         <div 
           onClick={() => onNavigate('discovery')}
@@ -344,6 +356,7 @@ function NavbarComponent({
               <p className="hidden sm:block text-[10px] text-slate-500 font-medium mt-1">Decentralized Web3 Commerce</p>
             )}
           </div>
+        </div>
         </div>
 
         {/* UNIVERSAL SEARCH BAR CENTER */}
@@ -522,16 +535,7 @@ function NavbarComponent({
             </div>
           </button>
 
-          {/* MENU DRAWER TOGGLE BUTTON FOR ALL NAVIGATION (ADMIN, BIZ CENTER, ETC) */}
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 transition-all border border-slate-800 flex items-center gap-1 cursor-pointer"
-            id="nav_menu_button"
-            title="Navigation Menu"
-          >
-            <Menu className="w-4 h-4 text-violet-400" />
-            <span className="hidden md:inline text-xs font-bold text-slate-300">Menu</span>
-          </button>
+          
 
         </div>
       </div>
@@ -643,6 +647,40 @@ function NavbarComponent({
                       })}
                     </div>
                   </div>
+                  <div className="space-y-4 pt-4 border-t border-slate-900/50">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Secondary Destinations</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Directory', iconName: 'Users', view: 'directory' },
+                        { label: 'Flash Deals', iconName: 'Zap', view: 'marketplace' },
+                        { label: 'Job Board', iconName: 'Briefcase', view: 'jobs' },
+                        { label: 'Register BIZ', iconName: 'Building2', view: 'create-business' },
+                        { label: 'Offer Service', iconName: 'Wrench', view: 'create-business' },
+                        { label: 'Post Ads', iconName: 'BarChart3', view: 'business-center' },
+                        { label: 'BMP Wallet', iconName: 'Coins', view: 'rewards' },
+                        { label: 'Community', iconName: 'Globe', view: 'community' },
+                        { label: 'Help & Support', iconName: 'HelpCircle', view: 'support' },
+                      ].map((item) => {
+                        const Icon = getIconComponent(item.iconName);
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={() => {
+                              onNavigate(item.view);
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="flex flex-col items-start gap-2.5 p-4 rounded-2xl text-left border transition-all bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white"
+                          >
+                            <Icon className="w-5 h-5 text-slate-400" />
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-black uppercase tracking-wider block">{item.label}</span>
+                              <span className="text-[9px] text-slate-500 block">Navigate</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Footer section matching Android / Apple Native design */}
@@ -683,28 +721,6 @@ function NavbarComponent({
           const Icon = getIconComponent(item.iconName);
           const activeTabId = getActiveTab();
           const isActive = activeTabId === item.id;
-          const isSell = item.id === 'orders';
-
-          if (isSell) {
-            return (
-              <button 
-                key={item.id}
-                onClick={() => onNavigate(item.view)}
-                className="flex flex-col items-center justify-center flex-1 h-full relative focus:outline-none -top-2.5"
-                id="nav_bottom_sell_fab"
-              >
-                <motion.div 
-                  whileTap={{ scale: 0.88 }} 
-                  className="flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 border border-violet-400/20 shadow-lg shadow-violet-500/30 text-white"
-                >
-                  <Icon className="w-5 h-5" />
-                </motion.div>
-                <span className="text-[7.5px] font-black uppercase tracking-widest mt-1 text-slate-400">
-                  {item.label}
-                </span>
-              </button>
-            );
-          }
 
           return (
             <button 

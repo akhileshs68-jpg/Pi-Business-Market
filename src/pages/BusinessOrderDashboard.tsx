@@ -25,7 +25,7 @@ import { orderService } from '../services/orderService';
 import { shippingService } from '../services/shippingService';
 import { Order, OrderStatus, ShippingMethod } from '../types';
 
-export const BusinessOrderDashboard: React.FC = () => {
+export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hideNavbar = false }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -99,18 +99,20 @@ export const BusinessOrderDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <Navbar 
-        currentUser={user!}
-        currentView="employer"
-        onNavigate={(view) => navigate(`/${view}`)}
-        cartCount={0}
-        walletBalance={100}
-        onWalletUpdate={() => {}}
-        onToggleCart={() => {}}
-      />
+    <div className={hideNavbar ? "text-slate-200" : "min-h-screen bg-slate-950 text-slate-200"}>
+      {!hideNavbar && (
+        <Navbar 
+          currentUser={user!}
+          currentView="employer"
+          onNavigate={(view) => navigate(`/${view}`)}
+          cartCount={0}
+          walletBalance={100}
+          onWalletUpdate={() => {}}
+          onToggleCart={() => {}}
+        />
+      )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className={hideNavbar ? "w-full py-2" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"}>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
           <div>

@@ -134,6 +134,14 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/my-business" 
+            element={
+              <ProtectedRoute>
+                <BusinessDashboard />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/business/:id" element={<BusinessProfile />} />
           <Route path="/store/:id" element={<BusinessProfile />} />
           <Route path="/doctor/:id" element={<BusinessProfile />} />
