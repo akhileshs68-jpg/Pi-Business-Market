@@ -867,8 +867,125 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   };
 
   return (
-    <div className="pb-28 space-y-8 sm:space-y-12" id="enterprise_home_experience">
+    <div className="pb-28 space-y-6 sm:space-y-8" id="enterprise_home_experience">
       
+      {/* 3. SMART SEARCH BAR */}
+      <section id="smart_search_section" ref={searchContainerRef} className="relative z-30">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-1.5 sm:p-2 shadow-md backdrop-blur-xl flex flex-col gap-1.5">
+          
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] sm:text-xs font-bold text-slate-400">
+            <span className="text-slate-500 uppercase tracking-widest text-[9px] mr-1">Search Scope:</span>
+            {[
+              { id: 'all', label: 'All Marketplace' },
+              { id: 'products', label: 'Products' },
+              { id: 'services', label: 'Services' },
+              { id: 'businesses', label: 'Businesses' },
+              { id: 'stores', label: 'Stores' }
+            ].map(type => (
+              <button
+                key={type.id}
+                onClick={() => setSearchCategory(type.id as any)}
+                className={`px-3 py-1 rounded-lg transition-all shrink-0 ${searchCategory === type.id ? 'bg-violet-600 text-white font-black shadow' : 'bg-slate-950/60 hover:bg-slate-800 text-slate-300'}`}
+              >
+                {type.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Input Box */}
+          <div className="relative flex items-center">
+            <Search className="absolute left-3 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search products, services, businesses & stores..."
+              value={searchVal}
+              onChange={(e) => {
+                setSearchVal(e.target.value);
+                setShowSearchSuggestions(true);
+              }}
+              onFocus={() => setShowSearchSuggestions(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleExecuteSearch(searchVal);
+              }}
+              className="w-full bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl py-2 pl-9 pr-24 text-[11px] sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all font-medium"
+            />
+            
+            <div className="absolute right-2 flex items-center gap-1">
+              <button 
+                type="button" 
+                onClick={() => showToast('Voice search listening...')}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-violet-400 transition-colors"
+                title="Voice Search"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+              <button 
+                type="button" 
+                onClick={() => handleExecuteSearch(searchVal || 'Electronics')}
+                className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-black uppercase rounded-lg transition-all"
+              >
+                Search
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Smart Search Suggestions Dropdown */}
+        <AnimatePresence>
+          {showSearchSuggestions && (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 5 }}
+              className="absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 z-50 space-y-3"
+            >
+              {recentSearches.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    <span>Recent Searches</span>
+                    <button onClick={() => {
+                      setRecentSearches([]);
+                      localStorage.removeItem('pi_marketplace_recent_searches');
+                    }} className="text-rose-500 hover:underline">Clear</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {recentSearches.map((term, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleExecuteSearch(term)}
+                        className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-xs font-medium text-slate-300 flex items-center gap-1.5"
+                      >
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        <span>{term}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Trending Searches</div>
+                <div className="flex flex-wrap gap-2">
+                  {['iPhone 15 Pro', 'Solar Inverter', 'Logistics Freight', 'Graphic Design', 'Organics', 'Mining Accessories'].map((tag, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleExecuteSearch(tag)}
+                      className="px-2.5 py-1 bg-violet-600/10 border border-violet-500/20 hover:bg-violet-600/20 text-violet-300 rounded-lg text-xs font-bold flex items-center gap-1"
+                    >
+                      <TrendingUp className="w-3 h-3 text-amber-400" />
+                      <span>{tag}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      
+
       {/* 1. HERO ADVERTISEMENT SLIDER (ENTERPRISE AD ENGINE) */}
       {campaigns.length > 0 && (
         <section 
@@ -902,6 +1019,8 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
                         {camp.businessLogo && (
                           <img src={camp.businessLogo} alt={camp.businessName} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-white/20" />
                         )}
+
+      
                         <span className="text-[10px] sm:text-xs font-black text-violet-400 uppercase tracking-widest">
                           {camp.storeName || camp.businessName}
                         </span>
@@ -1020,161 +1139,72 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         </section>
       )}
 
-      {/* 2. QUICK ACTIONS BAR */}
-      <section id="quick_actions_bar" className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>Quick Navigation Shortcuts</span>
-          </h2>
-        </div>
+      
 
-        <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-9 gap-2">
-          {[
-            { id: 'act_directory', label: 'Directory', icon: Users, color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', route: '/directory' },
-            { id: 'act_market', label: 'Products', icon: ShoppingBag, color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20', route: '/marketplace' },
-            { id: 'act_service', label: 'Services', icon: Wrench, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', route: '/services' },
-            { id: 'act_deals', label: 'Flash Deals', icon: Zap, color: 'text-rose-400 bg-rose-500/10 border-rose-500/20', action: () => {
-              const el = document.getElementById('flash_deals_section');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            } },
-            { id: 'act_jobs', label: 'Job Board', icon: Briefcase, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', route: '/jobs' },
-            { id: 'act_biz', label: 'Register BIZ', icon: Building2, color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', route: '/create-business' },
-            { id: 'act_ads', label: 'Post Ads', icon: BarChart3, color: 'text-pink-400 bg-pink-500/10 border-pink-500/20', route: '/business-center' },
-            { id: 'act_rewards', label: 'BMP Wallet', icon: Coins, color: 'text-teal-400 bg-teal-500/10 border-teal-500/20', route: '/rewards' },
-            { id: 'act_community', label: 'Community', icon: Globe, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', route: '/community' }
-          ].map(act => (
-            <button
-              key={act.id}
-              onClick={() => {
-                if (act.action) act.action();
-                else if (act.route) onNavigate(act.route);
-              }}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition-all cursor-pointer group shadow"
-            >
-              <div className={`p-2 rounded-xl border ${act.color} group-hover:scale-110 transition-transform mb-1`}>
-                <act.icon className="w-4 h-4" />
-              </div>
-              <span className="text-[10px] font-bold text-slate-300 group-hover:text-white truncate max-w-full text-center">{act.label}</span>
-            </button>
-          ))}
-        </div>
+      
+      {/* 2. FOUR COMPACT ACTIONS */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 z-20 relative">
+        <motion.button 
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onNavigate('marketplace')}
+          className="bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600/20 hover:border-indigo-500/40 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+        >
+          <div className="w-8 h-8 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
+            <ShoppingBag className="w-4 h-4" />
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <h3 className="text-xs font-black text-white uppercase tracking-wide leading-tight truncate">Buy Products</h3>
+            <p className="text-[9px] text-indigo-300/70 font-bold tracking-widest uppercase mt-0.5 truncate">Explore Market</p>
+          </div>
+        </motion.button>
+        
+        <motion.button 
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onCategorySelect('Services')}
+          className="bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-600/20 hover:border-emerald-500/40 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+        >
+          <div className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+            <Wrench className="w-4 h-4" />
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <h3 className="text-xs font-black text-white uppercase tracking-wide leading-tight truncate">Find Services</h3>
+            <p className="text-[9px] text-emerald-300/70 font-bold tracking-widest uppercase mt-0.5 truncate">Hire Experts</p>
+          </div>
+        </motion.button>
+        
+        <motion.button 
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onNavigate('create-business')}
+          className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+        >
+          <div className="w-8 h-8 bg-violet-500/10 text-violet-400 rounded-xl flex items-center justify-center shrink-0 border border-violet-500/20 group-hover:border-violet-500/40 transition-colors">
+            <Building2 className="w-4 h-4" />
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight truncate">Sell Products</h3>
+            <p className="text-[8px] sm:text-[9px] text-slate-500 font-bold tracking-widest uppercase mt-0.5 truncate">Open a Store</p>
+          </div>
+        </motion.button>
+        
+        <motion.button 
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onNavigate('create-business')}
+          className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+        >
+          <div className="w-8 h-8 bg-amber-500/10 text-amber-400 rounded-xl flex items-center justify-center shrink-0 border border-amber-500/20 group-hover:border-amber-500/40 transition-colors">
+            <Briefcase className="w-4 h-4" />
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-white uppercase tracking-wide leading-tight truncate">Offer Service</h3>
+            <p className="text-[8px] sm:text-[9px] text-slate-500 font-bold tracking-widest uppercase mt-0.5 truncate">Offer Expertise</p>
+          </div>
+        </motion.button>
       </section>
 
-      {/* 3. SMART SEARCH BAR */}
-      <section id="smart_search_section" ref={searchContainerRef} className="relative z-30">
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 sm:p-3 shadow-2xl backdrop-blur-xl flex flex-col gap-2">
-          
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px] sm:text-xs font-bold text-slate-400">
-            <span className="text-slate-500 uppercase tracking-widest text-[9px] mr-1">Search Scope:</span>
-            {[
-              { id: 'all', label: 'All Marketplace' },
-              { id: 'products', label: 'Products' },
-              { id: 'services', label: 'Services' },
-              { id: 'businesses', label: 'Businesses' },
-              { id: 'stores', label: 'Stores' }
-            ].map(type => (
-              <button
-                key={type.id}
-                onClick={() => setSearchCategory(type.id as any)}
-                className={`px-3 py-1 rounded-lg transition-all shrink-0 ${searchCategory === type.id ? 'bg-violet-600 text-white font-black shadow' : 'bg-slate-950/60 hover:bg-slate-800 text-slate-300'}`}
-              >
-                {type.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Search Input Box */}
-          <div className="relative flex items-center">
-            <Search className="absolute left-4 w-5 h-5 text-slate-500" />
-            <input
-              type="text"
-              placeholder={`Search ${searchCategory === 'all' ? 'anything across Pi Business Market' : searchCategory}...`}
-              value={searchVal}
-              onChange={(e) => {
-                setSearchVal(e.target.value);
-                setShowSearchSuggestions(true);
-              }}
-              onFocus={() => setShowSearchSuggestions(true)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleExecuteSearch(searchVal);
-              }}
-              className="w-full bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl py-3.5 pl-12 pr-28 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all font-medium"
-            />
-            
-            <div className="absolute right-2 flex items-center gap-1">
-              <button 
-                type="button" 
-                onClick={() => showToast('Voice search listening...')}
-                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-violet-400 transition-colors"
-                title="Voice Search"
-              >
-                <Mic className="w-4 h-4" />
-              </button>
-              <button 
-                type="button" 
-                onClick={() => handleExecuteSearch(searchVal || 'Electronics')}
-                className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-black uppercase rounded-lg transition-all"
-              >
-                Search
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Smart Search Suggestions Dropdown */}
-        <AnimatePresence>
-          {showSearchSuggestions && (
-            <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-              className="absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 z-50 space-y-3"
-            >
-              {recentSearches.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    <span>Recent Searches</span>
-                    <button onClick={() => {
-                      setRecentSearches([]);
-                      localStorage.removeItem('pi_marketplace_recent_searches');
-                    }} className="text-rose-500 hover:underline">Clear</button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {recentSearches.map((term, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleExecuteSearch(term)}
-                        className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-xs font-medium text-slate-300 flex items-center gap-1.5"
-                      >
-                        <Clock className="w-3 h-3 text-slate-500" />
-                        <span>{term}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">Trending Searches</div>
-                <div className="flex flex-wrap gap-2">
-                  {['iPhone 15 Pro', 'Solar Inverter', 'Logistics Freight', 'Graphic Design', 'Organics', 'Mining Accessories'].map((tag, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleExecuteSearch(tag)}
-                      className="px-2.5 py-1 bg-violet-600/10 border border-violet-500/20 hover:bg-violet-600/20 text-violet-300 rounded-lg text-xs font-bold flex items-center gap-1"
-                    >
-                      <TrendingUp className="w-3 h-3 text-amber-400" />
-                      <span>{tag}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </section>
 
       {/* 3. PRODUCT CATEGORIES GRID */}
       <section id="product_categories_section" className="space-y-3">

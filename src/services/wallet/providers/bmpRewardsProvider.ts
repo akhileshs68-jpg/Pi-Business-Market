@@ -72,10 +72,15 @@ export const bmpRewardsProvider: WalletProvider = {
     const txRef = doc(collection(db, 'wallet_transactions'));
 
     await runTransaction(db, async (transaction) => {
+      // PHASE 1 — ALL READS (Must be done before ANY writes)
       const walletDoc = await transaction.get(walletRef);
+      const gSnap = await transaction.get(gamificationRef);
+
+      // PHASE 2 — CALCULATIONS
       const balanceBefore = walletDoc.exists() ? walletDoc.data().balance || 0 : 0;
       const balanceAfter = balanceBefore + amount;
 
+      // PHASE 3 — ALL WRITES
       if (!walletDoc.exists()) {
         transaction.set(walletRef, {
           userId: canonicalUserId,
@@ -95,7 +100,6 @@ export const bmpRewardsProvider: WalletProvider = {
       }
 
       // Sync user_gamification document if it exists
-      const gSnap = await transaction.get(gamificationRef);
       if (gSnap.exists()) {
         transaction.update(gamificationRef, {
           bmpBalance: balanceAfter,
@@ -166,7 +170,11 @@ export const bmpRewardsProvider: WalletProvider = {
     const txRef = doc(collection(db, 'wallet_transactions'));
 
     await runTransaction(db, async (transaction) => {
+      // PHASE 1 — ALL READS (Must be done before ANY writes)
       const walletDoc = await transaction.get(walletRef);
+      const gSnap = await transaction.get(gamificationRef);
+
+      // PHASE 2 — CALCULATIONS
       const balanceBefore = walletDoc.exists() ? walletDoc.data().balance || 0 : 0;
       
       if (balanceBefore < amount) {
@@ -175,13 +183,13 @@ export const bmpRewardsProvider: WalletProvider = {
 
       const balanceAfter = balanceBefore - amount;
 
+      // PHASE 3 — ALL WRITES
       transaction.update(walletRef, {
         balance: balanceAfter,
         updatedAt: serverTimestamp()
       });
 
       // Sync user_gamification document if it exists
-      const gSnap = await transaction.get(gamificationRef);
       if (gSnap.exists()) {
         transaction.update(gamificationRef, {
           bmpBalance: balanceAfter,

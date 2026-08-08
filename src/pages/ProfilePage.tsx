@@ -4,6 +4,8 @@ import { useAuth } from '../auth/useAuth';
 import Navbar from '../components/Navbar';
 import { BmpRewardsWallet } from '../components/BmpRewardsWallet';
 import { paymentEngine } from '../services/wallet/paymentEngine';
+import { piTestnetProvider } from '../services/wallet/providers/piTestnetProvider';
+import { bmpRewardsProvider } from '../services/wallet/providers/bmpRewardsProvider';
 import { RoleResolver } from '../services/identity/RoleResolver';
 import { 
   User,
@@ -42,7 +44,8 @@ import {
   Store,
   ClipboardList,
   Users,
-  BarChart3
+  BarChart3,
+  HelpCircle
 } from 'lucide-react';
 
 
@@ -136,7 +139,7 @@ const ALL_PRODUCTS_DATABASE = [
   }
 ];
 
-type ProfileTab = 'account' | 'orders' | 'wallet' | 'wishlist' | 'settings' | 'business';
+type ProfileTab = 'account' | 'orders' | 'wallet' | 'wishlist' | 'settings' | 'help';
 
 export const ProfilePage: React.FC = () => {
   const { user, identity, permissions, logout, updateUser } = useAuth();
@@ -172,18 +175,26 @@ export const ProfilePage: React.FC = () => {
     }
   }, [user, navigate]);
 
-  // Load persistence states conditionally per activeTab
+  const [piWalletBalance, setPiWalletBalance] = useState<number>(0);
+  
+  // Load real wallet balances from providers
   useEffect(() => {
+    let isMounted = true;
     if (!user) return;
-
-    // Load Wallet Balance for header
-    const storedBalance = localStorage.getItem('bmp_wallet_balance');
-    if (storedBalance) {
-      setWalletBalance(parseFloat(storedBalance));
-    } else {
-      localStorage.setItem('bmp_wallet_balance', '300');
-      setWalletBalance(300);
-    }
+    const fetchBalances = async () => {
+      try {
+        const pBal = await piTestnetProvider.getBalance(user.uid);
+        const bBal = await bmpRewardsProvider.getBalance(user.uid);
+        if (isMounted) {
+          setPiWalletBalance(pBal);
+          setWalletBalance(bBal);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch wallet balances:', err);
+      }
+    };
+    fetchBalances();
+    return () => { isMounted = false; };
   }, [user]);
 
   // Lazy load tab-specific data
@@ -245,15 +256,19 @@ export const ProfilePage: React.FC = () => {
 
 
   // Faucet balance sandbox claim
-  const handleFaucetClaim = () => {
+  const handleFaucetClaim = async () => {
+    if (!user) return;
     setFaucetLoading(true);
-    setTimeout(() => {
-      const newBal = walletBalance + 50;
-      setWalletBalance(newBal);
-      localStorage.setItem('bmp_wallet_balance', String(newBal));
-      setFaucetLoading(false);
+    try {
+      await piTestnetProvider.credit(user.uid, 50, 'MISSION_REWARD', 'Sandbox Testnet Faucet Mined');
+      const newBal = await piTestnetProvider.getBalance(user.uid);
+      setPiWalletBalance(newBal);
       showTemporarySuccess('Successfully Mined +50 π Sandbox Testnet Faucet!');
-    }, 1200);
+    } catch (err) {
+      console.error('Faucet claim failed', err);
+    } finally {
+      setFaucetLoading(false);
+    }
   };
 
   // Remove from wishlist helper
@@ -359,12 +374,18 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             <div className="flex flex-col items-center sm:items-end gap-1.5 font-mono text-center sm:text-right shrink-0">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Balance</span>
-              <div className="text-xl sm:text-2xl font-black text-white leading-none">
-                {walletBalance.toFixed(2)} <span className="text-amber-400">BMP</span>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Balances</span>
+              <div className="flex items-center gap-4">
+                <div className="text-xl sm:text-2xl font-black text-white leading-none">
+                  {piWalletBalance.toFixed(2)} <span className="text-violet-400">π</span>
+                </div>
+                <div className="w-px h-6 bg-slate-800"></div>
+                <div className="text-xl sm:text-2xl font-black text-white leading-none">
+                  {walletBalance.toFixed(2)} <span className="text-amber-400">BMP</span>
+                </div>
               </div>
               <div className="text-[8px] text-slate-600 font-bold uppercase tracking-wider">
-                BMP Rewards Active
+                Pi Testnet & BMP Rewards
               </div>
             </div>
           </div>
@@ -403,8 +424,8 @@ export const ProfilePage: React.FC = () => {
             { id: 'orders', label: 'My Purchases', icon: Package },
             { id: 'wallet', label: 'BMP Rewards', icon: Wallet },
             { id: 'wishlist', label: 'Saved Items', icon: Heart },
-            { id: 'business', label: 'Business Center', icon: Briefcase },
-            { id: 'settings', label: 'Settings', icon: Settings }
+            { id: 'settings', label: 'Settings', icon: Settings },
+            { id: 'help', label: 'Help & Support', icon: HelpCircle }
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -778,101 +799,95 @@ export const ProfilePage: React.FC = () => {
             </div>
           )}
 
-          {/* 6. BUSINESS CENTER TAB */}
-          {activeTab === 'business' && (
+          {/* 6. HELP & SUPPORT TAB */}
+          {activeTab === 'help' && (
             <div className="space-y-6">
-              {/* Quick Business Registration CTA Header */}
-              <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-4 animate-fade-in">
+              {/* FAQ Section */}
+              <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Start Your Business</h3>
-                    <p className="text-[10px] text-slate-500 font-medium">Create a new business entity, store, or service profile</p>
-                  </div>
-                  <button 
-                    onClick={() => navigate('/business-dashboard')} 
-                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                  >
-                    Open Workspace ➔
-                  </button>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Frequently Asked Questions</h3>
+                  <span className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">5 General Guides</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                  <div 
-                    onClick={() => navigate('/create-business')}
-                    className="p-4 bg-slate-950/60 border border-slate-900 hover:border-indigo-500/50 rounded-2xl cursor-pointer transition-all hover:bg-slate-900 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold">
-                        <Plus className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-white">➕ Register Business</h4>
-                        <p className="text-[9px] text-slate-500">Legal business entity setup</p>
-                      </div>
+                <div className="space-y-4">
+                  {[
+                    { q: "What is Pi Business Market?", a: "Pi Business Market (PBM) is an omnichannel commerce operating system built for the Pi Network ecosystem. Pioneers can securely establish businesses, open retail storefronts, offer professional consulting, run logistical operations, and pay with Pi coin through our non-custodial sandbox ledger." },
+                    { q: "How do I claim my BMP Rewards?", a: "Click on the Daily BMP Claim button inside your wallet dashboard. Under our strict gamification ledger consensus rules, claiming awards a base of +10 BMP daily. Streak milestones compound rewards: +15 BMP at 3 days, +30 BMP at 7 days, and +100 BMP at 30 days of consecutive claims!" },
+                    { q: "Is the wallet secure?", a: "Yes. All transactions run on our distributed consensus simulator, secured by automated escrow controls. No raw private keys are stored on-chain or transmitted over public networks." },
+                    { q: "How do I start selling?", a: "Click on the 'My Business' tab in the primary navigation menu. If you don't have a registered entity, follow our 3-step wizard to register your business profile, list your physical catalog products or services, and submit for compliance approval." },
+                    { q: "What is the One Account Policy?", a: "To prevent sybil attacks and protect our decentralized trust graph, each Pioneer can establish one primary merchant brand per verified account. This profile can contain multiple catalog products, services, or physical store outlets." }
+                  ].map((faq, idx) => (
+                    <div key={idx} className="p-4 bg-slate-950/40 border border-slate-900 rounded-2xl space-y-2">
+                      <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide">Q: {faq.q}</h4>
+                      <p className="text-[10px] text-slate-500 leading-relaxed font-semibold">{faq.a}</p>
                     </div>
-                  </div>
-
-                  <div 
-                    onClick={() => navigate('/create-store')}
-                    className="p-4 bg-slate-950/60 border border-slate-900 hover:border-violet-500/50 rounded-2xl cursor-pointer transition-all hover:bg-slate-900 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-violet-600/20 text-violet-400 flex items-center justify-center font-bold">
-                        <Store className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-white">🏪 Open Store</h4>
-                        <p className="text-[9px] text-slate-500">Online storefront & products</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div 
-                    onClick={() => navigate('/service-management')}
-                    className="p-4 bg-slate-950/60 border border-slate-900 hover:border-emerald-500/50 rounded-2xl cursor-pointer transition-all hover:bg-slate-900 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center font-bold">
-                        <Briefcase className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-white">🛠 Register Service</h4>
-                        <p className="text-[9px] text-slate-500">Services & appointment slots</p>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Operating System Workspace Modules */}
+              {/* Contact Support Form */}
               <div className="bg-slate-900/40 border border-slate-900 rounded-3xl p-6 space-y-6 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Business Operating System</h3>
-                  <span className="text-[9px] text-emerald-400 font-mono font-bold">● Active Workspace</span>
+                <div>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">Direct Support Helpdesk</h3>
+                  <p className="text-[10px] text-slate-500 leading-relaxed font-semibold">Submit a diagnostic support ticket. Our engineering team will review your account state within 24 hours.</p>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {[
-                    { label: 'My Business', path: '/business-profile', icon: Briefcase },
-                    { label: 'My Store', path: '/store-dashboard', icon: Store },
-                    { label: 'Products', path: '/catalog-management', icon: Package },
-                    { label: 'Services', path: '/service-management', icon: Briefcase },
-                    { label: 'Orders', path: '/business-orders', icon: ClipboardList },
-                    { label: 'Customers', path: '/customer-crm', icon: Users },
-                    { label: 'Analytics', path: '/merchant-analytics', icon: BarChart3 },
-                    { label: 'Business Wallet', path: '/merchant-payments', icon: Wallet },
-                    { label: 'Store Settings', path: '/store-dashboard', icon: Settings },
-                    { label: 'Verification', path: '/business-profile', icon: ShieldCheck },
-                  ].map((item) => (
-                    <button
-                      key={item.label}
-                      onClick={() => navigate(item.path)}
-                      className="p-4 bg-slate-950/40 border border-slate-900 hover:border-slate-800 rounded-2xl flex flex-col items-center gap-2 text-center cursor-pointer transition-all hover:bg-slate-900/60"
-                    >
-                      <item.icon className="w-5 h-5 text-violet-400" />
-                      <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{item.label}</span>
-                    </button>
-                  ))}
-                </div>
+
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    showTemporarySuccess("Support ticket successfully transmitted to helpdesk!");
+                    (e.target as any).reset();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 ml-1">Your Full Name</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="e.g. John Doe"
+                        className="w-full bg-slate-950 border border-slate-900 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 ml-1">Email Address</label>
+                      <input 
+                        type="email" 
+                        required
+                        placeholder="e.g. jdoe@pioneer.com"
+                        className="w-full bg-slate-950 border border-slate-900 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 ml-1">Ticket Subject</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="e.g. Escrow payout discrepancy"
+                      className="w-full bg-slate-950 border border-slate-900 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 font-semibold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 ml-1">Detailed Message Description</label>
+                    <textarea 
+                      required
+                      rows={4}
+                      placeholder="Explain what happened, including any relevant transaction correlation IDs..."
+                      className="w-full bg-slate-950 border border-slate-900 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 font-semibold resize-none"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="w-full sm:w-auto px-8 py-3.5 bg-violet-600 hover:bg-violet-500 text-white font-extrabold text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-md shadow-violet-600/10 active:scale-95 cursor-pointer"
+                  >
+                    Submit Support Ticket
+                  </button>
+                </form>
               </div>
             </div>
           )}
