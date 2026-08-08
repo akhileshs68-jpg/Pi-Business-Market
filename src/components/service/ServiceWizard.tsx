@@ -38,6 +38,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { useAuth } from '../../auth/useAuth';
 import { EnterpriseServiceEngine } from '../../core/service/enterpriseServiceEngine';
+import { mediaService } from '../../services/mediaService';
 
 interface ServiceWizardProps {
   isOpen: boolean;
@@ -125,6 +126,16 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
   const [documents, setDocuments] = useState<string[]>(['Service_Specification.pdf']);
   const [docInput, setDocInput] = useState<string>('');
 
+  // Step 5 Upload states
+  const [imageUploadState, setImageUploadState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [imageUploadProgress, setImageUploadProgress] = useState<number>(0);
+  const [certUploading, setCertUploading] = useState<boolean>(false);
+  const [certProgress, setCertProgress] = useState<number>(0);
+  const [certUploadError, setCertUploadError] = useState<string | null>(null);
+  const [docUploading, setDocUploading] = useState<boolean>(false);
+  const [docProgress, setDocProgress] = useState<number>(0);
+  const [docUploadError, setDocUploadError] = useState<string | null>(null);
+
   // Reset or initialize state when wizard opens
   useEffect(() => {
     if (isOpen) {
@@ -173,6 +184,160 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
     if (docInput.trim() && !documents.includes(docInput.trim())) {
       setDocuments([...documents, docInput.trim()]);
       setDocInput('');
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Only JPG, JPEG, PNG, and WEBP image formats are allowed.');
+      setImageUploadState('error');
+      return;
+    }
+
+    // Validate size (10MB limit)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert('Image exceeds the maximum allowed size of 10MB.');
+      setImageUploadState('error');
+      return;
+    }
+
+    setImageUploadState('uploading');
+    setImageUploadProgress(0);
+
+    try {
+      const asset = await mediaService.uploadMedia(file, user?.uid || 'anonymous', {
+        module: 'services',
+        businessId: businessId || 'PI-CORP-001',
+        onProgress: (p) => setImageUploadProgress(p)
+      });
+
+      if (asset && asset.downloadUrl) {
+        if (images.includes(asset.downloadUrl)) {
+          alert('This image has already been uploaded.');
+          setImageUploadState('idle');
+          return;
+        }
+        setImages(prev => [...prev, asset.downloadUrl]);
+        setImageUploadState('success');
+        setTimeout(() => setImageUploadState('idle'), 3000);
+      } else {
+        throw new Error('No download URL returned');
+      }
+    } catch (err: any) {
+      console.error('Image upload failed:', err);
+      setImageUploadState('error');
+    }
+  };
+
+  const handleCertificateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setCertUploadError('Only PDF, JPG, JPEG, PNG, and WEBP formats are allowed.');
+      return;
+    }
+
+    // Validate size (10MB limit)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setCertUploadError('File exceeds the maximum allowed size of 10MB.');
+      return;
+    }
+
+    setCertUploading(true);
+    setCertProgress(0);
+    setCertUploadError(null);
+
+    try {
+      const asset = await mediaService.uploadMedia(file, user?.uid || 'anonymous', {
+        module: 'services',
+        businessId: businessId || 'PI-CORP-001',
+        onProgress: (p) => setCertProgress(p)
+      });
+
+      if (asset && asset.downloadUrl) {
+        if (certificates.includes(asset.downloadUrl)) {
+          setCertUploadError('This certificate has already been uploaded.');
+          setCertUploading(false);
+          return;
+        }
+        setCertificates(prev => [...prev, asset.downloadUrl]);
+        setCertProgress(100);
+        setTimeout(() => {
+          setCertUploading(false);
+          setCertProgress(0);
+        }, 1500);
+      } else {
+        throw new Error('No download URL returned');
+      }
+    } catch (err: any) {
+      console.error('Certificate upload failed:', err);
+      setCertUploadError('Upload failed — Please try again.');
+      setCertUploading(false);
+    }
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      setDocUploadError('Only PDF, DOC, and DOCX formats are allowed.');
+      return;
+    }
+
+    // Validate size (10MB limit)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setDocUploadError('File exceeds the maximum allowed size of 10MB.');
+      return;
+    }
+
+    setDocUploading(true);
+    setDocProgress(0);
+    setDocUploadError(null);
+
+    try {
+      const asset = await mediaService.uploadMedia(file, user?.uid || 'anonymous', {
+        module: 'services',
+        businessId: businessId || 'PI-CORP-001',
+        onProgress: (p) => setDocProgress(p)
+      });
+
+      if (asset && asset.downloadUrl) {
+        if (documents.includes(asset.downloadUrl)) {
+          setDocUploadError('This document has already been uploaded.');
+          setDocUploading(false);
+          return;
+        }
+        setDocuments(prev => [...prev, asset.downloadUrl]);
+        setDocProgress(100);
+        setTimeout(() => {
+          setDocUploading(false);
+          setDocProgress(0);
+        }, 1500);
+      } else {
+        throw new Error('No download URL returned');
+      }
+    } catch (err: any) {
+      console.error('Document upload failed:', err);
+      setDocUploadError('Upload failed — Please try again.');
+      setDocUploading(false);
     }
   };
 
@@ -744,27 +909,51 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
 
                 <div className="space-y-5">
                   {/* Images */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Portfolio Images (URL)</label>
-                    <div className="flex gap-2">
-                      <input 
-                        value={imageUrlInput}
-                        onChange={(e) => setImageUrlInput(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 text-sm text-white focus:border-violet-500 outline-none font-bold"
-                        placeholder="https://images.unsplash.com/photo..."
-                      />
-                      <button 
-                        type="button" 
-                        onClick={handleAddImage}
-                        className="px-5 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-bold text-xs"
-                      >
-                        Add
-                      </button>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Portfolio Images</label>
+                      <span className="text-[10px] text-slate-400">JPG, JPEG, PNG, WEBP (Max 10MB)</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 pt-2">
+
+                    <div className="flex flex-col md:flex-row gap-3 items-stretch">
+                      <div className="flex-1 flex gap-2">
+                        <input 
+                          value={imageUrlInput}
+                          onChange={(e) => setImageUrlInput(e.target.value)}
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 text-sm text-white focus:border-violet-500 outline-none font-bold"
+                          placeholder="Or paste image URL (https://...)"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleAddImage}
+                          className="px-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-xs whitespace-nowrap"
+                        >
+                          Add URL
+                        </button>
+                      </div>
+
+                      <label className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-bold text-xs cursor-pointer transition-all duration-200 text-center flex items-center justify-center gap-2 shrink-0 select-none shadow-lg shadow-violet-600/10">
+                        <ImageIcon className="w-4 h-4" />
+                        <span>
+                          {imageUploadState === 'idle' && 'Upload Image'}
+                          {imageUploadState === 'uploading' && `Uploading... (${imageUploadProgress}%)`}
+                          {imageUploadState === 'success' && 'Uploaded ✓'}
+                          {imageUploadState === 'error' && 'Upload failed — Please try again.'}
+                        </span>
+                        <input 
+                          type="file" 
+                          accept="image/png, image/jpeg, image/jpg, image/webp" 
+                          className="hidden" 
+                          onChange={handleImageUpload}
+                          disabled={imageUploadState === 'uploading'}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 pt-2">
                       {images.map((img, i) => (
                         <div key={i} className="relative h-20 rounded-xl overflow-hidden border border-slate-800 group">
-                          <img src={img} alt={`Showcase ${i}`} className="w-full h-full object-cover" />
+                          <img src={img} alt={`Showcase ${i}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           <button 
                             type="button" 
                             onClick={() => setImages(images.filter((_, idx) => idx !== i))}
@@ -789,60 +978,169 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
                   </div>
 
                   {/* Certificates */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Certificates / License</label>
-                    <div className="flex gap-2">
-                      <input 
-                        value={certInput}
-                        onChange={(e) => setCertInput(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 text-sm text-white focus:border-violet-500 outline-none font-bold"
-                        placeholder="e.g. Master Enterprise Architect Certification"
-                      />
-                      <button 
-                        type="button" 
-                        onClick={handleAddCertificate}
-                        className="px-5 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-bold text-xs"
-                      >
-                        Add
-                      </button>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Certificates / License</label>
+                      <span className="text-[10px] text-slate-400">PDF, JPG, JPEG, PNG, WEBP (Max 10MB)</span>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {certificates.map((cert, i) => (
-                        <span key={i} className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold rounded-xl flex items-center gap-2">
-                          <Award className="w-3.5 h-3.5 text-amber-400" />
-                          {cert}
-                          <X className="w-3 h-3 cursor-pointer hover:text-red-400" onClick={() => setCertificates(certificates.filter((_, idx) => idx !== i))} />
+
+                    <div className="flex flex-col md:flex-row gap-3">
+                      <div className="flex-1 flex gap-2">
+                        <input 
+                          value={certInput}
+                          onChange={(e) => setCertInput(e.target.value)}
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 text-sm text-white focus:border-violet-500 outline-none font-bold"
+                          placeholder="Enter certification name or description"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleAddCertificate}
+                          className="px-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-xs whitespace-nowrap"
+                        >
+                          Add Text
+                        </button>
+                      </div>
+
+                      <label className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-bold text-xs cursor-pointer transition-all duration-200 text-center flex items-center justify-center gap-2 shrink-0 select-none shadow-lg shadow-violet-600/10">
+                        <Award className="w-4 h-4" />
+                        <span>
+                          {!certUploading && 'Upload Certificate'}
+                          {certUploading && `Uploading... (${certProgress}%)`}
                         </span>
-                      ))}
+                        <input 
+                          type="file" 
+                          accept="application/pdf, image/png, image/jpeg, image/jpg, image/webp" 
+                          className="hidden" 
+                          onChange={handleCertificateUpload}
+                          disabled={certUploading}
+                        />
+                      </label>
+                    </div>
+
+                    {certUploadError && (
+                      <div className="text-xs text-red-400 flex items-center gap-2 font-mono bg-red-950/20 border border-red-900/30 px-3 py-2 rounded-xl">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>{certUploadError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {certificates.map((cert, i) => {
+                        const isUrl = cert.startsWith('http://') || cert.startsWith('https://');
+                        const fileName = isUrl ? cert.split('/').pop()?.split('?')[0] || 'certificate' : cert;
+                        const fileExt = isUrl ? fileName.split('.').pop()?.toUpperCase() : 'TEXT';
+
+                        return (
+                          <div key={i} className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold rounded-xl flex items-center gap-2 hover:border-slate-700 transition-colors">
+                            <Award className="w-3.5 h-3.5 text-amber-400" />
+                            {isUrl ? (
+                              <a 
+                                href={cert} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="hover:text-violet-400 hover:underline transition-colors flex items-center gap-1.5"
+                              >
+                                <span>{decodeURIComponent(fileName)}</span>
+                                <span className="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.5 rounded uppercase font-mono font-black">{fileExt}</span>
+                              </a>
+                            ) : (
+                              <span>{cert}</span>
+                            )}
+                            <X 
+                              className="w-3.5 h-3.5 cursor-pointer text-slate-500 hover:text-red-400 ml-1 transition-colors" 
+                              onClick={() => setCertificates(certificates.filter((_, idx) => idx !== i))} 
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Documents */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Brochures & Documents</label>
-                    <div className="flex gap-2">
-                      <input 
-                        value={docInput}
-                        onChange={(e) => setDocInput(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 text-sm text-white focus:border-violet-500 outline-none font-bold"
-                        placeholder="e.g. Service_Level_Agreement_2026.pdf"
-                      />
-                      <button 
-                        type="button" 
-                        onClick={handleAddDocument}
-                        className="px-5 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-bold text-xs"
-                      >
-                        Add
-                      </button>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Brochures & Documents</label>
+                      <span className="text-[10px] text-slate-400">PDF, DOC, DOCX (Max 10MB)</span>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {documents.map((d, i) => (
-                        <span key={i} className="px-3 py-1.5 bg-slate-950 border border-slate-800 text-slate-300 text-xs font-bold rounded-xl flex items-center gap-2">
-                          <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                          {d}
-                          <X className="w-3 h-3 cursor-pointer hover:text-red-400" onClick={() => setDocuments(documents.filter((_, idx) => idx !== i))} />
+
+                    <div className="flex flex-col md:flex-row gap-3">
+                      <div className="flex-1 flex gap-2">
+                        <input 
+                          value={docInput}
+                          onChange={(e) => setDocInput(e.target.value)}
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3 text-sm text-white focus:border-violet-500 outline-none font-bold"
+                          placeholder="Enter document name or file description"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={handleAddDocument}
+                          className="px-5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-xs whitespace-nowrap"
+                        >
+                          Add Text
+                        </button>
+                      </div>
+
+                      <label className="px-5 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-bold text-xs cursor-pointer transition-all duration-200 text-center flex items-center justify-center gap-2 shrink-0 select-none shadow-lg shadow-violet-600/10">
+                        <FileText className="w-4 h-4" />
+                        <span>
+                          {!docUploading && 'Upload Document'}
+                          {docUploading && `Uploading... (${docProgress}%)`}
                         </span>
-                      ))}
+                        <input 
+                          type="file" 
+                          accept="application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+                          className="hidden" 
+                          onChange={handleDocumentUpload}
+                          disabled={docUploading}
+                        />
+                      </label>
+                    </div>
+
+                    {docUploadError && (
+                      <div className="text-xs text-red-400 flex items-center gap-2 font-mono bg-red-950/20 border border-red-900/30 px-3 py-2 rounded-xl">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>{docUploadError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-2 pt-1">
+                      {documents.map((d, i) => {
+                        const isUrl = d.startsWith('http://') || d.startsWith('https://');
+                        const fileName = isUrl ? d.split('/').pop()?.split('?')[0] || 'document' : d;
+                        const fileExt = isUrl ? fileName.split('.').pop()?.toUpperCase() : 'TEXT';
+
+                        return (
+                          <div key={i} className="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-2xl transition-all">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                              {isUrl ? (
+                                <a 
+                                  href={d} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-slate-300 text-xs font-bold hover:text-violet-400 hover:underline truncate"
+                                >
+                                  {decodeURIComponent(fileName)}
+                                </a>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-bold truncate">{d}</span>
+                              )}
+                              {isUrl && (
+                                <span className="text-[9px] bg-slate-900 text-slate-500 px-1.5 py-0.5 rounded uppercase font-mono font-black shrink-0">
+                                  {fileExt}
+                                </span>
+                              )}
+                            </div>
+                            <button 
+                              type="button"
+                              onClick={() => setDocuments(documents.filter((_, idx) => idx !== i))}
+                              className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
