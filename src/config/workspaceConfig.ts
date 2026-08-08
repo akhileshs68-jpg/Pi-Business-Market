@@ -38,6 +38,16 @@ export const WORKSPACE_CONFIG: Record<string, RoleWorkspaceConfig> = {
       { id: 'finance', label: 'Finance', iconName: 'CreditCard', description: 'Payments', path: '/business-payments' },
     ]
   },
+  'service_provider': {
+    roleId: 'service_provider',
+    title: 'Service Workspace',
+    modules: [
+      { id: 'services', label: 'Services', iconName: 'Briefcase', description: 'Manage offerings', path: '/services' },
+      { id: 'bookings', label: 'Bookings', iconName: 'Calendar', description: 'Schedule', path: '/business-orders' },
+      { id: 'clients', label: 'Clients', iconName: 'Users', description: 'CRM', path: '/crm' },
+      { id: 'finance', label: 'Finance', iconName: 'CreditCard', description: 'Payments', path: '/business-payments' },
+    ]
+  },
   manufacturer: {
     roleId: 'manufacturer',
     title: 'Manufacturer Workspace',

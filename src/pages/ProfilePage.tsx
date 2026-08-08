@@ -481,6 +481,18 @@ export const ProfilePage: React.FC = () => {
                               if (updateUser) {
                                 await updateUser({ activeRole: r });
                                 showTemporarySuccess(`Switched active view role to: ${label}`);
+                                const normalized = r.toLowerCase().replace(/[\s_-]/g, '_');
+                                if (normalized === 'business_owner' || normalized === 'businessowner' || normalized === 'owner') {
+                                  navigate('/business-center');
+                                } else if (normalized === 'buyer' || normalized === 'customer') {
+                                  navigate('/home');
+                                } else if (normalized === 'seller') {
+                                  navigate('/seller-dashboard');
+                                } else if (normalized === 'service_provider' || normalized === 'serviceprovider') {
+                                  navigate('/bookings');
+                                } else {
+                                  navigate('/dashboard');
+                                }
                               }
                             } catch (err) {
                               console.warn('Role switch error:', err);

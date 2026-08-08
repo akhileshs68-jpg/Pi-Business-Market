@@ -160,6 +160,70 @@ const getDb = (): any => {
   }
 };
 
+// Payment API Rate Limiting - In-Memory Store
+interface RateLimitRecord {
+  count: number;
+  resetTime: number;
+}
+const rateLimitStore = new Map<string, RateLimitRecord>();
+
+const paymentRateLimiter = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute window
+  const maxRequests = 60; // 60 requests per minute
+
+  // Periodic memory cleanup when store size exceeds 1000
+  if (rateLimitStore.size > 1000) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (now > v.resetTime) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+
+  const key = `payment_${ip}`;
+  const record = rateLimitStore.get(key);
+
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(key, {
+      count: 1,
+      resetTime: now + windowMs
+    });
+    next();
+  } else if (record.count >= maxRequests) {
+    console.warn(`[RateLimit] Exceeded payment rate limit for IP: ${ip} on path ${req.path}`);
+    res.setHeader('Retry-After', Math.ceil((record.resetTime - now) / 1000));
+    return res.status(429).json({
+      error: "Too many requests, please try again later."
+    });
+  } else {
+    record.count++;
+    next();
+  }
+};
+
+// Read-Only Session check helper
+const isReadOnlySessionActive = async (uid: string): Promise<boolean> => {
+  if (!uid) return false;
+  try {
+    const db = getDb();
+    if (!db) return false;
+    const docSnap = await db.collection('adminSwitcherSessions').doc(uid).get();
+    if (docSnap.exists) {
+      const data = docSnap.data();
+      return data?.mode === 'read_only';
+    }
+  } catch (err) {
+    console.warn('[ReadOnly Check] Error checking switcher session:', err);
+  }
+  return false;
+};
+
 /**
  * Authentication Middleware for Payment & Order Protection
  * Supports both Firebase Auth Bearer tokens and Pi Browser SDK payment metadata payloads.
@@ -169,6 +233,39 @@ const authenticatePaymentRequest = async (
   res: express.Response,
   next: express.NextFunction
 ) => {
+  const originalNext = next;
+  const wrappedNext = async () => {
+    const user = (req as any).user;
+    const isMutation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method?.toUpperCase());
+    if (isMutation && user && user.uid) {
+      if (await isReadOnlySessionActive(user.uid)) {
+        console.warn(`[SERVER_AUTH_TRACE] Blocked mutation attempt on path ${req.path} for UID ${user.uid} due to active Read-Only support mode.`);
+        try {
+          const db = getDb();
+          if (db) {
+            const logId = `AUD_BLOCKED_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+            await db.collection('adminAuditLogs').doc(logId).set({
+              id: logId,
+              adminId: user.uid,
+              adminName: user.email || 'Admin',
+              action: `Mutation Blocked (${req.method} ${req.path})`,
+              timestamp: new Date().toISOString(),
+              reason: 'Attempted mutation while switcher is in Read-Only mode',
+              mode: 'read_only',
+              result: 'Access Denied'
+            });
+          }
+        } catch (logErr) {
+          console.error('[SERVER_AUTH_TRACE] Failed to log blocked mutation:', logErr);
+        }
+        return res.status(403).json({
+          error: "Access Denied: Switched Business is in Read-Only Mode. Modifications are not allowed."
+        });
+      }
+    }
+    originalNext();
+  };
+
   const endpoint = req.path || req.url;
   console.log(`[AuthenticatePaymentRequest ENTRY] Path: ${req.path}, URL: ${req.url}, Method: ${req.method}`);
   
@@ -251,7 +348,7 @@ const authenticatePaymentRequest = async (
         uid: finalUid,
         email: decodedToken.email || `${finalUid}@pi.network`
       };
-      return next();
+      return wrappedNext();
     }
   }
 
@@ -269,14 +366,14 @@ const authenticatePaymentRequest = async (
       email: `${derivedUid}@pi.network`,
       authSource: 'pi_sdk_metadata'
     };
-    return next();
+    return wrappedNext();
   }
 
   // 4. Fallback for sandbox/development mode
   if (!isProd) {
     console.warn(`[SERVER_AUTH_TRACE] Proceeding in sandbox/development mode without token.`);
     (req as any).user = { uid: 'dev_user', email: 'dev@example.com' };
-    return next();
+    return wrappedNext();
   }
 
   // 5. In production with no valid auth token and no valid payload metadata, reject with 401
@@ -682,7 +779,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   // =========================================================================
 
   // 1. Approve Payment Endpoint
-  app.post(["/api/payments/approve", "/payments/approve"], authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/approve", "/payments/approve"], paymentRateLimiter, authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     const reqTimestamp = new Date().toISOString();
     const runtimeLogs: string[] = [];
@@ -1046,7 +1143,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     }
   });
 
-  app.post(["/api/payments/complete", "/payments/complete"], authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/complete", "/payments/complete"], paymentRateLimiter, authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     const reqTimestamp = new Date().toISOString();
     const runtimeLogs: string[] = [];
@@ -1824,7 +1921,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     }
   });
 
-  app.all(["/api/payments/status", "/payments/status"], authenticatePaymentRequest, async (req, res) => {
+  app.all(["/api/payments/status", "/payments/status"], paymentRateLimiter, authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     const runtimeLogs: string[] = [];
     console.log(`[Payment Status ENTRY] Method: ${req.method} | URL: ${req.url} | Body:`, JSON.stringify(req.body || {}), `Query:`, JSON.stringify(req.query || {}));
@@ -1905,7 +2002,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     }
   });
 
-  app.post(["/api/payments/incomplete", "/payments/incomplete"], authenticatePaymentRequest, async (req, res) => {
+  app.post(["/api/payments/incomplete", "/payments/incomplete"], paymentRateLimiter, authenticatePaymentRequest, async (req, res) => {
     try {
       const { payment } = req.body;
       if (!payment || !payment.identifier) {

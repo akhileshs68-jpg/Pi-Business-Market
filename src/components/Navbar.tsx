@@ -392,7 +392,7 @@ function NavbarComponent({
                 onNavigate('admin');
                 navigate('/admin-console');
               }}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs shadow-md border border-violet-400/30 transition-all cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs shadow-md border border-violet-400/30 transition-all cursor-pointer shrink-0"
               id="nav_desktop_admin_btn"
               title="Open Admin Console"
             >
@@ -443,6 +443,18 @@ function NavbarComponent({
                             try {
                               if (updateUser) {
                                 await updateUser({ activeRole: r });
+                                const normalized = r.toLowerCase().replace(/[\s_-]/g, '_');
+                                if (normalized === 'business_owner' || normalized === 'businessowner' || normalized === 'owner') {
+                                  navigate('/business-center');
+                                } else if (normalized === 'buyer' || normalized === 'customer') {
+                                  navigate('/home');
+                                } else if (normalized === 'seller') {
+                                  navigate('/seller-dashboard');
+                                } else if (normalized === 'service_provider' || normalized === 'serviceprovider') {
+                                  navigate('/bookings');
+                                } else {
+                                  navigate('/dashboard');
+                                }
                               }
                             } catch (e) {
                               console.warn('Role switch update warning:', e);

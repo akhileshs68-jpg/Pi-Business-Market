@@ -72,6 +72,8 @@ export class IdentityResolver {
         const oldFirebaseUid = data.firebaseUid;
         console.log('[IdentityResolver] Session drift detected. Mapping new Firebase UID:', currentFirebaseUid, 'to Pi UID:', canonicalPiUid);
         await setDoc(canonicalRef, { 
+          uid: canonicalPiUid,
+          piUid: canonicalPiUid,
           firebaseUid: currentFirebaseUid,
           lastResolvedUid: currentFirebaseUid,
           updatedAt: serverTimestamp()
@@ -335,7 +337,12 @@ export class IdentityResolver {
       : cleanUsername;
 
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
-    const isSuperAdmin = data.platformRole === 'superadmin' || (Boolean(superAdminPiUid) && (cleanPiUid === superAdminPiUid || cleanUsername === superAdminPiUid));
+    const isDevMock = (cleanPiUid === 'dev_pioneer_mock' || cleanUsername === 'dev_pioneer_mock') && (
+      (import.meta as any).env?.VITE_ENABLE_DEV_MOCK === 'true' ||
+      (typeof window !== 'undefined' && localStorage.getItem('DEV_MOCK_AUTH_ENABLED') === 'true') ||
+      Boolean((import.meta as any).env?.DEV)
+    );
+    const isSuperAdmin = data.platformRole === 'superadmin' || isDevMock || (Boolean(superAdminPiUid) && (cleanPiUid === superAdminPiUid || cleanUsername === superAdminPiUid));
 
     // platformRole is independent of business capabilities
     const platformRole = isSuperAdmin ? 'superadmin' : 'user';

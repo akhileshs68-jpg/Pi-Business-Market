@@ -615,23 +615,40 @@ export const authService = {
       console.log(`[PI_VERIFY_STEP 8/10] Stored session matches live authenticated Pi session for @${username}.`);
     }
 
+    // Pre-fetch any existing document from Firestore to ensure we preserve its state (such as activeRole, role, platformRole, etc.)
+    let existingFirestoreUser: any = null;
+    try {
+      const db = getFirebaseDb();
+      if (db) {
+        const snap = await getDoc(doc(db, 'users', piUid));
+        if (snap.exists()) {
+          existingFirestoreUser = snap.data();
+          console.log('[PI_VERIFY_STEP 8/10] Loaded existing Firestore user document to merge fields:', existingFirestoreUser);
+        }
+      }
+    } catch (err) {
+      console.warn('[PI_VERIFY_STEP 8/10] Could not pre-fetch existing user doc from Firestore:', err);
+    }
+
     // Update / Save stored user with verified values
     const freshUser: User = {
       uid: piUid,
       piUid: piUid,
       username: username,
       displayName: username,
-      walletAddress: storedUser?.walletAddress || `PI_WAL_${piUid.substring(0, 12)}`,
-      platformRole: storedUser?.platformRole || 'user',
-      permissions: storedUser?.permissions || ['read:listings', 'create:orders'],
-      roles: storedUser?.roles || ['buyer', 'seller', 'business_owner', 'service_provider'],
-      accountType: storedUser?.accountType || 'individual',
+      walletAddress: existingFirestoreUser?.walletAddress || storedUser?.walletAddress || `PI_WAL_${piUid.substring(0, 12)}`,
+      platformRole: existingFirestoreUser?.platformRole || storedUser?.platformRole || 'user',
+      permissions: existingFirestoreUser?.permissions || storedUser?.permissions || ['read:listings', 'create:orders'],
+      roles: existingFirestoreUser?.roles || storedUser?.roles || ['buyer', 'seller', 'business_owner', 'service_provider'],
+      activeRole: existingFirestoreUser?.activeRole || existingFirestoreUser?.role || storedUser?.activeRole || 'buyer',
+      role: existingFirestoreUser?.role || existingFirestoreUser?.activeRole || storedUser?.role || 'buyer',
+      accountType: existingFirestoreUser?.accountType || storedUser?.accountType || 'individual',
       verified: true,
-      kycVerified: true,
+      kycVerified: existingFirestoreUser?.kycVerified !== undefined ? existingFirestoreUser.kycVerified : true,
       profileCompleted: true,
       onboardingCompleted: true,
-      status: 'active',
-      createdAt: storedUser?.createdAt || new Date().toISOString(),
+      status: existingFirestoreUser?.status || 'active',
+      createdAt: existingFirestoreUser?.createdAt || storedUser?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       lastLogin: new Date().toISOString()
     };
@@ -642,8 +659,6 @@ export const authService = {
 
     // Sync Firestore document synchronously and verify read back
     try {
-      const { getFirebaseDb, getFirebaseAuth } = await import('../firebase/config');
-      const { doc, setDoc, getDoc, serverTimestamp } = await import('firebase/firestore');
       const db = getFirebaseDb();
       if (db) {
         const firestoreSavePayload = {
@@ -715,7 +730,6 @@ export const authService = {
 
         // Optional Firebase Anonymous Auth for session indexing
         try {
-          const { getFirebaseAuth } = await import('../firebase/config');
           const auth = getFirebaseAuth();
           if (auth) {
             const userCredential = await signInAnonymously(auth).catch(() => null);
@@ -869,6 +883,27 @@ export const authService = {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         }));
+      }
+
+      // Synchronize changes to local storage and the live in-memory user reference
+      try {
+        const { PiBusinessMarketDB } = await import('../services/storage');
+        const storedUser = PiBusinessMarketDB.getCurrentUser();
+        if (storedUser && (storedUser.uid === uid || storedUser.piUid === uid)) {
+          const updated = { ...storedUser, ...updates };
+          PiBusinessMarketDB.setCurrentUser(updated);
+          if (latestVerifiedPiUser) {
+            latestVerifiedPiUser = updated;
+          }
+        } else if (latestVerifiedPiUser && (latestVerifiedPiUser.uid === uid || latestVerifiedPiUser.piUid === uid)) {
+          latestVerifiedPiUser = {
+            ...latestVerifiedPiUser,
+            ...updates
+          };
+          PiBusinessMarketDB.setCurrentUser(latestVerifiedPiUser);
+        }
+      } catch (err) {
+        console.warn('[AuthService] Failed to synchronize updates to local storage or in-memory state:', err);
       }
     } catch (error) {
       console.error('[AuthService] Update user profile failed:', error);

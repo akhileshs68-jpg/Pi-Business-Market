@@ -17,6 +17,13 @@ service cloud.firestore {
         : request.auth.uid;
     }
 
+    // Secure database-level read-only mode check
+    function canMutate() {
+      return request.auth == null || 
+             !exists(/databases/$(database)/documents/adminSwitcherSessions/$(request.auth.uid)) || 
+             get(/databases/$(database)/documents/adminSwitcherSessions/$(request.auth.uid)).data.mode != 'read_only';
+    }
+
     function isOwner(uid) {
       return isSignedIn() && (
         request.auth.uid == uid || 
@@ -32,12 +39,10 @@ service cloud.firestore {
      * Enforces schema integrity, type safety, and immutable identity.
      */
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'piUid', 'username', 'accountType', 'status']) &&
+      return (data.keys().hasAll(['pointer']) && data.pointer == true) ||
+             (data.keys().hasAll(['uid', 'piUid']) &&
              data.uid is string && data.uid.size() <= 128 &&
-             data.piUid is string && data.piUid.size() <= 128 &&
-             data.username is string && data.username.size() <= 128 &&
-             data.accountType in ['individual', 'business', 'enterprise'] &&
-             data.status in ['active', 'suspended', 'pending_verification'];
+             data.piUid is string && data.piUid.size() <= 128);
     }
 
     function isAdmin() {
@@ -101,17 +106,15 @@ service cloud.firestore {
     // 3. Collection Rules
     match /users/{uid} {
       allow read: if true;
-      allow create: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == incoming().firebaseUid || request.auth.uid == incoming().lastResolvedUid || getPiUid() == incoming().firebaseUid))) && isValidUser(incoming());
-      allow update: if (isOwner(uid) || (isSignedIn() && (request.auth.uid == existing().firebaseUid || request.auth.uid == existing().lastResolvedUid || getPiUid() == existing().firebaseUid))) && 
-                    isValidUser(incoming());
+      allow create, update: if isSignedIn();
     }
 
     // New Business Identity Rules
     match /businesses/{businessId} {
       allow read: if true;
-      allow create: if isSignedIn() && isOwner(incoming().ownerUid);
-      allow update: if isSignedIn() && (isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']));
-      allow delete: if isSignedIn() && (isBusinessOwner(businessId) || isSuperAdmin());
+      allow create: if canMutate() && isSignedIn() && isOwner(incoming().ownerUid);
+      allow update: if canMutate() && isSignedIn() && (isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']));
+      allow delete: if canMutate() && isSignedIn() && (isBusinessOwner(businessId) || isSuperAdmin());
     }
 
     match /businessMembers/{memberId} {
@@ -158,8 +161,8 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (
+      allow create: if canMutate() && isSignedIn();
+      allow update, delete: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.userId) || 
         isOwner(resource.data.sellerId) || 
@@ -179,8 +182,8 @@ service cloud.firestore {
 
     match /services/{serviceId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (
+      allow create: if canMutate() && isSignedIn();
+      allow update, delete: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
@@ -190,15 +193,15 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (
+      allow create: if canMutate() && isSignedIn();
+      allow update: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin() ||
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))
       );
-      allow delete: if isSignedIn() && (
+      allow delete: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.sellerId) || 
         isBusinessOwner(resource.data.businessId) || 
@@ -362,7 +365,8 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canMutate();
     }
 
     match /wallets/{walletId} {
@@ -484,17 +488,17 @@ service cloud.firestore {
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
-      allow create: if isSignedIn() && (
+      allow create: if canMutate() && isSignedIn() && (
         isOwner(incoming().uid) || 
         isOwner(incoming().userId)
       );
-      allow update: if isSignedIn() && (
+      allow update: if canMutate() && isSignedIn() && (
         isOwner(resource.data.uid) || 
         isOwner(resource.data.userId) || 
         isBusinessOwner(resource.data.businessId) || 
         isAdmin()
       );
-      allow delete: if isAdmin();
+      allow delete: if canMutate() && isAdmin();
     }
 
     match /paymentHistory/{historyId} {
@@ -751,24 +755,64 @@ service cloud.firestore {
 
     // MODULE 1: DISPUTE SYSTEM SECURITY RULES
     match /disputes/{disputeId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canMutate();
 
       match /events/{eventId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if canMutate();
       }
 
       match /messages/{messageId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if canMutate();
       }
     }
 
     // MODULE 2: BMP TOKEN SYSTEM SECURITY RULES
     match /bmp_wallets/{walletId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canMutate();
     }
 
     match /bmp_ledger/{entryId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if canMutate();
+    }
+
+    // MODULE 3: UNIVERSAL APPROVAL SYSTEM SECURITY RULES
+    match /universalApprovals/{approvalId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.submittedBy.uid == request.auth.uid ||
+        resource.data.submittedBy.uid == getPiUid() ||
+        (resource.data.keys().hasAll(['assignedReviewer']) && resource.data.assignedReviewer.uid == request.auth.uid)
+      );
+      allow create: if canMutate() && isSignedIn() && incoming().submittedBy.uid == request.auth.uid;
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() ||
+        (resource.data.keys().hasAll(['assignedReviewer']) && resource.data.assignedReviewer.uid == request.auth.uid && incoming().status in ['Under Review', 'On Hold', 'Approved', 'Rejected', 'Need Changes'])
+      );
+      allow delete: if canMutate() && isAdmin();
+    }
+
+    // MODULE 4: ADMIN SWITCHER SESSION SYSTEM
+    match /adminSwitcherSessions/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+    }
+
+    match /approvalAuditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /approvalNotifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.recipientUid == request.auth.uid || resource.data.recipientUid == getPiUid() || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.recipientUid == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
     }
   }
 }

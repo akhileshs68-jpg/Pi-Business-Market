@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Settings, Flag, ShieldCheck, Database, Lock, Server, Save, Plus, AlertTriangle, 
   History, UserCheck, Activity, Users, Store, Box, ShoppingBag, CreditCard, Award, 
-  MessageSquare, Megaphone, ShieldAlert, Shield, HeartPulse, Menu, X
+  MessageSquare, Megaphone, ShieldAlert, Shield, HeartPulse, Menu, X, Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -20,16 +20,20 @@ import { BlockchainAdminDashboard } from '../components/admin/BlockchainAdminDas
 import { DisputeManager } from '../components/dispute/DisputeManager';
 import { BmpAdminDashboard } from '../components/bmp/BmpAdminDashboard';
 import { 
-  DashboardPanel, UserManagementPanel, BusinessManagementPanel, StoreManagementPanel,
+  DashboardPanel, UserManagementPanel, StoreManagementPanel,
   ProductManagementPanel, ServiceManagementPanel, OrderAnalyticsPanel, PaymentAnalyticsPanel,
   BmpAnalyticsPanel, CommunityAnalyticsPanel, MarketingAnalyticsPanel, SystemHealthPanel,
   SecurityCenterPanel, BackupRecoveryPanel, AdModerationPanel
 } from '../components/admin/MissionControlPanels';
+import { BusinessManagementPanel } from '../components/admin/BusinessManagementPanel';
+import { UniversalSearchPanel } from '../components/admin/UniversalSearchPanel';
+import { UniversalApprovalCenter } from '../components/admin/UniversalApprovalCenter';
+import { EnterpriseFinanceCenter } from '../components/admin/EnterpriseFinanceCenter';
 
 type AdminTab = 
-  | 'dashboard' | 'users' | 'businesses' | 'stores' | 'products' | 'services'
+  | 'dashboard' | 'search' | 'users' | 'businesses' | 'stores' | 'products' | 'services'
   | 'orders' | 'disputes' | 'payments' | 'bmp' | 'community' | 'marketing' | 'ad_moderation' | 'blockchain' 
-  | 'health' | 'flags' | 'security' | 'backup' | 'governance' | 'settings';
+  | 'health' | 'flags' | 'security' | 'backup' | 'governance' | 'settings' | 'approvals' | 'finance';
 
 export const AdminConsole: React.FC = () => {
   const { user } = useAuth();
@@ -105,6 +109,9 @@ export const AdminConsole: React.FC = () => {
       title: 'Platform Overview',
       items: [
         { id: 'dashboard', label: 'Mission Control', icon: Activity },
+        { id: 'search', label: 'Universal Search', icon: Search },
+        { id: 'approvals', label: 'Universal Approvals', icon: Shield },
+        { id: 'finance', label: 'Finance & Settlement', icon: CreditCard },
       ]
     },
     {
@@ -230,7 +237,10 @@ export const AdminConsole: React.FC = () => {
                 <p className="text-sm text-slate-500 mt-1">Mission Control / {navCategories.find(c => c.items.some(i => i.id === activeTab))?.title}</p>
               </div>
 
-              {activeTab === 'dashboard' && <DashboardPanel />}
+              {activeTab === 'dashboard' && <DashboardPanel onNavigateTab={(tab) => setActiveTab(tab)} />}
+              {activeTab === 'search' && <UniversalSearchPanel />}
+              {activeTab === 'approvals' && <UniversalApprovalCenter />}
+              {activeTab === 'finance' && <EnterpriseFinanceCenter />}
               {activeTab === 'users' && <UserManagementPanel />}
               {activeTab === 'businesses' && <BusinessManagementPanel />}
               {activeTab === 'stores' && <StoreManagementPanel />}
