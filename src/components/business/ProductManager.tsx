@@ -542,6 +542,16 @@ export const ProductManager: React.FC = () => {
     setIsFormOpen(true);
   }, [categories]);
 
+  useEffect(() => {
+    const action = new URLSearchParams(window.location.search).get('action');
+    if (action === 'add_product' && !isFormOpen && categories.length > 0) {
+      handleOpenCreate();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('action');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [categories, handleOpenCreate, isFormOpen]);
+
   const handleOpenEdit = useCallback((product: Product) => {
     const defaultImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
     const existingImages = (product.imageUrls && product.imageUrls.length > 0)
@@ -617,15 +627,11 @@ export const ProductManager: React.FC = () => {
     e.preventDefault();
     if (!currentBusiness) return;
     
-    // Choose active store for assignment
+    // Choose active store for assignment (optional)
     const targetStore = stores.find(s => (s.storeId || (s as any).id) === selectedStoreId) || stores[0] || currentStore;
-    if (!targetStore) {
-      setErrorMsg('You must have at least one store outlet active to assign products.');
-      return;
-    }
 
-    const resolvedStoreId = targetStore.storeId || (targetStore as any).id || currentStore?.storeId;
-    const resolvedOwnerUid = user?.uid || currentBusiness.ownerUid || targetStore.ownerUid;
+    const resolvedStoreId = targetStore ? (targetStore.storeId || (targetStore as any).id || currentStore?.storeId) : 'no-store';
+    const resolvedOwnerUid = user?.uid || currentBusiness.ownerUid || (targetStore ? targetStore.ownerUid : user?.uid);
 
     setSavingForm(true);
     setErrorMsg(null);
