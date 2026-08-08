@@ -12,6 +12,8 @@ import {
 import { Product } from '../../types';
 import { useAuth } from '../../auth/useAuth';
 import { cartService } from '../../services/cartService';
+import { PriceDisplay } from '../pricing/PriceDisplay';
+import { resolveProductPricing, resolveVariantPricing } from '../../services/pricing/pricingCompatibility';
 
 interface ProductCardProps {
   product: Product;
@@ -97,16 +99,30 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     try {
       const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       let variantName = '';
+      let pricingRes;
       if (activeVariant) {
         variantName = ` (${Object.values(activeVariant.attributes).join(' / ')})`;
+        pricingRes = await resolveVariantPricing(activeVariant, product);
+      } else {
+        pricingRes = await resolveProductPricing(product);
       }
+
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
+        variantId: activeVariant?.variantId,
         name: `${product.productName}${variantName}`,
         imageUrl: gallery[0],
         quantity: 1,
-        unitPrice: displayPrice
+        unitPrice: pricingRes.piAmount ?? displayPrice,
+        pricingMode: pricingRes.mode,
+        localCurrency: pricingRes.localCurrency ?? undefined,
+        localAmount: pricingRes.localAmount ?? undefined,
+        communityPiAmount: pricingRes.mode === 'COMMUNITY' ? (pricingRes.piAmount ?? undefined) : undefined,
+        piUnitPrice: pricingRes.piAmount ?? displayPrice,
+        pricingRateUsed: pricingRes.rateUsed ?? undefined,
+        pricingRateSource: pricingRes.rateSource ?? undefined,
+        pricingRateTimestamp: pricingRes.rateTimestamp ?? undefined
       });
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
@@ -279,10 +295,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
 
             <div className="mt-2 flex flex-col gap-1">
-              <div className="flex items-baseline gap-1">
-                <span className="text-lg font-black text-white">{displayPrice}</span>
-                <span className="text-[10px] font-bold text-slate-400">π</span>
-              </div>
+              <PriceDisplay 
+                item={activeVariant || product} 
+                parentProduct={hasVariants ? product : undefined}
+                type={hasVariants && activeVariant ? 'variant' : 'product'}
+                size="sm"
+              />
               <div className="flex items-center justify-between">
                 <span className={`text-[9px] font-bold ${displayStock > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {displayStock > 0 ? `${displayStock} units available` : 'Out of Stock'}

@@ -22,6 +22,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cartService } from '../../services/cartService';
 import { checkoutService } from '../../services/checkoutService';
 import { Cart, CartItem } from '../../types';
+import { EnterpriseCartEngine } from '../../core/cart/enterpriseCartEngine';
+import { ExtendedCartItem } from '../../core/cart/enterpriseCartTypes';
+import { formatCurrencyAmount } from '../../services/pricing/currencyRegistry';
 import { useNavigate } from 'react-router-dom';
 import { getFirebaseDb } from '../../firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -68,17 +71,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
         });
       }
 
-      const subtotal = allItems.reduce((acc, it) => acc + (it.subtotal || (it.unitPrice * it.quantity)), 0);
-      const tax = subtotal * 0.05;
-      const shipping = subtotal > 0 ? 10 : 0;
-      const grandTotal = subtotal + tax + shipping;
+      const summary = EnterpriseCartEngine.calculateCartSummary(allItems as ExtendedCartItem[]);
 
       setCart({
         ...activeCart,
-        subtotal,
-        tax,
-        shipping,
-        grandTotal
+        subtotal: summary.subtotal,
+        tax: summary.tax,
+        shipping: summary.shipping,
+        grandTotal: summary.grandTotal
       });
       setItems(allItems);
     } catch (err) {
@@ -193,9 +193,31 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      <p className="text-[10px] font-black text-indigo-400 mb-3 uppercase tracking-widest">
-                        {item.unitPrice} Pi
-                      </p>
+                      <div className="mb-3">
+                        {item.pricingMode === 'EXCHANGE' && item.localAmount && item.localCurrency ? (
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-slate-200">
+                              {formatCurrencyAmount(item.localAmount, item.localCurrency)}
+                            </span>
+                            <span className="text-[10px] font-black text-indigo-400">
+                              ≈ {(item.piUnitPrice ?? item.unitPrice).toFixed(2)} π
+                            </span>
+                          </div>
+                        ) : item.pricingMode === 'COMMUNITY' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-black text-violet-400">
+                              {(item.communityPiAmount ?? item.unitPrice).toFixed(2)} π
+                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                              Community Price
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                            {item.unitPrice} π
+                          </p>
+                        )}
+                      </div>
                       
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
@@ -217,7 +239,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                           <button className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors tooltip-trigger" title="Save for Later">
                             <Bookmark className="w-4 h-4" />
                           </button>
-                          <p className="text-sm font-black text-white">{item.subtotal} Pi</p>
+                          {item.pricingMode === 'EXCHANGE' && item.localAmount && item.localCurrency ? (
+                            <div className="text-right">
+                              <p className="text-xs font-bold text-slate-300">
+                                {formatCurrencyAmount(item.localAmount * item.quantity, item.localCurrency)}
+                              </p>
+                              <p className="text-[10px] font-black text-indigo-400">
+                                ≈ {(item.subtotal || ((item.piUnitPrice ?? item.unitPrice) * item.quantity)).toFixed(2)} π
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-black text-white">
+                              {(item.subtotal || ((item.piUnitPrice ?? item.unitPrice) * item.quantity)).toFixed(2)} π
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

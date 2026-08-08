@@ -44,11 +44,13 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserType } from '../../types';
 import { cartService } from '../../services/cartService';
+import { resolveProductPricing, resolveServicePricing } from '../../services/pricing/pricingCompatibility';
 import { campaignService, Campaign } from '../../services/campaignService';
 import { collection, getDocs, getDoc, doc, query, limit, orderBy } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { getProductImageUrl } from '../../utils/imageUtils';
 import { aiEngineService, AIRecommendation } from '../../services/aiEngineService';
+import { PriceDisplay } from '../pricing/PriceDisplay';
 
 interface BuyerHomeProps {
   user: UserType | null;
@@ -465,17 +467,7 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
         {/* Price & Actions Row */}
         <div className="pt-1.5 border-t border-slate-800/70 flex items-center justify-between gap-1">
           {/* Price */}
-          <div className="flex flex-col">
-            <div className="flex items-baseline gap-0.5 font-mono text-sm sm:text-base font-black text-white leading-tight">
-              <span>{prod.price}</span>
-              <span className="text-violet-400 text-xs font-black">π</span>
-            </div>
-            {hasDiscount && (
-              <span className="text-[9px] font-semibold text-slate-500 line-through font-mono">
-                {prod.oldPrice}π
-              </span>
-            )}
-          </div>
+          <PriceDisplay item={prod} type="product" size="sm" />
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1">
@@ -793,18 +785,32 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   // Add to cart handler
   const handleAddToCart = async (product: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    showToast(`Adding ${product.title} to Cart...`);
+    showToast(`Adding ${product.title || product.productName || product.serviceName} to Cart...`);
     try {
       const uId = user?.uid || 'guest_user';
       const bId = product.businessId || product.storeId || 'unknown_business';
       const cart = await cartService.getOrCreateCart(uId, bId);
+
+      const isService = product.type === 'service' || product.serviceId;
+      const pricingRes = isService
+        ? await resolveServicePricing(product)
+        : await resolveProductPricing(product);
+
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
-        productId: product.id,
-        name: product.title,
+        productId: product.id || product.productId || product.serviceId,
+        name: product.title || product.productName || product.serviceName,
         quantity: 1,
         imageUrl: getProductImageUrl(product),
-        unitPrice: product.price
+        unitPrice: pricingRes.piAmount ?? product.price,
+        pricingMode: pricingRes.mode,
+        localCurrency: pricingRes.localCurrency ?? undefined,
+        localAmount: pricingRes.localAmount ?? undefined,
+        communityPiAmount: pricingRes.mode === 'COMMUNITY' ? (pricingRes.piAmount ?? undefined) : undefined,
+        piUnitPrice: pricingRes.piAmount ?? product.price,
+        pricingRateUsed: pricingRes.rateUsed ?? undefined,
+        pricingRateSource: pricingRes.rateSource ?? undefined,
+        pricingRateTimestamp: pricingRes.rateTimestamp ?? undefined
       });
       showToast('Added to Cart Bag successfully!');
     } catch (err) {
@@ -1257,7 +1263,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
-                  <span className="font-mono text-sm font-black text-white">{service.price} π</span>
+                  <PriceDisplay item={service} type="service" size="sm" />
                   <button className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[9px] uppercase rounded-lg">
                     Book Service
                   </button>

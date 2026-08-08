@@ -47,6 +47,7 @@ const CreateStorePage = lazy(() => import('./pages/CreateStorePage').then(m => (
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
 const CommunityHub = lazy(() => import('./pages/CommunityHub').then(m => ({ default: m.CommunityHub })));
 const DirectoryPage = lazy(() => import('./pages/DirectoryPage').then(m => ({ default: m.DirectoryPage })));
+const ToolsPage = lazy(() => import('./pages/ToolsPage').then(m => ({ default: m.ToolsPage })));
 
 const LoadingFallback = () => (
   <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-slate-200">
@@ -421,6 +422,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <DirectoryPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/tools" 
+            element={
+              <ProtectedRoute>
+                <ToolsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/tools/community-price-calculator" 
+            element={
+              <ProtectedRoute>
+                <ToolsPage />
               </ProtectedRoute>
             } 
           />

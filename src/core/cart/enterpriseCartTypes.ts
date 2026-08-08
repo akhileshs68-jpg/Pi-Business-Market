@@ -84,4 +84,8 @@ export interface CartPriceSummary {
   bmpRewardsEstimate: number;
   piTestnetAmount: number;
   currency: string;
+  hasExchangeItems?: boolean;
+  hasCommunityItems?: boolean;
+  hasLegacyItems?: boolean;
+  localCurrencyTotals?: Record<string, number>;
 }

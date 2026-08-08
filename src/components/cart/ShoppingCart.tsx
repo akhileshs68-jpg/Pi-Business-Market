@@ -30,6 +30,7 @@ import { cartService } from '../../services/cartService';
 import { checkoutService } from '../../services/checkoutService';
 import { EnterpriseCartEngine } from '../../core/cart/enterpriseCartEngine';
 import { CartCoupon, ExtendedCartItem } from '../../core/cart/enterpriseCartTypes';
+import { formatCurrencyAmount } from '../../services/pricing/currencyRegistry';
 import { getFirebaseDb } from '../../firebase/config';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Cart, CartItem } from '../../types';
@@ -437,12 +438,42 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                               </p>
                             </div>
                             <div className="flex flex-col items-end shrink-0 text-right">
-                              <p className="text-base font-black text-violet-400">
-                                {item.unitPrice} Pi <span className="text-xs text-slate-500 font-normal">each</span>
-                              </p>
-                              <p className="text-sm font-bold text-slate-300 mt-0.5">
-                                Subtotal: {(item.unitPrice * item.quantity).toFixed(2)} Pi
-                              </p>
+                              {item.pricingMode === 'EXCHANGE' && item.localAmount && item.localCurrency ? (
+                                <>
+                                  <p className="text-sm font-bold text-slate-200">
+                                    {formatCurrencyAmount(item.localAmount, item.localCurrency)} <span className="text-xs text-slate-500 font-normal">each</span>
+                                  </p>
+                                  <p className="text-xs font-bold text-violet-400">
+                                    ≈ {(item.piUnitPrice ?? item.unitPrice).toFixed(2)} π
+                                  </p>
+                                  <p className="text-xs font-bold text-slate-300 mt-1">
+                                    Subtotal: {formatCurrencyAmount(item.localAmount * item.quantity, item.localCurrency)} (≈ {((item.piUnitPrice ?? item.unitPrice) * item.quantity).toFixed(2)} π)
+                                  </p>
+                                </>
+                              ) : item.pricingMode === 'COMMUNITY' ? (
+                                <>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-base font-black text-violet-400">
+                                      {(item.communityPiAmount ?? item.unitPrice).toFixed(2)} π
+                                    </p>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                                      Community
+                                    </span>
+                                  </div>
+                                  <p className="text-sm font-bold text-slate-300 mt-0.5">
+                                    Subtotal: {((item.communityPiAmount ?? item.unitPrice) * item.quantity).toFixed(2)} π
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-base font-black text-violet-400">
+                                    {item.unitPrice} π <span className="text-xs text-slate-500 font-normal">each</span>
+                                  </p>
+                                  <p className="text-sm font-bold text-slate-300 mt-0.5">
+                                    Subtotal: {((item.piUnitPrice ?? item.unitPrice) * item.quantity).toFixed(2)} π
+                                  </p>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -651,6 +682,19 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
               <span className="text-slate-400 font-semibold">Tax (5%)</span>
               <span className="text-slate-300 font-mono font-bold">+{summary.tax.toFixed(2)} Pi</span>
             </div>
+
+            {/* Local Currency Breakdown for Exchange Items */}
+            {summary.hasExchangeItems && summary.localCurrencyTotals && Object.keys(summary.localCurrencyTotals).length > 0 && (
+              <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1.5 text-xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fiat Values Breakdown</span>
+                {Object.entries(summary.localCurrencyTotals).map(([code, amt]) => (
+                  <div key={code} className="flex justify-between items-center text-slate-300 font-mono text-[11px]">
+                    <span>{code} Total</span>
+                    <span className="font-bold text-slate-200">{formatCurrencyAmount(amt, code)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* BMP Rewards Preview Badge */}
             <div className="p-3 bg-gradient-to-r from-amber-500/10 to-violet-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between text-xs">

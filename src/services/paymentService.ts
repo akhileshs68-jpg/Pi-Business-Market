@@ -61,6 +61,12 @@ export const paymentService = {
     currency: string;
     paymentMethod: string;
     amount: number;
+    pricingQuoteId?: string;
+    pricingSnapshot?: any;
+    rateUsed?: number | null;
+    rateSource?: string;
+    rateTimestamp?: string | null;
+    piAmount?: number;
   }): Promise<string> {
     const db = getFirebaseDb();
     
@@ -93,6 +99,12 @@ export const paymentService = {
       productIds: data.productIds,
       currency: data.currency || 'BMP',
       amount: data.amount,
+      piAmount: data.piAmount ?? data.amount,
+      pricingQuoteId: data.pricingQuoteId || data.pricingSnapshot?.quoteId,
+      pricingSnapshot: data.pricingSnapshot || null,
+      rateUsed: data.rateUsed ?? data.pricingSnapshot?.rateUsed ?? null,
+      rateSource: data.rateSource || data.pricingSnapshot?.rateSource,
+      rateTimestamp: data.rateTimestamp || data.pricingSnapshot?.rateTimestamp,
       status: 'Pending',
       paymentMethod: data.paymentMethod || 'pi',
       createdAt: new Date().toISOString(),

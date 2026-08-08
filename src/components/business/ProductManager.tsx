@@ -4,18 +4,21 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Plus, Edit2, Trash2, Archive, Pause, Play, Eye, 
   Search, Loader2, Tag, Layers, Sliders, CheckCircle2,
   AlertCircle, ChevronDown, Check, Globe, RefreshCw, X,
-  Upload, Star, Image as ImageIcon, Link as LinkIcon, Share2
+  Upload, Star, Image as ImageIcon, Link as LinkIcon, Share2,
+  Calculator
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
 import { useAuth } from '../../auth/useAuth';
 import { productService } from '../../services/productService';
 import { catalogService } from '../../services/catalogService';
 import { mediaService } from '../../services/mediaService';
+import { pricingEngine } from '../../services/pricing/pricingEngine';
+import { getSupportedCurrencies, formatCurrencyAmount } from '../../services/pricing/currencyRegistry';
 import { Product, Category, ProductStatus } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -580,6 +583,8 @@ ProductCardItem.displayName = 'ProductCardItem';
 export const ProductManager: React.FC = () => {
   const { currentBusiness, stores, currentStore } = useBusiness();
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>(categoriesCache || []);
@@ -601,6 +606,10 @@ export const ProductManager: React.FC = () => {
     shortDescription: string;
     price: number;
     comparePrice: number;
+    pricingMode: 'EXCHANGE' | 'COMMUNITY';
+    localCurrency: string;
+    localAmount: number;
+    communityPiAmount: number;
     stock: number;
     sku: string;
     barcode: string;
@@ -620,6 +629,10 @@ export const ProductManager: React.FC = () => {
     shortDescription: '',
     price: 0,
     comparePrice: 0,
+    pricingMode: 'COMMUNITY',
+    localCurrency: 'INR',
+    localAmount: 0,
+    communityPiAmount: 0,
     stock: 0,
     sku: '',
     barcode: '',
@@ -632,6 +645,7 @@ export const ProductManager: React.FC = () => {
     featured: false
   });
 
+  const [ratePreview, setRatePreview] = useState<{ piAmount: number | null; error?: string }>({ piAmount: null });
   const [savingForm, setSavingForm] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -687,6 +701,10 @@ export const ProductManager: React.FC = () => {
       shortDescription: '',
       price: 0,
       comparePrice: 0,
+      pricingMode: 'COMMUNITY',
+      localCurrency: 'INR',
+      localAmount: 0,
+      communityPiAmount: 0,
       stock: 50,
       sku: 'SKU-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
       barcode: '',
@@ -703,6 +721,23 @@ export const ProductManager: React.FC = () => {
   }, [categories]);
 
   useEffect(() => {
+    const locState = location.state as any;
+    if (locState?.fromCalculator && locState?.communityPiAmount && categories.length > 0) {
+      handleOpenCreate();
+      setFormData(prev => ({
+        ...prev,
+        pricingMode: 'COMMUNITY',
+        communityPiAmount: locState.communityPiAmount,
+        price: locState.communityPiAmount,
+        localCurrency: locState.localCurrency || prev.localCurrency,
+        localAmount: locState.localAmount || prev.localAmount,
+      }));
+      // Clear history state to avoid reopening on re-renders
+      window.history.replaceState({}, document.title);
+    }
+  }, [categories, handleOpenCreate, location.state]);
+
+  useEffect(() => {
     const action = new URLSearchParams(window.location.search).get('action');
     if (action === 'add_product' && !isFormOpen && categories.length > 0) {
       handleOpenCreate();
@@ -712,12 +747,34 @@ export const ProductManager: React.FC = () => {
     }
   }, [categories, handleOpenCreate, isFormOpen]);
 
+  useEffect(() => {
+    if (formData.pricingMode === 'EXCHANGE' && formData.localAmount > 0) {
+      pricingEngine.calculatePrice({
+        mode: 'EXCHANGE',
+        localCurrency: formData.localCurrency,
+        localAmount: formData.localAmount,
+      }).then(res => {
+        if (res.success && res.piAmount) {
+          setRatePreview({ piAmount: res.piAmount });
+        } else {
+          setRatePreview({ piAmount: null, error: res.error || 'Live Pi rate unavailable' });
+        }
+      }).catch(err => {
+        setRatePreview({ piAmount: null, error: 'Live Pi rate unavailable' });
+      });
+    } else {
+      setRatePreview({ piAmount: null });
+    }
+  }, [formData.pricingMode, formData.localCurrency, formData.localAmount]);
+
   const handleOpenEdit = useCallback((product: Product) => {
     const defaultImage = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
     const existingImages = (product.imageUrls && product.imageUrls.length > 0)
       ? product.imageUrls 
       : [product.mainImage || defaultImage];
     const primary = product.mainImage || existingImages[0] || defaultImage;
+
+    const mode = product.pricingMode || (product.localAmount ? 'EXCHANGE' : 'COMMUNITY');
 
     setEditingProduct(product);
     setFormData({
@@ -729,6 +786,10 @@ export const ProductManager: React.FC = () => {
       shortDescription: product.shortDescription || '',
       price: product.price || 0,
       comparePrice: product.comparePrice || 0,
+      pricingMode: mode,
+      localCurrency: product.localCurrency || 'INR',
+      localAmount: product.localAmount || 0,
+      communityPiAmount: product.communityPiAmount || (product.price || 0),
       stock: product.stock || 0,
       sku: product.sku || '',
       barcode: product.barcode || '',
@@ -801,6 +862,23 @@ export const ProductManager: React.FC = () => {
       const finalMainImage = formData.primaryImageUrl || formData.imageUrls[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
       const finalImageUrls = formData.imageUrls.length > 0 ? formData.imageUrls : [finalMainImage];
 
+      let finalPrice = formData.price;
+      if (formData.pricingMode === 'COMMUNITY') {
+        finalPrice = formData.communityPiAmount > 0 ? formData.communityPiAmount : formData.price;
+      } else if (formData.pricingMode === 'EXCHANGE') {
+        const calc = await pricingEngine.calculatePrice({
+          mode: 'EXCHANGE',
+          localCurrency: formData.localCurrency,
+          localAmount: formData.localAmount,
+        });
+        if (calc.success && calc.piAmount) {
+          finalPrice = calc.piAmount;
+        } else {
+          // If rate unavailable, price defaults to 0 or current price, but localAmount & localCurrency are preserved
+          finalPrice = 0;
+        }
+      }
+
       const payload = {
         productName: formData.productName,
         type: formData.type,
@@ -808,8 +886,12 @@ export const ProductManager: React.FC = () => {
         subCategory: formData.subCategory,
         description: formData.description,
         shortDescription: formData.shortDescription,
-        price: formData.price,
+        price: finalPrice,
         comparePrice: formData.comparePrice,
+        pricingMode: formData.pricingMode,
+        localCurrency: formData.localCurrency,
+        localAmount: formData.localAmount,
+        communityPiAmount: formData.communityPiAmount,
         stock: formData.stock,
         sku: formData.sku,
         barcode: formData.barcode,
@@ -1056,30 +1138,124 @@ export const ProductManager: React.FC = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest border-b border-slate-800/60 pb-1.5">Pricing & Supply</h4>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Price (Pi) *</label>
-                        <input 
-                          type="number" 
-                          required
-                          min={0.001}
-                          step={0.001}
-                          value={formData.price}
-                          onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
-                        />
+                    <div className="space-y-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="text-xs font-bold text-slate-300">Pricing Mode</span>
+                        <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, pricingMode: 'EXCHANGE' }))}
+                            className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all ${
+                              formData.pricingMode === 'EXCHANGE'
+                                ? 'bg-emerald-600 text-white font-bold'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Exchange Price
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, pricingMode: 'COMMUNITY' }))}
+                            className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all ${
+                              formData.pricingMode === 'COMMUNITY'
+                                ? 'bg-emerald-600 text-white font-bold'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            Community Price
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Regular / MRP Price</label>
-                        <input 
-                          type="number" 
-                          min={0}
-                          value={formData.comparePrice}
-                          onChange={(e) => setFormData(prev => ({ ...prev, comparePrice: parseFloat(e.target.value) || 0 }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
-                        />
-                      </div>
+                      {formData.pricingMode === 'EXCHANGE' ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-400">Currency</label>
+                              <select
+                                value={formData.localCurrency}
+                                onChange={(e) => setFormData(prev => ({ ...prev, localCurrency: e.target.value }))}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
+                              >
+                                {getSupportedCurrencies().filter(c => c.code !== 'PI').map(curr => (
+                                  <option key={curr.code} value={curr.code}>
+                                    {curr.displayName} ({curr.symbol})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-400">Local Price</label>
+                              <input
+                                type="number"
+                                required
+                                min={0.01}
+                                step={0.01}
+                                value={formData.localAmount || ''}
+                                onChange={(e) => setFormData(prev => ({ ...prev, localAmount: parseFloat(e.target.value) || 0 }))}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                                placeholder="1000"
+                              />
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-emerald-400/90 font-medium bg-slate-950/70 p-2 rounded-lg border border-slate-800/80">
+                            <span>Preview: </span>
+                            {formData.localAmount > 0 ? (
+                              <span>
+                                {formatCurrencyAmount(formData.localAmount, formData.localCurrency)}
+                                {' ≈ '}
+                                {ratePreview.piAmount ? `${ratePreview.piAmount} π` : (
+                                  <span className="text-amber-400">{ratePreview.error || 'Live Pi rate unavailable'}</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">Enter local amount to view preview</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-bold text-slate-400">Community Price (Pi) *</label>
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/tools/community-price-calculator?target=product&currency=${formData.localCurrency}&amount=${formData.localAmount}`)}
+                                className="text-[10px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 cursor-pointer"
+                              >
+                                <Calculator className="w-3 h-3" /> Calculator
+                              </button>
+                            </div>
+                            <input
+                              type="number"
+                              required
+                              min={0.0000001}
+                              step={0.0000001}
+                              value={formData.communityPiAmount || ''}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setFormData(prev => ({ ...prev, communityPiAmount: val, price: val }));
+                              }}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                              placeholder="10"
+                            />
+                          </div>
+                          <div className="text-[11px] text-emerald-400 font-medium bg-slate-950/70 p-2 rounded-lg border border-slate-800/80">
+                            Preview: {formData.communityPiAmount || 0} π (Community Price)
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-400">Regular / MRP Price</label>
+                      <input 
+                        type="number" 
+                        min={0}
+                        value={formData.comparePrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, comparePrice: parseFloat(e.target.value) || 0 }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

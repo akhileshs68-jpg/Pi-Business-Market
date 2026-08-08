@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   X, 
   Plus, 
@@ -31,7 +31,8 @@ import {
   FileCode,
   DollarSign,
   Send,
-  Video
+  Video,
+  Calculator
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -40,6 +41,8 @@ import { useAuth } from '../../auth/useAuth';
 import { useBusiness } from '../../context/BusinessContext';
 import { EnterpriseServiceEngine } from '../../core/service/enterpriseServiceEngine';
 import { mediaService } from '../../services/mediaService';
+import { pricingEngine } from '../../services/pricing/pricingEngine';
+import { getSupportedCurrencies, formatCurrencyAmount } from '../../services/pricing/currencyRegistry';
 
 interface ServiceWizardProps {
   isOpen: boolean;
@@ -81,6 +84,7 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
   // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { businesses } = useBusiness();
   const currentBusinessObj = businesses.find(b => b.id === businessId);
 
@@ -100,8 +104,46 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
   const [languages, setLanguages] = useState<string[]>(['English']);
   const [langInput, setLangInput] = useState<string>('');
   const [priceType, setPriceType] = useState<'Hourly' | 'Fixed' | 'Negotiable'>('Fixed');
+  const [pricingMode, setPricingMode] = useState<'EXCHANGE' | 'COMMUNITY'>('COMMUNITY');
+  const [localCurrency, setLocalCurrency] = useState<string>('INR');
+  const [localAmount, setLocalAmount] = useState<number>(0);
+  const [communityPiAmount, setCommunityPiAmount] = useState<number>(25);
+  const [ratePreview, setRatePreview] = useState<{ piAmount: number | null; error?: string }>({ piAmount: null });
   const [minPrice, setMinPrice] = useState<number>(25);
   const [maxPrice, setMaxPrice] = useState<number>(150);
+
+  useEffect(() => {
+    const locState = location.state as any;
+    if (locState?.fromCalculator && locState?.communityPiAmount) {
+      setPricingMode('COMMUNITY');
+      setCommunityPiAmount(locState.communityPiAmount);
+      setMinPrice(locState.communityPiAmount);
+      setMaxPrice(locState.communityPiAmount);
+      if (locState.localCurrency) setLocalCurrency(locState.localCurrency);
+      if (locState.localAmount) setLocalAmount(locState.localAmount);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (pricingMode === 'EXCHANGE' && localAmount > 0) {
+      pricingEngine.calculatePrice({
+        mode: 'EXCHANGE',
+        localCurrency,
+        localAmount,
+      }).then(res => {
+        if (res.success && res.piAmount) {
+          setRatePreview({ piAmount: res.piAmount });
+        } else {
+          setRatePreview({ piAmount: null, error: res.error || 'Live Pi rate unavailable' });
+        }
+      }).catch(() => {
+        setRatePreview({ piAmount: null, error: 'Live Pi rate unavailable' });
+      });
+    } else {
+      setRatePreview({ piAmount: null });
+    }
+  }, [pricingMode, localCurrency, localAmount]);
 
   // Step 3: Location
   const [country, setCountry] = useState<string>('United States');
@@ -352,6 +394,22 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
       const serviceId = 'srv_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
       const ownerId = user?.uid || 'provider_' + (businessId || 'default');
 
+      let calculatedBasePrice = Number(minPrice) || 0;
+      if (pricingMode === 'COMMUNITY') {
+        calculatedBasePrice = communityPiAmount > 0 ? communityPiAmount : calculatedBasePrice;
+      } else if (pricingMode === 'EXCHANGE') {
+        const calc = await pricingEngine.calculatePrice({
+          mode: 'EXCHANGE',
+          localCurrency,
+          localAmount,
+        });
+        if (calc.success && calc.piAmount) {
+          calculatedBasePrice = calc.piAmount;
+        } else {
+          calculatedBasePrice = 0;
+        }
+      }
+
       const serviceData = {
         serviceId,
         ownerId,
@@ -366,9 +424,14 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
         languages,
         pricingType: priceType.toLowerCase(),
         priceType,
-        minPrice: Number(minPrice) || 0,
-        maxPrice: Number(maxPrice) || 0,
-        basePrice: Number(minPrice) || 0,
+        pricingMode,
+        localCurrency,
+        localAmount,
+        communityPiAmount,
+        minPrice: calculatedBasePrice,
+        maxPrice: calculatedBasePrice,
+        basePrice: calculatedBasePrice,
+        price: calculatedBasePrice,
         currency: 'π',
         location: {
           country,
@@ -632,24 +695,113 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Minimum Price (π)</label>
-                    <input 
-                      type="number"
-                      value={minPrice}
-                      onChange={(e) => setMinPrice(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-violet-500 outline-none font-bold"
-                    />
-                  </div>
+                  <div className="sm:col-span-2 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-slate-300">Service Valuation Mode</span>
+                      <div className="flex gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setPricingMode('EXCHANGE')}
+                          className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all ${
+                            pricingMode === 'EXCHANGE'
+                              ? 'bg-violet-600 text-white font-bold'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Exchange Price
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPricingMode('COMMUNITY')}
+                          className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all ${
+                            pricingMode === 'COMMUNITY'
+                              ? 'bg-violet-600 text-white font-bold'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Community Price
+                        </button>
+                      </div>
+                    </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Maximum Price (π)</label>
-                    <input 
-                      type="number"
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-3.5 text-sm text-white focus:border-violet-500 outline-none font-bold"
-                    />
+                    {pricingMode === 'EXCHANGE' ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Local Currency</label>
+                            <select
+                              value={localCurrency}
+                              onChange={(e) => setLocalCurrency(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none cursor-pointer focus:border-violet-500"
+                            >
+                              {getSupportedCurrencies().filter(c => c.code !== 'PI').map(curr => (
+                                <option key={curr.code} value={curr.code}>
+                                  {curr.displayName} ({curr.symbol})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Local Price Amount</label>
+                            <input
+                              type="number"
+                              min={0.01}
+                              step={0.01}
+                              value={localAmount || ''}
+                              onChange={(e) => setLocalAmount(parseFloat(e.target.value) || 0)}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-violet-500 outline-none"
+                              placeholder="1000"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] text-violet-300 font-medium bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                          <span>Preview: </span>
+                          {localAmount > 0 ? (
+                            <span>
+                              {formatCurrencyAmount(localAmount, localCurrency)}
+                              {' ≈ '}
+                              {ratePreview.piAmount ? `${ratePreview.piAmount} π` : (
+                                <span className="text-amber-400">{ratePreview.error || 'Live Pi rate unavailable'}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Enter local price to calculate live Pi rate</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Community Base Price (π) *</label>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/tools/community-price-calculator?target=service&currency=${localCurrency}&amount=${localAmount}`)}
+                              className="text-[10px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Calculator className="w-3 h-3" /> Calculator
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            min={0.0000001}
+                            step={0.0000001}
+                            value={communityPiAmount || ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setCommunityPiAmount(val);
+                              setMinPrice(val);
+                              setMaxPrice(val);
+                            }}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-violet-500 outline-none"
+                            placeholder="25"
+                          />
+                        </div>
+                        <div className="text-[11px] text-violet-300 font-medium bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                          Preview: {communityPiAmount || 0} π (Community Price)
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="sm:col-span-2 space-y-2">

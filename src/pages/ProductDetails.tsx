@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { PriceDisplay } from '../components/pricing/PriceDisplay';
 import { 
   ShoppingBag, 
   Heart, 
@@ -35,6 +36,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { cartService } from '../services/cartService';
+import { resolveProductPricing, resolveVariantPricing } from '../services/pricing/pricingCompatibility';
 import { searchService } from '../services/searchService';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
@@ -484,13 +486,30 @@ export const ProductDetails: React.FC = () => {
     try {
       const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       const attributesString = Object.entries(selectedAttributes).map(([k, v]) => v).join(' / ') || 'Standard';
+      
+      let pricingRes;
+      if (matchedVariant) {
+        pricingRes = await resolveVariantPricing(matchedVariant, product);
+      } else {
+        pricingRes = await resolveProductPricing(product);
+      }
+
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
+        variantId: matchedVariant?.variantId,
         name: `${product.productName} (${attributesString})`,
         imageUrl: getProductImageUrl(product),
         quantity,
-        unitPrice: activePrice
+        unitPrice: pricingRes.piAmount ?? activePrice,
+        pricingMode: pricingRes.mode,
+        localCurrency: pricingRes.localCurrency ?? undefined,
+        localAmount: pricingRes.localAmount ?? undefined,
+        communityPiAmount: pricingRes.mode === 'COMMUNITY' ? (pricingRes.piAmount ?? undefined) : undefined,
+        piUnitPrice: pricingRes.piAmount ?? activePrice,
+        pricingRateUsed: pricingRes.rateUsed ?? undefined,
+        pricingRateSource: pricingRes.rateSource ?? undefined,
+        pricingRateTimestamp: pricingRes.rateTimestamp ?? undefined
       });
       setAdded(true);
       triggerToast('Product successfully added to shopping bag!');
@@ -509,13 +528,30 @@ export const ProductDetails: React.FC = () => {
     try {
       const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
       const attributesString = Object.entries(selectedAttributes).map(([k, v]) => v).join(' / ') || 'Standard';
+      
+      let pricingRes;
+      if (matchedVariant) {
+        pricingRes = await resolveVariantPricing(matchedVariant, product);
+      } else {
+        pricingRes = await resolveProductPricing(product);
+      }
+
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
+        variantId: matchedVariant?.variantId,
         name: `${product.productName} (${attributesString})`,
         imageUrl: getProductImageUrl(product),
         quantity,
-        unitPrice: activePrice
+        unitPrice: pricingRes.piAmount ?? activePrice,
+        pricingMode: pricingRes.mode,
+        localCurrency: pricingRes.localCurrency ?? undefined,
+        localAmount: pricingRes.localAmount ?? undefined,
+        communityPiAmount: pricingRes.mode === 'COMMUNITY' ? (pricingRes.piAmount ?? undefined) : undefined,
+        piUnitPrice: pricingRes.piAmount ?? activePrice,
+        pricingRateUsed: pricingRes.rateUsed ?? undefined,
+        pricingRateSource: pricingRes.rateSource ?? undefined,
+        pricingRateTimestamp: pricingRes.rateTimestamp ?? undefined
       });
       
       const updatedCart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
@@ -999,18 +1035,18 @@ export const ProductDetails: React.FC = () => {
                   <span className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-300 rounded font-bold text-[8px] uppercase tracking-wider border border-indigo-500/20">Future Ready</span>
                 </div>
                 <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-4xl font-black text-white">{activePrice} <span className="text-xl font-bold text-slate-400">π</span></span>
-                  <span className="text-sm text-slate-500 line-through font-bold">{originalPrice} π</span>
-                  <span className="text-xs text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-                    -{discountPercent}% OFF
-                  </span>
+                  <PriceDisplay 
+                    item={matchedVariant || product} 
+                    parentProduct={matchedVariant ? product : undefined}
+                    type={matchedVariant ? 'variant' : 'product'}
+                    size="xl"
+                  />
+                  {discountPercent > 0 && (
+                    <span className="text-xs text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                      -{discountPercent}% OFF
+                    </span>
+                  )}
                 </div>
-                {/* Consensus Dual Pricing */}
-                <p className="text-[10px] text-slate-400 mt-2 font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  Consensus Value: <span className="text-white font-black">${(activePrice * 3.14).toFixed(2)} USD</span>
-                  <span className="text-slate-600 text-[9px] font-medium">(at 1 Pi = $3.14)</span>
-                </p>
               </div>
 
               <div className="sm:text-right shrink-0 border-t sm:border-t-0 border-slate-800/60 pt-4 sm:pt-0">
