@@ -22,6 +22,20 @@ import { getFirebaseDb } from '../firebase/config';
 import { Cart, CartItem, WishlistItem, SearchEntityType } from '../types';
 import { resolveProductPricing, resolveVariantPricing } from './pricing/pricingCompatibility';
 
+function sanitizeFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      clean[key] = null;
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+      clean[key] = sanitizeFirestoreData(value);
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
 export const cartService = {
   /**
    * CART MANAGEMENT
@@ -104,48 +118,16 @@ export const cartService = {
         throw new Error('This product is no longer available.');
       }
 
-      // 1. If storeId is valid, verify store
-      if (!isInvalid(storeId)) {
-        const storeSnap = await getDoc(doc(db, 'stores', storeId));
-        if (storeSnap.exists()) {
-          const sData = storeSnap.data();
-          if (sData.status !== 'active' && sData.status !== 'published' && sData.status !== 'approved' && sData.status) {
-            throw new Error('This product is no longer available.');
-          }
-          if (isInvalid(businessId)) businessId = sData.businessId;
-          if (isInvalid(ownerId)) ownerId = sData.ownerId || sData.ownerUid;
-        }
-      } else {
-        // Fallback store
-        const storesQuery = query(collection(db, 'stores'));
-        const storesSnap = await getDocs(storesQuery);
-        const validStoreDoc = storesSnap.docs.find(d => {
-          const data = d.data() as any;
-          return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || isInvalid(ownerId));
-        }) || storesSnap.docs[0];
-
-        if (validStoreDoc) {
-          const sData = validStoreDoc.data() as any;
-          storeId = validStoreDoc.id;
-          if (isInvalid(businessId)) businessId = sData.businessId;
-          if (isInvalid(ownerId)) ownerId = sData.ownerId || sData.ownerUid;
-        }
+      // 1. Resolve storeId and businessId safely without unbounded collection queries
+      if (isInvalid(storeId) && !isInvalid(businessId)) {
+        storeId = businessId;
       }
-
-      // 2. Fallback business
       if (isInvalid(businessId)) {
-        const bizQuery = query(collection(db, 'businesses'));
-        const bizSnap = await getDocs(bizQuery);
-        const validBizDoc = bizSnap.docs.find(d => {
-          const data = d.data() as any;
-          return data.status !== 'deleted' && (data.ownerUid === ownerId || data.ownerId === ownerId || isInvalid(ownerId));
-        }) || bizSnap.docs[0];
-
-        if (validBizDoc) {
-          businessId = validBizDoc.id;
-          const bData = validBizDoc.data() as any;
-          if (isInvalid(ownerId)) ownerId = bData.ownerUid || bData.ownerId;
-        }
+        const cartBizId = cartId.split('_')[1];
+        businessId = item.businessId || (cartBizId && cartBizId !== 'unknown_business' ? cartBizId : 'default_business');
+      }
+      if (isInvalid(storeId)) {
+        storeId = item.storeId || businessId || 'default_store';
       }
     }
 
@@ -194,7 +176,7 @@ export const cartService = {
     if (itemSnap.exists()) {
       const current = itemSnap.data() as CartItem;
       const newQuantity = Math.min(current.quantity + requestedQty, stock);
-      await updateDoc(itemRef, {
+      await updateDoc(itemRef, sanitizeFirestoreData({
         quantity: newQuantity,
         unitPrice: effectiveUnitPrice,
         piUnitPrice: effectiveUnitPrice,
@@ -214,9 +196,9 @@ export const cartService = {
         pricingRateSource: pricingRateSource ?? current.pricingRateSource ?? null,
         pricingRateTimestamp: pricingRateTimestamp ?? current.pricingRateTimestamp ?? null,
         updatedAt: new Date().toISOString()
-      });
+      }));
     } else {
-      await setDoc(itemRef, {
+      await setDoc(itemRef, sanitizeFirestoreData({
         ...item,
         itemId,
         id: itemId,
@@ -245,7 +227,7 @@ export const cartService = {
         pricingRateTimestamp: pricingRateTimestamp || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      });
+      }));
     }
 
     await this.recalculateCart(cartId);

@@ -38,31 +38,62 @@ export const businessProfileService = {
 
   async getProfileById(businessId: string) {
     const db = getFirebaseDb();
+    if (!businessId) return null;
     
     // Determine preferred collection based on pathname
     const isStorePath = typeof window !== 'undefined' && window.location.pathname.includes('/store/');
     const collectionsToTry = isStorePath ? ['stores', 'businesses'] : ['businesses', 'stores'];
     
     for (const collectionName of collectionsToTry) {
-      console.log(`[businessProfileService] Querying Firestore: collection="${collectionName}", documentId="${businessId}"`);
-      const docRef = doc(db, collectionName, businessId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        console.log(`[businessProfileService] Document found in collection "${collectionName}":`, data);
-        
-        // If it was found in "stores" collection, adapt store-specific fields for the profile UI
-        if (collectionName === 'stores') {
-          return {
-            id: snap.id,
-            businessName: data.storeName || data.businessName || 'Unnamed Store',
-            category: data.storeCategory || data.category || 'Store',
-            businessType: 'seller', // Store corresponds to 'seller' role config
-            ...data
-          } as any;
+      try {
+        console.log(`[businessProfileService] Querying Firestore doc: collection="${collectionName}", documentId="${businessId}"`);
+        const docRef = doc(db, collectionName, businessId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          console.log(`[businessProfileService] Document found by direct ID in "${collectionName}":`, data);
+          
+          if (collectionName === 'stores') {
+            return {
+              id: snap.id,
+              businessName: data.storeName || data.businessName || 'Unnamed Store',
+              category: data.storeCategory || data.category || 'Store',
+              businessType: 'seller',
+              ...data
+            } as any;
+          }
+          
+          return { id: snap.id, ...data } as any;
         }
-        
-        return { id: snap.id, ...data } as any;
+      } catch (err) {
+        console.warn(`[businessProfileService] getDoc error on ${collectionName}/${businessId}:`, err);
+      }
+    }
+
+    // Fallback: Query by fields 'id', 'businessId', 'slug', 'storeId'
+    for (const collectionName of collectionsToTry) {
+      for (const field of ['id', 'businessId', 'slug', 'storeId']) {
+        try {
+          const q = query(collection(db, collectionName), where(field, '==', businessId));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const docSnap = snap.docs[0];
+            const data = docSnap.data();
+            console.log(`[businessProfileService] Document found by field query (${field}="${businessId}") in "${collectionName}":`, data);
+            if (collectionName === 'stores') {
+              return {
+                id: docSnap.id,
+                businessName: data.storeName || data.businessName || 'Unnamed Store',
+                category: data.storeCategory || data.category || 'Store',
+                businessType: 'seller',
+                ...data
+              } as any;
+            }
+            return { id: docSnap.id, ...data } as any;
+          }
+        } catch (e) {
+          // Continue trying next field
+        }
       }
     }
     

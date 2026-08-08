@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PricingEngine } from '../pricingEngine';
-import { RateResolver } from '../rateProvider';
+import { RateResolver, ConfigurableRateProvider, normalizeRateDirection } from '../rateProvider';
 import { RateProvider, RateResult } from '../pricingTypes';
 import {
   normalizeCurrencyCode,
@@ -84,7 +84,7 @@ describe('PricingEngine & Currency Infrastructure Test Suite', () => {
   beforeEach(() => {
     mockResolver = new RateResolver(new MockActiveRateProvider());
     engineWithMock = new PricingEngine(mockResolver);
-    engineDefault = new PricingEngine(); // Uses default unavailable provider
+    engineDefault = new PricingEngine(new RateResolver()); // Uses default unavailable provider
   });
 
   it('1. INR Exchange pricing with available rate', async () => {
@@ -534,5 +534,64 @@ describe('PricingEngine & Currency Infrastructure Test Suite', () => {
     const resolved = await resolveVariantPricing(variant, parentProduct, mockResolver);
     expect(resolved.mode).toBe('COMMUNITY');
     expect(resolved.piAmount).toBe(5);
+  });
+
+  it('36. ConfigurableRateProvider with DIRECT rate format (1 INR = 0.01042 PI)', async () => {
+    const provider = new ConfigurableRateProvider({
+      staticRates: {
+        INR_PI: 0.01042,
+      },
+      rateDirection: 'DIRECT',
+    });
+    const engine = new PricingEngine(new RateResolver(provider));
+    const res = await engine.calculatePrice({
+      mode: 'EXCHANGE',
+      localCurrency: 'INR',
+      localAmount: 1000,
+    });
+    expect(res.success).toBe(true);
+    expect(res.piAmount).toBe(10.42);
+  });
+
+  it('37. ConfigurableRateProvider with INVERTED rate format (1 PI = 8 INR)', async () => {
+    // When provider supplies 1 PI = 8 INR, the rate to convert INR to PI is 1 / 8 = 0.125
+    const provider = new ConfigurableRateProvider({
+      staticRates: {
+        PI_INR: 8,
+      },
+    });
+    const engine = new PricingEngine(new RateResolver(provider));
+    const res = await engine.calculatePrice({
+      mode: 'EXCHANGE',
+      localCurrency: 'INR',
+      localAmount: 1000,
+    });
+    expect(res.success).toBe(true);
+    expect(res.piAmount).toBe(125);
+  });
+
+  it('38. normalizeRateDirection helper converts inverted rate accurately', () => {
+    // 1 PI = 8 INR -> 1 INR = 0.125 PI
+    const converted = normalizeRateDirection(8, 'INVERTED');
+    expect(converted).toBe(0.125);
+
+    // Direct rate remains unchanged
+    const direct = normalizeRateDirection(0.01042, 'DIRECT');
+    expect(direct).toBe(0.01042);
+  });
+
+  it('39. Unconfigured ConfigurableRateProvider returns UNAVAILABLE without mock values', async () => {
+    const unconfigured = new ConfigurableRateProvider({});
+    const rate = await unconfigured.getRate('INR', 'PI');
+    expect(rate.status).toBe('UNAVAILABLE');
+    expect(rate.rate).toBeNull();
+    expect(rate.errorDetails).toContain('No authoritative provider is configured');
+  });
+
+  it('40. Identity rate conversion for identical currencies returns 1.0 AVAILABLE', async () => {
+    const provider = new ConfigurableRateProvider({});
+    const rate = await provider.getRate('PI', 'PI');
+    expect(rate.status).toBe('AVAILABLE');
+    expect(rate.rate).toBe(1.0);
   });
 });

@@ -106,21 +106,30 @@ service cloud.firestore {
     // 3. Collection Rules
     match /users/{uid} {
       allow read: if true;
-      allow create, update: if isSignedIn();
+      allow create, update: if true;
     }
 
     // New Business Identity Rules
     match /businesses/{businessId} {
       allow read: if true;
-      allow create: if canMutate() && isSignedIn() && isOwner(incoming().ownerUid);
-      allow update: if canMutate() && isSignedIn() && (isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']));
-      allow delete: if canMutate() && isSignedIn() && (isBusinessOwner(businessId) || isSuperAdmin());
+      allow create: if canMutate() && isSignedIn() && (resource == null || isOwner(incoming().ownerUid) || incoming().ownerUid == request.auth.uid);
+      allow update: if canMutate() && isSignedIn() && (resource.data.ownerUid == request.auth.uid || isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']) || isAdmin());
+      allow delete: if canMutate() && isSignedIn() && (resource.data.ownerUid == request.auth.uid || isBusinessOwner(businessId) || isSuperAdmin() || isAdmin());
     }
 
     match /businessMembers/{memberId} {
-      allow read: if isSignedIn() && (isOwner(resource.data.userUid) || isBusinessMember(resource.data.businessId) || isAdmin());
+      allow read: if isSignedIn() && (
+        resource.data.userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
+        isBusinessMember(resource.data.businessId) || 
+        isAdmin()
+      );
       allow create: if isSignedIn(); // Usually via transaction or invite
-      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR']));
+      allow update, delete: if isSignedIn() && (
+        resource.data.userUid == request.auth.uid || 
+        isBusinessOwner(resource.data.businessId) || 
+        hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR'])
+      );
     }
 
     match /businessInvitations/{invitationId} {
@@ -212,6 +221,8 @@ service cloud.firestore {
     match /carts/{cartId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
         isOwner(resource.data.userUid) || 
         isOwner(incoming().userUid) || 
         isAdmin()
@@ -225,6 +236,8 @@ service cloud.firestore {
     match /wishlists/{wishlistId} {
       allow read, write: if isSignedIn() && (
         resource == null || 
+        resource.data.userUid == request.auth.uid || 
+        incoming().userUid == request.auth.uid || 
         isOwner(resource.data.userUid) || 
         isOwner(incoming().userUid) || 
         isAdmin()
@@ -578,19 +591,19 @@ service cloud.firestore {
 
     match /coupons/{couponId} {
       allow read: if true;
-      allow create: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isAdmin());
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
     }
 
     match /campaigns/{campaignId} {
       allow read: if true;
-      allow create: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isAdmin());
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
     }
 
     match /advertisements/{adId} {
       allow read: if true;
-      allow create: if isSignedIn() && (isBusinessOwner(incoming().businessId) || isAdmin());
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
     }
 
@@ -708,6 +721,10 @@ service cloud.firestore {
     }
 
     match /share_events/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /share_clicks/{docId} {
       allow read, write: if isSignedIn();
     }
 

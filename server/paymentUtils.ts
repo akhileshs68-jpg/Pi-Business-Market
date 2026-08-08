@@ -1,4 +1,4 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { initializeApp, getApps, applicationDefault, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import fs from 'fs';
@@ -136,17 +136,25 @@ export const initFirebaseAdmin = (): any => {
         projectId: projectId || undefined
       });
     } else {
-      console.warn('[Firebase Admin Audit WARNING] Service account environment variables missing. Initializing with explicit credential provider to bypass GCP ADC metadata server lookup timeouts.');
-      const noAdcCredential = {
-        getAccessToken: async () => ({
-          access_token: 'dummy_no_adc_token',
-          expires_in: 3600
-        })
-      };
-      return initializeApp({
-        credential: noAdcCredential,
-        projectId: projectId || undefined
-      });
+      console.log('[Firebase Admin Audit] Attempting initialization with Application Default Credentials (ADC)');
+      try {
+        return initializeApp({
+          credential: applicationDefault(),
+          projectId: projectId || undefined
+        });
+      } catch (adcErr) {
+        console.warn('[Firebase Admin Audit WARNING] Service account environment variables missing and ADC failed. Initializing with fallback credential provider.');
+        const noAdcCredential = {
+          getAccessToken: async () => ({
+            access_token: 'dummy_no_adc_token',
+            expires_in: 3600
+          })
+        };
+        return initializeApp({
+          credential: noAdcCredential,
+          projectId: projectId || undefined
+        });
+      }
     }
   } catch (err: any) {
     console.error(`[Firebase Admin Audit ERROR] initializeApp failed: ${err.message}`);
@@ -199,7 +207,7 @@ export const getDb = (): any => {
   try {
     return databaseId ? getFirestore(databaseId) : getFirestore();
   } catch (err: any) {
-    console.error("[Firebase Admin Error] Failed to get Firestore instance:", err.message);
+    console.warn("[Firebase Admin Notice] Firestore SDK unavailable (mock / local fallback active):", err.message);
     return null;
   }
 };

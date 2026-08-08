@@ -178,7 +178,7 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
           </button>
 
           <button 
-            onClick={() => navigate(`/business-profile`)} 
+            onClick={() => navigate(`/business/${business.id}`)} 
             className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
           >
             <Eye className="w-4 h-4" />
@@ -451,7 +451,7 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
               <p className="text-xs text-slate-500 font-medium">Verified parameters stored under One Account Policy.</p>
             </div>
             <button 
-              onClick={() => navigate('/business-profile')} 
+              onClick={() => navigate(`/business/${business.id}/settings`)} 
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all"
             >
               Edit Credentials
