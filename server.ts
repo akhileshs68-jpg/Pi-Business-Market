@@ -92,17 +92,25 @@ const initFirebaseAdmin = (): any => {
         projectId: projectId || undefined
       });
     } else {
-      console.warn('[Firebase Admin Audit WARNING] Service account environment variables missing. Initializing with explicit credential provider to bypass GCP ADC metadata server lookup timeouts.');
-      const noAdcCredential = {
-        getAccessToken: async () => ({
-          access_token: 'dummy_no_adc_token',
-          expires_in: 3600
-        })
-      };
-      return initializeApp({
-        credential: noAdcCredential,
-        projectId: projectId || undefined
-      });
+      console.log('[Firebase Admin Audit] Attempting initialization with Application Default Credentials (ADC)');
+      try {
+        return initializeApp({
+          credential: applicationDefault(),
+          projectId: projectId || undefined
+        });
+      } catch (adcErr) {
+        console.warn('[Firebase Admin Audit WARNING] Service account environment variables missing and ADC failed. Initializing with fallback credential provider.');
+        const noAdcCredential = {
+          getAccessToken: async () => ({
+            access_token: 'dummy_no_adc_token',
+            expires_in: 3600
+          })
+        };
+        return initializeApp({
+          credential: noAdcCredential,
+          projectId: projectId || undefined
+        });
+      }
     }
   } catch (err: any) {
     console.error(`[Firebase Admin Audit ERROR] initializeApp failed: ${err.message}`);
@@ -130,6 +138,9 @@ const dbQueryWithTimeout = async <T>(fn: () => Promise<T>, timeoutMs: number = 2
   }
 };
 
+const dbCache: Record<string, any> = {};
+let defaultDbCache: any = null;
+
 const getDb = (): any => {
   if (getApps().length === 0) {
     try {
@@ -153,9 +164,27 @@ const getDb = (): any => {
   }
 
   try {
-    return databaseId ? getFirestore(databaseId) : getFirestore();
+    if (databaseId) {
+      if (!dbCache[databaseId]) {
+        const db = getFirestore(databaseId);
+        if (db && typeof db.settings === 'function') {
+          db.settings({ ignoreUndefinedProperties: true });
+        }
+        dbCache[databaseId] = db;
+      }
+      return dbCache[databaseId];
+    } else {
+      if (!defaultDbCache) {
+        const db = getFirestore();
+        if (db && typeof db.settings === 'function') {
+          db.settings({ ignoreUndefinedProperties: true });
+        }
+        defaultDbCache = db;
+      }
+      return defaultDbCache;
+    }
   } catch (err: any) {
-    console.error("[Firebase Admin Error] Failed to get Firestore instance:", err.message);
+    console.warn("[Firebase Admin Notice] Firestore SDK unavailable (mock / local fallback active):", err.message);
     return null;
   }
 };
@@ -609,6 +638,101 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       res.status(401).json({
         error: "Pi authentication failed",
         details: error.response?.data || error.message,
+      });
+    }
+  });
+
+  // =========================================================================
+  // COINGECKO LIVE PI NETWORK MARKET RATE ENDPOINT
+  // Server-side market data proxy with in-memory TTL caching and timeout protection.
+  // Never exposes API keys to client code.
+  // =========================================================================
+  let serverRateCache: { data: Record<string, number>; timestamp: number } | null = null;
+  const SERVER_CACHE_TTL_MS = 60000; // 60s cache TTL
+
+  app.get(["/api/pricing/rate", "/api/exchange-rate"], async (req, res) => {
+    try {
+      const base = ((req.query.base as string) || 'INR').toUpperCase();
+      const quote = ((req.query.quote as string) || 'PI').toUpperCase();
+      const nowMs = Date.now();
+
+      let prices: Record<string, number> | null = null;
+
+      if (serverRateCache && (nowMs - serverRateCache.timestamp) < SERVER_CACHE_TTL_MS) {
+        prices = serverRateCache.data;
+      } else {
+        const currencies = 'usd,inr,eur,gbp,aed,sar,cad,aud,jpy,cny';
+        const url = `https://api.coingecko.com/api/v3/simple/price?ids=pi-network,pi-network-iou&vs_currencies=${currencies}&include_last_updated_at=true`;
+        
+        const headers: Record<string, string> = { 'Accept': 'application/json' };
+        if (process.env.COINGECKO_API_KEY) {
+          headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
+        }
+
+        const response = await axios.get(url, { headers, timeout: 8000 });
+        const data = response.data;
+        const piData = data['pi-network'] || data['pi-network-iou'];
+
+        if (piData && typeof piData === 'object') {
+          prices = {};
+          for (const [k, v] of Object.entries(piData)) {
+            if (typeof v === 'number' && v > 0 && k !== 'last_updated_at') {
+              prices[k.toLowerCase()] = v;
+            }
+          }
+          if (Object.keys(prices).length > 0) {
+            serverRateCache = { data: prices, timestamp: nowMs };
+          }
+        }
+      }
+
+      if (!prices || Object.keys(prices).length === 0) {
+        return res.status(503).json({
+          success: false,
+          error: "Live exchange rate is temporarily unavailable from CoinGecko provider.",
+          provider: "CoinGecko",
+          status: "UNAVAILABLE"
+        });
+      }
+
+      // Resolve specific pair if requested
+      let calculatedRate: number | null = null;
+      let targetFiat = '';
+      let isFiatToBase = false;
+
+      if (base === 'PI') {
+        targetFiat = quote;
+        isFiatToBase = false;
+      } else if (quote === 'PI') {
+        targetFiat = base;
+        isFiatToBase = true;
+      }
+
+      if (targetFiat && prices[targetFiat.toLowerCase()]) {
+        const piPriceInFiat = prices[targetFiat.toLowerCase()];
+        calculatedRate = isFiatToBase ? (1 / piPriceInFiat) : piPriceInFiat;
+      }
+
+      return res.json({
+        success: true,
+        provider: "CoinGecko",
+        source: "CoinGecko Market Data",
+        status: "AVAILABLE",
+        fetchedAt: new Date(serverRateCache?.timestamp || nowMs).toISOString(),
+        baseCurrency: base,
+        quoteCurrency: quote,
+        rate: calculatedRate,
+        rates: prices,
+        piMarketPriceInLocal: targetFiat && prices[targetFiat.toLowerCase()] ? prices[targetFiat.toLowerCase()] : null
+      });
+    } catch (error: any) {
+      console.error("[Backend Pricing] CoinGecko fetch error:", error?.message || error);
+      return res.status(503).json({
+        success: false,
+        error: "Failed to fetch live Pi market rate from CoinGecko.",
+        details: error?.message,
+        provider: "CoinGecko",
+        status: "UNAVAILABLE"
       });
     }
   });
