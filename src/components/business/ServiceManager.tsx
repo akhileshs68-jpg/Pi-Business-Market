@@ -106,6 +106,16 @@ export const ServiceManager: React.FC = () => {
     setIsFormOpen(true);
   };
 
+  useEffect(() => {
+    const action = new URLSearchParams(window.location.search).get('action');
+    if (action === 'add_service' && !isFormOpen) {
+      handleOpenCreate();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('action');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [isFormOpen]);
+
   const handleOpenEdit = (service: Service) => {
     setEditingService(service);
     setFormData({

@@ -37,6 +37,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { useAuth } from '../../auth/useAuth';
+import { useBusiness } from '../../context/BusinessContext';
 import { EnterpriseServiceEngine } from '../../core/service/enterpriseServiceEngine';
 import { mediaService } from '../../services/mediaService';
 
@@ -80,6 +81,8 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
   // ALL HOOKS MUST BE DECLARED UNCONDITIONALLY AT THE TOP
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { businesses } = useBusiness();
+  const currentBusinessObj = businesses.find(b => b.id === businessId);
 
   const [step, setStep] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
@@ -496,6 +499,16 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
+                {currentBusinessObj && (
+                  <div className="p-5 bg-violet-600/10 border border-violet-500/25 rounded-3xl mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-black text-violet-400 uppercase tracking-widest">BUSINESS: {currentBusinessObj.businessName}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">You are adding a SERVICE to this business.</p>
+                    </div>
+                    <span className="text-[10px] bg-violet-500/10 text-violet-300 font-bold px-3 py-1 rounded-full uppercase tracking-wider">Active Business Context</span>
+                  </div>
+                )}
+
                 <div>
                   <h3 className="text-lg font-bold text-white mb-1">Step 1: Select Business Type</h3>
                   <p className="text-sm text-slate-400">Choose the category that best represents your professional discipline.</p>

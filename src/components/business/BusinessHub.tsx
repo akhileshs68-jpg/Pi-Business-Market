@@ -77,11 +77,22 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
         setActiveTab(tabQuery as any);
       }
     }
-  }, [tabQuery]);
+    const subTabQuery = searchParams.get('subTab');
+    if (subTabQuery) {
+      const validSubTabs = ['products', 'services', 'taxonomies'];
+      if (validSubTabs.includes(subTabQuery)) {
+        setCatalogSubTab(subTabQuery as any);
+      }
+    }
+  }, [tabQuery, searchParams]);
 
-  const handleTabChange = (tabId: string) => {
+  const handleTabChange = (tabId: string, subTabId?: string) => {
     setActiveTab(tabId as any);
-    setSearchParams({ tab: tabId });
+    const newParams: Record<string, string> = { tab: tabId };
+    if (subTabId) {
+      newParams.subTab = subTabId;
+    }
+    setSearchParams(newParams);
   };
 
   const [overview, setOverview] = useState<BusinessOverview | null>(null);

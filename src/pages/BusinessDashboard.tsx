@@ -97,47 +97,167 @@ export const BusinessDashboard: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pb-28 sm:pb-28 lg:pb-28">
         
-        {/* Business Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 sm:gap-8 mb-8 sm:mb-12">
-          <div>
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <div className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-indigo-600/10 border border-indigo-500/20 shadow-inner">
-                <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+        {/* Active Business Banner & Switcher (only if at least one business exists) */}
+        {businesses.length > 0 && (
+          <div className="mb-10 p-6 sm:p-8 bg-slate-900/40 border border-slate-800 rounded-3xl backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="w-20 h-20 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                {currentBusiness?.logoUrl ? (
+                  <img src={currentBusiness.logoUrl} alt={currentBusiness.businessName} className="w-full h-full object-cover" />
+                ) : (
+                  <Building2 className="w-10 h-10 text-indigo-400" />
+                )}
               </div>
-              <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em]">Marketplace Registry</p>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">This is your Business</p>
+                  {currentBusiness?.verificationStatus === 'Verified' ? (
+                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Verified</span>
+                  ) : (
+                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Pending Approval</span>
+                  )}
+                  <span className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">
+                    {currentBusiness?.businessStatus || 'Active'}
+                  </span>
+                </div>
+
+                {/* Switcher dropdown if multiple exist */}
+                {businesses.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 text-xs font-bold">Switch:</span>
+                    <select
+                      value={currentBusiness?.id || ''}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setCurrentBusinessId(id);
+                        const matched = businesses.find(b => b.id === id);
+                        if (matched) setSelectedBusiness(matched);
+                      }}
+                      className="bg-slate-950 border border-slate-800 text-sm font-extrabold text-white rounded-xl px-3 py-1.5 focus:border-indigo-500 outline-none cursor-pointer"
+                    >
+                      {businesses.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.businessName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    {currentBusiness?.businessName}
+                  </h1>
+                )}
+
+                <p className="text-slate-400 text-xs mt-1 font-semibold">
+                  Category: <span className="text-indigo-400 capitalize">{currentBusiness?.category || 'General'}</span> • Type: <span className="text-indigo-400 capitalize">{currentBusiness?.businessType || 'Enterprise'}</span>
+                </p>
+              </div>
             </div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">Business Profiles</h1>
-            <p className="text-slate-500 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base font-medium">Root control for all your marketplace operations.</p>
+
+            {/* Quick Actions (inheriting business context directly!) */}
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <button
+                onClick={() => {
+                  if (currentBusiness) {
+                    setSelectedBusiness(currentBusiness);
+                    navigate('/business-center?tab=catalog&subTab=products&action=add_product');
+                  }
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Add Product
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (currentBusiness) {
+                    setSelectedBusiness(currentBusiness);
+                    navigate('/business-center?tab=catalog&subTab=services&action=add_service');
+                  }
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs transition-all shadow-lg shadow-violet-600/20 active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Add Service
+              </button>
+
+              <button
+                onClick={() => {
+                  if (currentBusiness) {
+                    setSelectedBusiness(currentBusiness);
+                    navigate('/business-center?tab=stores');
+                  }
+                }}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                title="Store outlets are optional"
+              >
+                <Store className="w-4 h-4" /> Store (Optional)
+              </button>
+
+              <button
+                onClick={() => setShowWizard(true)}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white font-bold text-xs transition-all"
+                title="Create another business under One Account Policy"
+              >
+                + Add Another Business
+              </button>
+            </div>
           </div>
-          
-          <button 
-            onClick={() => setShowWizard(true)}
-            className="group flex items-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-indigo-600 text-white font-bold transition-all hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95"
+        )}
+
+        {/* Main Workspace Section */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-[400px] bg-slate-900/50 rounded-[2rem] border border-slate-800 animate-pulse" />
+            ))}
+          </div>
+        ) : businesses.length === 0 ? (
+          /* FIRST-TIME USER EXPERIENCE - SIMPLE GUIDED ONBOARDING SCREEN */
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl mx-auto py-12 px-6 bg-slate-900/40 border border-slate-800 rounded-3xl backdrop-blur-sm text-center my-10"
           >
-            <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-            <span className="text-sm sm:text-base">Create Business Profile</span>
-          </button>
-        </div>
-
-        {/* Global Context Rail */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
-           {[
-            { label: 'Total Businesses', val: businesses.length, icon: Building2, color: 'text-indigo-400' },
-            { label: 'Verified Status', val: businesses.filter(b => b.verificationStatus === 'Verified').length, icon: ShieldCheck, color: 'text-emerald-400' },
-            { label: 'Active Personnel', val: businesses.reduce((acc, b) => acc + b.employeeCount, 0), icon: Zap, color: 'text-amber-400' },
-            { label: 'System Health', val: 'Operational', icon: Globe, color: 'text-sky-400' },
-          ].map((stat, i) => (
-            <div key={i} className="bg-slate-900/40 border border-slate-800 p-4 sm:p-5 rounded-2xl sm:rounded-3xl backdrop-blur-sm">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <stat.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${stat.color}`} />
-                <span className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">{stat.label}</span>
-              </div>
-              <p className="text-xl sm:text-2xl font-bold text-white">{stat.val}</p>
+            <div className="w-20 h-20 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-8 shadow-inner">
+              <Briefcase className="w-10 h-10 text-indigo-400" />
             </div>
-          ))}
-        </div>
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.3em] mb-3">Pioneer Workspace</p>
+            <h2 className="text-3xl font-extrabold text-white mb-6">START YOUR BUSINESS</h2>
+            
+            <div className="space-y-4 text-left max-w-md mx-auto mb-10">
+              <div className="p-4 bg-slate-950/60 border border-slate-850 rounded-2xl flex items-start gap-4">
+                <span className="w-6 h-6 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                <div>
+                  <p className="text-xs font-black text-white uppercase tracking-wider">Create your Business Profile</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Register your business identity under the One Account Policy.</p>
+                </div>
+              </div>
 
-        {selectedBusiness ? (
+              <div className="p-4 bg-slate-950/60 border border-slate-850 rounded-2xl flex items-start gap-4">
+                <span className="w-6 h-6 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                <div>
+                  <p className="text-xs font-black text-white uppercase tracking-wider">Add Products or Services</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">List physical products or consulting services directly under your business context.</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-950/60 border border-slate-850 rounded-2xl flex items-start gap-4">
+                <span className="w-6 h-6 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                <div>
+                  <p className="text-xs font-black text-white uppercase tracking-wider">Submit for Approval</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Undergo compliance audit to receive the verified merchant badge.</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowWizard(true)}
+              className="px-10 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold transition-all shadow-xl shadow-indigo-600/20 cursor-pointer active:scale-95"
+            >
+              CREATE MY BUSINESS
+            </button>
+          </motion.div>
+        ) : selectedBusiness ? (
           <Suspense fallback={<div className="text-white text-center py-20">Loading Dashboard...</div>}>
             <BusinessHub business={selectedBusiness} onBack={handleBackToRegistry} />
           </Suspense>
@@ -225,13 +345,7 @@ export const BusinessDashboard: React.FC = () => {
             </div>
 
             {/* Businesses Grid */}
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-[400px] bg-slate-900/50 rounded-[2rem] border border-slate-800 animate-pulse" />
-                ))}
-              </div>
-            ) : filteredBusinesses.length > 0 ? (
+            {filteredBusinesses.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatePresence mode="popLayout">
                   {filteredBusinesses.map(business => (
@@ -255,26 +369,9 @@ export const BusinessDashboard: React.FC = () => {
                 </AnimatePresence>
               </div>
             ) : (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="py-32 flex flex-col items-center text-center"
-              >
-                <div className="w-24 h-24 rounded-[2rem] bg-slate-900 border border-slate-800 flex items-center justify-center mb-8 shadow-inner">
-                  <Building2 className="w-10 h-10 text-slate-700" />
-                </div>
-                <h2 className="text-3xl font-bold text-white mb-3">You don't have a business yet.</h2>
-                <p className="text-slate-500 max-w-sm mb-10 font-medium">
-                  You haven't created any business profiles yet. Create one to start trading on the Pi Network.
-                </p>
-                <button 
-                  onClick={() => setShowWizard(true)}
-                  className="flex items-center gap-2 px-10 py-4 rounded-2xl bg-white text-slate-950 font-extrabold hover:bg-slate-200 transition-all shadow-2xl shadow-white/10"
-                >
-                  <Zap className="w-5 h-5" />
-                  Create Business
-                </button>
-              </motion.div>
+              <div className="text-center py-20 text-slate-500">
+                No matching businesses found.
+              </div>
             )}
           </>
         )}
