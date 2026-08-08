@@ -26,7 +26,9 @@ const ALLOWED_MIME_TYPES = [
   'image/jpg', 
   'image/webp', 
   'image/svg+xml',
-  'application/pdf'
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 ];
 
 export const mediaService = {
