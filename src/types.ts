@@ -2091,3 +2091,125 @@ export interface ReviewReport {
   status: 'pending' | 'resolved' | 'dismissed';
   createdAt: string;
 }
+
+// ==========================================
+// UNIVERSAL APPROVAL CENTER DOMAIN
+// ==========================================
+
+export type ApprovalType =
+  | 'Business Registration'
+  | 'Store Registration'
+  | 'Product Approval'
+  | 'Service Approval'
+  | 'Banner Campaign Approval'
+  | 'Advertisement Approval'
+  | 'Featured Product Approval'
+  | 'Featured Store Approval'
+  | 'Seller Verification'
+  | 'Merchant Verification'
+  | 'Withdrawal Requests'
+  | 'Refund Requests'
+  | 'BMP Mint Requests'
+  | 'BMP Burn Requests'
+  | 'Dispute Resolution Queue'
+  | 'Report / Appeal Queue';
+
+export type ApprovalStatus =
+  | 'Draft'
+  | 'Submitted'
+  | 'Pending Review'
+  | 'Under Review'
+  | 'Approved'
+  | 'Rejected'
+  | 'Need Changes'
+  | 'On Hold'
+  | 'Expired';
+
+export type ApprovalPriority = 'Low' | 'Medium' | 'High' | 'Critical';
+
+export interface ApprovalHistoryEvent {
+  eventId: string;
+  action: string;
+  oldStatus: ApprovalStatus;
+  newStatus: ApprovalStatus;
+  adminUid: string;
+  adminName: string;
+  reason: string;
+  notes?: string;
+  timestamp: string;
+}
+
+export interface UniversalApproval {
+  id: string; // Document ID
+  approvalType: ApprovalType;
+  entityId: string;
+  entityName: string;
+  submittedBy: {
+    uid: string;
+    name: string;
+    email?: string;
+  };
+  business?: {
+    id: string;
+    name: string;
+  };
+  store?: {
+    id: string;
+    name: string;
+  };
+  category?: string;
+  status: ApprovalStatus;
+  createdAt: string;
+  updatedAt: string;
+  priority: ApprovalPriority;
+  riskScore: number; // 0 to 100
+  paymentStatus?: 'N/A' | 'Pending' | 'Paid' | 'Refunded';
+  verificationStatus?: 'N/A' | 'Unverified' | 'Pending' | 'Verified';
+  historyTimeline: ApprovalHistoryEvent[];
+  attachments?: {
+    name: string;
+    url: string;
+    type: string;
+  }[];
+  comments?: {
+    commentId: string;
+    authorUid: string;
+    authorName: string;
+    content: string;
+    timestamp: string;
+  }[];
+  assignedReviewer?: {
+    uid: string;
+    name: string;
+  };
+  entityPreview?: Record<string, any>;
+  archived?: boolean;
+}
+
+export interface ApprovalAuditLog {
+  id: string;
+  adminUid: string;
+  adminName: string;
+  approvalType: ApprovalType;
+  entityId: string;
+  entityName: string;
+  action: string;
+  oldStatus: ApprovalStatus;
+  newStatus: ApprovalStatus;
+  reason: string;
+  notes?: string;
+  timestamp: string;
+  ip?: string;
+}
+
+export interface ApprovalNotification {
+  id: string;
+  recipientUid: string;
+  title: string;
+  message: string;
+  priority: 'low' | 'normal' | 'high';
+  read: boolean;
+  createdAt: string;
+  link?: string;
+}
+

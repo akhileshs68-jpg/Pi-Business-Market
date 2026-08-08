@@ -8,37 +8,19 @@ import {
   Activity, Users, Store, Box, ShoppingBag, CreditCard, Award, 
   TrendingUp, MessageSquare, Megaphone, ShieldAlert, ShieldCheck, 
   Database, Server, RefreshCw, CheckCircle2, XCircle, AlertCircle,
-  Play, Pause, Trash2, Search, BarChart3, Clock, Lock, Shield
+  Play, Pause, Trash2, Search, BarChart3, Clock, Lock, Shield, Zap
 } from 'lucide-react';
 import { collection, getDocs, query, limit, orderBy, getCountFromServer, where } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
+import { EnterpriseOperationsCenter } from './EnterpriseOperationsCenter';
 
 // 1. Live Platform Status (Dashboard)
-export const DashboardPanel = () => {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Platform Status', status: 'Online', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-          { label: 'API Services', status: 'Operational', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-          { label: 'Firestore DB', status: 'Healthy', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-          { label: 'Storage', status: 'Operational', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-          { label: 'Authentication', status: 'Secure', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-          { label: 'Cloud Functions', status: 'Active', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-          { label: 'RPC Health', status: 'Synced', color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-          { label: 'Background Jobs', status: 'Processing', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-        ].map(item => (
-          <div key={item.label} className="p-5 rounded-2xl bg-slate-900/50 border border-slate-800 flex flex-col items-center justify-center text-center space-y-2">
-            <Activity className={`w-6 h-6 ${item.color}`} />
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{item.label}</h4>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${item.color} ${item.bg}`}>
-              {item.status}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+interface DashboardPanelProps {
+  onNavigateTab?: (tab: any) => void;
+}
+
+export const DashboardPanel = ({ onNavigateTab }: DashboardPanelProps) => {
+  return <EnterpriseOperationsCenter onNavigateTab={onNavigateTab || (() => {})} />;
 };
 
 // Generic table panel generator for entities

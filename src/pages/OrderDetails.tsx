@@ -45,6 +45,8 @@ import { QRVerificationModal } from '../components/billing/QRVerificationModal';
 import { EnterpriseInvoice, ProfessionalReceipt } from '../types/billing';
 import { OpenDisputeModal } from '../components/dispute/OpenDisputeModal';
 import { DisputeDetailView } from '../components/dispute/DisputeDetailView';
+import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
+import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 
 export const OrderDetails: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -125,8 +127,6 @@ export const OrderDetails: React.FC = () => {
       if (!data && cleanId) {
         console.warn('[OrderDetails Navigation Trace] Order document not found directly by ID. Attempting fallback queries...');
         try {
-          const { getFirebaseDb } = await import('../firebase/config');
-          const { collection, query, where, getDocs } = await import('firebase/firestore');
           const db = getFirebaseDb();
           
           let snap = await getDocs(query(collection(db, 'orders'), where('orderId', '==', cleanId)));
@@ -190,8 +190,6 @@ export const OrderDetails: React.FC = () => {
       const shipmentId = await shippingService.createShipment(order, method);
       
       if (trackingNumber || courierName) {
-        const { getFirebaseDb } = await import('../firebase/config');
-        const { writeBatch, doc, serverTimestamp } = await import('firebase/firestore');
         const db = getFirebaseDb();
         const batch = writeBatch(db);
         batch.update(doc(db, 'shipments', shipmentId), {
@@ -251,7 +249,6 @@ export const OrderDetails: React.FC = () => {
     let activeUserUid = user?.uid;
     if (!activeUserUid) {
       try {
-        const { getFirebaseAuth } = await import('../firebase/config');
         activeUserUid = getFirebaseAuth().currentUser?.uid;
       } catch (e) {
         console.warn('[OrderDetails Chat Auth Notice] Could not retrieve fallback auth user:', e);
@@ -356,7 +353,6 @@ export const OrderDetails: React.FC = () => {
     let activeUserUid = user?.uid;
     if (!activeUserUid) {
       try {
-        const { getFirebaseAuth } = await import('../firebase/config');
         activeUserUid = getFirebaseAuth().currentUser?.uid;
         console.log('[OrderDetails Dispute Step 3 Auth Fallback] Retrieved activeUserUid from Firebase auth:', activeUserUid);
       } catch (e) {

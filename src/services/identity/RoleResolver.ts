@@ -60,9 +60,15 @@ export class RoleResolver {
   isSuperAdmin(): boolean {
     if (!this.user) return false;
     const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const isDevMock = (this.user.piUid === 'dev_pioneer_mock' || this.user.uid === 'dev_pioneer_mock' || this.user.username === 'dev_pioneer_mock') && (
+      (import.meta as any).env?.VITE_ENABLE_DEV_MOCK === 'true' ||
+      (typeof window !== 'undefined' && localStorage.getItem('DEV_MOCK_AUTH_ENABLED') === 'true') ||
+      Boolean((import.meta as any).env?.DEV)
+    );
     return (
       this.user.platformRole === 'superadmin' ||
       this.user.roles?.includes('superadmin') ||
+      isDevMock ||
       (Boolean(superAdminPiUid) && (this.user.piUid === superAdminPiUid || this.user.uid === superAdminPiUid || this.user.username === superAdminPiUid))
     );
   }

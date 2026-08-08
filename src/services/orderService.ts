@@ -1,5 +1,5 @@
 import { collection, arrayUnion, doc, getDoc, getDocs, setDoc, updateDoc, query, where, serverTimestamp } from 'firebase/firestore';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
 import { notificationService } from './notificationService';
 import { OrderStatus } from '../types';
 import { getCanonicalRewardUserId } from './rewards/rewardIdentityResolver';
@@ -591,7 +591,6 @@ export const orderService = {
       console.log('[orderService.raiseDispute Step 2 API Call] Preparing fetch request to /api/orders/dispute...');
       let authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       try {
-        const { getFirebaseAuth } = await import('../firebase/config');
         const auth = getFirebaseAuth();
         if (auth && auth.currentUser) {
           const token = await auth.currentUser.getIdToken();

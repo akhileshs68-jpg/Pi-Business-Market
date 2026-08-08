@@ -137,6 +137,57 @@
         "endDate": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "title", "businessId", "bannerUrl", "status"]
+    },
+    "UniversalApproval": {
+      "title": "Universal Approval Request",
+      "description": "Centralized platform approval request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "approvalType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "entityName": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "priority": { "type": "string" },
+        "riskScore": { "type": "number" }
+      },
+      "required": ["id", "approvalType", "entityId", "entityName", "status", "createdAt", "updatedAt", "priority", "riskScore"]
+    },
+    "ApprovalAuditLog": {
+      "title": "Approval Audit Log",
+      "description": "Immutable log of approval actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminUid": { "type": "string" },
+        "adminName": { "type": "string" },
+        "approvalType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "entityName": { "type": "string" },
+        "action": { "type": "string" },
+        "oldStatus": { "type": "string" },
+        "newStatus": { "type": "string" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "adminUid", "adminName", "approvalType", "entityId", "entityName", "action", "oldStatus", "newStatus", "reason", "timestamp"]
+    },
+    "ApprovalNotification": {
+      "title": "Approval Notification",
+      "description": "Notification triggered by an approval action",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recipientUid": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "priority": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "recipientUid", "title", "message", "priority", "read", "createdAt"]
     }
   },
   "firestore": {
@@ -155,6 +206,18 @@
     "/products/{productId}": {
       "schema": "Product",
       "description": "Enterprise product document"
+    },
+    "/universalApprovals/{approvalId}": {
+      "schema": "UniversalApproval",
+      "description": "Centralized universal approval record"
+    },
+    "/approvalAuditLogs/{logId}": {
+      "schema": "ApprovalAuditLog",
+      "description": "Audit trail log of approval actions"
+    },
+    "/approvalNotifications/{notifId}": {
+      "schema": "ApprovalNotification",
+      "description": "Notifications related to approval workflows"
     }
   },
   "indexes": [

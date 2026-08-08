@@ -52,7 +52,29 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setIsFetching(true);
     try {
-      // 1. Fetch businesses
+      // 1. Check if administrative switcher is active for Platform Owners
+      const adminSwitcherBizId = localStorage.getItem('admin_switcher_active_business_id');
+      const adminSwitcherMode = localStorage.getItem('admin_switcher_mode');
+      
+      if (adminSwitcherBizId && (user.platformRole === 'superadmin' || user.roles?.includes('superadmin'))) {
+        const switchedBiz = await businessService.getBusiness(adminSwitcherBizId);
+        if (switchedBiz) {
+          setBusinesses([switchedBiz]);
+          setCurrentBusiness(switchedBiz);
+          const fetchedStores = await storeService.getStoresByBusiness(switchedBiz.id);
+          setStores(fetchedStores);
+          if (fetchedStores.length > 0) {
+            setCurrentStore(fetchedStores[0]);
+          } else {
+            setCurrentStore(null);
+          }
+          setIsWorkspaceReady(true);
+          setIsFetching(false);
+          return;
+        }
+      }
+
+      // 2. Fallback to normal flow
       const fetchedBusinesses = await businessService.getMyBusinesses(user.uid);
       setBusinesses(fetchedBusinesses);
 

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './auth/AuthProvider';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { BusinessProvider } from './context/BusinessContext';
+import { AdminSwitcherBanner } from './components/admin/AdminSwitcherBanner';
 
 // Lazy loaded page components
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -69,6 +70,7 @@ function App() {
       <AuthProvider>
         <BusinessProvider>
           <Suspense fallback={<LoadingFallback />}>
+            <AdminSwitcherBanner />
             <Routes>
           {/* PUBLIC ROUTES */}
           <Route path="/login" element={<LoginPage />} />

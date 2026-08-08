@@ -244,9 +244,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
     try {
-      await authService.updateUserProfile(user.uid, updates);
+      // 1. Instantly update React context states for immediate UI reactivity
       setUser(prev => prev ? { ...prev, ...updates } : null);
       setProfile(prev => prev ? { ...prev, ...updates } : null);
+
+      // 2. Instantly update local storage and memory states
+      try {
+        const { PiBusinessMarketDB } = await import('../services/storage');
+        const storedUser = PiBusinessMarketDB.getCurrentUser();
+        if (storedUser && (storedUser.uid === user.uid || storedUser.piUid === user.uid)) {
+          PiBusinessMarketDB.setCurrentUser({ ...storedUser, ...updates });
+        }
+      } catch (err) {
+        console.warn('[AuthProvider] Local database sync warning:', err);
+      }
+
+      // 3. Sync to Firestore in background; catch and log any remote write failures gracefully
+      try {
+        await authService.updateUserProfile(user.uid, updates);
+      } catch (fsErr) {
+        console.warn('[AuthProvider] Background Firestore profile write warning:', fsErr);
+      }
     } catch (err: any) {
       setError(err.message || 'Update failed');
       throw err;
