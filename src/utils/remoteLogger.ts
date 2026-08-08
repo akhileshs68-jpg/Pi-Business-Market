@@ -5,6 +5,33 @@ import { getAbsoluteUrl } from './urlUtils';
 
 const logQueue: any[] = [];
 let isProcessingQueue = false;
+let consecutiveFailures = 0;
+const MAX_FAILURES = 3;
+
+const SENSITIVE_KEYS = ['apiKey', 'api_key', 'token', 'secret', 'privateKey', 'password', 'authorization', 'bearer', 'accessToken', 'refreshToken', 'walletSeed', 'passphrase'];
+
+function sanitizeData(val: any, depth = 0): any {
+  if (depth > 4) return '[Max Depth]';
+  if (val === null || val === undefined) return val;
+  if (val instanceof Error) {
+    return { name: val.name, message: val.message, stack: val.stack };
+  }
+  if (typeof val !== 'object') return val;
+  if (Array.isArray(val)) return val.map(item => sanitizeData(item, depth + 1));
+
+  const clean: Record<string, any> = {};
+  for (const [key, itemVal] of Object.entries(val)) {
+    const isSensitive = SENSITIVE_KEYS.some(k => key.toLowerCase().includes(k.toLowerCase()));
+    if (isSensitive) {
+      clean[key] = '[REDACTED]';
+    } else if (typeof itemVal === 'object' && itemVal !== null) {
+      clean[key] = sanitizeData(itemVal, depth + 1);
+    } else {
+      clean[key] = itemVal;
+    }
+  }
+  return clean;
+}
 
 export function initRemoteLogger() {
   if (typeof window === 'undefined') return;
@@ -16,24 +43,9 @@ export function initRemoteLogger() {
   const originalFetch = window.fetch;
 
   const sendRemoteLog = (level: string, args: any[]) => {
+    if (consecutiveFailures >= MAX_FAILURES) return;
     try {
-      const formattedArgs = args.map(arg => {
-        if (arg instanceof Error) {
-          return {
-            name: arg.name,
-            message: arg.message,
-            stack: arg.stack
-          };
-        }
-        if (typeof arg === 'object' && arg !== null) {
-          try {
-            return JSON.parse(JSON.stringify(arg));
-          } catch (e) {
-            return String(arg);
-          }
-        }
-        return String(arg);
-      });
+      const sanitizedArgs = args.map(arg => sanitizeData(arg));
 
       const payload = {
         level,
@@ -42,8 +54,8 @@ export function initRemoteLogger() {
         origin: window.location.origin,
         referrer: document.referrer,
         userAgent: navigator.userAgent,
-        message: formattedArgs.join(' '),
-        details: formattedArgs
+        message: sanitizedArgs.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '),
+        details: sanitizedArgs
       };
 
       logQueue.push(payload);
@@ -54,26 +66,42 @@ export function initRemoteLogger() {
   };
 
   const processQueue = async () => {
-    if (isProcessingQueue || logQueue.length === 0) return;
+    if (isProcessingQueue || logQueue.length === 0 || consecutiveFailures >= MAX_FAILURES) return;
     isProcessingQueue = true;
 
-    while (logQueue.length > 0) {
+    while (logQueue.length > 0 && consecutiveFailures < MAX_FAILURES) {
       const payload = logQueue[0];
       try {
-        const debugUrl = getAbsoluteUrl('/api/debug-log');
+        const isPiCdn = typeof window !== 'undefined' && window.location && (
+          window.location.origin.includes('app-cdn.minepi.com') ||
+          window.location.origin.includes('sandbox.minepi.com') ||
+          window.location.origin.endsWith('.pi')
+        );
+        
+        // Use relative /api/debug-log when running on localhost or non-Pi-CDN origin
+        const debugUrl = isPiCdn ? getAbsoluteUrl('/api/debug-log') : '/api/debug-log';
         const fetchToUse = originalFetch || window.fetch;
         
-        await fetchToUse(debugUrl, {
+        const res = await fetchToUse(debugUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        
+
+        if (!res.ok) {
+          consecutiveFailures++;
+        } else {
+          consecutiveFailures = 0;
+        }
         logQueue.shift();
       } catch (err) {
-        // Silently drop or warn quietly to avoid error spam
-        logQueue.shift(); // Remove to prevent blocking queue
+        consecutiveFailures++;
+        logQueue.shift(); // Remove failed item
       }
+    }
+
+    if (consecutiveFailures >= MAX_FAILURES) {
+      logQueue.length = 0; // Clear queue if breaker tripped
     }
 
     isProcessingQueue = false;

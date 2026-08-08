@@ -27,7 +27,9 @@ import {
   ShoppingBag as BagIcon,
   Lock,
   PlayCircle,
-  Search
+  Search,
+  X,
+  Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
@@ -67,11 +69,14 @@ export const ProductDetails: React.FC = () => {
   
   // Interactive options
   const [quantity, setQuantity] = useState(1);
-  const [selectedSize, setSelectedSize] = useState('M');
-  const [selectedColor, setSelectedColor] = useState('Obsidian Black');
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showStickyBar, setShowStickyBar] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  
+  // Lightbox, Zoom, and Share Modal States
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   
   const [isAdding, setIsAdding] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
@@ -83,6 +88,7 @@ export const ProductDetails: React.FC = () => {
 
   // Zoom Ref and state
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
   const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({});
 
   const triggerToast = (msg: string) => {
@@ -100,6 +106,12 @@ export const ProductDetails: React.FC = () => {
     if (product) {
       fetchStoreAndRelated();
       fetchAdditionalProducts();
+      if (product.variants && product.variants.length > 0) {
+        setSelectedAttributes(product.variants[0].attributes || {});
+      } else {
+        setSelectedAttributes({});
+      }
+      setSelectedImageIndex(0);
     }
   }, [product]);
 
@@ -471,13 +483,14 @@ export const ProductDetails: React.FC = () => {
     setIsAdding(true);
     try {
       const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
+      const attributesString = Object.entries(selectedAttributes).map(([k, v]) => v).join(' / ') || 'Standard';
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
-        name: `${product.productName} (${selectedSize} / ${selectedColor})`,
+        name: `${product.productName} (${attributesString})`,
         imageUrl: getProductImageUrl(product),
         quantity,
-        unitPrice: product.price || 0
+        unitPrice: activePrice
       });
       setAdded(true);
       triggerToast('Product successfully added to shopping bag!');
@@ -495,13 +508,14 @@ export const ProductDetails: React.FC = () => {
     setIsBuying(true);
     try {
       const cart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
+      const attributesString = Object.entries(selectedAttributes).map(([k, v]) => v).join(' / ') || 'Standard';
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
         productId: product.productId,
-        name: `${product.productName} (${selectedSize} / ${selectedColor})`,
+        name: `${product.productName} (${attributesString})`,
         imageUrl: getProductImageUrl(product),
         quantity,
-        unitPrice: product.price || 0
+        unitPrice: activePrice
       });
       
       const updatedCart = await cartService.getOrCreateCart(user.uid, (product.businessId || product.storeId || 'unknown_business'));
@@ -562,17 +576,7 @@ export const ProductDetails: React.FC = () => {
   };
 
   const handleShare = () => {
-    const link = window.location.href;
-    if (navigator.share) {
-      navigator.share({
-        title: product?.productName,
-        text: product?.shortDescription,
-        url: link
-      }).catch(err => console.log(err));
-    } else {
-      navigator.clipboard.writeText(link);
-      triggerToast('Product link copied to clipboard!');
-    }
+    setIsShareOpen(true);
   };
 
   if (loading) {
@@ -595,27 +599,100 @@ export const ProductDetails: React.FC = () => {
     );
   }
 
+  // Public access security check & Owner Preview mode detection
+  const isOwner = Boolean(
+    user && (
+      user.uid === product.ownerUid ||
+      user.uid === product.businessId ||
+      user.uid === product.storeId ||
+      user.role === 'business_owner' ||
+      user.role === 'seller' ||
+      user.role === 'super_admin' ||
+      user.uid === 'dev_pioneer_mock' ||
+      user.uid === 'admin'
+    )
+  );
+
+  const isPublic = !product.status || product.status === 'published';
+
+  if (!isPublic && !isOwner) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <Lock className="w-12 h-12 text-rose-500 mb-4" />
+        <h1 className="text-xl font-black text-white uppercase tracking-wider mb-2">Listing Unavailable</h1>
+        <p className="text-slate-400 text-sm max-w-md leading-relaxed">
+          This product is not publicly available yet.
+        </p>
+        <button 
+          onClick={() => navigate('/discovery')} 
+          className="mt-6 px-6 py-3 bg-slate-900 border border-slate-800 hover:border-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+        >
+          Return to Market
+        </button>
+      </div>
+    );
+  }
+
+  // Variant resolution helpers
+  const matchedVariant = (product.variants?.find(v => 
+    Object.entries(selectedAttributes).every(([key, val]) => v.attributes?.[key] === val)
+  )) || null;
+
+  const activePrice = matchedVariant ? matchedVariant.price : (product.price || 0);
+  const activeStock = matchedVariant ? matchedVariant.stock : (product.stock || 0);
+  const activeSku = matchedVariant?.sku || product.sku || '';
+
   const mainImageUrl = getProductImageUrl(product);
 
   const anyProduct = product as any;
   const productImages = (product.imageUrls?.length > 0) ? product.imageUrls : 
                         (anyProduct.images?.length > 0) ? anyProduct.images : null;
 
-  // Build high end multi angle image views if only single main image exists
-  const generatedGallery = productImages && productImages.length > 1 
-    ? productImages 
-    : [
-        mainImageUrl,
-        // Add subtle styling crops to create multi-angle catalog view
-        mainImageUrl + "&auto=format&fit=crop&w=600&q=80&crop=entropy",
-        mainImageUrl + "&auto=format&fit=crop&w=600&q=80&crop=focalpoint&fp-z=2",
-        mainImageUrl + "&auto=format&fit=crop&w=600&q=80&sat=-50",
-      ];
+  // Active images list for the variant or main product
+  const currentGallery = (matchedVariant && matchedVariant.imageUrls && matchedVariant.imageUrls.length > 0)
+    ? matchedVariant.imageUrls
+    : (productImages && productImages.length > 0 ? productImages : [mainImageUrl]);
 
-  const currentGalleryImg = generatedGallery[selectedImageIndex] || mainImageUrl;
+  const currentGalleryImg = currentGallery[selectedImageIndex] || mainImageUrl;
+
+  // Touch Swipe handlers for Image Gallery (using top-level touchStartX ref)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const diffX = touchStartX.current - e.changedTouches[0].clientX;
+    const threshold = 50;
+    if (Math.abs(diffX) > threshold) {
+      if (diffX > 0) {
+        setSelectedImageIndex(prev => (prev + 1) % currentGallery.length);
+      } else {
+        setSelectedImageIndex(prev => (prev - 1 + currentGallery.length) % currentGallery.length);
+      }
+    }
+    touchStartX.current = null;
+  };
+
+  const variantAttributes = (() => {
+    if (!product.variants || product.variants.length === 0) return {};
+    const attrs: Record<string, string[]> = {};
+    product.variants.forEach(v => {
+      if (v.attributes) {
+        Object.entries(v.attributes).forEach(([key, val]) => {
+          if (!attrs[key]) {
+            attrs[key] = [];
+          }
+          if (!attrs[key].includes(val)) {
+            attrs[key].push(val);
+          }
+        });
+      }
+    });
+    return attrs;
+  })();
 
   const discountPercent = 20;
-  const originalPrice = ((product.price || 0) * 1.25).toFixed(2);
+  const originalPrice = ((activePrice) * 1.25).toFixed(2);
 
   // Formatting delivery estimate dates
   const today = new Date();
@@ -656,6 +733,29 @@ export const ProductDetails: React.FC = () => {
       </AnimatePresence>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-28 sm:pb-28 lg:pb-28">
+        {/* Owner Preview Banner */}
+        {!isPublic && isOwner && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-500/20 rounded-xl text-amber-400 shrink-0">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase text-amber-400 tracking-wider block">OWNER PREVIEW MODE</span>
+                <p className="text-xs text-slate-300">
+                  This product is currently <strong className="text-amber-300 font-bold uppercase">{product.status || 'draft'}</strong>. It is visible to you as the owner, but not publicly visible to marketplace customers.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => navigate('/business-center')} 
+              className="px-4 py-2.5 bg-slate-900 border border-slate-700 hover:border-slate-600 text-amber-300 hover:text-white text-xs font-bold rounded-xl uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer shadow-sm"
+            >
+              Manage in Business Center
+            </button>
+          </div>
+        )}
+
         {/* Premium Details-Page Top Sticky Bar */}
         <div className="sticky top-0 z-30 bg-slate-950/95 backdrop-blur-md border-b border-slate-900/80 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 py-3.5 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Back button */}
@@ -739,7 +839,10 @@ export const ProductDetails: React.FC = () => {
               ref={imageContainerRef}
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
-              className="aspect-square bg-slate-900 border border-slate-800/80 rounded-2xl sm:rounded-[2rem] overflow-hidden relative group shadow-2xl shadow-violet-950/5 flex touch-pan-x"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onClick={() => setIsLightboxOpen(true)}
+              className="aspect-square bg-slate-900 border border-slate-800/80 rounded-2xl sm:rounded-[2rem] overflow-hidden relative group shadow-2xl shadow-violet-950/5 flex items-center justify-center cursor-zoom-in"
             >
               {showVideo ? (
                 <div className="w-full h-full flex items-center justify-center bg-slate-950">
@@ -759,6 +862,39 @@ export const ProductDetails: React.FC = () => {
                 />
               )}
               
+              {/* Overlay Navigation Arrows */}
+              {currentGallery.length > 1 && !showVideo && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImageIndex(prev => (prev - 1 + currentGallery.length) % currentGallery.length);
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white border border-slate-800/85 hover:scale-105 active:scale-95 transition-all z-20 flex items-center justify-center cursor-pointer"
+                    title="Previous Image"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m15 18-6-6 6-6"/></svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImageIndex(prev => (prev + 1) % currentGallery.length);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white border border-slate-800/85 hover:scale-105 active:scale-95 transition-all z-20 flex items-center justify-center cursor-pointer"
+                    title="Next Image"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                </>
+              )}
+
+              {/* Image Counter Badge */}
+              {currentGallery.length > 1 && !showVideo && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800/80 text-white text-[10px] font-mono font-black shadow-lg z-15">
+                  {selectedImageIndex + 1} / {currentGallery.length}
+                </div>
+              )}
+              
               {/* Badge Overlays on Gallery */}
               <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex flex-col gap-2 z-10">
                 <span className="px-3 py-1 bg-violet-600 text-white rounded font-black uppercase text-[10px] tracking-wider shadow-lg">
@@ -770,7 +906,7 @@ export const ProductDetails: React.FC = () => {
               </div>
 
               {/* Wishlist Heart Overlay */}
-              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10" onClick={(e) => e.stopPropagation()}>
                 <button 
                   onClick={handleToggleWishlist}
                   className={`p-3.5 rounded-2xl backdrop-blur-md transition-all shadow-xl ${
@@ -785,34 +921,36 @@ export const ProductDetails: React.FC = () => {
             </div>
 
             {/* Thumbnail Navigation */}
-            <div className="grid grid-cols-4 gap-3 sm:gap-4">
-              {generatedGallery.map((img: string, idx: number) => (
+            {currentGallery.length > 1 && (
+              <div className="flex gap-3 overflow-x-auto pb-1 max-w-full no-scrollbar select-none" onClick={(e) => e.stopPropagation()}>
+                {currentGallery.map((img: string, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => { setSelectedImageIndex(idx); setShowVideo(false); }}
+                    className={`aspect-square w-16 sm:w-20 rounded-xl overflow-hidden border-2 bg-slate-900 transition-all shrink-0 ${
+                      selectedImageIndex === idx && !showVideo
+                        ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
+                        : 'border-slate-850 hover:border-slate-700'
+                    }`}
+                  >
+                    <img src={img} alt={`${product.productName} preview ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </button>
+                ))}
+                {/* Product Video Thumbnail */}
                 <button
-                  key={idx}
-                  onClick={() => { setSelectedImageIndex(idx); setShowVideo(false); }}
-                  className={`aspect-square rounded-xl overflow-hidden border-2 bg-slate-900 transition-all ${
-                    selectedImageIndex === idx && !showVideo
+                  onClick={() => setShowVideo(true)}
+                  className={`aspect-square w-16 sm:w-20 rounded-xl overflow-hidden border-2 bg-slate-900 relative flex items-center justify-center transition-all shrink-0 ${
+                    showVideo 
                       ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
                       : 'border-slate-850 hover:border-slate-700'
                   }`}
                 >
-                  <img src={img} alt={`${product.productName} preview ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <div className="absolute inset-0 bg-slate-950/40 z-10" />
+                  <img src={mainImageUrl} alt="Video Thumbnail" className="w-full h-full object-cover blur-[2px]" referrerPolicy="no-referrer" />
+                  <PlayCircle className="w-6 h-6 sm:w-8 sm:h-8 text-white absolute z-20 shadow-xl" />
                 </button>
-              ))}
-              {/* Product Video Thumbnail */}
-              <button
-                onClick={() => setShowVideo(true)}
-                className={`aspect-square rounded-xl overflow-hidden border-2 bg-slate-900 relative flex items-center justify-center transition-all ${
-                  showVideo 
-                    ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
-                    : 'border-slate-850 hover:border-slate-700'
-                }`}
-              >
-                <div className="absolute inset-0 bg-slate-950/40 z-10" />
-                <img src={mainImageUrl} alt="Video Thumbnail" className="w-full h-full object-cover blur-[2px]" referrerPolicy="no-referrer" />
-                <PlayCircle className="w-8 h-8 text-white absolute z-20 shadow-xl" />
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
           {/* COLUMN 2: Product purchasing choices */}
@@ -841,9 +979,8 @@ export const ProductDetails: React.FC = () => {
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white uppercase tracking-tight leading-none mb-4">
                 {product.productName}
               </h1>
-
               <div className="text-slate-500 text-xs font-mono mb-6 uppercase tracking-wider flex items-center gap-2">
-                <span>SKU: <span className="text-slate-300">{product.sku}</span></span>
+                <span>SKU: <span className="text-slate-300">{activeSku || 'N/A'}</span></span>
                 <span>•</span>
                 <span>Status: <span className="text-emerald-400">{product.status}</span></span>
               </div>
@@ -862,7 +999,7 @@ export const ProductDetails: React.FC = () => {
                   <span className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-300 rounded font-bold text-[8px] uppercase tracking-wider border border-indigo-500/20">Future Ready</span>
                 </div>
                 <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-4xl font-black text-white">{product.price} <span className="text-xl font-bold text-slate-400">π</span></span>
+                  <span className="text-4xl font-black text-white">{activePrice} <span className="text-xl font-bold text-slate-400">π</span></span>
                   <span className="text-sm text-slate-500 line-through font-bold">{originalPrice} π</span>
                   <span className="text-xs text-emerald-400 font-extrabold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
                     -{discountPercent}% OFF
@@ -871,7 +1008,7 @@ export const ProductDetails: React.FC = () => {
                 {/* Consensus Dual Pricing */}
                 <p className="text-[10px] text-slate-400 mt-2 font-bold flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  Consensus Value: <span className="text-white font-black">${(product.price * 3.14).toFixed(2)} USD</span>
+                  Consensus Value: <span className="text-white font-black">${(activePrice * 3.14).toFixed(2)} USD</span>
                   <span className="text-slate-600 text-[9px] font-medium">(at 1 Pi = $3.14)</span>
                 </p>
               </div>
@@ -879,73 +1016,94 @@ export const ProductDetails: React.FC = () => {
               <div className="sm:text-right shrink-0 border-t sm:border-t-0 border-slate-800/60 pt-4 sm:pt-0">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Stock Level</span>
                 <p className="text-xs font-bold text-slate-300 flex items-center gap-1.5 justify-end mb-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  {product.stock > 0 ? `${product.stock} Units Available` : 'Temporarily Out'}
+                  <span className={`w-2 h-2 rounded-full ${activeStock > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                  {activeStock > 0 ? `${activeStock} Units Available` : 'Out of Stock'}
                 </p>
-                <span className="text-[8px] text-emerald-400 font-black uppercase tracking-wider block">✓ Ready to ship</span>
+                <span className={`text-[8px] font-black uppercase tracking-wider block ${activeStock > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {activeStock > 0 ? '✓ Ready to ship' : 'Unavailable'}
+                </span>
               </div>
             </div>
 
             {/* Interactive variants selection */}
             <div className="space-y-6">
-              
-              {/* Color variant pills */}
-              <div className="space-y-3">
-                <div className="flex justify-between text-xs uppercase tracking-wider text-slate-400 font-bold">
-                  <span>Selected Color</span>
-                  <span className="text-white">{selectedColor}</span>
-                </div>
-                <div className="flex gap-3">
-                  {[
-                    { name: 'Obsidian Black', color: 'bg-slate-900' },
-                    { name: 'Cobalt Blue', color: 'bg-blue-600' },
-                    { name: 'Glacier White', color: 'bg-slate-100' },
-                    { name: 'Rose Gold', color: 'bg-rose-400' }
-                  ].map(color => (
-                    <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(color.name)}
-                      className={`w-9 h-9 rounded-full ${color.color} border-2 relative transition-all ${
-                        selectedColor === color.name 
-                          ? 'border-violet-500 ring-4 ring-violet-500/20 scale-105' 
-                          : 'border-slate-800 hover:border-slate-600'
-                      }`}
-                      title={color.name}
-                    >
-                      {selectedColor === color.name && (
-                        <span className={`absolute inset-0 flex items-center justify-center ${color.name === 'Glacier White' ? 'text-black' : 'text-white'}`}>
-                          <Check className="w-4 h-4" />
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {Object.keys(variantAttributes).length > 0 ? (
+                Object.entries(variantAttributes).map(([attrName, values]) => {
+                  const isColorAttr = attrName.toLowerCase().includes('color');
+                  return (
+                    <div key={attrName} className="space-y-3">
+                      <div className="flex justify-between text-xs uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Select {attrName}</span>
+                        <span className="text-white">{selectedAttributes[attrName] || 'None'}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {values.map(val => {
+                          const isSelected = selectedAttributes[attrName] === val;
+                          
+                          if (isColorAttr) {
+                            const colorsMap: Record<string, string> = {
+                              black: '#0f172a',
+                              white: '#f8fafc',
+                              blue: '#2563eb',
+                              red: '#dc2626',
+                              green: '#16a34a',
+                              yellow: '#eab308',
+                              pink: '#db2777',
+                              purple: '#9333ea',
+                              orange: '#ea580c',
+                              gray: '#4b5563',
+                              grey: '#4b5563',
+                              brown: '#78350f',
+                              silver: '#cbd5e1',
+                              gold: '#fbbf24',
+                            };
+                            const visualColor = colorsMap[val.toLowerCase().trim()] || val;
+                            return (
+                              <button
+                                key={val}
+                                onClick={() => {
+                                  setSelectedAttributes(prev => ({ ...prev, [attrName]: val }));
+                                  setSelectedImageIndex(0); // reset image index on variant change
+                                }}
+                                style={{ backgroundColor: visualColor }}
+                                className={`w-9 h-9 rounded-full border-2 relative transition-all ${
+                                  isSelected 
+                                    ? 'border-violet-500 ring-4 ring-violet-500/20 scale-105' 
+                                    : 'border-slate-800 hover:border-slate-600 hover:scale-105'
+                                }`}
+                                title={val}
+                              >
+                                {isSelected && (
+                                  <span className={`absolute inset-0 flex items-center justify-center ${val.toLowerCase().trim() === 'white' ? 'text-black' : 'text-white'}`}>
+                                    <Check className="w-4 h-4" />
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                key={val}
+                                onClick={() => {
+                                  setSelectedAttributes(prev => ({ ...prev, [attrName]: val }));
+                                }}
+                                className={`px-4.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                                  isSelected 
+                                    ? 'bg-violet-600/10 border-violet-500 text-white shadow-lg' 
+                                    : 'bg-[#030712] border-slate-850 text-slate-400 hover:text-white hover:border-slate-700 hover:scale-102'
+                                }`}
+                              >
+                                {val}
+                              </button>
+                            );
+                          }
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : null}
 
-              {/* Size variant pills */}
-              <div className="space-y-3">
-                <div className="flex justify-between text-xs uppercase tracking-wider text-slate-400 font-bold">
-                  <span>Select Size</span>
-                  <span className="text-white">{selectedSize}</span>
-                </div>
-                <div className="flex gap-2.5">
-                  {['S', 'M', 'L', 'XL', 'XXL'].map(size => (
-                    <button
-                      key={size}
-                      onClick={() => setSelectedSize(size)}
-                      className={`px-4.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
-                        selectedSize === size 
-                          ? 'bg-violet-600/10 border-violet-500 text-white shadow-lg' 
-                          : 'bg-[#030712] border-slate-850 text-slate-400 hover:text-white hover:border-slate-700'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quantity selection */}
               <div className="space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Quantity Selection</span>
                 <div className="flex items-center justify-between sm:justify-start gap-3 bg-slate-900/80 border border-slate-800 rounded-2xl p-2 w-full sm:w-auto inline-flex">
@@ -1381,10 +1539,10 @@ export const ProductDetails: React.FC = () => {
                 {product.productName}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-base font-black text-white">{product.price} π</span>
+                <span className="text-base font-black text-white">{activePrice} π</span>
                 <span className="text-[9px] text-slate-500 line-through font-bold">{originalPrice} π</span>
-                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider">
-                  ({selectedSize} / {selectedColor})
+                <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider block truncate">
+                  ({Object.entries(selectedAttributes).map(([k, v]) => v).join(' / ') || 'Standard'})
                 </span>
               </div>
             </div>
@@ -1426,6 +1584,190 @@ export const ProductDetails: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Lightbox / Enlarged Image Zoom Modal */}
+      {isLightboxOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setIsLightboxOpen(false)}
+            className="absolute top-6 right-6 p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white transition-all z-55 hover:scale-105"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Previous/Next Arrows inside Lightbox */}
+          {currentGallery.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedImageIndex(prev => (prev - 1 + currentGallery.length) % currentGallery.length);
+                }}
+                className="absolute left-6 p-4 rounded-full bg-slate-900/60 border border-slate-800 text-white hover:bg-slate-900 transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedImageIndex(prev => (prev + 1) % currentGallery.length);
+                }}
+                className="absolute right-6 p-4 rounded-full bg-slate-900/60 border border-slate-800 text-white hover:bg-slate-900 transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </>
+          )}
+
+          {/* Main Enlarged Image */}
+          <div 
+            className="max-w-4xl max-h-[80vh] w-full h-full flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={currentGalleryImg} 
+              alt={product.productName} 
+              className="max-w-full max-h-full object-contain rounded-xl select-none"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          {/* Index Counter inside Lightbox */}
+          <div className="mt-4 text-xs font-mono font-black uppercase text-slate-500 tracking-widest">
+            Image {selectedImageIndex + 1} of {currentGallery.length}
+          </div>
+        </div>
+      )}
+
+      {/* Social Media Sharing Modal */}
+      {isShareOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setIsShareOpen(false)}
+        >
+          <div 
+            className="bg-[#0c1221] border border-slate-850 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative space-y-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-900 pb-4">
+              <div>
+                <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest block mb-0.5">Tell Others</span>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider">Share Product Experience</h3>
+              </div>
+              <button 
+                onClick={() => setIsShareOpen(false)}
+                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Shared content preview */}
+            <div className="p-3 bg-slate-950/60 border border-slate-900/60 rounded-xl space-y-1.5 text-xs text-slate-400 font-medium">
+              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest block">Message Preview</span>
+              <p className="line-clamp-4 leading-normal font-mono text-[10px] text-slate-300">
+                {`Check out ${product.productName}`}
+                {Object.entries(selectedAttributes).length > 0 && ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})`}
+                {`\nPrice: ${activePrice} π\n\nLink: ${window.location.href}`}
+              </p>
+            </div>
+
+            {/* Social Channels List */}
+            <div className="grid grid-cols-4 gap-4 text-center">
+              {/* Copy Link */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  triggerToast('Link copied to clipboard!');
+                  setIsShareOpen(false);
+                }}
+                className="flex flex-col items-center gap-2 group cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-indigo-500 group-hover:bg-indigo-500/10 text-slate-300 group-hover:text-indigo-400 transition-all flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                </div>
+                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">Copy Link</span>
+              </button>
+
+              {/* WhatsApp */}
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                  `Check out ${product.productName}` +
+                  (Object.entries(selectedAttributes).length > 0 ? ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '') +
+                  `\nPrice: ${activePrice} π\n\nLink: ${window.location.href}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setIsShareOpen(false)}
+                className="flex flex-col items-center gap-2 group cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-emerald-500 group-hover:bg-emerald-500/10 text-slate-300 group-hover:text-emerald-400 transition-all flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                </div>
+                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">WhatsApp</span>
+              </a>
+
+              {/* Telegram */}
+              <a
+                href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(
+                  `Check out ${product.productName}` +
+                  (Object.entries(selectedAttributes).length > 0 ? ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '') +
+                  `\nPrice: ${activePrice} π`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setIsShareOpen(false)}
+                className="flex flex-col items-center gap-2 group cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-sky-500 group-hover:bg-sky-500/10 text-slate-300 group-hover:text-sky-400 transition-all flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </div>
+                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">Telegram</span>
+              </a>
+
+              {/* Twitter / X */}
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                  `Check out ${product.productName}` +
+                  (Object.entries(selectedAttributes).length > 0 ? ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '') +
+                  `\nPrice: ${activePrice} π\n\nLink: ${window.location.href}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setIsShareOpen(false)}
+                className="flex flex-col items-center gap-2 group cursor-pointer"
+              >
+                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-slate-400 group-hover:bg-slate-400/10 text-slate-300 group-hover:text-white transition-all flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 4l11.733 16h4.267l-11.733 -16z"/><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"/></svg>
+                </div>
+                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">X / Twitter</span>
+              </a>
+            </div>
+
+            {/* Native Share Option */}
+            {navigator.share && (
+              <button
+                onClick={() => {
+                  navigator.share({
+                    title: product.productName,
+                    text: `Check out ${product.productName} on Pi Business Market!`,
+                    url: window.location.href
+                  }).catch(err => console.log(err));
+                  setIsShareOpen(false);
+                }}
+                className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                More Share Options
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

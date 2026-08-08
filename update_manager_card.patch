@@ -1,0 +1,20 @@
+--- src/components/business/ProductManager.tsx
++++ src/components/business/ProductManager.tsx
+@@ -326,7 +326,16 @@
+ }>(({ p, linkedStoreName, actionLoading, onToggleStatus, onOpenEdit, onArchive, onDelete }) => {
+   const displayImage = p.mainImage || (p.imageUrls && p.imageUrls[0]) || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+   
+-  // Extract variants preview if available
++  const gallery = p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls : (p.mainImage ? [p.mainImage] : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500']);
++  const [imgIdx, setImgIdx] = React.useState(0);
++  
++  // Touch handling
++  const touchStartX = React.useRef(0);
++  const touchEndX = React.useRef(0);
++  
++  // Variant selection
++  const [selectedVariant, setSelectedVariant] = React.useState<any>(null);
++  
+   const hasVariants = p.variants && p.variants.length > 0;
+   let variantPreview = null;
+   if (hasVariants) {
