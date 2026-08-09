@@ -35,13 +35,123 @@ import { notificationService } from './notificationService';
 
 export const shippingService = {
   /**
+   * CALCULATE SHIPPING QUOTE
+   * Dynamic weight & volumetric weight rate calculation
+   */
+  calculateShippingQuote(
+    items: Array<{
+      type?: string;
+      unitPrice?: number;
+      price?: number;
+      quantity?: number;
+      weight?: number;
+      dimensions?: { length?: number; width?: number; height?: number };
+    }>,
+    destinationAddress?: { postalCode?: string; country?: string; city?: string },
+    deliveryMethod: 'shipping' | 'pickup' = 'shipping'
+  ): {
+    shippingCharge: number;
+    courierName: string;
+    estimatedDays: string;
+    expectedDeliveryDate: string;
+    serviceType: string;
+    totalWeightKg: number;
+    volumetricWeightKg: number;
+    isEstimate: boolean;
+  } {
+    if (deliveryMethod === 'pickup' || !items || items.length === 0) {
+      return {
+        shippingCharge: 0,
+        courierName: 'Store Self-Pickup',
+        estimatedDays: '0',
+        expectedDeliveryDate: 'Ready in 1-2 hours',
+        serviceType: 'In-Store Pickup',
+        totalWeightKg: 0,
+        volumetricWeightKg: 0,
+        isEstimate: false
+      };
+    }
+
+    // Filter physical items
+    const physicalItems = items.filter(it => it.type !== 'digital' && it.type !== 'service');
+    if (physicalItems.length === 0) {
+      return {
+        shippingCharge: 0,
+        courierName: 'Digital Instant Delivery',
+        estimatedDays: '0',
+        expectedDeliveryDate: 'Instant Access',
+        serviceType: 'Digital Fulfillment',
+        totalWeightKg: 0,
+        volumetricWeightKg: 0,
+        isEstimate: false
+      };
+    }
+
+    let totalWeight = 0;
+    let totalVolumetricWeight = 0;
+    let totalSubtotal = 0;
+
+    physicalItems.forEach(item => {
+      const qty = item.quantity || 1;
+      const price = item.unitPrice ?? item.price ?? 0;
+      totalSubtotal += price * qty;
+
+      const itemWeight = (item.weight && item.weight > 0) ? item.weight : 0.5; // default 0.5kg
+      totalWeight += itemWeight * qty;
+
+      const l = item.dimensions?.length || 10;
+      const w = item.dimensions?.width || 10;
+      const h = item.dimensions?.height || 5;
+      const vol = (l * w * h) / 5000; // standard volumetric divisor in kg
+      totalVolumetricWeight += vol * qty;
+    });
+
+    const billableWeight = Math.max(totalWeight, totalVolumetricWeight);
+
+    let baseRate = 0.50;
+    if (totalSubtotal > 0 && totalSubtotal < 5) {
+      baseRate = Math.min(0.50, Math.max(0.20, totalSubtotal * 0.15));
+    }
+
+    let extraWeightCharge = 0;
+    if (billableWeight > 1) {
+      extraWeightCharge = (billableWeight - 1) * 0.20; // 0.20 Pi per extra kg
+    }
+
+    let zoneFactor = 1.0;
+    if (destinationAddress?.country && destinationAddress.country.toLowerCase() !== 'usa' && destinationAddress.country.toLowerCase() !== 'us') {
+      zoneFactor = 1.4; // International zone
+    }
+
+    const calculatedCharge = parseFloat(((baseRate + extraWeightCharge) * zoneFactor).toFixed(2));
+
+    const deliveryDate = new Date();
+    deliveryDate.setDate(deliveryDate.getDate() + 5);
+    const expectedDateStr = deliveryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    return {
+      shippingCharge: calculatedCharge,
+      courierName: zoneFactor > 1 ? 'Pi Global Freight Courier' : 'Pi Express Courier',
+      estimatedDays: '3–5 Days',
+      expectedDeliveryDate: expectedDateStr,
+      serviceType: 'Standard Tracked Delivery',
+      totalWeightKg: parseFloat(totalWeight.toFixed(2)),
+      volumetricWeightKg: parseFloat(totalVolumetricWeight.toFixed(2)),
+      isEstimate: true
+    };
+  },
+
+  /**
    * CREATE SHIPMENT
    * Triggered when a merchant starts fulfilling an order
    */
   async createShipment(order: Order, method: ShippingMethod): Promise<string> {
     const db = getFirebaseDb();
     const shipmentId = `SHIP_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const trackingNumber = `AWB-PI-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     
+    const quote = this.calculateShippingQuote(order.items || [], order.shippingAddress, method === ShippingMethod.STORE_PICKUP ? 'pickup' : 'shipping');
+
     const shipment: Shipment = {
       shipmentId,
       orderId: order.orderId,
@@ -49,7 +159,9 @@ export const shippingService = {
       storeId: order.storeId,
       shippingMethod: method,
       status: ShipmentStatus.PENDING,
-      shippingAddress: order.shippingAddress!, // Should exist if physical
+      shippingAddress: order.shippingAddress!,
+      trackingNumber,
+      courierName: quote.courierName,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -59,6 +171,7 @@ export const shippingService = {
     // 1. Create Shipment Doc
     batch.set(doc(db, 'shipments', shipmentId), {
       ...shipment,
+      estimatedDelivery: quote.expectedDeliveryDate,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -69,8 +182,8 @@ export const shippingService = {
       eventId: eventRef.id,
       shipmentId,
       status: ShipmentStatus.PENDING,
-      location: 'Warehouse',
-      description: 'Shipment created and awaiting fulfillment.',
+      location: 'Merchant Warehouse',
+      description: `Shipment package created with ${quote.courierName}. Air Waybill (AWB): ${trackingNumber}. Estimated delivery: ${quote.expectedDeliveryDate}`,
       eventTime: serverTimestamp(),
       createdBy: order.businessId
     });
@@ -83,10 +196,15 @@ export const shippingService = {
       'Logistics Engine'
     );
     
-    // Also update order with shipmentId
+    // Also update order with shipmentId, tracking number and courier
     batch.update(doc(db, 'orders', order.orderId), {
       shipmentId: shipmentId,
       deliveryMethod: method,
+      trackingNumber,
+      courierName: quote.courierName,
+      'logistics.trackingNumber': trackingNumber,
+      'logistics.courierName': quote.courierName,
+      'logistics.estimatedDelivery': quote.expectedDeliveryDate,
       updatedAt: serverTimestamp()
     });
 
@@ -98,7 +216,7 @@ export const shippingService = {
         order.userUid,
         'shipment_update',
         'Order Shipped!',
-        `Your order #${order.orderNumber} has been shipped via ${method}. Tracking: ${shipmentId}`,
+        `Your order #${order.orderNumber} has been dispatched via ${quote.courierName}. AWB Tracking Number: ${trackingNumber}`,
         { entityType: 'shipment', entityId: shipmentId, priority: 'medium', linkTo: `/account/orders/${order.orderId}` }
       );
     } catch (notifErr) {

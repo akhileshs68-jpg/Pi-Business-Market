@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useActiveRole } from '../hooks/useActiveRole';
 import { orderService } from '../services/orderService';
@@ -35,6 +36,7 @@ interface ManagerProps {
 }
 
 export const OrderBookingManager: React.FC<ManagerProps> = ({ type, viewAs }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const activeRole = useActiveRole();
   const [items, setItems] = useState<any[]>([]);
@@ -399,10 +401,40 @@ export const OrderBookingManager: React.FC<ManagerProps> = ({ type, viewAs }) =>
           Syncing records with the secure ledger...
         </div>
       ) : filteredItems.length === 0 ? (
-        <div className="py-24 text-center bg-slate-950/20 border border-slate-900/40 border-dashed rounded-[2rem] space-y-3">
-          <Calendar className="w-12 h-12 text-slate-800 mx-auto" />
-          <h4 className="text-sm font-black text-white uppercase tracking-wider">No matching records found</h4>
-          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">There are no records in this list that match your active search or tab filter.</p>
+        <div className="py-20 text-center bg-slate-950/20 border border-slate-900/40 border-dashed rounded-[2rem] p-6 space-y-4">
+          {type === 'booking' ? (
+            <Calendar className="w-12 h-12 text-slate-800 mx-auto" />
+          ) : (
+            <Package className="w-12 h-12 text-slate-800 mx-auto" />
+          )}
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-wider">
+              {type === 'booking' ? 'No Upcoming Appointments' : 'No Matching Records Found'}
+            </h4>
+            <p className="text-[11px] text-slate-500 max-w-sm mx-auto mt-1">
+              {type === 'booking'
+                ? 'Explore services and consultation slots to book your next appointment.'
+                : 'There are no records in this list that match your active search or tab filter.'}
+            </p>
+          </div>
+          {type === 'booking' && viewAs === 'buyer' && (
+            <button
+              onClick={() => navigate('/directory')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-violet-600/20"
+            >
+              <span>Explore Services</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {type === 'order' && viewAs === 'buyer' && (
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-indigo-600/20"
+            >
+              <span>Explore Marketplace</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-6">

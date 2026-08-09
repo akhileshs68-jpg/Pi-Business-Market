@@ -518,8 +518,8 @@ export const Checkout: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <DeliveryOption 
                       title="Standard Shipping" 
-                      desc="Tracked Delivery (3-5 Days)" 
-                      price={`${summaryBreakdown?.shipping.toFixed(2) || '10.00'} Pi`} 
+                      desc="Tracked Courier Delivery (3-5 Days)" 
+                      price={`${(summaryBreakdown?.shipping ?? 0.50).toFixed(2)} Pi`} 
                       active={deliveryMethod === 'shipping'}
                       onClick={() => setDeliveryMethod('shipping')}
                     />

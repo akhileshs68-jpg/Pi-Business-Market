@@ -21,6 +21,7 @@ import {
 import { getFirebaseDb } from '../firebase/config';
 import { Cart, CartItem, WishlistItem, SearchEntityType } from '../types';
 import { resolveProductPricing, resolveVariantPricing } from './pricing/pricingCompatibility';
+import { shippingService } from './shippingService';
 
 function sanitizeFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
   const clean: Record<string, any> = {};
@@ -315,10 +316,11 @@ export const cartService = {
     const items = await this.getCartItems(cartId);
     const subtotal = items.reduce((acc, item) => acc + item.subtotal, 0);
     
-    // Simple tax/shipping logic for foundation
-    const tax = subtotal * 0.05; // 5% tax
-    const shipping = subtotal > 0 ? 10 : 0; // Flat shipping
-    const grandTotal = subtotal + tax + shipping;
+    // Dynamic tax & shipping logic
+    const tax = parseFloat((subtotal * 0.05).toFixed(2)); // 5% tax
+    const quote = shippingService.calculateShippingQuote(items);
+    const shipping = quote.shippingCharge;
+    const grandTotal = parseFloat((subtotal + tax + shipping).toFixed(2));
 
     await updateDoc(doc(db, 'carts', cartId), {
       subtotal,

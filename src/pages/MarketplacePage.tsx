@@ -23,6 +23,7 @@ import {
   History,
   TrendingUp,
   LayoutGrid,
+  Plus,
   Zap,
   ArrowRight,
   SlidersHorizontal,
@@ -678,30 +679,97 @@ export const MarketplacePage: React.FC = () => {
                   </div>
                   
                   <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight mt-1 flex items-center gap-3">
-                    {activeType === 'all' && "All Marketplace"}
+                    {activeType === 'all' && (
+                      <>
+                        <LayoutGrid className="w-7 h-7 text-violet-400" />
+                        All Marketplace
+                      </>
+                    )}
                     {activeType === 'product' && (
                       <>
                         <ShoppingBag className="w-7 h-7 text-violet-400" />
-                        Products Hub
+                        Products
                       </>
                     )}
-                    {activeType === 'service' && "Browsing Services"}
-                    {activeType === 'business' && "Business Directory"}
-                    {activeType === 'store' && "Merchant Stores"}
-                    {activeType === 'job' && "Career Board"}
+                    {activeType === 'service' && (
+                      <>
+                        <Zap className="w-7 h-7 text-violet-400" />
+                        Services
+                      </>
+                    )}
+                    {activeType === 'business' && (
+                      <>
+                        <Building2 className="w-7 h-7 text-violet-400" />
+                        Businesses
+                      </>
+                    )}
+                    {activeType === 'store' && (
+                      <>
+                        <Store className="w-7 h-7 text-violet-400" />
+                        Stores
+                      </>
+                    )}
+                    {activeType === 'job' && (
+                      <>
+                        <Briefcase className="w-7 h-7 text-violet-400" />
+                        Jobs
+                      </>
+                    )}
                   </h2>
                   <p className="text-xs text-slate-400 mt-2 max-w-xl leading-relaxed">
                     {activeType === 'all' && "Broad cross-entity discovery across all products, services, and merchants."}
-                    {activeType === 'product' && "Discover and buy physical or digital products in the Pi Ecosystem. Filter by high-fidelity taxonomies."}
-                    {activeType === 'service' && "Hire verified service providers, experts, and freelancers."}
-                    {activeType === 'business' && "Connect with leading businesses and registered enterprises."}
-                    {activeType === 'store' && "Browse dedicated vendor storefronts and local shops."}
-                    {activeType === 'job' && "Find Web3 and local jobs offered by Pi Business network."}
+                    {activeType === 'product' && "Discover and buy physical or digital products in the Pi ecosystem."}
+                    {activeType === 'service' && "Discover professional and local services."}
+                    {activeType === 'business' && "Discover businesses and providers."}
+                    {activeType === 'store' && "Discover merchant storefronts."}
+                    {activeType === 'job' && "Discover opportunities and hiring."}
                   </p>
                 </div>
                 
-                {/* Clean, mathematical breadcrumbs for subcategories */}
-                {(selectedCategory || selectedSubcategory || selectedChildCategory) && (
+                <div className="flex flex-col items-start sm:items-end gap-3 min-w-[140px] shrink-0 mt-4 sm:mt-0">
+                  {activeType === 'product' && (
+                    <button 
+                      onClick={() => navigate('/catalog')}
+                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <Plus className="w-4 h-4" /> Add Product
+                    </button>
+                  )}
+                  {activeType === 'service' && (
+                    <button 
+                      onClick={() => navigate('/services')}
+                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <Plus className="w-4 h-4" /> Add Service
+                    </button>
+                  )}
+                  {activeType === 'business' && (
+                    <button 
+                      onClick={() => navigate('/create-business')}
+                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <Plus className="w-4 h-4" /> Add Business
+                    </button>
+                  )}
+                  {activeType === 'store' && (
+                    <button 
+                      onClick={() => navigate('/create-store')}
+                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <Plus className="w-4 h-4" /> Add Store
+                    </button>
+                  )}
+                  {activeType === 'job' && (
+                    <button 
+                      onClick={() => navigate('/employer/jobs')}
+                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <Plus className="w-4 h-4" /> Add Job
+                    </button>
+                  )}
+
+                  {/* Clean, mathematical breadcrumbs for subcategories */}
+                  {(selectedCategory || selectedSubcategory || selectedChildCategory) && (
                   <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/80 px-4 py-2.5 rounded-2xl border border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 sm:mt-0 shadow-lg">
                     <button 
                       onClick={() => {
@@ -759,6 +827,7 @@ export const MarketplacePage: React.FC = () => {
                     </button>
                   </div>
                 )}
+                </div>
               </div>
             </div>
 

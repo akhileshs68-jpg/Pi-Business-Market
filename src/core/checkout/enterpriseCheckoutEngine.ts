@@ -28,6 +28,7 @@ import { orderService } from '../../services/orderService';
 import { paymentService } from '../../services/paymentService';
 import { piPaymentService } from '../../services/piPaymentService';
 import { loyaltyService } from '../../services/loyaltyService';
+import { shippingService } from '../../services/shippingService';
 import { ledgerService } from '../../services/ledgerService';
 import { paymentEngine } from '../../services/wallet/paymentEngine';
 import { masterWalletService } from '../../services/blockchain/masterWalletService';
@@ -252,9 +253,12 @@ export class EnterpriseCheckoutEngine {
 
     const subtotal = session.subtotal || (productSubtotal + serviceSubtotal);
     const discount = session.discount || 0;
-    const shipping = session.shipping || (productSubtotal > 0 ? 10 : 0);
-    const tax = session.tax || (subtotal * 0.05);
-    const grandTotal = session.grandTotal || (subtotal - discount + shipping + tax);
+    
+    // Dynamic shipping quote based on orderItems and address/pickup method
+    const quote = shippingService.calculateShippingQuote(orderItems, session.shippingAddress);
+    const shipping = session.shipping !== undefined && session.shipping !== 10 ? session.shipping : quote.shippingCharge;
+    const tax = session.tax || parseFloat((subtotal * 0.05).toFixed(2));
+    const grandTotal = parseFloat((subtotal - discount + shipping + tax).toFixed(2));
 
     // Calculate BMP reward estimate (10 BMP per 1 Pi spent)
     const bmpRewardsEstimate = Math.floor(grandTotal * 10);

@@ -1935,6 +1935,7 @@ export interface Shipment {
   storeId?: string;
   warehouseId?: string;
   carrierId?: string;
+  courierName?: string;
   trackingNumber?: string;
   shippingMethod: ShippingMethod;
   estimatedDelivery?: string;

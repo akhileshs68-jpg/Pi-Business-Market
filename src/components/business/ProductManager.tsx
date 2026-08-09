@@ -10,7 +10,7 @@ import {
   Search, Loader2, Tag, Layers, Sliders, CheckCircle2,
   AlertCircle, ChevronDown, Check, Globe, RefreshCw, X,
   Upload, Star, Image as ImageIcon, Link as LinkIcon, Share2,
-  Calculator
+  Calculator, Truck
 } from 'lucide-react';
 import { useBusiness } from '../../context/BusinessContext';
 import { useAuth } from '../../auth/useAuth';
@@ -620,6 +620,10 @@ export const ProductManager: React.FC = () => {
     seoTitle: string;
     seoDescription: string;
     featured: boolean;
+    weight: number;
+    length: number;
+    width: number;
+    height: number;
   }>({
     productName: '',
     type: 'physical',
@@ -642,7 +646,11 @@ export const ProductManager: React.FC = () => {
     status: 'published',
     seoTitle: '',
     seoDescription: '',
-    featured: false
+    featured: false,
+    weight: 0.5,
+    length: 10,
+    width: 10,
+    height: 5
   });
 
   const [ratePreview, setRatePreview] = useState<{ piAmount: number | null; error?: string }>({ piAmount: null });
@@ -714,7 +722,11 @@ export const ProductManager: React.FC = () => {
       status: 'published',
       seoTitle: '',
       seoDescription: '',
-      featured: false
+      featured: false,
+      weight: 0.5,
+      length: 10,
+      width: 10,
+      height: 5
     });
     setErrorMsg(null);
     setIsFormOpen(true);
@@ -799,7 +811,11 @@ export const ProductManager: React.FC = () => {
       status: product.status || 'published',
       seoTitle: product.seoTitle || '',
       seoDescription: product.seoDescription || '',
-      featured: product.featured || false
+      featured: product.featured || false,
+      weight: product.weight || 0.5,
+      length: product.dimensions?.length || 10,
+      width: product.dimensions?.width || 10,
+      height: product.dimensions?.height || 5
     });
     setErrorMsg(null);
     setIsFormOpen(true);
@@ -900,6 +916,12 @@ export const ProductManager: React.FC = () => {
         seoTitle: formData.seoTitle,
         seoDescription: formData.seoDescription,
         featured: formData.featured,
+        weight: formData.weight || 0,
+        dimensions: {
+          length: formData.length || 0,
+          width: formData.width || 0,
+          height: formData.height || 0
+        },
         productSlug: slug,
         ownerUid: resolvedOwnerUid,
         sellerId: resolvedOwnerUid,
@@ -1306,6 +1328,63 @@ export const ProductManager: React.FC = () => {
                           <option key={s.storeId} value={s.storeId}>{s.storeName}</option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logistics & Shipping Info */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl space-y-3">
+                  <h4 className="text-xs font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5" /> Package & Shipping Specs (Logistics Readiness)
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400">Weight (kg)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={formData.weight || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        placeholder="0.5"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400">Length (cm)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        value={formData.length || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        placeholder="10"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400">Width (cm)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        value={formData.width || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        placeholder="10"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400">Height (cm)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        value={formData.height || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, height: parseFloat(e.target.value) || 0 }))}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        placeholder="5"
+                      />
                     </div>
                   </div>
                 </div>
