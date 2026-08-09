@@ -50,14 +50,19 @@ export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hid
     }
   };
 
+  const [processingStatusId, setProcessingStatusId] = useState<string | null>(null);
+
   const handleQuickAdvanceStatus = async (e: React.MouseEvent, order: Order, nextStatus: string) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user || processingStatusId === order.orderId) return;
     try {
+      setProcessingStatusId(order.orderId);
       await orderService.updateOrderStatus(order.orderId, nextStatus, user.uid, 'seller', `Advanced status to ${nextStatus}`);
       fetchOrders();
     } catch (err) {
       console.error('Failed status advance', err);
+    } finally {
+      setProcessingStatusId(null);
     }
   };
 
@@ -86,7 +91,7 @@ export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hid
 
   const statusFilterOptions = [
     { label: 'All Orders', value: 'all' },
-    { label: 'New / Pending', value: OrderStatus.PENDING_PAYMENT },
+    { label: 'New', value: OrderStatus.NEW_ORDER },
     { label: 'Accepted', value: OrderStatus.ACCEPTED },
     { label: 'Preparing', value: OrderStatus.PREPARING },
     { label: 'Packed', value: OrderStatus.PACKED },

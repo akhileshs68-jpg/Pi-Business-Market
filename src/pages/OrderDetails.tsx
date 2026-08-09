@@ -287,14 +287,19 @@ export const OrderDetails: React.FC = () => {
     });
   };
 
+  const [statusUpdating, setStatusUpdating] = useState(false);
+
   const handleUpdateStatus = async (status: string, remarks?: string) => {
-    if (!order || !user) return;
+    if (!order || !user || statusUpdating) return;
     try {
+      setStatusUpdating(true);
       const role = isMerchant ? 'seller' : 'buyer';
       await orderService.updateOrderStatus(order.orderId, status, user.uid, role, remarks);
       fetchOrderData();
     } catch (err) {
       console.error('Status update failed', err);
+    } finally {
+      setStatusUpdating(false);
     }
   };
 

@@ -297,7 +297,7 @@ const authenticatePaymentRequest = async (
 
   const endpoint = req.path || req.url;
   console.log(`[AuthenticatePaymentRequest ENTRY] Path: ${req.path}, URL: ${req.url}, Method: ${req.method}`);
-  
+
   if (getApps().length === 0) {
     try {
       initFirebaseAdmin();
@@ -431,8 +431,8 @@ app.use((req, res, next) => {
   const xMatchedPath = req.headers['x-matched-path'] as string | undefined;
 
   // Check if request is explicitly an API request
-  const isApiRequest = 
-    req.url.startsWith('/api') || 
+  const isApiRequest =
+    req.url.startsWith('/api') ||
     (xForwardedUri && xForwardedUri.startsWith('/api')) ||
     req.url.startsWith('/payments') ||
     req.url.startsWith('/orders') ||
@@ -501,7 +501,7 @@ app.use((req, res, next) => {
 
 async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
-  
+
   try {
     initFirebaseAdmin();
     console.log("[Firebase Admin Audit] Verifying Firestore Admin connection before server startup...");
@@ -663,7 +663,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       } else {
         const currencies = 'usd,inr,eur,gbp,aed,sar,cad,aud,jpy,cny';
         const url = `https://api.coingecko.com/api/v3/simple/price?ids=pi-network,pi-network-iou&vs_currencies=${currencies}&include_last_updated_at=true`;
-        
+
         const headers: Record<string, string> = { 'Accept': 'application/json' };
         if (process.env.COINGECKO_API_KEY) {
           headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
@@ -795,7 +795,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   function recordPaymentDebugLog(entry: Partial<PaymentDebugEntry>): PaymentDebugEntry {
     const ts = entry.timestamp || new Date().toISOString();
     const rawText = `${entry.eventName || ''} ${JSON.stringify(entry.rawDetails || '')} ${JSON.stringify(entry.requestBody || '')} ${JSON.stringify(entry.responseBody || '')}`;
-    
+
     const paymentId = entry.paymentId || extractPaymentIdFromText(rawText, entry.rawDetails || entry.requestBody);
     const correlationId = entry.correlationId || extractCorrelationIdFromText(rawText, entry.rawDetails || entry.requestBody);
 
@@ -984,7 +984,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       if (!isConfigured || !apiKey) {
         runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
         console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] PI_NETWORK_API_KEY is missing or unconfigured.`);
-        
+
         if (process.env.NODE_ENV !== 'production') {
           console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Development mode: returning sandbox mock approval success`);
           recordPaymentDebugLog({
@@ -1022,7 +1022,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
       console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] PI_NETWORK_API_KEY configured. Sending POST https://api.minepi.com/v2/payments/${paymentId}/approve...`);
       runtimeLogs.push("[Runtime Log] Sending approval POST to Pi Network API...");
-      
+
       const piReqStartTime = Date.now();
       recordPaymentDebugLog({
         timestamp: new Date().toISOString(),
@@ -1040,7 +1040,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           {},
           { headers: { Authorization: `Key ${apiKey}` }, timeout: 15000 }
         );
-        
+
         const durationMs = Date.now() - piReqStartTime;
         console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Successfully approved payment ${paymentId} with Pi Network Platform API in ${durationMs}ms.`);
         runtimeLogs.push(`[Runtime Log] Pi Network server approved payment: ${paymentId}`);
@@ -1064,11 +1064,11 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         const errorData = axiosError.response?.data;
         const errorStatus = axiosError.response?.status;
         const errorString = JSON.stringify(errorData || axiosError.message || '');
-        
+
         console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Axios error approving payment (${errorStatus}):`, errorString);
 
-        const isAlreadyApproved = 
-          errorString.toLowerCase().includes('already approved') || 
+        const isAlreadyApproved =
+          errorString.toLowerCase().includes('already approved') ||
           errorString.toLowerCase().includes('already_approved') ||
           errorData?.error === 'payment_already_approved' ||
           errorData?.message?.toLowerCase()?.includes('approved');
@@ -1076,7 +1076,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         if (isAlreadyApproved) {
           console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Payment ${paymentId} was ALREADY approved on Pi Network API. Returning success.`);
           runtimeLogs.push(`[Runtime Log] Payment ${paymentId} was already approved on Pi Network API.`);
-          
+
           recordPaymentDebugLog({
             timestamp: new Date().toISOString(),
             source: 'server',
@@ -1116,7 +1116,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       const errorMsg = error.response?.data || error.message;
       console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Exception approving payment:`, errorMsg);
       runtimeLogs.push(`[Runtime Log] Error approving payment: ${JSON.stringify(errorMsg)}`);
-      
+
       recordPaymentDebugLog({
         timestamp: new Date().toISOString(),
         source: 'server',
@@ -1141,13 +1141,13 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     try {
       const { resourceType, resourceId } = req.body;
       const user = (req as any).user;
-      
+
       if (resourceType === 'business') {
         await deleteEngine.hardDeleteBusiness(resourceId, user.uid);
       } else {
         await deleteEngine.hardDeleteResource(resourceType, resourceId, user.uid);
       }
-      
+
       res.json({ success: true });
     } catch (err: any) {
       console.error('[DeleteEngine] Error:', err);
@@ -1159,7 +1159,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   app.post(["/api/orders/dispute", "/orders/dispute"], authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     console.log("[Dispute Endpoint ENTRY] POST /api/orders/dispute called with body:", JSON.stringify(req.body));
-    
+
     try {
       const { orderId, reason, userUid } = req.body;
       const cleanOrderId = (orderId || '').trim();
@@ -1286,7 +1286,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
     console.log(`[${reqTimestamp}] [SERVER_PAYMENT_TRACE] POST /api/payments/complete RECEIVED for paymentId: ${paymentId}, txid: ${txid}. Body:`, JSON.stringify(req.body));
     runtimeLogs.push(`[Runtime Log ENTRY] Reached /api/payments/complete route handler at ${reqTimestamp}`);
-    
+
     const logTx = async (docRef: any, fn: () => any) => {
       const docPath = typeof docRef === 'string' ? docRef : (docRef?.path || '<query>');
       console.log("BEFORE:", docPath);
@@ -1353,7 +1353,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
               runtimeLogs.push(`[Runtime Log] ${msg}`);
               runtimeLogs.push(`[Runtime Log] Final payment status: completed`);
               runtimeLogs.push(`[Runtime Log] RETURN SUCCESS (duplicate check) for order ${existingOrderId}`);
-              
+
               recordPaymentDebugLog({
                 timestamp: new Date().toISOString(),
                 source: 'server',
@@ -1387,7 +1387,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       if (!isConfigured || !apiKey) {
         runtimeLogs.push("[Runtime Log] Security rejection: PI_NETWORK_API_KEY is not configured on this server");
         console.warn(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] PI_NETWORK_API_KEY is missing or unconfigured.`);
-        
+
         if (process.env.NODE_ENV !== 'production') {
           console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Development mode: returning mock completion success`);
           paymentData = { identifier: paymentId, status: 'completed', txid };
@@ -1419,7 +1419,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       } else {
         console.log(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Requesting Pi server completion for payment ${paymentId} with txid ${txid}...`);
         runtimeLogs.push("[Runtime Log] POSTing to Pi Network API v2/payments/.../complete...");
-        
+
         const piReqStartTime = Date.now();
         recordPaymentDebugLog({
           timestamp: new Date().toISOString(),
@@ -1461,8 +1461,8 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
           console.error(`[${new Date().toISOString()}] [SERVER_PAYMENT_TRACE] Axios error completing payment (${errorStatus}):`, errorString);
 
-          const isAlreadyCompleted = 
-            errorString.toLowerCase().includes('already completed') || 
+          const isAlreadyCompleted =
+            errorString.toLowerCase().includes('already completed') ||
             errorString.toLowerCase().includes('already_completed') ||
             errorData?.error === 'payment_already_completed' ||
             errorData?.message?.toLowerCase()?.includes('completed');
@@ -1613,6 +1613,73 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         }];
       }
 
+      // ---------------------------------------------------------
+      // PHASE 5B.1: AUTHORITATIVE PRICING VERIFICATION
+      // ---------------------------------------------------------
+      let authoritativeSubtotal = 0;
+      let authoritativeShipping = sessionData.shipping ?? sessionData.shippingCharge ?? 0;
+      let authoritativeTax = sessionData.tax ?? 0;
+      let authoritativeDiscount = sessionData.discount ?? 0;
+
+      if (db) {
+        for (let i = 0; i < cartItems.length; i++) {
+          let item = cartItems[i];
+          if (item.productId && item.productId !== 'prod_default') {
+            try {
+              let authoritativePrice = item.unitPrice || item.price || 0;
+              let authoritativeName = item.name;
+
+              if (item.variantId) {
+                const variantRef = db.collection('productVariants').doc(item.variantId);
+                const variantSnap = await variantRef.get();
+                if (variantSnap.exists) {
+                  const vData = variantSnap.data();
+                  authoritativePrice = vData.price;
+                  if (vData.variantName) authoritativeName = vData.variantName;
+                }
+              } else {
+                const productRef = db.collection('products').doc(item.productId);
+                const productSnap = await productRef.get();
+                if (productSnap.exists) {
+                  const pData = productSnap.data();
+                  authoritativePrice = pData.price;
+                  if (pData.productName) authoritativeName = pData.productName;
+                }
+              }
+
+              item.unitPrice = authoritativePrice;
+              item.price = authoritativePrice;
+              item.name = authoritativeName;
+              item.subtotal = authoritativePrice * (item.quantity || 1);
+              authoritativeSubtotal += item.subtotal;
+            } catch (e) {
+              console.error(`[Security Alert] Failed to fetch authoritative pricing for productId: ${item.productId}`, e);
+              authoritativeSubtotal += item.subtotal || (item.unitPrice || item.price || 0) * (item.quantity || 1);
+            }
+          } else {
+             authoritativeSubtotal += item.subtotal || (item.unitPrice || item.price || 0) * (item.quantity || 1);
+          }
+        }
+      } else {
+         authoritativeSubtotal = cartItems.reduce((acc, item) => acc + (item.subtotal || (item.unitPrice || item.price || 0) * (item.quantity || 1)), 0);
+      }
+
+      const authoritativeGrandTotal = authoritativeSubtotal + authoritativeTax + authoritativeShipping - authoritativeDiscount;
+      const paidAmount = parseFloat(paymentData?.amount || metadata?.amount || 0);
+
+      if (paidAmount < authoritativeGrandTotal - 0.001) {
+          console.error(`[Security Alert] Payment amount ${paidAmount} is less than authoritative grand total ${authoritativeGrandTotal}!`);
+          throw new Error(`Payment verification failed: Paid amount ${paidAmount} does not match required total ${authoritativeGrandTotal}`);
+      }
+
+      sessionData.grandTotal = authoritativeGrandTotal;
+      sessionData.subtotal = authoritativeSubtotal;
+      sessionData.shipping = authoritativeShipping;
+      sessionData.tax = authoritativeTax;
+      sessionData.discount = authoritativeDiscount;
+      // ---------------------------------------------------------
+
+
       const orderId = `ORD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       finalOrderId = orderId;
 
@@ -1705,7 +1772,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         id: orderId,
         orderId: orderId,
         orderNumber: orderId,
-        orderStatus: "pending_payment",
+        orderStatus: "new_order",
         status: "paid",
         paymentStatus: "completed",
 
@@ -2076,7 +2143,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       } catch (txError: any) {
         console.error(`[Server Transaction Note] Primary database transaction error for order ${orderId}:`, txError?.message || txError);
         runtimeLogs.push(`[Runtime Log] Primary database transaction note: ${txError?.message || txError}`);
-        
+
         try {
           console.warn(`[Server Transaction] Attempting fallback on default database...`);
           const defaultDb = getFirestore();
@@ -2255,7 +2322,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
           message: "Incomplete payment acknowledged in sandbox mode",
         });
       }
-      
+
       console.log("[Pi Incomplete Payment] PI_NETWORK_API_KEY found (length:", apiKey.length, ")");
 
       const isApproved = payment.status?.developer_approved;
@@ -2511,12 +2578,12 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     });
   });
 
-  
+
   app.post("/api/debug-log", async (req, res) => {
     try {
       const payload = req.body || {};
       const messageStr = typeof payload.message === 'string' ? payload.message : JSON.stringify(payload.message || payload);
-      
+
       let httpStatus: number | undefined = undefined;
       let durationMs: number | undefined = undefined;
       let requestBody: any = undefined;
@@ -2551,7 +2618,7 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       });
 
       console.log(`[CLIENT_LOG] Recorded client trace: "${messageStr.slice(0, 100)}"`);
-      
+
       try {
         fs.writeFileSync('/tmp/client_debug.json', JSON.stringify({ latest: recorded, payload }, null, 2));
       } catch (e) {}
@@ -2577,14 +2644,14 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
 
   app.get(["/api/debug-log/latest", "/api/payment-debug/latest", "/api/payment-debug", "/api/debug-log"], (req, res) => {
     res.setHeader("Content-Type", "application/json");
-    
+
     const paymentIdQuery = (req.query.paymentId || req.query.id || req.query.txid) as string;
     const { sessions, unassociatedEvents } = groupLogsBySession(paymentDebugStore);
 
     if (paymentIdQuery) {
-      const matchedEvents = paymentDebugStore.filter(l => 
-        l.paymentId === paymentIdQuery || 
-        l.correlationId === paymentIdQuery || 
+      const matchedEvents = paymentDebugStore.filter(l =>
+        l.paymentId === paymentIdQuery ||
+        l.correlationId === paymentIdQuery ||
         l.eventName.includes(paymentIdQuery)
       );
       const matchedSession = sessions.find(s => s.paymentId === paymentIdQuery || s.correlationId === paymentIdQuery);
@@ -2618,9 +2685,9 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     const pId = req.params.paymentId;
     const { sessions } = groupLogsBySession(paymentDebugStore);
-    const matchedEvents = paymentDebugStore.filter(l => 
-      l.paymentId === pId || 
-      l.correlationId === pId || 
+    const matchedEvents = paymentDebugStore.filter(l =>
+      l.paymentId === pId ||
+      l.correlationId === pId ||
       l.eventName.includes(pId)
     );
     const matchedSession = sessions.find(s => s.paymentId === pId || s.correlationId === pId);
@@ -2688,11 +2755,11 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
       try {
         const res = await fetch('/api/debug-log/latest');
         const data = await res.json();
-        
+
         document.getElementById('summaryCard').innerHTML = \`
-          <strong>Total Sessions:</strong> \${data.totalSessionsCount || 0} | 
-          <strong>Total Events:</strong> \${data.totalLogsCount || 0} | 
-          <strong>Latest Payment ID:</strong> \${data.latestPaymentId || 'None'} | 
+          <strong>Total Sessions:</strong> \${data.totalSessionsCount || 0} |
+          <strong>Total Events:</strong> \${data.totalLogsCount || 0} |
+          <strong>Latest Payment ID:</strong> \${data.latestPaymentId || 'None'} |
           <strong>Latest Status:</strong> \${data.latestSession ? data.latestSession.status : 'N/A'}
         \`;
 
