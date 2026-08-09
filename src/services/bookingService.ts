@@ -27,6 +27,15 @@ export const bookingService = {
     });
   },
 
+  async updateBooking(id: string, updates: any): Promise<void> {
+    const db = getFirebaseDb();
+    const itemRef = doc(db, 'bookings', id);
+    await updateDoc(itemRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  },
+
   async getBookingsBySeller(sellerId: string) {
     const db = getFirebaseDb();
     const q = query(collection(db, 'bookings'), where('sellerId', '==', sellerId));

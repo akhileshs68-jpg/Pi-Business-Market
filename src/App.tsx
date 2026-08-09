@@ -38,6 +38,7 @@ const MerchantAnalytics = lazy(() => import('./pages/MerchantAnalytics'));
 const AdminAnalytics = lazy(() => import('./pages/AdminAnalytics'));
 const AdminConsole = lazy(() => import('./pages/AdminConsole'));
 const BusinessProfile = lazy(() => import('./pages/BusinessProfile').then(m => ({ default: m.BusinessProfile })));
+const ServiceDetails = lazy(() => import('./pages/ServiceDetails').then(m => ({ default: m.ServiceDetails })));
 const DocumentationPortal = lazy(() => import('./pages/DocumentationPortal'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const CartPage = lazy(() => import('./pages/CartPage').then(m => ({ default: m.CartPage })));
@@ -145,7 +146,7 @@ function App() {
           <Route path="/business/:id" element={<BusinessProfile />} />
           <Route path="/store/:id" element={<BusinessProfile />} />
           <Route path="/doctor/:id" element={<BusinessProfile />} />
-          <Route path="/service/:id" element={<BusinessProfile />} />
+          <Route path="/service/:id" element={<ServiceDetails />} />
           <Route path="/company/:id" element={<BusinessProfile />} />
           <Route path="/freelancer/:id" element={<BusinessProfile />} />
           <Route path="/artist/:id" element={<BusinessProfile />} />

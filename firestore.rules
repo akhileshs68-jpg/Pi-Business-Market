@@ -121,7 +121,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         resource.data.userUid == request.auth.uid || 
         isOwner(resource.data.userUid) || 
-        isBusinessMember(resource.data.businessId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessMember(resource.data.businessId)) || 
         isAdmin()
       );
       allow create: if isSignedIn(); // Usually via transaction or invite
@@ -219,12 +219,19 @@ service cloud.firestore {
     }
 
     match /carts/{cartId} {
-      allow read, write: if isSignedIn() && (
-        resource == null || 
+      allow read: if isSignedIn() && (
         resource.data.userUid == request.auth.uid || 
-        incoming().userUid == request.auth.uid || 
         isOwner(resource.data.userUid) || 
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        incoming().userUid == request.auth.uid || 
         isOwner(incoming().userUid) || 
+        isAdmin()
+      );
+      allow update, delete: if isSignedIn() && (
+        resource.data.userUid == request.auth.uid || 
+        isOwner(resource.data.userUid) || 
         isAdmin()
       );
     }

@@ -54,7 +54,7 @@ import { PriceDisplay } from '../pricing/PriceDisplay';
 
 interface BuyerHomeProps {
   user: UserType | null;
-  onSearchSubmit: (query: string) => void;
+  onSearchSubmit: (query: string, category?: string) => void;
   onNavigate: (view: string) => void;
   onCategorySelect: (catId: string) => void;
 }
@@ -513,6 +513,22 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
   
+  // Context-aware dynamic placeholder generator
+  const getSearchPlaceholder = () => {
+    switch (searchCategory) {
+      case 'products':
+        return "Search for physical goods, digital assets and hardware...";
+      case 'services':
+        return "Search for verified freelancers, consulting services & expert builders...";
+      case 'businesses':
+        return "Search for registered enterprises, global suppliers and manufacturers...";
+      case 'stores':
+        return "Search for physical merchant stores, digital boutiques and local shops...";
+      default:
+        return "Search products, services, businesses & stores...";
+    }
+  };
+  
   // Firestore data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
@@ -820,14 +836,16 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
   };
 
   // Handle Search Submission
-  const handleExecuteSearch = (term: string) => {
-    if (!term.trim()) return;
+  const handleExecuteSearch = (term: string, catOverride?: string) => {
     const clean = term.trim();
-    const updated = [clean, ...recentSearches.filter(s => s !== clean)].slice(0, 5);
-    setRecentSearches(updated);
-    localStorage.setItem('pi_marketplace_recent_searches', JSON.stringify(updated));
+    const activeCategory = catOverride || searchCategory;
+    if (clean) {
+      const updated = [clean, ...recentSearches.filter(s => s !== clean)].slice(0, 5);
+      setRecentSearches(updated);
+      localStorage.setItem('pi_marketplace_recent_searches', JSON.stringify(updated));
+    }
     setShowSearchSuggestions(false);
-    onSearchSubmit(clean);
+    onSearchSubmit(clean, activeCategory);
   };
 
   // Load more items for infinite feed
@@ -885,7 +903,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             ].map(type => (
               <button
                 key={type.id}
-                onClick={() => setSearchCategory(type.id as any)}
+                onClick={() => {
+                  setSearchCategory(type.id as any);
+                  handleExecuteSearch(searchVal, type.id);
+                }}
                 className={`px-3 py-1 rounded-lg transition-all shrink-0 ${searchCategory === type.id ? 'bg-violet-600 text-white font-black shadow' : 'bg-slate-950/60 hover:bg-slate-800 text-slate-300'}`}
               >
                 {type.label}
@@ -898,7 +919,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             <Search className="absolute left-3 w-4 h-4 text-slate-500" />
             <input
               type="text"
-              placeholder="Search products, services, businesses & stores..."
+              placeholder={getSearchPlaceholder()}
               value={searchVal}
               onChange={(e) => {
                 setSearchVal(e.target.value);

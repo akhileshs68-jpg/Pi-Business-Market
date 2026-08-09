@@ -39,6 +39,24 @@ export const businessProfileService = {
   async getProfileById(businessId: string) {
     const db = getFirebaseDb();
     if (!businessId) return null;
+
+    // Detect if we are loading a service path and resolve the businessId of the service
+    const isServicePath = typeof window !== 'undefined' && window.location.pathname.includes('/service/');
+    if (isServicePath) {
+      try {
+        const serviceDoc = await getDoc(doc(db, 'services', businessId));
+        if (serviceDoc.exists()) {
+          const serviceData = serviceDoc.data();
+          const canonBusinessId = serviceData.businessId;
+          if (canonBusinessId) {
+            console.log(`[businessProfileService] Resolved service ID "${businessId}" to businessId: "${canonBusinessId}"`);
+            businessId = canonBusinessId;
+          }
+        }
+      } catch (err) {
+        console.warn(`[businessProfileService] getDoc error checking serviceId: ${businessId}`, err);
+      }
+    }
     
     // Determine preferred collection based on pathname
     const isStorePath = typeof window !== 'undefined' && window.location.pathname.includes('/store/');

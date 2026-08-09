@@ -84,6 +84,39 @@ export const searchService = {
   ): Promise<{ results: SearchIndexEntry[], lastVisible: any }> {
     const db = getFirebaseDb();
     let results: SearchIndexEntry[] = [];
+
+    // Synonym utility for backward compatible matching of legacy names
+    const getCategorySynonyms = (cat: string): string[] => {
+      if (!cat) return [];
+      const lower = cat.toLowerCase().trim();
+      const synonyms = [cat];
+      
+      if (lower === 'fashion' || lower === 'fashion & apparel' || lower === 'apparel' || lower === 'clothing') {
+        synonyms.push('Fashion', 'Fashion & Apparel', 'Clothing');
+      }
+      if (lower === 'electronics' || lower === 'smartphones' || lower === 'smartphones & accessories' || lower === 'mobile') {
+        synonyms.push('Electronics', 'Smartphones & Accessories', 'Mobile', 'Mobile Phones');
+      }
+      if (lower === 'services' || lower === 'service') {
+        synonyms.push('Services', 'Digital Services', 'Consulting & Business', 'Local Services');
+      }
+      if (lower === 'digital_services' || lower === 'digital services') {
+        synonyms.push('Digital Services', 'digital_services', 'Web Development', 'Design & Creative', 'Writing & Translation');
+      }
+      if (lower === 'consulting' || lower === 'consulting & business' || lower === 'consulting_business') {
+        synonyms.push('Consulting & Business', 'consulting', 'Financial Consulting', 'Marketing Strategy');
+      }
+      if (lower === 'local_services' || lower === 'local services') {
+        synonyms.push('Local Services', 'local_services', 'Home Maintenance', 'Personal Care');
+      }
+      if (lower === 'home' || lower === 'home & garden' || lower === 'garden' || lower === 'furniture') {
+        synonyms.push('Home & Garden', 'Furniture', 'Home Decor');
+      }
+      if (lower === 'food' || lower === 'beverage' || lower === 'food & beverage') {
+        synonyms.push('Food & Beverage', 'Food', 'Beverage');
+      }
+      return synonyms;
+    };
     
     // ==========================================
     // DEBUGGING AUDIT - FIREBASE TO UI
@@ -99,6 +132,18 @@ export const searchService = {
           snap.forEach(d => {
             const p = d.data();
             if (p.status === 'published' || !p.status) {
+              const categoryIdsList = [
+                ...getCategorySynonyms(p.category || ''),
+                ...getCategorySynonyms(p.subCategory || ''),
+                ...getCategorySynonyms(p.childCategory || ''),
+                p.category || '',
+                p.subCategory || '',
+                p.childCategory || ''
+              ].filter((v, i, self) => v && self.indexOf(v) === i);
+
+              const priceVal = p.price !== undefined ? p.price : (p.basePrice !== undefined ? p.basePrice : 0);
+              const oldPriceVal = p.oldPrice !== undefined ? p.oldPrice : (p.originalPrice !== undefined ? p.originalPrice : 0);
+
               results.push({
                 documentId: `product_${p.productId || d.id}`,
                 entityType: 'product',
@@ -107,14 +152,21 @@ export const searchService = {
                 storeId: p.storeId,
                 title: p.productName || p.name || p.title || '',
                 description: p.shortDescription || p.description || '',
-                keywords: [p.brand || '', p.category || '', ...(p.tags || [])].filter(Boolean),
-                categoryIds: [p.category || ''],
+                keywords: [p.brand || '', p.category || '', p.subCategory || '', ...(p.tags || [])].filter(Boolean),
+                categoryIds: categoryIdsList,
                 visibility: 'public',
                 status: 'published',
-                price: p.basePrice,
-                currency: p.currency,
-                featured: false,
-                metadata: {},
+                price: typeof priceVal === 'string' ? parseFloat(priceVal) : priceVal,
+                currency: p.currency || 'π',
+                featured: p.featured || false,
+                metadata: {
+                  imageUrl: p.imageUrl || (p.images && p.images[0]) || '',
+                  rating: typeof p.rating === 'number' ? p.rating : (p.rating ? parseFloat(p.rating) : 4.8),
+                  reviewCount: typeof p.reviews === 'number' ? p.reviews : (p.reviewCount || 12),
+                  oldPrice: typeof oldPriceVal === 'string' ? parseFloat(oldPriceVal) : oldPriceVal,
+                  isTrending: p.isTrending !== undefined ? p.isTrending : true,
+                  seller: p.seller || p.storeName || 'Verified Merchant',
+                },
                 createdAt: p.createdAt,
                 updatedAt: p.updatedAt
               });
@@ -144,6 +196,10 @@ export const searchService = {
               pass = (b.rating || 0) >= filters.minRating;
             }
             if (pass) {
+              const businessCategories = [
+                ...getCategorySynonyms(b.category || ''),
+                b.category || ''
+              ].filter((v, i, self) => v && self.indexOf(v) === i);
 
               results.push({
                 documentId: `business_${b.id || d.id}`,
@@ -153,11 +209,17 @@ export const searchService = {
                 title: b.displayName || b.businessName || b.name || b.title || '',
                 description: b.description || b.industry || '',
                 keywords: [b.industry || '', b.category || '', b.ownerUid || ''].filter(Boolean),
-                categoryIds: [b.category || ''],
+                categoryIds: businessCategories,
                 visibility: 'public',
                 status: 'published',
-                featured: false,
-                metadata: {},
+                featured: b.featured || false,
+                metadata: {
+                  logoUrl: b.logoUrl || '',
+                  location: b.location || 'Global Hub',
+                  category: b.category || '',
+                  trustScore: b.trustScore || 95,
+                  verified: b.verified || false,
+                },
                 createdAt: b.createdAt,
                 updatedAt: b.updatedAt
               });
@@ -179,6 +241,11 @@ export const searchService = {
             
             // Allow active, pending, or undefined status just to be safe
             if (s.status !== 'archived' && s.status !== 'deleted') {
+              const storeCategories = [
+                ...getCategorySynonyms(s.storeCategory || ''),
+                s.storeCategory || ''
+              ].filter((v, i, self) => v && self.indexOf(v) === i);
+
               results.push({
                 documentId: `store_${s.storeId || d.id}`,
                 entityType: 'store',
@@ -187,11 +254,17 @@ export const searchService = {
                 title: s.storeName || s.name || s.displayName || s.title || '',
                 description: s.description || s.storeType || '',
                 keywords: [s.storeType || '', s.storeCategory || ''].filter(Boolean),
-                categoryIds: [s.storeCategory || ''],
+                categoryIds: storeCategories,
                 visibility: 'public',
                 status: 'published',
-                featured: false,
-                metadata: {},
+                featured: s.featured || false,
+                metadata: {
+                  logoUrl: s.logoUrl || '',
+                  bannerUrl: s.bannerUrl || '',
+                  location: s.location || 'Global Pioneer Hub',
+                  rating: s.rating || 4.8,
+                  productCount: s.productCount || 24,
+                },
                 createdAt: s.createdAt,
                 updatedAt: s.updatedAt
               });
@@ -210,6 +283,13 @@ export const searchService = {
           snap.forEach(d => {
             const s = d.data();
             if (s.status !== 'archived' && s.status !== 'deleted') {
+              const serviceCategories = [
+                ...getCategorySynonyms(s.category || ''),
+                ...getCategorySynonyms(s.subCategory || ''),
+                s.category || '',
+                s.subCategory || ''
+              ].filter((v, i, self) => v && self.indexOf(v) === i);
+
               results.push({
                 documentId: `service_${s.serviceId || d.id}`,
                 entityType: 'service',
@@ -218,14 +298,19 @@ export const searchService = {
                 title: s.title || s.name || s.serviceName || '',
                 description: s.description || '',
                 keywords: [s.category || '', s.subCategory || '', s.locationType || ''].filter(Boolean),
-                categoryIds: [s.category || ''],
+                categoryIds: serviceCategories,
                 location: s.serviceArea,
                 visibility: 'public',
                 status: 'published',
                 price: s.basePrice,
                 currency: s.currency,
-                featured: false,
-                metadata: {},
+                featured: s.featured || false,
+                metadata: {
+                  imageUrl: s.image || s.coverImage || s.imageUrl || 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500',
+                  rating: s.rating || 4.9,
+                  reviewCount: s.reviews || 28,
+                  seller: s.seller || s.providerName || 'Certified Expert',
+                },
                 createdAt: s.createdAt,
                 updatedAt: s.updatedAt
               });
@@ -256,8 +341,13 @@ export const searchService = {
                 status: 'published',
                 price: j.salaryMin,
                 currency: j.currency,
-                featured: false,
-                metadata: {},
+                featured: j.featured || false,
+                metadata: {
+                  department: j.department || '',
+                  employmentType: j.employmentType || 'Full-time',
+                  workMode: j.workMode || 'remote',
+                  salaryMax: j.salaryMax || 0,
+                },
                 createdAt: j.createdAt,
                 updatedAt: j.updatedAt
               });

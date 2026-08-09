@@ -38,6 +38,7 @@ export const CustomerOrders: React.FC = () => {
   
   // High level Section State
   const [activeSection, setActiveSection] = useState<'purchases' | 'sales' | 'bookings'>('purchases');
+  const [bookingViewMode, setBookingViewMode] = useState<'buyer' | 'seller'>('buyer');
 
   useEffect(() => {
     if (user) {
@@ -253,11 +254,36 @@ export const CustomerOrders: React.FC = () => {
 
         {activeSection === 'bookings' && (
           <div className="animate-fade-in bg-slate-900/10 border border-slate-900 rounded-[2.5rem] p-4 sm:p-8">
-            <div className="mb-6">
-              <h2 className="text-lg font-black text-white uppercase tracking-wider mb-1">Service Appointment Bookings</h2>
-              <p className="text-slate-500 text-xs">Manage appointment slots, live consulting bookings, and service fulfillment.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-lg font-black text-white uppercase tracking-wider mb-1">Service Appointment Bookings</h2>
+                <p className="text-slate-500 text-xs">Manage appointment slots, live consulting bookings, and service fulfillment.</p>
+              </div>
+              
+              <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 self-start sm:self-center">
+                <button
+                  onClick={() => setBookingViewMode('buyer')}
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    bookingViewMode === 'buyer' 
+                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20' 
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  My Bookings (Buyer)
+                </button>
+                <button
+                  onClick={() => setBookingViewMode('seller')}
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    bookingViewMode === 'seller' 
+                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20' 
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  My Schedule (Provider)
+                </button>
+              </div>
             </div>
-            <OrderBookingManager type="booking" viewAs="seller" />
+            <OrderBookingManager type="booking" viewAs={bookingViewMode} />
           </div>
         )}
       </main>

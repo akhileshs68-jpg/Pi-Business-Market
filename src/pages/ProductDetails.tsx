@@ -1335,8 +1335,8 @@ export const ProductDetails: React.FC = () => {
                       <div className="flex items-start gap-3.5 border-t border-slate-900/60 pt-3">
                         <Lock className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                         <div>
-                          <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-0.5">Safe Pioneer Escrow Service</h4>
-                          <p className="leading-relaxed text-slate-400">Pi network balance is secure. Escrow funds are only dispersed to merchant upon customer delivery confirmation.</p>
+                          <h4 className="text-white font-black uppercase text-[10px] tracking-wider mb-0.5">7-Day Buyer Protection</h4>
+                          <p className="leading-relaxed text-slate-400">Merchant payout is held for 7 days after successful payment.</p>
                         </div>
                       </div>
                     </div>

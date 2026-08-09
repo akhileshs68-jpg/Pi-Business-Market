@@ -69,6 +69,7 @@ interface NavbarProps {
   searchQuery?: string;
   onSearchChange?: (val: string) => void;
   onSearchSubmit?: (val: string) => void;
+  searchPlaceholder?: string;
 }
 
 function NavbarComponent({
@@ -81,7 +82,8 @@ function NavbarComponent({
   onToggleCart,
   searchQuery,
   onSearchChange,
-  onSearchSubmit
+  onSearchSubmit,
+  searchPlaceholder
 }: NavbarProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -388,7 +390,7 @@ function NavbarComponent({
                   onNavigate('discovery');
                 }
               }}
-              placeholder="Search products..."
+              placeholder={searchPlaceholder || "Search products, services, businesses or stores..."}
               className="w-full bg-slate-900 border border-slate-850 focus:border-violet-500 rounded-xl py-1.5 pl-7 sm:pl-9 pr-3 text-[10px] sm:text-xs font-bold text-white placeholder:text-slate-600 outline-none transition-all shadow-inner"
             />
             <Search className="absolute left-2.5 top-2.5 sm:left-3 sm:top-3 w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500" />

@@ -7,11 +7,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Star, Share2, ShoppingBag, Eye, Heart, Store, Tag, 
-  ChevronLeft, ChevronRight, Check, CheckCircle2, ShieldCheck
+  ChevronLeft, ChevronRight, Check, CheckCircle2, ShieldCheck, Scale
 } from 'lucide-react';
 import { Product } from '../../types';
 import { useAuth } from '../../auth/useAuth';
 import { cartService } from '../../services/cartService';
+import { WishlistService } from '../../services/wishlistService';
 import { PriceDisplay } from '../pricing/PriceDisplay';
 import { resolveProductPricing, resolveVariantPricing } from '../../services/pricing/pricingCompatibility';
 
@@ -88,6 +89,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const [isAdding, setIsAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+
+  useEffect(() => {
+    const wishlist = WishlistService.getLocalWishlist();
+    const compare = WishlistService.getLocalCompare();
+    setIsWishlisted(wishlist.includes(product.productId));
+    setIsComparing(compare.includes(product.productId));
+  }, [product.productId]);
+
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const wishStatus = await WishlistService.toggleWishlist(product.productId, user?.uid);
+    setIsWishlisted(wishStatus);
+  };
+
+  const handleToggleCompare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { inCompare } = WishlistService.toggleCompare(product.productId);
+    setIsComparing(inCompare);
+  };
   
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -217,6 +240,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     });
   }
 
+  const currentPrice = displayPrice;
+  const originalPrice = activeVariant?.comparePrice || product.comparePrice || 0;
+  const hasDiscount = originalPrice > currentPrice && originalPrice > 0;
+  const discountPct = hasDiscount ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
+
+  const rating = (product as any).rating ?? (product as any).averageRating ?? product.metrics?.performanceScore ?? null;
+  const reviewCount = (product as any).reviewCount ?? product.metrics?.views ?? null;
+  const sellerName = (product as any).seller || product.brand || 'Verified Merchant';
+  const isVerifiedMerchant = (product as any).isVerified || product.featured || sellerName.toLowerCase().includes('verified');
+
+  const showEscrowBadge = currentPrice > 0 && product.status !== 'draft';
+
   return (
     <>
       <div 
@@ -251,6 +286,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 referrerPolicy="no-referrer"
               />
               
+              {/* Floating Action Badges & Buttons over Image */}
+              {hasDiscount && (
+                <div className="absolute top-2 left-2 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg z-10 select-none">
+                  -{discountPct}% OFF
+                </div>
+              )}
+
+              <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10" onClick={e => e.stopPropagation()}>
+                <button
+                  title="Compare Item"
+                  onClick={handleToggleCompare}
+                  className={`p-1.5 rounded-lg border backdrop-blur-md transition-all ${
+                    isComparing
+                      ? 'bg-indigo-600/95 border-indigo-500 text-white shadow-md'
+                      : 'bg-black/50 hover:bg-black/85 border-white/10 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Scale className="w-3 h-3" />
+                </button>
+                <button
+                  title="Wishlist"
+                  onClick={handleToggleWishlist}
+                  className={`p-1.5 rounded-lg border backdrop-blur-md transition-all ${
+                    isWishlisted
+                      ? 'bg-rose-600/95 border-rose-500 text-white shadow-md'
+                      : 'bg-black/50 hover:bg-black/85 border-white/10 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Heart className={`w-3 h-3 ${isWishlisted ? 'fill-white' : ''}`} />
+                </button>
+              </div>
+
               {gallery.length > 1 && (
                 <>
                   <div className="absolute bottom-1.5 inset-x-0 flex justify-center gap-1 z-10">
@@ -258,7 +325,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       <div key={i} className={`h-1 rounded-full ${i === imgIdx ? 'w-3 bg-white' : 'w-1 bg-white/50'}`} />
                     ))}
                   </div>
-                  <div className="absolute top-1 left-1 bg-black/60 text-white text-[7px] font-black px-1.5 py-0.5 rounded backdrop-blur-sm z-10">
+                  <div className="absolute bottom-1.5 left-1.5 bg-black/60 text-white text-[7px] font-black px-1.5 py-0.5 rounded backdrop-blur-sm z-10">
                     {imgIdx + 1} / {gallery.length}
                   </div>
                   
@@ -280,9 +347,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest line-clamp-1 mb-0.5">
                   {product.category || 'Product'}
                 </span>
-                <span className="flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded">
-                  <Star className="w-2.5 h-2.5 fill-current" /> 4.5
-                </span>
+                {rating !== null && (
+                  <span className="flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded shrink-0">
+                    <Star className="w-2.5 h-2.5 fill-current" /> {rating} {reviewCount !== null ? `(${reviewCount})` : ''}
+                  </span>
+                )}
               </div>
               
               <h3 className="text-xs sm:text-sm font-extrabold text-white leading-tight line-clamp-2 mt-0.5 group-hover:text-indigo-300 transition-colors">
@@ -292,22 +361,47 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <p className="text-[9px] text-slate-400 line-clamp-1 mt-1 font-medium">
                 {product.shortDescription || product.description}
               </p>
+
+              {/* Dynamic Buyer Protection Badge */}
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {showEscrowBadge && (
+                  <span 
+                    title="Merchant payout is held for 7 days after successful payment."
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-[7px] font-black uppercase tracking-wider select-none cursor-help"
+                  >
+                    <ShieldCheck className="w-2 h-2 text-amber-400" /> 7-Day Buyer Protection
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="mt-2 flex flex-col gap-1">
-              <PriceDisplay 
-                item={activeVariant || product} 
-                parentProduct={hasVariants ? product : undefined}
-                type={hasVariants && activeVariant ? 'variant' : 'product'}
-                size="sm"
-              />
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <PriceDisplay 
+                  item={activeVariant || product} 
+                  parentProduct={hasVariants ? product : undefined}
+                  type={hasVariants && activeVariant ? 'variant' : 'product'}
+                  size="sm"
+                />
+                {hasDiscount && (
+                  <div className="flex items-center gap-1 shrink-0 select-none">
+                    <span className="text-[10px] text-slate-500 line-through font-medium">
+                      {originalPrice} π
+                    </span>
+                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">
+                      -{discountPct}%
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="flex items-center justify-between">
                 <span className={`text-[9px] font-bold ${displayStock > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {displayStock > 0 ? `${displayStock} units available` : 'Out of Stock'}
                 </span>
-                {product.storeId && (
-                  <span className="text-[8px] flex items-center gap-0.5 text-slate-500 font-bold truncate max-w-[80px]">
-                    <Store className="w-2.5 h-2.5" /> Store
+                {sellerName && (
+                  <span className="text-[8px] flex items-center gap-0.5 text-slate-500 font-bold truncate max-w-[100px]" title={sellerName}>
+                    <Store className="w-2.5 h-2.5 text-violet-400 shrink-0" /> {sellerName}
+                    {isVerifiedMerchant && <Check className="w-2 h-2 text-emerald-400 shrink-0" />}
                   </span>
                 )}
               </div>

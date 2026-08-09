@@ -17,6 +17,7 @@ import {
   serverTimestamp,
   increment
 } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { getFirebaseDb } from '../firebase/config';
 import { logger } from '../core/logger';
 import { analyticsService } from './analyticsService';
@@ -472,6 +473,10 @@ export class CampaignService {
    */
   private async seedDefaultCampaigns(): Promise<void> {
     try {
+      const auth = getAuth();
+      if (!auth.currentUser) {
+        return; // Do not try to seed campaigns if not signed in, prevents missing permission error
+      }
       const db = getFirebaseDb();
       for (const camp of DEFAULT_BANNER_CAMPAIGNS) {
         const ref = doc(db, 'campaigns', camp.id);

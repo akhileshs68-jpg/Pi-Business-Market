@@ -34,7 +34,7 @@ export const HomePage: React.FC = () => {
         <div>
           <BuyerHome 
             user={user} 
-            onSearchSubmit={(val) => navigate('/marketplace', { state: { query: val } })}
+            onSearchSubmit={(val, cat) => navigate('/marketplace', { state: { query: val, category: cat } })}
             onNavigate={(view) => navigate(`/${view}`)}
             onCategorySelect={(catId) => {
               navigate('/marketplace', { state: { category: catId } });

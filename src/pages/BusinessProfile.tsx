@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { businessProfileService } from '../services/businessProfileService';
 import { businessService } from '../services/businessService';
+import { bookingService } from '../services/bookingService';
+import { motion, AnimatePresence } from 'motion/react';
 import { BUSINESS_PROFILE_CONFIG } from '../config/businessProfileConfig';
 import { BusinessProfileForm } from '../components/BusinessProfileForm';
 import Navbar from '../components/Navbar';
@@ -11,7 +13,7 @@ import { Product } from '../types';
 import { 
   Edit2, Eye, MapPin, Mail, Phone, Globe, Shield, Star, Briefcase, 
   ExternalLink, MessageSquare, Share2, Package, Building2, Store, 
-  ShieldCheck, CheckCircle2, ArrowLeft, Plus, Copy, Check 
+  ShieldCheck, CheckCircle2, ArrowLeft, Plus, Copy, Check, X, Calendar, Clock
 } from 'lucide-react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
@@ -37,6 +39,70 @@ export const BusinessProfile: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
+
+  // Service Booking state
+  const [selectedServiceForBooking, setSelectedServiceForBooking] = useState<any | null>(null);
+  const [bookingDate, setBookingDate] = useState<string>('');
+  const [bookingTime, setBookingTime] = useState<string>('');
+  const [bookingNotes, setBookingNotes] = useState<string>('');
+  const [bookingSubmitting, setBookingSubmitting] = useState<boolean>(false);
+  const [bookingSuccess, setBookingSuccess] = useState<boolean>(false);
+
+  const handleCreateBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedServiceForBooking || !user) return;
+    if (!bookingDate || !bookingTime) {
+      alert('Please select both a booking date and time.');
+      return;
+    }
+
+    setBookingSubmitting(true);
+    try {
+      const dbPrice = selectedServiceForBooking.basePrice || selectedServiceForBooking.price || 0;
+      const dbCurrency = selectedServiceForBooking.currency || 'π';
+      
+      const bookingPayload = {
+        buyerId: user.uid,
+        sellerId: profileData.ownerUid || profileData.ownerId || '',
+        businessId: profileData.id || profileData.businessId || '',
+        serviceId: selectedServiceForBooking.id || selectedServiceForBooking.serviceId || '',
+        title: selectedServiceForBooking.serviceName || selectedServiceForBooking.title || 'Service Appointment',
+        description: selectedServiceForBooking.description || '',
+        price: dbPrice,
+        currency: dbCurrency,
+        grandTotal: dbPrice,
+        items: [
+          {
+            serviceId: selectedServiceForBooking.id || selectedServiceForBooking.serviceId || '',
+            title: selectedServiceForBooking.serviceName || selectedServiceForBooking.title || 'Service Appointment',
+            price: dbPrice,
+          }
+        ],
+        bookingDate,
+        bookingTime,
+        bookingNotes,
+        bookingStatus: 'pending',
+      };
+
+      await bookingService.createBooking(bookingPayload);
+      setBookingSuccess(true);
+      setBookingDate('');
+      setBookingTime('');
+      setBookingNotes('');
+      
+      // Auto close and redirect to bookings view
+      setTimeout(() => {
+        setSelectedServiceForBooking(null);
+        setBookingSuccess(false);
+        navigate('/orders');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to submit booking:', err);
+      alert('Failed to submit booking request. Please try again.');
+    } finally {
+      setBookingSubmitting(false);
+    }
+  };
 
   // Sync window profile context
   useEffect(() => {
@@ -649,10 +715,25 @@ export const BusinessProfile: React.FC = () => {
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {storeServices.map((svc) => (
-                          <div key={svc.id} className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2">
-                            <h4 className="text-sm font-bold text-white">{svc.serviceName || svc.title || 'Service'}</h4>
-                            <p className="text-xs text-slate-400 line-clamp-2">{svc.description}</p>
-                            <span className="text-xs font-black text-indigo-400 block">{svc.price ? `${svc.price} π` : 'Contact for Quote'}</span>
+                          <div 
+                            key={svc.id} 
+                            onClick={() => setSelectedServiceForBooking(svc)}
+                            className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 hover:border-violet-500/50 transition-all cursor-pointer space-y-3 relative group flex flex-col justify-between"
+                          >
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-black text-white group-hover:text-violet-400 transition-colors uppercase tracking-tight">{svc.serviceName || svc.title || 'Service'}</h4>
+                              <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{svc.description || 'No description provided.'}</p>
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-900">
+                              <span className="text-sm font-black text-violet-400">
+                                {svc.price !== undefined ? `${svc.price} π` : 'Contact for Quote'}
+                              </span>
+                              <button 
+                                className="px-3 py-1 bg-violet-600/10 hover:bg-violet-600 border border-violet-500/20 hover:border-violet-500 text-violet-400 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                              >
+                                Book Service
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -762,6 +843,150 @@ export const BusinessProfile: React.FC = () => {
         resourceName={profileData?.businessName || profileData?.name || 'this business'}
       />
       {deleteStatus && <DeleteProgressDialog isOpen={!!deleteStatus} status={deleteStatus} />}
+
+      {/* Service Booking Request Dialog */}
+      <AnimatePresence>
+        {selectedServiceForBooking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!bookingSubmitting) setSelectedServiceForBooking(null);
+              }}
+              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+
+            {/* Modal Body */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-lg p-6 sm:p-8 relative overflow-hidden shadow-2xl z-10 space-y-6"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="px-2.5 py-1 bg-violet-600/10 border border-violet-500/20 text-violet-400 rounded-full text-[9px] font-black uppercase tracking-wider block w-max mb-2">
+                    Service Appointment Request
+                  </span>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    {selectedServiceForBooking.serviceName || selectedServiceForBooking.title || 'Book Service'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Provided by {profileData?.businessName || 'Verified Professional'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={bookingSubmitting}
+                  onClick={() => setSelectedServiceForBooking(null)}
+                  className="p-2 bg-slate-950 border border-slate-850 hover:border-slate-700 text-slate-500 hover:text-white rounded-full transition-all disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {bookingSuccess ? (
+                /* Success View */
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="py-12 flex flex-col items-center justify-center text-center space-y-4"
+                >
+                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/5">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Booking Requested!</h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                      Your booking request has been sent to the service provider. You are being redirected to your Bookings list.
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                /* Booking Form */
+                <form onSubmit={handleCreateBooking} className="space-y-4">
+                  {/* Service Price Info */}
+                  <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850/60 flex justify-between items-center">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Estimated Service Total:</span>
+                    <span className="text-lg font-black text-violet-400">
+                      {selectedServiceForBooking.basePrice || selectedServiceForBooking.price || 0} π
+                    </span>
+                  </div>
+
+                  {/* Date & Time Selectors */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-violet-400" /> Target Date
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        disabled={bookingSubmitting}
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-violet-400" /> Target Time
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        disabled={bookingSubmitting}
+                        value={bookingTime}
+                        onChange={(e) => setBookingTime(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Booking Notes / Special Requests
+                    </label>
+                    <textarea
+                      disabled={bookingSubmitting}
+                      value={bookingNotes}
+                      onChange={(e) => setBookingNotes(e.target.value)}
+                      placeholder="Specify details, requirements, or special instructions for the provider..."
+                      rows={3}
+                      className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-850/50">
+                    <button
+                      type="button"
+                      disabled={bookingSubmitting}
+                      onClick={() => setSelectedServiceForBooking(null)}
+                      className="px-4 py-2 bg-slate-950 hover:bg-slate-900 border border-slate-850 text-slate-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bookingSubmitting || !user}
+                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {bookingSubmitting ? 'Requesting...' : 'Request Booking'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
