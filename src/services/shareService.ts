@@ -29,7 +29,7 @@ export interface ShareTargetConfig {
   colorClass: string;
   bgClass: string;
   borderClass: string;
-  getShareUrl: (url: string, title: string, text: string) => string;
+  getShareUrl: (url: string, title: string, text: string, image?: string) => string;
 }
 
 export interface ShareEventRecord {
@@ -76,7 +76,7 @@ export const SHARE_TARGETS: ShareTargetConfig[] = [
     colorClass: 'text-emerald-400',
     bgClass: 'bg-emerald-950/40 hover:bg-emerald-900/60',
     borderClass: 'border-emerald-500/30',
-    getShareUrl: (url, title, text) => `https://api.whatsapp.com/send?text=${encodeURIComponent(`${text}\n${url}`)}`
+    getShareUrl: (url, title, text) => `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`
   },
   {
     id: 'whatsapp_business',
@@ -106,15 +106,6 @@ export const SHARE_TARGETS: ShareTargetConfig[] = [
     getShareUrl: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
   },
   {
-    id: 'messenger',
-    name: 'FB Messenger',
-    iconName: 'MessageCircle',
-    colorClass: 'text-indigo-400',
-    bgClass: 'bg-indigo-950/40 hover:bg-indigo-900/60',
-    borderClass: 'border-indigo-500/30',
-    getShareUrl: (url) => `fb-messenger://share?link=${encodeURIComponent(url)}`
-  },
-  {
     id: 'x_twitter',
     name: 'X (Twitter)',
     iconName: 'Twitter',
@@ -130,61 +121,7 @@ export const SHARE_TARGETS: ShareTargetConfig[] = [
     colorClass: 'text-cyan-400',
     bgClass: 'bg-cyan-950/40 hover:bg-cyan-900/60',
     borderClass: 'border-cyan-500/30',
-    getShareUrl: (url, title) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
-  },
-  {
-    id: 'instagram',
-    name: 'Instagram',
-    iconName: 'Instagram',
-    colorClass: 'text-pink-400',
-    bgClass: 'bg-pink-950/40 hover:bg-pink-900/60',
-    borderClass: 'border-pink-500/30',
-    getShareUrl: (url) => `https://instagram.com`
-  },
-  {
-    id: 'threads',
-    name: 'Threads',
-    iconName: 'AtSign',
-    colorClass: 'text-purple-400',
-    bgClass: 'bg-purple-950/40 hover:bg-purple-900/60',
-    borderClass: 'border-purple-500/30',
-    getShareUrl: (url, title, text) => `https://www.threads.net/intent/post?text=${encodeURIComponent(`${text} ${url}`)}`
-  },
-  {
-    id: 'discord',
-    name: 'Discord',
-    iconName: 'Disc',
-    colorClass: 'text-violet-400',
-    bgClass: 'bg-violet-950/40 hover:bg-violet-900/60',
-    borderClass: 'border-violet-500/30',
-    getShareUrl: (url) => `https://discord.com/channels/@me`
-  },
-  {
-    id: 'signal',
-    name: 'Signal',
-    iconName: 'Shield',
-    colorClass: 'text-blue-300',
-    bgClass: 'bg-blue-900/40 hover:bg-blue-800/60',
-    borderClass: 'border-blue-400/30',
-    getShareUrl: (url, title, text) => `sgnl://send?text=${encodeURIComponent(`${text}\n${url}`)}`
-  },
-  {
-    id: 'snapchat',
-    name: 'Snapchat',
-    iconName: 'Smartphone',
-    colorClass: 'text-yellow-300',
-    bgClass: 'bg-yellow-950/40 hover:bg-yellow-900/60',
-    borderClass: 'border-yellow-500/30',
-    getShareUrl: (url) => `snapchat://creativeKitWebShare?url=${encodeURIComponent(url)}`
-  },
-  {
-    id: 'pinterest',
-    name: 'Pinterest',
-    iconName: 'ExternalLink',
-    colorClass: 'text-red-400',
-    bgClass: 'bg-red-950/40 hover:bg-red-900/60',
-    borderClass: 'border-red-500/30',
-    getShareUrl: (url, title) => `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}&description=${encodeURIComponent(title)}`
+    getShareUrl: (url) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
   },
   {
     id: 'reddit',
@@ -193,7 +130,16 @@ export const SHARE_TARGETS: ShareTargetConfig[] = [
     colorClass: 'text-orange-400',
     bgClass: 'bg-orange-950/40 hover:bg-orange-900/60',
     borderClass: 'border-orange-500/30',
-    getShareUrl: (url, title) => `https://reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`
+    getShareUrl: (url, title) => `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`
+  },
+  {
+    id: 'pinterest',
+    name: 'Pinterest',
+    iconName: 'ExternalLink',
+    colorClass: 'text-red-400',
+    bgClass: 'bg-red-950/40 hover:bg-red-900/60',
+    borderClass: 'border-red-500/30',
+    getShareUrl: (url: string, title: string, text: string, image?: string) => `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}${image ? `&media=${encodeURIComponent(image)}` : ''}&description=${encodeURIComponent(title || text)}`
   },
   {
     id: 'email',
@@ -212,6 +158,24 @@ export const SHARE_TARGETS: ShareTargetConfig[] = [
     bgClass: 'bg-emerald-950/40 hover:bg-emerald-900/60',
     borderClass: 'border-emerald-500/30',
     getShareUrl: (url, title, text) => `sms:?body=${encodeURIComponent(`${text} ${url}`)}`
+  },
+  {
+    id: 'threads',
+    name: 'Threads',
+    iconName: 'AtSign',
+    colorClass: 'text-purple-400',
+    bgClass: 'bg-purple-950/40 hover:bg-purple-900/60',
+    borderClass: 'border-purple-500/30',
+    getShareUrl: (url, title, text) => `https://www.threads.net/intent/post?text=${encodeURIComponent(`${text} ${url}`)}`
+  },
+  {
+    id: 'messenger',
+    name: 'FB Messenger',
+    iconName: 'MessageCircle',
+    colorClass: 'text-indigo-400',
+    bgClass: 'bg-indigo-950/40 hover:bg-indigo-900/60',
+    borderClass: 'border-indigo-500/30',
+    getShareUrl: (url) => `https://www.facebook.com/dialog/send?link=${encodeURIComponent(url)}&app_id=291494419107518&redirect_uri=${encodeURIComponent(url)}`
   }
 ];
 
@@ -323,48 +287,52 @@ export const shareService = {
     shareId: string,
     telemetry: any = {}
   ): Promise<void> {
-    const db = getFirebaseDb();
-    const todayStr = new Date().toISOString().split('T')[0];
-    
-    // Parse individual IDs if they are included in the URL params for analytics indexation
-    const params = new URL(shareUrl).searchParams;
-    const ref = doc(db, 'share_events', shareId);
+    try {
+      const db = getFirebaseDb();
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      // Parse individual IDs if they are included in the URL params for analytics indexation
+      const params = new URL(shareUrl).searchParams;
+      const ref = doc(db, 'share_events', shareId);
 
-    await setDoc(ref, {
-      shareId,
-      userId,
-      entityType,
-      entityId,
-      platform,
-      shareUrl,
-      shareDate: todayStr,
-      clicksCount: 0,
-      conversionsCount: 0,
-      rewarded: true, // sharing is automatically logged as verified once checks pass
-      rewardBmpAmount: 15,
-      createdAt: serverTimestamp(),
+      await setDoc(ref, {
+        shareId,
+        userId: userId || 'guest',
+        entityType,
+        entityId,
+        platform,
+        shareUrl,
+        shareDate: todayStr,
+        clicksCount: 0,
+        conversionsCount: 0,
+        rewarded: true, // sharing is automatically logged as verified once checks pass
+        rewardBmpAmount: 15,
+        createdAt: serverTimestamp(),
 
-      // Smart Deep Link Parameters preserved for high-speed indexing & querying
-      productId: params.get('productId') || (entityType === 'product' ? entityId : null),
-      serviceId: params.get('serviceId') || (entityType === 'service' ? entityId : null),
-      businessId: params.get('businessId') || (entityType === 'business' ? entityId : null),
-      storeId: params.get('storeId') || (entityType === 'store' ? entityId : null),
-      campaignId: params.get('campaignId') || (entityType === 'campaign' ? entityId : null),
-      couponId: params.get('couponId') || (entityType === 'coupon' ? entityId : null),
-      orderId: params.get('orderId') || (entityType === 'order' ? entityId : null),
-      referralCode: params.get('ref') || userId,
-      trackingId: shareId,
-      sourcePlatform: platform,
-      utmSource: platform,
-      utmMedium: 'social_share',
-      utmCampaign: `pi_growth_${entityType}`,
+        // Smart Deep Link Parameters preserved for high-speed indexing & querying
+        productId: params.get('productId') || (entityType === 'product' ? entityId : null),
+        serviceId: params.get('serviceId') || (entityType === 'service' ? entityId : null),
+        businessId: params.get('businessId') || (entityType === 'business' ? entityId : null),
+        storeId: params.get('storeId') || (entityType === 'store' ? entityId : null),
+        campaignId: params.get('campaignId') || (entityType === 'campaign' ? entityId : null),
+        couponId: params.get('couponId') || (entityType === 'coupon' ? entityId : null),
+        orderId: params.get('orderId') || (entityType === 'order' ? entityId : null),
+        referralCode: params.get('ref') || userId,
+        trackingId: shareId,
+        sourcePlatform: platform,
+        utmSource: platform,
+        utmMedium: 'social_share',
+        utmCampaign: `pi_growth_${entityType}`,
 
-      // Anti-cheat client metadata captured server-side
-      deviceId: telemetry.deviceId || null,
-      fingerprint: telemetry.fingerprint || null,
-      ipAddress: telemetry.ipAddress || null,
-      userAgent: telemetry.userAgent || null
-    });
+        // Anti-cheat client metadata captured server-side
+        deviceId: telemetry.deviceId || null,
+        fingerprint: telemetry.fingerprint || null,
+        ipAddress: telemetry.ipAddress || null,
+        userAgent: telemetry.userAgent || null
+      });
+    } catch (err) {
+      console.warn('[ShareService] Non-critical share event record warning:', err);
+    }
   },
 
   /**
@@ -386,14 +354,14 @@ export const shareService = {
       const { antiCheatEngine } = await import('./rewards/antiCheatEngine');
       await antiCheatEngine.validateShareClick(shareData.userId, visitorId, telemetry);
 
-      // Prevent double counting of click by the same visitor on this share link
+      // Prevent double counting of click by the same visitor on this share link (using single-field query)
       const qDupClick = query(
         collection(db, 'share_clicks'),
-        where('shareId', '==', shareId),
-        where('visitorId', '==', visitorId)
+        where('shareId', '==', shareId)
       );
       const snapDupClick = await getDocs(qDupClick);
-      if (!snapDupClick.empty) {
+      const isDup = snapDupClick.docs.some(d => d.data().visitorId === visitorId);
+      if (isDup) {
         console.warn('[Anti-Cheat] Double-visitor engagement click detected. Reward bypassed to prevent farming.');
         return false;
       }

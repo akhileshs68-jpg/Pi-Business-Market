@@ -297,7 +297,7 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
   // Share action
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const productUrl = `${window.location.origin}/product/${prod.id}`;
+    const productUrl = `${window.location.origin}/product/${prod.id || prod.productId}`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -307,7 +307,8 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
         });
         return;
       } catch (err) {
-        // Fallback to clipboard if share canceled or failed
+        console.log("Native share dismissed or cancelled", err);
+        return;
       }
     }
     try {

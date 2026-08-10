@@ -80,61 +80,95 @@ export const UniversalShareModal: React.FC<Props> = ({
     );
   };
 
-  const handleExecuteShare = async (platformId: string, directUrl?: string) => {
-    setLoading(true);
+  const openShareDestination = (url: string) => {
+    if (!url) return;
+    if (url.startsWith('mailto:') || url.startsWith('sms:') || url.startsWith('sgnl:')) {
+      window.location.href = url;
+      return;
+    }
+    try {
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.assign(url);
+      }
+    } catch (e) {
+      window.location.assign(url);
+    }
+  };
+
+  const handleExecuteShare = (platformId: string, directUrl?: string) => {
     setStatusMsg(null);
 
-    try {
-      // Collect anti-cheat telemetry securely
-      const telemetry = {
-        deviceId: localStorage.getItem('deviceId') || `dev_${Math.random().toString(36).substring(2, 12)}`,
-        fingerprint: `fp_${navigator.userAgent.replace(/[^a-zA-Z]/g, '').slice(0, 30)}`,
-        userAgent: navigator.userAgent,
-        isVpn: false
-      };
-      if (!localStorage.getItem('deviceId')) {
-        localStorage.setItem('deviceId', telemetry.deviceId);
-      }
-
-      // Record share event
-      await shareService.recordShareEvent(userId, entityType, entityId, platformId, shareUrl, shareId, telemetry);
-
-      if (directUrl) {
-        window.open(directUrl, '_blank', 'noopener,noreferrer');
-      } else if (platformId === 'native' && typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({
-          title: shareTitle,
-          text: customText,
-          url: shareUrl
-        });
-      }
-
-      // Process base share reward in backend
-      const earned = await gamificationService.processShareReward(userId, entityId, platformId, telemetry);
-
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.6 }
+    // 1. Immediately trigger native share or open social platform URL
+    if (directUrl) {
+      openShareDestination(directUrl);
+    } else if (platformId === 'native' && typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: shareTitle,
+        text: customText,
+        url: shareUrl
+      }).catch(err => {
+        console.log('Native share dismissed or failed', err);
       });
-
-      setStatusMsg(`Share broadcasted! Earned +${earned} BMP reward.`);
-      if (onRewardEarned) onRewardEarned(earned);
-    } catch (err: any) {
-      setStatusMsg(err.message || 'Share link ready and recorded.');
-    } finally {
-      setLoading(false);
     }
+
+    // 2. Perform analytics & rewards in background without blocking UI
+    (async () => {
+      try {
+        const telemetry = {
+          deviceId: localStorage.getItem('deviceId') || `dev_${Math.random().toString(36).substring(2, 12)}`,
+          fingerprint: `fp_${navigator.userAgent.replace(/[^a-zA-Z]/g, '').slice(0, 30)}`,
+          userAgent: navigator.userAgent,
+          isVpn: false
+        };
+        if (!localStorage.getItem('deviceId')) {
+          localStorage.setItem('deviceId', telemetry.deviceId);
+        }
+
+        await shareService.recordShareEvent(userId, entityType, entityId, platformId, shareUrl, shareId, telemetry);
+
+        const earned = await gamificationService.processShareReward(userId, entityId, platformId, telemetry);
+
+        if (earned > 0) {
+          try {
+            confetti({
+              particleCount: 50,
+              spread: 60,
+              origin: { y: 0.6 }
+            });
+          } catch (e) {}
+          setStatusMsg(`Shared! +${earned} BMP credited to your account.`);
+          if (onRewardEarned) onRewardEarned(earned);
+        }
+      } catch (err: any) {
+        console.warn('[ShareTracking] Background share reward non-critical notice:', err?.message || err);
+      }
+    })();
   };
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${customText}\n${shareUrl}`);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(`${customText}\n${shareUrl}`);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = `${customText}\n${shareUrl}`;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      handleExecuteShare('copy_link');
+      setStatusMsg('Link copied to clipboard!');
+
+      // Record copy action in background without redirecting
+      shareService.recordShareEvent(userId, entityType, entityId, 'copy_link', shareUrl, shareId, {}).catch(err => {
+        console.warn('[ShareTracking] Copy tracking notice:', err);
+      });
     } catch (err) {
       console.warn('Clipboard write failed:', err);
+      setStatusMsg('Could not write to clipboard automatically. Link is available above.');
     }
   };
 

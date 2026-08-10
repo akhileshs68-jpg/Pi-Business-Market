@@ -115,13 +115,13 @@ export class AntiCheatEngine {
     const sharesRef = collection(db, 'share_events');
     const qShares = query(
       sharesRef,
-      where('userId', '==', canonicalUserId),
-      where('shareDate', '==', todayStr)
+      where('userId', '==', canonicalUserId)
     );
     const snapShares = await getDocs(qShares);
+    const todaySharesCount = snapShares.docs.filter(d => d.data().shareDate === todayStr).length;
 
     // Limit sharing to 3 per day
-    if (snapShares.size >= 3) {
+    if (todaySharesCount >= 3) {
       await this.logViolation(canonicalUserId, 'SOCIAL_SHARE', 'Daily share reward limit exceeded (3/3).', telemetry, 'INFO');
       throw new Error('Daily share reward limit reached (3/3). Shares are logged, but daily BMP bonus is maxed out today.');
     }
@@ -156,15 +156,16 @@ export class AntiCheatEngine {
     if (telemetry.fingerprint) {
       const qFingerprint = query(
         collection(db, 'share_clicks'),
-        where('fingerprint', '==', telemetry.fingerprint),
-        where('createdAt', '>=', new Date(Date.now() - 24 * 60 * 60 * 1000))
+        where('fingerprint', '==', telemetry.fingerprint)
       );
       const snapFingerprint = await getDocs(qFingerprint);
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
       
       const distinctReferrers = new Set<string>();
       for (const d of snapFingerprint.docs) {
         const docData = d.data();
-        if (docData.referrerUserId) {
+        const createdTime = docData.createdAt?.toMillis ? docData.createdAt.toMillis() : new Date(docData.createdAt).getTime();
+        if (createdTime >= cutoff && docData.referrerUserId) {
           const canonicalRef = await getCanonicalRewardUserId(docData.referrerUserId);
           distinctReferrers.add(canonicalRef);
         }

@@ -1019,20 +1019,23 @@ export const gamificationService = {
       throw new Error('Verification failed: Gamification profile not found.');
     }
 
-    // Duplicate Detection within last 10 minutes
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    // Duplicate Detection within last 10 minutes (single-field query to avoid index errors)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).getTime();
     const sharesRef = collection(db, 'share_events');
     const qDup = query(
       sharesRef,
-      where('userId', '==', canonicalUserId),
-      where('entityId', '==', productId),
-      where('platform', '==', platform),
-      where('createdAt', '>=', tenMinutesAgo)
+      where('userId', '==', canonicalUserId)
     );
     const snapDup = await getDocs(qDup);
-    if (!snapDup.empty) {
-      await antiCheatEngine.logViolation(canonicalUserId, 'SHARE_REPLAY_ATTEMPT', `Duplicate share of entity ${productId} to ${platform} within 10 mins.`, telemetry, 'WARNING');
-      throw new Error('Duplicate share action detected too quickly. Please wait before sharing this item to the same platform again.');
+    const isDuplicate = snapDup.docs.some(d => {
+      const data = d.data();
+      const createdTime = data.createdAt?.toMillis ? data.createdAt.toMillis() : new Date(data.createdAt).getTime();
+      return data.entityId === productId && data.platform === platform && createdTime >= tenMinutesAgo;
+    });
+
+    if (isDuplicate) {
+      await antiCheatEngine.logViolation(canonicalUserId, 'SHARE_REPLAY_ATTEMPT', `Duplicate share of entity ${productId} to ${platform} within 10 mins.`, telemetry, 'WARNING').catch(() => {});
+      return 0;
     }
 
     // Daily Limit Validation
@@ -1118,13 +1121,15 @@ export const gamificationService = {
     const sharesRef = collection(db, 'share_events');
     const qShares = query(
       sharesRef,
-      where('userId', '==', canonicalUserId),
-      where('shareDate', '==', todayStr),
-      where('rewarded', '==', true)
+      where('userId', '==', canonicalUserId)
     );
     const snapShares = await getDocs(qShares);
+    const todayRewardedShares = snapShares.docs.filter(d => {
+      const data = d.data();
+      return data.shareDate === todayStr && data.rewarded === true;
+    }).length;
 
-    if (snapShares.size >= 5) {
+    if (todayRewardedShares >= 5) {
       console.warn('[Anti-Cheat] Daily verified share click reward cap reached (5/5) for user:', canonicalUserId);
       return 0;
     }
