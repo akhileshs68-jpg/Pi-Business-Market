@@ -389,7 +389,7 @@ function App() {
           <Route 
             path="/admin-analytics" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['superadmin', 'platform_admin']}>
                 <AdminAnalytics />
               </ProtectedRoute>
             } 
@@ -397,7 +397,7 @@ function App() {
           <Route 
             path="/admin-console" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['superadmin', 'platform_admin']}>
                 <AdminConsole />
               </ProtectedRoute>
             } 

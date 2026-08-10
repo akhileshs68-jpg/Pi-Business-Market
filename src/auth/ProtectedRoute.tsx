@@ -109,6 +109,66 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // 1. Account Status Enforcement (Suspended / Disabled)
+  if ((user.status as string) === 'suspended' || (user.status as string) === 'disabled' || (user as any).isSuspended) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mb-4 text-rose-400">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h1 className="text-xl font-bold text-white mb-2">Account Suspended</h1>
+        <p className="text-sm text-slate-400 max-w-md mb-6">
+          Your account has been suspended by platform administration. Please contact support if you believe this is an error.
+        </p>
+        <button
+          onClick={() => window.location.href = '/'}
+          className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
+        >
+          Return to Marketplace
+        </button>
+      </div>
+    );
+  }
+
+  // 2. Role-Based Access Control (RBAC) Enforcement
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRoleSet = roleResolver.getResolvedRoles();
+    const userCanonical = roleResolver.getCanonicalRole();
+    const activeRole = user.activeRole || user.role || userCanonical;
+
+    const hasAllowedRole = isSuperAdmin || allowedRoles.some(r => {
+      const norm = r.toLowerCase().replace(/[\s_-]/g, '_');
+      return (
+        userRoleSet.has(norm) || 
+        userCanonical === norm || 
+        activeRole === norm ||
+        user.platformRole === norm ||
+        user.roles?.includes(norm) ||
+        user.roles?.includes(r)
+      );
+    });
+
+    if (!hasAllowedRole) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mb-4 text-amber-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-white mb-2">Access Restricted</h1>
+          <p className="text-sm text-slate-400 max-w-md mb-6">
+            You do not have the required role ({allowedRoles.join(', ')}) to access this page.
+          </p>
+          <button
+            onClick={() => navigate('/home')}
+            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
+          >
+            Return Home
+          </button>
+        </div>
+      );
+    }
+  }
+
   // Check if onboarding is complete. Owner is exempt.
   const profileExists = !!profile;
   const isLegacyUser = profileExists && 

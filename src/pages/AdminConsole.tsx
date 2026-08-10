@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Settings, Flag, ShieldCheck, Database, Lock, Server, Save, Plus, AlertTriangle, 
   History, UserCheck, Activity, Users, Store, Box, ShoppingBag, CreditCard, Award, 
-  MessageSquare, Megaphone, ShieldAlert, Shield, HeartPulse, Menu, X, Search
+  MessageSquare, Megaphone, ShieldAlert, Shield, HeartPulse, Menu, X, Search, Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +21,7 @@ import { DisputeManager } from '../components/dispute/DisputeManager';
 import { BmpAdminDashboard } from '../components/bmp/BmpAdminDashboard';
 import { 
   DashboardPanel, UserManagementPanel, StoreManagementPanel,
-  ProductManagementPanel, ServiceManagementPanel, OrderAnalyticsPanel, PaymentAnalyticsPanel,
+  ProductManagementPanel, ServiceManagementPanel, CourierManagementPanel, OrderAnalyticsPanel, PaymentAnalyticsPanel,
   BmpAnalyticsPanel, CommunityAnalyticsPanel, MarketingAnalyticsPanel, SystemHealthPanel,
   SecurityCenterPanel, BackupRecoveryPanel, AdModerationPanel
 } from '../components/admin/MissionControlPanels';
@@ -31,7 +31,7 @@ import { UniversalApprovalCenter } from '../components/admin/UniversalApprovalCe
 import { EnterpriseFinanceCenter } from '../components/admin/EnterpriseFinanceCenter';
 
 type AdminTab = 
-  | 'dashboard' | 'search' | 'users' | 'businesses' | 'stores' | 'products' | 'services'
+  | 'dashboard' | 'search' | 'users' | 'businesses' | 'stores' | 'products' | 'services' | 'couriers'
   | 'orders' | 'disputes' | 'payments' | 'bmp' | 'community' | 'marketing' | 'ad_moderation' | 'blockchain' 
   | 'health' | 'flags' | 'security' | 'backup' | 'governance' | 'settings' | 'approvals' | 'finance';
 
@@ -122,6 +122,7 @@ export const AdminConsole: React.FC = () => {
         { id: 'stores', label: 'Stores', icon: Store },
         { id: 'products', label: 'Products', icon: Box },
         { id: 'services', label: 'Services', icon: Box },
+        { id: 'couriers', label: 'Couriers & Logistics', icon: Truck },
       ]
     },
     {
@@ -246,6 +247,7 @@ export const AdminConsole: React.FC = () => {
               {activeTab === 'stores' && <StoreManagementPanel />}
               {activeTab === 'products' && <ProductManagementPanel />}
               {activeTab === 'services' && <ServiceManagementPanel />}
+              {activeTab === 'couriers' && <CourierManagementPanel />}
               {activeTab === 'orders' && <OrderAnalyticsPanel />}
               {activeTab === 'disputes' && <DisputeManager currentUserUid={user?.uid || ''} currentUserRole="ADMIN" />}
               {activeTab === 'payments' && <PaymentAnalyticsPanel />}

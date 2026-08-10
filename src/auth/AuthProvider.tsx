@@ -5,6 +5,7 @@ import { AuthContext } from './AuthContext';
 import { isFirebaseConfigured } from '../firebase/config';
 import { EnterpriseIdentity, Permission } from '../services/identity/identityTypes';
 import { identityService } from '../services/identity/identityService';
+import { RoleResolver } from '../services/identity/RoleResolver';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -244,6 +245,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
     try {
+      const roleResolver = new RoleResolver(user);
+      const isCallingAsAdmin = roleResolver.isSuperAdmin();
+
       // 1. Instantly update React context states for immediate UI reactivity
       setUser(prev => prev ? { ...prev, ...updates } : null);
       setProfile(prev => prev ? { ...prev, ...updates } : null);
@@ -261,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 3. Sync to Firestore in background; catch and log any remote write failures gracefully
       try {
-        await authService.updateUserProfile(user.uid, updates);
+        await authService.updateUserProfile(user.uid, updates, isCallingAsAdmin);
       } catch (fsErr) {
         console.warn('[AuthProvider] Background Firestore profile write warning:', fsErr);
       }

@@ -184,9 +184,14 @@ export const OrderBookingManager: React.FC<ManagerProps> = ({ type, viewAs }) =>
       setRescheduleTime('');
       setRescheduleNotes('');
       await loadItems();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Rescheduling failed:', err);
-      setActionError('Failed to update scheduled slot.');
+      const msg = err?.message || '';
+      if (msg.includes('SLOT_UNAVAILABLE:')) {
+        setActionError(msg.replace('SLOT_UNAVAILABLE:', '').trim());
+      } else {
+        setActionError('Failed to update scheduled slot.');
+      }
     } finally {
       setActionLoadingId(null);
     }

@@ -857,14 +857,28 @@ export const authService = {
   /**
    * Updates the user profile in Firestore
    */
-  async updateUserProfile(uid: string, updates: Partial<User>): Promise<void> {
+  async updateUserProfile(uid: string, updates: Partial<User>, isCallingAsAdmin: boolean = false): Promise<void> {
     try {
       const db = getFirebaseDb();
       const userRef = doc(db, 'users', uid);
       const userSnap = await getDoc(userRef);
       
       const payload: any = { ...updates };
-      if ('kycVerified' in payload) {
+      
+      // Prevent non-admin self-promotion or self-un-suspension
+      if (!isCallingAsAdmin) {
+        delete payload.platformRole;
+        delete payload.role;
+        delete payload.roles;
+        delete payload.permissions;
+        delete payload.isSuspended;
+        delete payload.status;
+        delete payload.accountStatus;
+        delete payload.approvalStatus;
+        delete payload.approval;
+      }
+
+      if ('kycVerified' in payload && !isCallingAsAdmin) {
         payload.kycVerified = Boolean(payload.kycVerified);
       }
       

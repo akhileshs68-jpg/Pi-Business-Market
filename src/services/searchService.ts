@@ -282,7 +282,8 @@ export const searchService = {
           console.log('[Search Debug] Services returned:', snap.size);
           snap.forEach(d => {
             const s = d.data();
-            if (s.status !== 'archived' && s.status !== 'deleted') {
+            const serviceStatus = (s.status || 'published').toLowerCase();
+            if (['published', 'active'].includes(serviceStatus)) {
               const serviceCategories = [
                 ...getCategorySynonyms(s.category || ''),
                 ...getCategorySynonyms(s.subCategory || ''),

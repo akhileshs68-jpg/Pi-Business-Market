@@ -105,8 +105,33 @@ service cloud.firestore {
 
     // 3. Collection Rules
     match /users/{uid} {
-      allow read: if true;
-      allow create, update: if true;
+      // User isolation: Users can read their own profile, or Admins can read any profile
+      allow read: if isSignedIn() && (isOwner(uid) || isAdmin());
+
+      // Create rule: Users can create their own doc, but cannot set admin roles
+      allow create: if isSignedIn() && isOwner(uid) && (
+        isAdmin() || (
+          (!incoming().keys().hasAny(['platformRole']) || !(incoming().platformRole in ['admin', 'superadmin'])) &&
+          (!incoming().keys().hasAny(['role']) || !(incoming().role in ['Admin', 'Super Admin'])) &&
+          (!incoming().keys().hasAny(['roles']) || !incoming().roles.hasAny(['admin', 'superadmin', 'Admin', 'Super Admin'])) &&
+          (!incoming().keys().hasAny(['permissions']) || incoming().permissions.size() == 0) &&
+          (!incoming().keys().hasAny(['isSuspended']) || incoming().isSuspended == false)
+        )
+      );
+
+      // Update rule: User can update own doc EXCEPT protected role/permission/status fields. Admins can update any field.
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          isOwner(uid) && 
+          !incoming().diff(existing()).affectedKeys().hasAny([
+            'role', 'platformRole', 'roles', 'permissions', 'status', 
+            'accountStatus', 'approvalStatus', 'approval', 'isSuspended', 'kycVerified'
+          ])
+        )
+      );
+
+      // Delete rule: Only Super Admins or Admins can delete user documents
+      allow delete: if canMutate() && (isSuperAdmin() || isAdmin());
     }
 
     // New Business Identity Rules
@@ -170,12 +195,18 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow read: if true;
-      allow create: if canMutate() && isSignedIn();
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().ownerUid) || 
+        isOwner(incoming().userId) || 
+        isOwner(incoming().sellerId) ||
+        (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId)) ||
+        isAdmin()
+      );
       allow update, delete: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.userId) || 
         isOwner(resource.data.sellerId) || 
-        isBusinessOwner(resource.data.businessId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
         isAdmin()
       );
     }
@@ -191,29 +222,56 @@ service cloud.firestore {
 
     match /services/{serviceId} {
       allow read: if true;
-      allow create: if canMutate() && isSignedIn();
-      allow update, delete: if canMutate() && isSignedIn() && (
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().ownerUid) || 
+        isOwner(incoming().sellerId) || 
+        isOwner(incoming().ownerId) || 
+        (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId)) ||
+        isAdmin()
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (isOwner(resource.data.ownerUid) || isOwner(resource.data.sellerId) || isOwner(resource.data.ownerId) || (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId))) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['ownerUid', 'ownerId', 'sellerId', 'merchantId', 'businessId', 'storeId']) &&
+          !(resource.data.status in ['rejected', 'suspended'] && incoming().status in ['published', 'approved'])
+        )
+      );
+      allow delete: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.sellerId) || 
-        isBusinessOwner(resource.data.businessId) || 
+        isOwner(resource.data.ownerId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
         isAdmin()
       );
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if canMutate() && isSignedIn();
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().ownerUid) || 
+        isOwner(incoming().sellerId) || 
+        isOwner(incoming().ownerId) || 
+        (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId)) ||
+        isAdmin()
+      );
       allow update: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.sellerId) || 
-        isBusinessOwner(resource.data.businessId) || 
+        isOwner(resource.data.ownerId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
         isAdmin() ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']) &&
+          request.resource.data.stock is number &&
+          request.resource.data.stock >= 0 &&
+          request.resource.data.stock < resource.data.stock
+        )
       );
       allow delete: if canMutate() && isSignedIn() && (
         isOwner(resource.data.ownerUid) || 
         isOwner(resource.data.sellerId) || 
-        isBusinessOwner(resource.data.businessId) || 
+        isOwner(resource.data.ownerId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
         isAdmin()
       );
     }
@@ -257,8 +315,16 @@ service cloud.firestore {
         isOwner(resource.data.sellerId) || 
         isAdmin()
       );
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (
+      allow create: if isSignedIn() && (
+        isOwner(incoming().buyerId) || isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId)) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['buyerId', 'sellerId', 'serviceId', 'businessId', 'price', 'grandTotal', 'currency'])
+        )
+      );
+      allow delete: if isSignedIn() && (
         isOwner(resource.data.buyerId) || 
         isOwner(resource.data.sellerId) || 
         isAdmin()
@@ -269,12 +335,12 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         isOwner(resource.data.buyerId) ||
         isOwner(resource.data.sellerId) ||
-        isOwner(resource.data.businessId) ||
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) ||
         isAdmin()
       );
       allow create, update: if isSignedIn() && canMutate() && (
         isOwner(incoming().sellerId) ||
-        isOwner(incoming().businessId) ||
+        (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId)) ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -346,6 +412,17 @@ service cloud.firestore {
       allow update, delete: if false; // Audit logs are immutable
     }
 
+    match /adminAuditLogs/{logId} {
+      allow create: if isAdmin();
+      allow read: if isAdmin();
+      allow update, delete: if false; // Immutable administrative audit trail
+    }
+
+    match /couriers/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /platformSettings/{settingId} {
       allow read: if true;
       allow write: if isSuperAdmin();
@@ -400,7 +477,7 @@ service cloud.firestore {
         isOwner(resource.data.buyerId) || 
         isOwner(resource.data.userUid) || 
         isOwner(resource.data.sellerId) || 
-        isOwner(resource.data.businessId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
         isAdmin()
       );
       

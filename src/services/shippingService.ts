@@ -32,6 +32,9 @@ import {
 } from '../types';
 import { orderService } from './orderService';
 import { notificationService } from './notificationService';
+import { defaultTestCourier, ShipmentBookingRequest } from './courierAdapter';
+
+const activeShipmentCreations = new Set<string>();
 
 export const shippingService = {
   /**
@@ -146,84 +149,150 @@ export const shippingService = {
    * Triggered when a merchant starts fulfilling an order
    */
   async createShipment(order: Order, method: ShippingMethod): Promise<string> {
-    const db = getFirebaseDb();
-    const shipmentId = `SHIP_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    const trackingNumber = `AWB-PI-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
-    const quote = this.calculateShippingQuote(order.items || [], order.shippingAddress, method === ShippingMethod.STORE_PICKUP ? 'pickup' : 'shipping');
-
-    const shipment: Shipment = {
-      shipmentId,
-      orderId: order.orderId,
-      businessId: order.businessId,
-      storeId: order.storeId,
-      shippingMethod: method,
-      status: ShipmentStatus.PENDING,
-      shippingAddress: order.shippingAddress!,
-      trackingNumber,
-      courierName: quote.courierName,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    const batch = writeBatch(db);
-
-    // 1. Create Shipment Doc
-    batch.set(doc(db, 'shipments', shipmentId), {
-      ...shipment,
-      estimatedDelivery: quote.expectedDeliveryDate,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-
-    // 2. Add Initial Tracking Event
-    const eventRef = doc(collection(db, 'trackingEvents'));
-    batch.set(eventRef, {
-      eventId: eventRef.id,
-      shipmentId,
-      status: ShipmentStatus.PENDING,
-      location: 'Merchant Warehouse',
-      description: `Shipment package created with ${quote.courierName}. Air Waybill (AWB): ${trackingNumber}. Estimated delivery: ${quote.expectedDeliveryDate}`,
-      eventTime: serverTimestamp(),
-      createdBy: order.businessId
-    });
-
-    // 3. Update Order Fulfillment Status
-    await orderService.updateFulfillmentStatus(
-      order.orderId, 
-      FulfillmentStatus.PACKED, 
-      order.businessId, 
-      'Logistics Engine'
-    );
-    
-    // Also update order with shipmentId, tracking number and courier
-    batch.update(doc(db, 'orders', order.orderId), {
-      shipmentId: shipmentId,
-      deliveryMethod: method,
-      trackingNumber,
-      courierName: quote.courierName,
-      'logistics.trackingNumber': trackingNumber,
-      'logistics.courierName': quote.courierName,
-      'logistics.estimatedDelivery': quote.expectedDeliveryDate,
-      updatedAt: serverTimestamp()
-    });
-
-    await batch.commit();
-
-    // Notify Customer of Shipment
-    try {
-      await notificationService.notify(
-        order.userUid,
-        'shipment_update',
-        'Order Shipped!',
-        `Your order #${order.orderNumber} has been dispatched via ${quote.courierName}. AWB Tracking Number: ${trackingNumber}`,
-        { entityType: 'shipment', entityId: shipmentId, priority: 'medium', linkTo: `/account/orders/${order.orderId}` }
-      );
-    } catch (notifErr) {
-      console.error('Shipment notification failed', notifErr);
+    const lockKey = order.orderId;
+    if (activeShipmentCreations.has(lockKey)) {
+      console.warn(`[shippingService] Shipment creation already in progress for order: ${lockKey}`);
+      if (order.shipmentId) return order.shipmentId;
     }
+    
+    activeShipmentCreations.add(lockKey);
 
-    return shipmentId;
+    try {
+      const db = getFirebaseDb();
+      
+      // Check if shipment already exists
+      if (order.shipmentId) {
+        const existingSnap = await getDoc(doc(db, 'shipments', order.shipmentId));
+        if (existingSnap.exists()) {
+          return order.shipmentId;
+        }
+      }
+
+      const orderItems = await orderService.getOrderItems(order.orderId);
+      const itemsList = orderItems.length > 0 ? orderItems : (order.items || []);
+      const quote = this.calculateShippingQuote(itemsList, order.shippingAddress, method === ShippingMethod.STORE_PICKUP ? 'pickup' : 'shipping');
+
+      // Build shipment booking request for Test Courier adapter
+      const bookingRequest: ShipmentBookingRequest = {
+        orderId: order.orderId,
+        businessId: order.businessId,
+        storeId: order.storeId,
+        shippingAddress: order.shippingAddress || {
+          fullName: 'Valued Customer',
+          email: 'pioneer@pinetwork.app',
+          phone: '+1 555-0199',
+          street: '1 Pioneer Plaza',
+          city: 'Pi City',
+          state: 'Global',
+          postalCode: '90001',
+          country: 'GLOBAL'
+        },
+        packages: itemsList.map((it: any) => ({
+          weightKg: it.weightKg || it.weight || 0.5,
+          lengthCm: it.lengthCm || 10,
+          widthCm: it.widthCm || 10,
+          heightCm: it.heightCm || 5,
+          declaredValuePi: it.subtotal || it.unitPrice || 0,
+          description: it.productName || it.title || 'Marketplace Item'
+        })),
+        totalWeightKg: quote.totalWeightKg,
+        volumetricWeightKg: quote.volumetricWeightKg
+      };
+
+      const courierResponse = await defaultTestCourier.createShipment(bookingRequest);
+
+      const shipmentId = `SHIP_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const trackingNumber = courierResponse.trackingNumber;
+      const courierName = courierResponse.courierName;
+
+      const shipment: Shipment = {
+        shipmentId,
+        orderId: order.orderId,
+        businessId: order.businessId,
+        storeId: order.storeId,
+        shippingMethod: method,
+        status: ShipmentStatus.PENDING,
+        shippingAddress: order.shippingAddress || {
+          fullName: bookingRequest.shippingAddress.fullName,
+          email: bookingRequest.shippingAddress.email || 'pioneer@pinetwork.app',
+          phone: bookingRequest.shippingAddress.phone || '+1 555-0199',
+          street: bookingRequest.shippingAddress.street,
+          city: bookingRequest.shippingAddress.city,
+          state: bookingRequest.shippingAddress.state,
+          postalCode: bookingRequest.shippingAddress.postalCode,
+          country: bookingRequest.shippingAddress.country
+        },
+        trackingNumber,
+        courierName,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const batch = writeBatch(db);
+
+      // 1. Create Shipment Doc
+      batch.set(doc(db, 'shipments', shipmentId), {
+        ...shipment,
+        isSimulated: true,
+        estimatedDelivery: courierResponse.estimatedDeliveryDate,
+        dispatchHub: courierResponse.dispatchHub,
+        labelUrl: courierResponse.labelUrl,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // 2. Add Initial Tracking Event
+      const eventRef = doc(collection(db, 'trackingEvents'));
+      batch.set(eventRef, {
+        eventId: eventRef.id,
+        shipmentId,
+        status: ShipmentStatus.PENDING,
+        location: courierResponse.dispatchHub,
+        description: `Package registered with ${courierName}. Air Waybill (AWB): ${trackingNumber}. Estimated delivery: ${courierResponse.estimatedDeliveryDate}`,
+        eventTime: serverTimestamp(),
+        createdBy: order.businessId
+      });
+
+      // 3. Update Order Fulfillment Status
+      await orderService.updateFulfillmentStatus(
+        order.orderId, 
+        FulfillmentStatus.PACKED, 
+        order.businessId, 
+        'Logistics Engine'
+      );
+      
+      // Also update order with shipmentId, tracking number and courier
+      batch.update(doc(db, 'orders', order.orderId), {
+        shipmentId: shipmentId,
+        deliveryMethod: method,
+        trackingNumber,
+        courierName,
+        'logistics.trackingNumber': trackingNumber,
+        'logistics.courierName': courierName,
+        'logistics.estimatedDelivery': courierResponse.estimatedDeliveryDate,
+        'logistics.isSimulated': true,
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+
+      // Notify Customer of Shipment
+      try {
+        await notificationService.notify(
+          order.userUid,
+          'shipment_update',
+          'Shipment Registered via Test Courier',
+          `Your order #${order.orderNumber || order.orderId.substring(0,8)} has been registered for delivery via ${courierName}. AWB Tracking: ${trackingNumber}`,
+          { entityType: 'shipment', entityId: shipmentId, priority: 'medium', linkTo: `/order-details/${order.orderId}` }
+        );
+      } catch (notifErr) {
+        console.error('Shipment notification failed', notifErr);
+      }
+
+      return shipmentId;
+    } finally {
+      activeShipmentCreations.delete(lockKey);
+    }
   },
 
   /**

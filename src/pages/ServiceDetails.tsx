@@ -54,9 +54,46 @@ export const ServiceDetails: React.FC = () => {
   const [bookingDate, setBookingDate] = useState<string>('');
   const [bookingTime, setBookingTime] = useState<string>('');
   const [bookingNotes, setBookingNotes] = useState<string>('');
+  const [availableSlots, setAvailableSlots] = useState<{ time: string; isAvailable: boolean; reason?: string }[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState<boolean>(false);
   const [bookingSubmitting, setBookingSubmitting] = useState<boolean>(false);
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Fetch slots whenever date changes
+  useEffect(() => {
+    let isMounted = true;
+    const loadSlots = async () => {
+      if (!bookingDate || !id) {
+        setAvailableSlots([]);
+        return;
+      }
+      setSlotsLoading(true);
+      try {
+        const sellerId = service?.ownerUid || provider?.ownerUid || provider?.ownerId || '';
+        const slots = await bookingService.getAvailableTimeSlots(id, sellerId, bookingDate);
+        if (isMounted) {
+          setAvailableSlots(slots);
+          // Auto deselect if previously selected slot is unavailable
+          if (bookingTime) {
+            const selectedSlot = slots.find(s => s.time === bookingTime);
+            if (!selectedSlot || !selectedSlot.isAvailable) {
+              setBookingTime('');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load slots:', err);
+      } finally {
+        if (isMounted) setSlotsLoading(false);
+      }
+    };
+
+    loadSlots();
+    return () => { isMounted = false; };
+  }, [bookingDate, id, service?.ownerUid, provider?.ownerUid]);
 
   useEffect(() => {
     let isMounted = true;
@@ -184,9 +221,14 @@ export const ServiceDetails: React.FC = () => {
         navigate('/orders');
       }, 2500);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('[ServiceDetails] Booking submission failed:', err);
-      setBookingError("We couldn't send your booking request. Please try again.");
+      const msg = err?.message || '';
+      if (msg.includes('SLOT_UNAVAILABLE:')) {
+        setBookingError(msg.replace('SLOT_UNAVAILABLE:', '').trim());
+      } else {
+        setBookingError("We couldn't send your booking request. Please try again.");
+      }
     } finally {
       setBookingSubmitting(false);
     }
@@ -636,6 +678,7 @@ export const ServiceDetails: React.FC = () => {
                           <input
                             type="date"
                             required
+                            min={todayStr}
                             disabled={bookingSubmitting}
                             value={bookingDate}
                             onChange={(e) => setBookingDate(e.target.value)}
@@ -643,18 +686,46 @@ export const ServiceDetails: React.FC = () => {
                           />
                         </div>
                         
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-violet-400" /> Target Time
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-violet-400" /> Select Time Slot</span>
+                            {bookingTime && <span className="text-violet-400 font-bold">{bookingTime}</span>}
                           </label>
-                          <input
-                            type="time"
-                            required
-                            disabled={bookingSubmitting}
-                            value={bookingTime}
-                            onChange={(e) => setBookingTime(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all cursor-pointer"
-                          />
+                          
+                          {!bookingDate ? (
+                            <p className="text-[10px] text-slate-500 italic p-2.5 bg-slate-950 rounded-xl border border-slate-900 text-center">
+                              Select a date above to check available time slots.
+                            </p>
+                          ) : slotsLoading ? (
+                            <div className="p-3 bg-slate-950 rounded-xl border border-slate-900 flex items-center justify-center gap-2 text-[10px] text-slate-400">
+                              <Loader2 className="w-3.5 h-3.5 text-violet-400 animate-spin" />
+                              <span>Checking slot availability...</span>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {availableSlots.map((slot) => {
+                                const isSelected = bookingTime === slot.time;
+                                return (
+                                  <button
+                                    key={slot.time}
+                                    type="button"
+                                    disabled={!slot.isAvailable || bookingSubmitting}
+                                    onClick={() => setBookingTime(slot.time)}
+                                    title={slot.reason || (slot.isAvailable ? 'Available' : 'Reserved')}
+                                    className={`py-1.5 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border text-center ${
+                                      isSelected
+                                        ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/20'
+                                        : slot.isAvailable
+                                        ? 'bg-slate-950 hover:bg-slate-850 text-slate-200 border-slate-800'
+                                        : 'bg-slate-950/40 text-slate-600 border-slate-900/60 line-through cursor-not-allowed opacity-60'
+                                    }`}
+                                  >
+                                    {slot.time}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -679,20 +750,27 @@ export const ServiceDetails: React.FC = () => {
                         </div>
                       )}
 
-                      <button
-                        type="submit"
-                        disabled={bookingSubmitting}
-                        className="w-full py-3 bg-violet-600 hover:bg-violet-500 active:scale-98 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {bookingSubmitting ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Transmitting...
-                          </>
-                        ) : (
-                          'Request Booking'
-                        )}
-                      </button>
+                      {(service?.status && !['published', 'active'].includes(service.status.toLowerCase())) || (provider?.status && ['suspended', 'inactive'].includes(provider.status.toLowerCase())) ? (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-[10px] text-amber-400 font-bold">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                          <span>This service is currently unavailable or under administrative review.</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="submit"
+                          disabled={bookingSubmitting || !bookingDate || !bookingTime}
+                          className="w-full py-3 bg-violet-600 hover:bg-violet-500 active:scale-98 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          {bookingSubmitting ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Transmitting...
+                            </>
+                          ) : (
+                            'Request Booking'
+                          )}
+                        </button>
+                      )}
                     </>
                   ) : (
                     <div className="pt-2 text-center space-y-4">

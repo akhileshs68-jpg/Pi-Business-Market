@@ -162,7 +162,25 @@ export const OrderDetails: React.FC = () => {
           orderService.getOrderTimeline(data.id || orderId!)
         ]);
         console.log('[OrderDetails Navigation Trace] Order items & timeline retrieved:', orderItems, orderTimeline);
-        setItems(orderItems.length > 0 ? orderItems : (data.items || []));
+        
+        let finalItems = orderItems.length > 0 ? orderItems : (data.items && data.items.length > 0 ? data.items : []);
+        if (finalItems.length === 0) {
+          finalItems = [{
+            itemId: 'item_0',
+            productId: data.productId || 'PROD-UNKNOWN',
+            productName: data.productName || data.title || (data as any).packageName || 'Marketplace Product / Service',
+            title: data.title || data.productName || (data as any).packageName || 'Marketplace Product / Service',
+            quantity: Number(data.quantity || 1),
+            unitPrice: Number(data.unitPrice || data.price || data.grandTotal || 0),
+            price: Number(data.price || data.unitPrice || data.grandTotal || 0),
+            subtotal: Number(data.subtotal || data.grandTotal || (data.quantity || 1) * (data.unitPrice || data.price || data.grandTotal || 0)),
+            imageUrl: data.imageUrl || '',
+            sku: data.sku || 'N/A',
+            isService: Boolean(data.isService)
+          } as any];
+        }
+
+        setItems(finalItems);
         setTimeline(orderTimeline);
       } else {
         console.error('[OrderDetails Navigation Trace] Order not found for orderId:', orderId);
@@ -781,6 +799,47 @@ export const OrderDetails: React.FC = () => {
                         ZIP: {order.shippingAddress.postalCode}
                       </p>
                     </div>
+
+                    {(order.trackingNumber || order.shipmentId || order.courierName) && (
+                      <div className="pt-4 border-t border-slate-800/50 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Courier Partner</span>
+                          <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded">
+                            {order.courierName || 'TEST COURIER (Simulated Integration)'}
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-950 p-3 rounded-2xl border border-slate-850 space-y-1.5">
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Air Waybill (AWB) Tracking ID</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-mono font-bold text-amber-400 tracking-wider">
+                              {order.trackingNumber || 'TEST-AWB-PI-LOGISTICS'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                if (order.trackingNumber) {
+                                  navigator.clipboard.writeText(order.trackingNumber);
+                                  const event = new CustomEvent('toast', { detail: { message: 'AWB Tracking Number Copied!', type: 'success' } });
+                                  window.dispatchEvent(event);
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                            >
+                              Copy AWB
+                            </button>
+                          </div>
+                        </div>
+
+                        {order.shipmentId && (
+                          <button
+                            onClick={() => navigate(`/shipment/${order.shipmentId}`)}
+                            className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                          >
+                            <Truck className="w-3.5 h-3.5" /> View Live Tracking History
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-[10px] sm:text-xs text-slate-600 italic">No address required (Digital/Service)</p>
@@ -891,36 +950,48 @@ export const OrderDetails: React.FC = () => {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Delivery Method</label>
                   <select 
                     value={shipmentMethod}
-                    onChange={(e) => setShipmentMethod(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setShipmentMethod(val);
+                      if (val === 'courier') {
+                        if (!courierName) setCourierName('TEST COURIER (Simulated Integration)');
+                        if (!trackingNumber) setTrackingNumber(`TEST-AWB-PI-${Math.random().toString(36).substring(2,8).toUpperCase()}`);
+                      }
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="">Select Method</option>
                     <option value="store_pickup">Store Pickup</option>
                     <option value="self_delivery">Self Delivery</option>
                     <option value="local_delivery">Local Delivery</option>
-                    <option value="courier">Courier Partner</option>
+                    <option value="courier">Courier Partner (Test Courier)</option>
                   </select>
                 </div>
                 
                 {shipmentMethod === 'courier' && (
                   <>
+                    <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl space-y-1">
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block">Test Courier Adapter Active</span>
+                      <p className="text-[11px] text-slate-300">Simulated Air Waybill (AWB) generation for Pi Network Testnet fulfillment workflow.</p>
+                    </div>
+
                     <div>
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Courier Partner Name</label>
                       <input 
                         type="text" 
                         value={courierName}
                         onChange={(e) => setCourierName(e.target.value)}
-                        placeholder="e.g. Shiprocket, BlueDart, DHL"
+                        placeholder="TEST COURIER (Simulated Integration)"
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tracking Number</label>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Air Waybill / Tracking ID</label>
                       <input 
                         type="text" 
                         value={trackingNumber}
                         onChange={(e) => setTrackingNumber(e.target.value)}
-                        placeholder="Waybill / Tracking ID"
+                        placeholder="TEST-AWB-PI-XXXXXX"
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
                       />
                     </div>
