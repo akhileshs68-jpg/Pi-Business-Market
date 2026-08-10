@@ -10,8 +10,9 @@ import {
   Database, Server, RefreshCw, CheckCircle2, XCircle, AlertCircle,
   Play, Pause, Trash2, Search, BarChart3, Clock, Lock, Shield, Zap, Truck
 } from 'lucide-react';
-import { collection, getDocs, query, limit, orderBy, getCountFromServer, where, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, query, limit, orderBy, getCountFromServer, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
+import { notificationService } from '../../services/notificationService';
 import { EnterpriseOperationsCenter } from './EnterpriseOperationsCenter';
 
 // Helper to record administrative actions into immutable adminAuditLogs
@@ -457,6 +458,19 @@ export const CourierManagementPanel = () => {
         reason
       );
 
+      try {
+        const targetCourierUid = courier.userUid || courier.uid || courier.id;
+        await notificationService.notify(
+          targetCourierUid,
+          'system_alert',
+          `Courier Partner Account ${newStatus === 'active' ? 'Activated' : 'Suspended'}`,
+          `Your courier partner account "${courier.name || courier.id}" status has been set to ${newStatus}.${reason ? ' Reason: ' + reason : ''}`,
+          { entityId: courier.id, entityType: 'courier', linkTo: '/admin-console' }
+        );
+      } catch (notifErr) {
+        console.warn('Courier notification warning:', notifErr);
+      }
+
       alert(`Courier status updated to ${newStatus}.`);
       loadData();
     } catch (e) {
@@ -685,6 +699,26 @@ export const ServiceManagementPanel = () => {
         updatedBy: currentUser?.displayName || 'Super Admin'
       });
       await logAdminAuditAction(currentUser, 'service', serviceId, serviceId, `Set status to ${targetStatus}`, currentStatus, targetStatus, reason);
+      
+      try {
+        const snap = await getDoc(doc(db, 'services', serviceId));
+        if (snap.exists()) {
+          const sData = snap.data();
+          const ownerUid = sData.ownerUid || sData.ownerId || sData.sellerId || sData.businessId;
+          if (ownerUid) {
+            await notificationService.notify(
+              ownerUid,
+              'marketplace_update',
+              `Service Status: ${targetStatus.toUpperCase()}`,
+              `Your service offering "${sData.title || serviceId}" status was updated to ${targetStatus}.${reason ? ' Reason: ' + reason : ''}`,
+              { entityId: serviceId, entityType: 'service', linkTo: '/services' }
+            );
+          }
+        }
+      } catch (notifErr) {
+        console.warn('Service notification warning:', notifErr);
+      }
+
       alert(`Service status successfully updated to ${targetStatus}.`);
       loadEcosystemData();
     } catch (e) {
@@ -719,6 +753,18 @@ export const ServiceManagementPanel = () => {
       }
       await updateDoc(doc(db, 'users', providerUid), updates);
       await logAdminAuditAction(currentUser, 'user_provider', providerUid, providerUid, `Set provider status to ${targetStatus}`, 'previous', targetStatus, reason);
+
+      try {
+        await notificationService.notify(
+          providerUid,
+          'system_alert',
+          `Service Provider Status: ${targetStatus.toUpperCase()}`,
+          `Your service provider status has been updated to ${targetStatus}.${reason ? ' Reason: ' + reason : ''}`,
+          { entityId: providerUid, entityType: 'provider', linkTo: '/services' }
+        );
+      } catch (notifErr) {
+        console.warn('Provider notification warning:', notifErr);
+      }
       alert(`Provider status updated to ${targetStatus}.`);
       loadEcosystemData();
     } catch (e) {

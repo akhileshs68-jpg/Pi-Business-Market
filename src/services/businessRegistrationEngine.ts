@@ -22,6 +22,7 @@ import { UserRole } from '../types';
 
 import { searchService } from './searchService';
 import { removeUndefinedFields } from '../utils/firestoreUtils';
+import { notificationService } from './notificationService';
 
 export class BusinessRegistrationEngine {
   /**
@@ -280,7 +281,39 @@ export class BusinessRegistrationEngine {
           updatedAt: serverTimestamp()
         });
 
-        // 6. Audit Log Entry
+        // 6. Universal Approval Entry
+        const approvalRef = doc(collection(db, 'universalApprovals'));
+        transaction.set(approvalRef, {
+          id: approvalRef.id,
+          approvalType: 'Business Registration',
+          status: 'Pending Review',
+          priority: 'High',
+          entityId: businessId,
+          entityName: payload.businessName,
+          submittedBy: {
+            uid: payload.ownerUid,
+            name: payload.ownerName,
+            email: payload.email
+          },
+          business: {
+            id: businessId,
+            name: payload.businessName,
+            type: payload.businessType
+          },
+          submissionData: {
+            businessType: payload.businessType,
+            category: payload.businessCategory,
+            email: payload.email,
+            phone: payload.phone,
+            city: payload.city,
+            country: payload.country
+          },
+          submittedAt: new Date().toISOString(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
+        // 7. Audit Log Entry
         const auditRef = doc(collection(db, 'businessAuditLogs'));
         transaction.set(auditRef, {
           logId: auditRef.id,
@@ -294,6 +327,26 @@ export class BusinessRegistrationEngine {
           timestamp: serverTimestamp()
         });
       });
+
+      // Dispatch notifications to seller and super admins
+      try {
+        await notificationService.notify(
+          payload.ownerUid,
+          'system_alert',
+          'Seller Application Submitted',
+          `Your seller application for "${payload.businessName}" has been submitted and is currently pending administrator review.`,
+          { entityId: businessId, entityType: 'business', linkTo: '/business/dashboard' }
+        );
+
+        await notificationService.notifyAdmins(
+          'system_alert',
+          'New Seller Registration Pending Review',
+          `New seller application submitted for "${payload.businessName}" by ${payload.ownerName}.`,
+          { entityId: businessId, entityType: 'business', linkTo: '/admin-console' }
+        );
+      } catch (notifErr) {
+        console.warn('Post-registration notification warning:', notifErr);
+      }
 
       // Index business into search engine
       try {

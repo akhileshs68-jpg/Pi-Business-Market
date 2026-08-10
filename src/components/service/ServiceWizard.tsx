@@ -43,6 +43,7 @@ import { EnterpriseServiceEngine } from '../../core/service/enterpriseServiceEng
 import { mediaService } from '../../services/mediaService';
 import { pricingEngine } from '../../services/pricing/pricingEngine';
 import { getSupportedCurrencies, formatCurrencyAmount } from '../../services/pricing/currencyRegistry';
+import { calculateCommunityPiFromLocalPrice, DEFAULT_COMMUNITY_PI_USD_RATE } from '../../services/pricing/communityPriceCalculator';
 
 interface ServiceWizardProps {
   isOpen: boolean;
@@ -771,17 +772,64 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
                       </div>
                     ) : (
                       <div className="space-y-3">
+                        {/* Community Pricing Conversion Calculator Helper */}
+                        {(() => {
+                          const calc = calculateCommunityPiFromLocalPrice(
+                            localAmount || 0,
+                            localCurrency || 'INR',
+                            DEFAULT_COMMUNITY_PI_USD_RATE
+                          );
+                          return (
+                            <div className="bg-slate-900/90 border border-violet-500/20 rounded-xl p-3 space-y-2">
+                              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                                <span className="text-[10px] font-bold text-violet-400 flex items-center gap-1 uppercase tracking-wider">
+                                  <Calculator className="w-3 h-3" /> Community Price Calculator
+                                </span>
+                                <span className="text-[10px] text-slate-400 bg-violet-950/60 text-violet-300 px-2 py-0.5 rounded-full border border-violet-500/30 font-mono">
+                                  Ref: $314,159 USD/π
+                                </span>
+                              </div>
+
+                              {localAmount > 0 ? (
+                                <div className="space-y-2 text-xs">
+                                  <div className="text-[11px] text-slate-300 space-y-1 font-mono">
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500">Local Price:</span>
+                                      <span>{formatCurrencyAmount(localAmount, localCurrency)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-500">USD Equivalent:</span>
+                                      <span className="text-emerald-400">${calc.usdEquivalent} USD</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold pt-1 border-t border-slate-800">
+                                      <span className="text-slate-400">Community Pi Price:</span>
+                                      <span className="text-violet-400">{calc.communityPiAmount} π</span>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCommunityPiAmount(calc.communityPiAmount);
+                                      setMinPrice(calc.communityPiAmount);
+                                      setMaxPrice(calc.communityPiAmount);
+                                    }}
+                                    className="w-full py-1.5 bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-200 text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
+                                  >
+                                    Use Calculated Price ({calc.communityPiAmount} π)
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-slate-500 italic">
+                                  Enter local price above to convert via the $314,159 USD/π Community Reference pipeline.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Community Base Price (π) *</label>
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/tools/community-price-calculator?target=service&currency=${localCurrency}&amount=${localAmount}`)}
-                              className="text-[10px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 cursor-pointer"
-                            >
-                              <Calculator className="w-3 h-3" /> Calculator
-                            </button>
-                          </div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Community Base Price (π) *</label>
                           <input
                             type="number"
                             min={0.0000001}
@@ -793,12 +841,9 @@ export const ServiceWizard: React.FC<ServiceWizardProps> = ({
                               setMinPrice(val);
                               setMaxPrice(val);
                             }}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-violet-500 outline-none"
-                            placeholder="25"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-violet-500 outline-none font-bold text-violet-300"
+                            placeholder="0.0000381"
                           />
-                        </div>
-                        <div className="text-[11px] text-violet-300 font-medium bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                          Preview: {communityPiAmount || 0} π (Community Price)
                         </div>
                       </div>
                     )}

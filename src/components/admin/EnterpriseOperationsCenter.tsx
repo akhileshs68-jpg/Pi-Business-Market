@@ -186,7 +186,11 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
     new: dataSources.businesses.filter(b => b.status === 'pending' || b.status === 'new' || (b.createdAt && b.createdAt.startsWith(todayStr.substring(0, 7)))),
     suspended: dataSources.businesses.filter(b => b.status === 'suspended' || b.active === false),
     inactive: dataSources.businesses.filter(b => b.status === 'inactive'),
-    pendingVerification: dataSources.businesses.filter(b => ['Pending Audit', 'Pending Verification', 'pending_verification'].includes(b.status || b.verificationStatus)),
+    pendingVerification: dataSources.businesses.filter(b => 
+      ['Pending', 'Pending Audit', 'Pending Verification', 'pending_verification', 'pending'].includes(b.status || b.verificationStatus || b.approvalStatus) || 
+      b.verificationStatus === 'Pending' || 
+      b.approvalStatus === 'pending'
+    ),
     noActivity: dataSources.businesses.filter(b => {
       const bId = b.businessId || b.id;
       return !dataSources.orders.some(o => o.businessId === bId);
@@ -429,7 +433,7 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
               { label: 'New Businesses', val: businessHealth.new.length, key: 'new', color: 'text-indigo-400' },
               { label: 'Suspended', val: businessHealth.suspended.length, key: 'suspended', color: 'text-red-400' },
               { label: 'Inactive', val: businessHealth.inactive.length, key: 'inactive', color: 'text-slate-500' },
-              { label: 'Verify Pending', val: businessHealth.pendingVerification.length, key: 'pendingVerification', color: 'text-amber-400' },
+              { label: 'Pending Seller Approvals', val: businessHealth.pendingVerification.length, key: 'pendingVerification', color: 'text-amber-400' },
               { label: 'No Activity', val: businessHealth.noActivity.length, key: 'noActivity', color: 'text-orange-400' },
             ].map(item => (
               <div 

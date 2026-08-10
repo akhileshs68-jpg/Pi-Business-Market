@@ -138,7 +138,16 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow read: if true;
       allow create: if canMutate() && isSignedIn() && (resource == null || isOwner(incoming().ownerUid) || incoming().ownerUid == request.auth.uid);
-      allow update: if canMutate() && isSignedIn() && (resource.data.ownerUid == request.auth.uid || isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin']) || isAdmin());
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (resource.data.ownerUid == request.auth.uid || isBusinessOwner(businessId) || hasBusinessRole(businessId, ['Super Admin', 'Business Admin'])) &&
+          !incoming().diff(existing()).affectedKeys().hasAny([
+            'verificationStatus', 'approvalStatus', 'approvedBy', 'approvedAt', 
+            'rejectedBy', 'rejectedAt', 'rejectionReason', 
+            'suspendedBy', 'suspendedAt', 'suspensionReason'
+          ])
+        )
+      );
       allow delete: if canMutate() && isSignedIn() && (resource.data.ownerUid == request.auth.uid || isBusinessOwner(businessId) || isSuperAdmin() || isAdmin());
     }
 
@@ -655,18 +664,80 @@ service cloud.firestore {
     }
 
     match /notifications/{notifId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (
+        resource == null || 
+        resource.data.recipientUid == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if canMutate() && isSignedIn() && (
+        incoming().recipientUid != null
+      );
+      allow update, delete: if canMutate() && isSignedIn() && (
+        resource.data.recipientUid == request.auth.uid || 
+        isAdmin()
+      );
     }
 
     match /notificationPreferences/{userUid} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (
+        isOwner(userUid) || 
+        isAdmin()
+      );
+      allow create, update, delete: if canMutate() && isSignedIn() && (
+        isOwner(userUid) || 
+        isAdmin()
+      );
     }
 
     match /conversations/{convId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read: if isSignedIn() && (
+        getPiUid() in resource.data.participants || 
+        request.auth.uid in resource.data.participants || 
+        isAdmin()
+      );
+      
+      allow create: if isSignedIn() && (
+        getPiUid() in incoming().participants || 
+        request.auth.uid in incoming().participants
+      );
+      
+      allow update: if isSignedIn() && (
+        getPiUid() in resource.data.participants || 
+        request.auth.uid in resource.data.participants || 
+        isAdmin()
+      ) && (
+        isAdmin() || 
+        !incoming().diff(existing()).affectedKeys().hasAny(['conversationId', 'participants', 'type'])
+      );
+      
+      allow delete: if isSignedIn() && (isSuperAdmin() || isAdmin());
       
       match /messages/{msgId} {
-        allow read, create, update, delete: if isSignedIn();
+        allow read: if isSignedIn() && (
+          getPiUid() in get(/databases/$(database)/documents/conversations/$(convId)).data.participants || 
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants || 
+          isAdmin()
+        );
+        
+        allow create: if isSignedIn() && (
+          getPiUid() in get(/databases/$(database)/documents/conversations/$(convId)).data.participants || 
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants
+        ) && (
+          incoming().senderUid == request.auth.uid ||
+          incoming().senderUid == getPiUid()
+        );
+        
+        allow update: if isSignedIn() && (
+          getPiUid() in get(/databases/$(database)/documents/conversations/$(convId)).data.participants || 
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants || 
+          isAdmin()
+        );
+        
+        allow delete: if isSignedIn() && (
+          existing().senderUid == request.auth.uid ||
+          existing().senderUid == getPiUid() ||
+          isAdmin()
+        );
       }
     }
 
@@ -727,8 +798,27 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (isBusinessOwner(resource.data.businessId) || isAdmin());
+      allow create: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (incoming().merchantId == request.auth.uid || isOwner(incoming().merchantId) || (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId))) &&
+          incoming().status == 'pending' &&
+          (!incoming().keys().hasAny(['isPinned']) || incoming().isPinned == false) &&
+          (!incoming().keys().hasAny(['isFeatured']) || incoming().isFeatured == false)
+        )
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (isOwner(resource.data.merchantId) || (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId))) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['merchantId', 'businessId', 'isPinned', 'isFeatured']) &&
+          !(existing().status in ['rejected', 'expired'] && incoming().status in ['active']) &&
+          (incoming().status in ['pending', 'paused', 'expired'])
+        )
+      );
+      allow delete: if canMutate() && isSignedIn() && (
+        isOwner(resource.data.merchantId) || 
+        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
+        isAdmin()
+      );
     }
 
     match /advertisements/{adId} {

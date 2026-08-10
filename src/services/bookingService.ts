@@ -82,19 +82,28 @@ export const bookingService = {
 
     await setDoc(itemRef, payload);
 
-    // 3. Notify Service Provider
-    if (bookingData.sellerId) {
-      try {
+    // 3. Notify Service Provider & Buyer
+    try {
+      if (bookingData.sellerId) {
         await notificationService.notify(
           bookingData.sellerId,
-          'order_update',
+          'job_update',
           'New Service Booking Request!',
           `You have a new appointment request for "${bookingData.title}" on ${bookingData.bookingDate} at ${bookingData.bookingTime}.`,
           { entityType: 'booking', entityId: id, priority: 'high', linkTo: '/bookings' }
         );
-      } catch (notifErr) {
-        console.warn('[BookingService] Provider notification notice:', notifErr);
       }
+      if (bookingData.buyerId) {
+        await notificationService.notify(
+          bookingData.buyerId,
+          'job_update',
+          'Booking Created Successfully',
+          `Your appointment request for "${bookingData.title}" on ${bookingData.bookingDate} at ${bookingData.bookingTime} has been submitted.`,
+          { entityType: 'booking', entityId: id, priority: 'medium', linkTo: '/orders' }
+        );
+      }
+    } catch (notifErr) {
+      console.warn('[BookingService] Notification notice:', notifErr);
     }
 
     return id;
@@ -184,18 +193,27 @@ export const bookingService = {
       updatedAt: serverTimestamp(),
     });
 
-    if (booking?.buyerId) {
-      try {
+    try {
+      if (booking?.buyerId) {
         await notificationService.notify(
           booking.buyerId,
-          'order_update',
-          `Booking Update: ${status}`,
-          `Your appointment for "${booking.title}" on ${booking.bookingDate} at ${booking.bookingTime} is now marked as ${status}.`,
+          'job_update',
+          `Booking Update: ${status.toUpperCase()}`,
+          `Your appointment for "${booking.title}" on ${booking.bookingDate} at ${booking.bookingTime} is now ${status}.`,
           { entityType: 'booking', entityId: id, priority: 'medium', linkTo: '/orders' }
         );
-      } catch (notifErr) {
-        console.warn('[BookingService] Buyer notification notice:', notifErr);
       }
+      if (booking?.sellerId) {
+        await notificationService.notify(
+          booking.sellerId,
+          'job_update',
+          `Booking Status Changed: ${status.toUpperCase()}`,
+          `Appointment for "${booking.title}" with customer on ${booking.bookingDate} changed to ${status}.`,
+          { entityType: 'booking', entityId: id, priority: 'medium', linkTo: '/bookings' }
+        );
+      }
+    } catch (notifErr) {
+      console.warn('[BookingService] Notification notice:', notifErr);
     }
   },
 

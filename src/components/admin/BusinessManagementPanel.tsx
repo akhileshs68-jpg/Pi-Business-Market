@@ -24,6 +24,7 @@ import { getFirebaseDb } from '../../firebase/config';
 import { useAuth } from '../../auth/useAuth';
 import { useBusiness } from '../../context/BusinessContext';
 import { Business } from '../../types';
+import { notificationService } from '../../services/notificationService';
 import { 
   Store, Box, ShoppingBag, CreditCard, ShieldAlert, CheckCircle2, XCircle, 
   Archive, Trash2, Eye, Edit2, Play, Pause, ChevronLeft, ChevronRight, 
@@ -238,38 +239,66 @@ export const BusinessManagementPanel: React.FC = () => {
 
     try {
       const bizRef = doc(db, 'businesses', selectedBiz.id);
-      let updates: Partial<Business> = {};
-      let oldVal = '';
+      let updates: any = {};
+      let oldVal = selectedBiz.verificationStatus || selectedBiz.businessStatus || 'Pending';
       let newVal = '';
+      const nowIso = new Date().toISOString();
+      const adminUid = user?.uid || 'admin';
 
       switch (actionType) {
-        case 'Suspend':
-          updates.businessStatus = 'suspended';
-          oldVal = selectedBiz.businessStatus || 'active';
-          newVal = 'suspended';
-          break;
-        case 'Activate':
-          updates.businessStatus = 'active';
-          oldVal = selectedBiz.businessStatus || 'suspended';
-          newVal = 'active';
-          break;
         case 'Verify':
-          updates.verificationStatus = 'Verified';
-          oldVal = selectedBiz.verificationStatus || 'Pending';
-          newVal = 'Verified';
+        case 'Approve':
+          updates = {
+            verificationStatus: 'Verified',
+            approvalStatus: 'approved',
+            businessStatus: 'active',
+            status: 'active',
+            approvedAt: nowIso,
+            approvedBy: adminUid,
+          };
+          newVal = 'Verified / Approved';
           break;
         case 'Reject':
-          updates.verificationStatus = 'Rejected';
-          oldVal = selectedBiz.verificationStatus || 'Pending';
+          updates = {
+            verificationStatus: 'Rejected',
+            approvalStatus: 'rejected',
+            businessStatus: 'rejected',
+            status: 'rejected',
+            rejectedAt: nowIso,
+            rejectedBy: adminUid,
+            rejectionReason: actionReason,
+          };
           newVal = 'Rejected';
           break;
+        case 'Suspend':
+          updates = {
+            verificationStatus: 'Suspended',
+            approvalStatus: 'suspended',
+            businessStatus: 'suspended',
+            status: 'suspended',
+            suspendedAt: nowIso,
+            suspendedBy: adminUid,
+            suspensionReason: actionReason,
+          };
+          newVal = 'Suspended';
+          break;
+        case 'Activate':
+          updates = {
+            verificationStatus: 'Verified',
+            approvalStatus: 'approved',
+            businessStatus: 'active',
+            status: 'active',
+          };
+          newVal = 'Active';
+          break;
         case 'Archive':
-          updates.businessStatus = 'archived';
-          oldVal = selectedBiz.businessStatus || 'active';
-          newVal = 'archived';
+          updates = {
+            businessStatus: 'archived',
+            status: 'archived',
+          };
+          newVal = 'Archived';
           break;
         case 'Delete':
-          // Perform document delete (Audit log preserved)
           await deleteDoc(bizRef);
           await logAdminAction(selectedBiz, 'Delete Business', selectedBiz.businessStatus, 'deleted', actionReason);
           setModalType(null);
@@ -281,11 +310,52 @@ export const BusinessManagementPanel: React.FC = () => {
 
       await setDoc(bizRef, {
         ...updates,
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
         updatedBy: user?.displayName || 'Admin'
       }, { merge: true });
 
-      // Log the admin audit log
+      // Sync matching universalApprovals document if present
+      try {
+        const appq = query(collection(db, 'universalApprovals'), where('entityId', '==', selectedBiz.id));
+        const appSnap = await getDocs(appq);
+        appSnap.forEach(async (ad) => {
+          await setDoc(doc(db, 'universalApprovals', ad.id), {
+            status: actionType === 'Verify' || actionType === 'Approve' ? 'Approved' : actionType === 'Reject' ? 'Rejected' : 'On Hold',
+            updatedAt: nowIso
+          }, { merge: true });
+        });
+      } catch (appErr) {
+        console.warn('Failed syncing universalApprovals record:', appErr);
+      }
+
+      // Dispatch notification to seller owner
+      if (selectedBiz.ownerUid) {
+        const notifTitle = actionType === 'Verify' || actionType === 'Approve' 
+          ? 'Seller Account Approved' 
+          : actionType === 'Reject' 
+          ? 'Seller Account Application Rejected' 
+          : actionType === 'Suspend' 
+          ? 'Seller Account Suspended' 
+          : 'Seller Account Status Update';
+        
+        const notifMsg = actionType === 'Verify' || actionType === 'Approve'
+          ? `Congratulations! Your seller business profile "${selectedBiz.businessName}" has been approved.`
+          : actionType === 'Reject'
+          ? `Your seller application for "${selectedBiz.businessName}" was rejected. Reason: ${actionReason}`
+          : actionType === 'Suspend'
+          ? `Your business profile "${selectedBiz.businessName}" has been suspended. Reason: ${actionReason}`
+          : `Your business profile "${selectedBiz.businessName}" status has been updated to ${newVal}.`;
+
+        await notificationService.notify(
+          selectedBiz.ownerUid,
+          'system_alert',
+          notifTitle,
+          notifMsg,
+          { entityId: selectedBiz.id, entityType: 'business', linkTo: '/business/dashboard' }
+        ).catch(e => console.warn('Failed sending notification:', e));
+      }
+
+      // Record immutable admin audit log
       await logAdminAction(selectedBiz, `${actionType} Business`, oldVal, newVal, actionReason);
 
       setModalType(null);
@@ -404,51 +474,95 @@ export const BusinessManagementPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Overview stats header banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <Store className="w-5 h-5 text-indigo-400" /> Enterprise Business Management
-          </h3>
-          <p className="text-slate-400 text-xs mt-1">Platform control panel to view, audit, switch, and moderate network businesses.</p>
+      {/* Overview stats & Seller Approval Queue Header Banner */}
+      <div className="p-6 bg-slate-900/60 border border-slate-800 rounded-3xl backdrop-blur-md space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                Seller Account Approval System
+              </span>
+            </div>
+            <h3 className="text-xl font-black text-white flex items-center gap-2">
+              <Store className="w-5 h-5 text-indigo-400" /> Enterprise Business & Seller Management
+            </h3>
+            <p className="text-slate-400 text-xs mt-1">Review pending merchant registrations, approve accounts, audit business identity, and issue notifications.</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => fetchBusinesses('init')}
+              className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all flex items-center gap-2 text-xs font-bold"
+              title="Refresh list"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Refresh Queue</span>
+            </button>
+          </div>
         </div>
-        
-        {/* Filters bar */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Status</label>
-            <select 
-              value={statusFilter} 
-              onChange={e => setStatusFilter(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="archived">Archived</option>
-            </select>
-          </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Verification</label>
-            <select 
-              value={verificationFilter} 
-              onChange={e => setVerificationFilter(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="all">All Verification</option>
-              <option value="Verified">Verified</option>
-              <option value="Pending">Pending</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-          </div>
-
-          <button 
-            onClick={() => fetchBusinesses('init')}
-            className="mt-5 p-2 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
-            title="Refresh list"
+        {/* Quick Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-4">
+          <button
+            onClick={() => { setVerificationFilter('all'); setStatusFilter('all'); }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              verificationFilter === 'all' && statusFilter === 'all'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-white border border-slate-800'
+            }`}
           >
-            <RefreshCw className="w-4 h-4" />
+            All Businesses
+          </button>
+
+          <button
+            onClick={() => { setVerificationFilter('Pending'); setStatusFilter('all'); }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              verificationFilter === 'Pending'
+                ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Pending Approvals</span>
+            <span className="ml-1 px-1.5 py-0.2 bg-slate-950/40 rounded-full text-[10px]">
+              {businesses.filter(b => b.verificationStatus === 'Pending' || b.verificationStatus === 'Submitted' || b.verificationStatus === 'Under Review').length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => { setVerificationFilter('Verified'); setStatusFilter('active'); }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              verificationFilter === 'Verified'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Approved / Verified</span>
+          </button>
+
+          <button
+            onClick={() => { setVerificationFilter('Rejected'); setStatusFilter('all'); }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              verificationFilter === 'Rejected'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+                : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Rejected</span>
+          </button>
+
+          <button
+            onClick={() => { setVerificationFilter('all'); setStatusFilter('suspended'); }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              statusFilter === 'suspended'
+                ? 'bg-slate-700 text-white'
+                : 'bg-slate-950 text-slate-400 hover:bg-slate-800 border border-slate-800'
+            }`}
+          >
+            <Pause className="w-3.5 h-3.5" />
+            <span>Suspended</span>
           </button>
         </div>
       </div>

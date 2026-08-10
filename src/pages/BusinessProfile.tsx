@@ -462,7 +462,7 @@ export const BusinessProfile: React.FC = () => {
   const role = profileData?.businessType || 'seller';
   const roleConfig = BUSINESS_PROFILE_CONFIG[role] || BUSINESS_PROFILE_CONFIG['seller'];
   const isOwner = user && profileData && (user.uid === profileData.ownerUid || user.uid === profileData.createdByUid);
-  const isVerified = profileData?.status === 'active' || profileData?.verificationStatus === 'Verified' || profileData?.isVerified;
+  const isVerified = profileData?.verificationStatus === 'Verified' || profileData?.verificationStatus === 'Approved' || profileData?.approvalStatus === 'approved' || profileData?.isVerified === true;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">

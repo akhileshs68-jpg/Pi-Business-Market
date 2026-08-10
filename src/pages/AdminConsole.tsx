@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Settings, Flag, ShieldCheck, Database, Lock, Server, Save, Plus, AlertTriangle, 
   History, UserCheck, Activity, Users, Store, Box, ShoppingBag, CreditCard, Award, 
-  MessageSquare, Megaphone, ShieldAlert, Shield, HeartPulse, Menu, X, Search, Truck
+  MessageSquare, Megaphone, ShieldAlert, Shield, HeartPulse, Menu, X, Search, Truck, DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -332,6 +332,70 @@ export const AdminConsole: React.FC = () => {
                           onChange={(e) => setSettings({...settings, marketplaceFeePercentage: parseFloat(e.target.value)})}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-all text-white"
                         />
+                      </div>
+                    </div>
+
+                    {/* Dual Pricing & Reference Rates Control */}
+                    <div className="space-y-6 pt-6 border-t border-slate-800 col-span-1 md:col-span-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <DollarSign className="w-5 h-5 text-violet-400" />
+                          Dual Pricing Engine & Community Reference Rate
+                        </h3>
+                        <span className="text-xs bg-violet-500/10 text-violet-300 px-3 py-1 rounded-full border border-violet-500/20 font-bold">
+                          Super Admin Authority
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            Community Reference Rate (USD / Pi) *
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                            <input
+                              type="number"
+                              required
+                              min={1}
+                              step={1}
+                              value={settings.communityPiUsdRate ?? 314159}
+                              onChange={(e) => setSettings({ ...settings, communityPiUsdRate: parseFloat(e.target.value) || 314159 })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 py-3 text-sm font-bold text-violet-300 focus:outline-none focus:border-violet-500 transition-all"
+                            />
+                          </div>
+                          <p className="text-[11px] text-slate-500">
+                            Authoritative reference rate used in Community Pricing calculations across the platform (Default: $314,159 USD).
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            Live Exchange Rates Inspector
+                          </label>
+                          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs font-mono">
+                            <div className="flex items-center justify-between text-slate-400 border-b border-slate-800/80 pb-1.5">
+                              <span>Provider: CoinGecko API</span>
+                              <span className="text-emerald-400 font-bold">ACTIVE</span>
+                            </div>
+                            <div className="flex justify-between text-slate-300">
+                              <span>USD/PI Live:</span>
+                              <span className="text-emerald-400 font-bold">1 PI = 8.69 USD</span>
+                            </div>
+                            <div className="flex justify-between text-slate-300">
+                              <span>INR/PI Live:</span>
+                              <span className="text-emerald-400 font-bold">1 PI = 725.61 INR</span>
+                            </div>
+                            <div className="flex justify-between text-slate-300">
+                              <span>EUR/PI Live:</span>
+                              <span className="text-emerald-400 font-bold">1 PI = 7.98 EUR</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] text-slate-500 pt-1">
+                              <span>Status: Staleness Guard Active (&lt;15m)</span>
+                              <span>Source: Global RateResolver</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

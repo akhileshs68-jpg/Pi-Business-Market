@@ -12,6 +12,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
+import { notificationService } from './notificationService';
 
 function sanitizeImageField(val: any): any {
   if (typeof val === 'string') {
@@ -302,6 +303,29 @@ export const productService = {
     
     const cleanDocData = removeUndefinedFields(docData);
     await setDoc(itemRef, cleanDocData);
+
+    try {
+      if (ownerId) {
+        await notificationService.notify(
+          ownerId,
+          'marketplace_update',
+          `${itemData.type === 'service' ? 'Service' : 'Product'} Created`,
+          `Your ${itemData.type === 'service' ? 'service offering' : 'product listing'} "${sanitizedData.title || 'Item'}" was created successfully.`,
+          { entityId: id, entityType: itemData.type || 'product', linkTo: itemData.type === 'service' ? '/services' : '/marketplace' }
+        );
+      }
+      if (sanitizedData.approvalStatus === 'pending' || sanitizedData.status === 'pending') {
+        await notificationService.notifyAdmins(
+          'admin_notice',
+          `New ${itemData.type === 'service' ? 'Service' : 'Product'} Pending Moderation`,
+          `New listing "${sanitizedData.title || 'Item'}" submitted for administrative review.`,
+          { entityId: id, entityType: itemData.type || 'product', linkTo: '/admin-console' }
+        );
+      }
+    } catch (notifErr) {
+      console.warn('Product/Service creation notification warning:', notifErr);
+    }
+
     return id;
   },
 

@@ -225,6 +225,58 @@ export function formatCurrencyAmount(amount: number, rawCode: string | undefined
   return `${symbol}${safeAmount.toFixed(precision)}`;
 }
 
+export const DEFAULT_COMMUNITY_PI_USD_RATE = 314159;
+
+export const DEFAULT_FX_TO_USD_RATES: Record<string, number> = {
+  USD: 1.0,
+  INR: 0.011976, // 1 INR = ~0.011976 USD (1 USD = ~83.5 INR)
+  EUR: 1.085,    // 1 EUR = ~1.085 USD
+  GBP: 1.270,    // 1 GBP = ~1.270 USD
+  AED: 0.2723,   // 1 AED = ~0.2723 USD
+  SAR: 0.2666,   // 1 SAR = ~0.2666 USD
+  CAD: 0.7300,   // 1 CAD = ~0.7300 USD
+  AUD: 0.6550,   // 1 AUD = ~0.6550 USD
+  JPY: 0.0067,   // 1 JPY = ~0.0067 USD
+  CNY: 0.1390,   // 1 CNY = ~0.1390 USD
+};
+
+/**
+ * Converts a local fiat currency amount into USD equivalent using authoritative FX rates.
+ */
+export function convertLocalToUsd(
+  localAmount: number,
+  localCurrency: string,
+  customFxRates?: Record<string, number>
+): number {
+  if (isNaN(localAmount) || !isFinite(localAmount) || localAmount <= 0) return 0;
+  const normCurr = normalizeCurrencyCode(localCurrency);
+  if (normCurr === 'USD') return safeRoundNumber(localAmount, 2);
+  
+  const fxRates = customFxRates || DEFAULT_FX_TO_USD_RATES;
+  const rateToUsd = fxRates[normCurr] ?? DEFAULT_FX_TO_USD_RATES[normCurr] ?? 1.0;
+  return safeRoundNumber(localAmount * rateToUsd, 4);
+}
+
+/**
+ * Converts a USD amount into a local fiat currency equivalent using authoritative FX rates.
+ */
+export function convertUsdToLocal(
+  usdAmount: number,
+  targetCurrency: string,
+  customFxRates?: Record<string, number>
+): number {
+  if (isNaN(usdAmount) || !isFinite(usdAmount) || usdAmount <= 0) return 0;
+  const normCurr = normalizeCurrencyCode(targetCurrency);
+  if (normCurr === 'USD') return safeRoundNumber(usdAmount, 2);
+
+  const fxRates = customFxRates || DEFAULT_FX_TO_USD_RATES;
+  const rateToUsd = fxRates[normCurr] ?? DEFAULT_FX_TO_USD_RATES[normCurr] ?? 1.0;
+  if (rateToUsd <= 0) return usdAmount;
+  
+  const precision = getCurrencyPrecision(normCurr);
+  return safeRoundNumber(usdAmount / rateToUsd, precision);
+}
+
 /**
  * Returns an array of all enabled CurrencyDefinitions from the registry.
  */

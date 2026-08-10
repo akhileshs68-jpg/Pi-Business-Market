@@ -21,6 +21,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirebaseDb } from '../firebase/config';
 import { logger } from '../core/logger';
 import { analyticsService } from './analyticsService';
+import { notificationService } from './notificationService';
 
 export type CampaignType = 
   | 'featured_product'
@@ -195,6 +196,21 @@ const DEFAULT_BANNER_CAMPAIGNS: Campaign[] = [
 
 export class CampaignService {
   /**
+   * Sanitizes and validates target URLs to prevent open redirects or protocol attacks
+   */
+  public sanitizeTargetRoute(route?: string): string {
+    if (!route || typeof route !== 'string') return '/marketplace';
+    const clean = route.trim();
+    if (/^(javascript|data|vbscript|file):/i.test(clean)) {
+      return '/marketplace';
+    }
+    if (clean.startsWith('/') || /^https?:\/\//i.test(clean)) {
+      return clean;
+    }
+    return `/${clean}`;
+  }
+
+  /**
    * Get all active campaigns for the Home Page Slider and Featured sections
    */
   public async getActiveCampaigns(): Promise<Campaign[]> {
@@ -210,8 +226,13 @@ export class CampaignService {
       if (snap.empty) {
         // Seed default initial campaigns to Firestore asynchronously
         this.seedDefaultCampaigns().catch(err => console.warn('Seeding campaigns warning:', err));
-        return DEFAULT_BANNER_CAMPAIGNS;
+        return DEFAULT_BANNER_CAMPAIGNS.map(c => ({
+          ...c,
+          targetRoute: this.sanitizeTargetRoute(c.targetRoute)
+        }));
       }
+
+      const now = new Date().toISOString();
 
       const list: Campaign[] = snap.docs.map(d => {
         const data = d.data();
@@ -228,7 +249,7 @@ export class CampaignService {
           campaignType: data.campaignType || 'sponsored_ad',
           bannerImage: data.bannerImage || data.imageUrl || data.image || '',
           bgClass: data.bgClass || 'from-violet-950 via-indigo-900 to-slate-950',
-          targetRoute: data.targetRoute || '/marketplace',
+          targetRoute: this.sanitizeTargetRoute(data.targetRoute),
           offerBadge: data.offerBadge || 'Special Offer',
           discountPercent: data.discountPercent || 0,
           isVerified: data.isVerified ?? true,
@@ -247,8 +268,15 @@ export class CampaignService {
         };
       });
 
+      // Filter out future scheduled or expired campaigns
+      const validCampaigns = list.filter(c => {
+        if (c.startDate && c.startDate > now) return false;
+        if (c.endDate && c.endDate < now) return false;
+        return true;
+      });
+
       // Sort pinned campaigns first, then featured, then by impressions
-      return list.sort((a, b) => {
+      return validCampaigns.sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
         if (a.isFeatured && !b.isFeatured) return -1;
@@ -257,7 +285,10 @@ export class CampaignService {
       });
     } catch (e: any) {
       console.warn('Error fetching campaigns, using fallback defaults:', e);
-      return DEFAULT_BANNER_CAMPAIGNS;
+      return DEFAULT_BANNER_CAMPAIGNS.map(c => ({
+        ...c,
+        targetRoute: this.sanitizeTargetRoute(c.targetRoute)
+      }));
     }
   }
 
@@ -273,6 +304,7 @@ export class CampaignService {
 
     const newCampaign: Campaign = {
       ...campaignData,
+      targetRoute: this.sanitizeTargetRoute(campaignData.targetRoute),
       id,
       impressions: 0,
       clicks: 0,
@@ -289,6 +321,27 @@ export class CampaignService {
     });
 
     logger.audit('CampaignService', `Created campaign ${id} for business ${campaignData.businessName}`, campaignData.merchantId, { campaignType: campaignData.campaignType });
+
+    try {
+      if (campaignData.merchantId) {
+        await notificationService.notify(
+          campaignData.merchantId,
+          'marketing_alert',
+          'Campaign Created',
+          `Your campaign "${campaignData.campaignTitle}" has been created and submitted for review.`,
+          { entityId: id, entityType: 'campaign', linkTo: '/business/campaigns' }
+        );
+      }
+      await notificationService.notifyAdmins(
+        'marketing_alert',
+        'New Campaign Submitted',
+        `New campaign "${campaignData.campaignTitle}" submitted by ${campaignData.businessName}.`,
+        { entityId: id, entityType: 'campaign', linkTo: '/admin-console' }
+      );
+    } catch (notifErr) {
+      console.warn('Campaign creation notification warning:', notifErr);
+    }
+
     return newCampaign;
   }
 
@@ -302,6 +355,39 @@ export class CampaignService {
       status,
       updatedAt: serverTimestamp()
     });
+
+    // Notify merchant owner
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const camp = snap.data();
+        if (camp.merchantId) {
+          await notificationService.notify(
+            camp.merchantId,
+            'marketing_alert',
+            `Campaign Status: ${status.toUpperCase()}`,
+            `Your campaign "${camp.campaignTitle || 'Ad'}" status has been updated to ${status.toUpperCase()}.`,
+            { entityId: campaignId, entityType: 'campaign', linkTo: '/business/campaigns' }
+          );
+        }
+      }
+    } catch (notifErr) {
+      console.warn('Campaign status update notification warning:', notifErr);
+    }
+
+    // Write immutable admin audit log
+    try {
+      const logRef = doc(collection(db, 'adminAuditLogs'));
+      await setDoc(logRef, {
+        action: 'UPDATE_CAMPAIGN_STATUS',
+        actorUid: adminUid,
+        targetId: campaignId,
+        newStatus: status,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Audit log creation warning:', err);
+    }
 
     logger.audit('CampaignService', `Admin ${adminUid} updated campaign ${campaignId} status to ${status}`, adminUid);
   }
@@ -317,6 +403,20 @@ export class CampaignService {
       updatedAt: serverTimestamp()
     });
 
+    // Write immutable admin audit log
+    try {
+      const logRef = doc(collection(db, 'adminAuditLogs'));
+      await setDoc(logRef, {
+        action: 'TOGGLE_CAMPAIGN_PIN',
+        actorUid: adminUid,
+        targetId: campaignId,
+        isPinned,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Audit log creation warning:', err);
+    }
+
     logger.audit('CampaignService', `Admin ${adminUid} set isPinned=${isPinned} for campaign ${campaignId}`, adminUid);
   }
 
@@ -325,6 +425,7 @@ export class CampaignService {
    */
   public async trackImpression(campaignId: string): Promise<void> {
     try {
+      const auth = getAuth();
       const db = getFirebaseDb();
       const ref = doc(db, 'campaigns', campaignId);
       await updateDoc(ref, {
@@ -332,7 +433,7 @@ export class CampaignService {
       });
       analyticsService.trackEvent({
         eventType: 'banner_view' as any,
-        userUid: 'anonymous',
+        userUid: auth.currentUser?.uid || 'anonymous',
         metadata: { campaignId }
       }).catch(() => {});
     } catch (e) {
@@ -345,6 +446,7 @@ export class CampaignService {
    */
   public async trackClick(campaignId: string): Promise<void> {
     try {
+      const auth = getAuth();
       const db = getFirebaseDb();
       const ref = doc(db, 'campaigns', campaignId);
       await updateDoc(ref, {
@@ -352,7 +454,7 @@ export class CampaignService {
       });
       analyticsService.trackEvent({
         eventType: 'banner_click' as any,
-        userUid: 'anonymous',
+        userUid: auth.currentUser?.uid || 'anonymous',
         metadata: { campaignId }
       }).catch(() => {});
     } catch (e) {

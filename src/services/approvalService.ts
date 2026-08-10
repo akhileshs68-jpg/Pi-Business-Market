@@ -20,6 +20,7 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
+import { notificationService } from './notificationService';
 import {
   UniversalApproval,
   ApprovalType,
@@ -260,6 +261,63 @@ export class ApprovalService {
 
     await updateDoc(docRef, updatedFields);
 
+    // Sync underlying entity status for Businesses, Stores, Products, Services
+    if (currentData.entityId) {
+      try {
+        if (['Business Registration', 'Seller Verification', 'Merchant Verification'].includes(currentData.approvalType)) {
+          const bizRef = doc(db, 'businesses', currentData.entityId);
+          if (action === 'Approve') {
+            await setDoc(bizRef, {
+              verificationStatus: 'Verified',
+              approvalStatus: 'approved',
+              businessStatus: 'active',
+              status: 'active',
+              approvedAt: new Date().toISOString(),
+              approvedBy: adminUser.uid,
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          } else if (action === 'Reject') {
+            await setDoc(bizRef, {
+              verificationStatus: 'Rejected',
+              approvalStatus: 'rejected',
+              businessStatus: 'rejected',
+              status: 'rejected',
+              rejectedAt: new Date().toISOString(),
+              rejectedBy: adminUser.uid,
+              rejectionReason: reason || 'Application rejected during administrative review.',
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          }
+        } else if (currentData.approvalType === 'Store Registration') {
+          const storeRef = doc(db, 'stores', currentData.entityId);
+          if (action === 'Approve') {
+            await setDoc(storeRef, {
+              verificationStatus: 'Verified',
+              approvalStatus: 'approved',
+              storeStatus: 'active',
+              status: 'active',
+              approvedAt: new Date().toISOString(),
+              approvedBy: adminUser.uid,
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          } else if (action === 'Reject') {
+            await setDoc(storeRef, {
+              verificationStatus: 'Rejected',
+              approvalStatus: 'rejected',
+              storeStatus: 'rejected',
+              status: 'rejected',
+              rejectedAt: new Date().toISOString(),
+              rejectedBy: adminUser.uid,
+              rejectionReason: reason || 'Store registration rejected.',
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[ApprovalService] Underlying entity sync warning:', syncErr);
+      }
+    }
+
     // Write immutable Audit Log
     const auditLogId = doc(collection(db, 'temp')).id;
     const auditLog: ApprovalAuditLog = {
@@ -338,7 +396,7 @@ export class ApprovalService {
     const notificationsCollection = this.getNotificationsCollection();
     const timestamp = new Date().toISOString();
 
-    const dispatchNotification = async (recipientUid: string, title: string, message: string, priority: 'low' | 'normal' | 'high') => {
+    const dispatchNotification = async (recipientUid: string, title: string, message: string, priority: 'low' | 'normal' | 'high', route = '/business/dashboard') => {
       const notifId = doc(collection(db, 'temp')).id;
       const notif: ApprovalNotification = {
         id: notifId,
@@ -348,19 +406,56 @@ export class ApprovalService {
         priority,
         read: false,
         createdAt: timestamp,
-        link: '/admin-console'
+        link: route
       };
       await setDoc(doc(db, 'approvalNotifications', notifId), notif);
+
+      // Also deliver via central Notification Service
+      try {
+        await notificationService.notify(
+          recipientUid,
+          'system_alert',
+          title,
+          message,
+          {
+            entityId: approval.id,
+            entityType: 'approval',
+            priority: priority === 'high' ? 'high' : 'medium',
+            linkTo: route
+          }
+        );
+      } catch (err) {
+        console.warn('Central notification dispatch notice:', err);
+      }
     };
+
+    const isSellerApproval = ['Business Registration', 'Seller Verification', 'Merchant Verification'].includes(approval.approvalType);
 
     // 1. Notify Applicant
     if (approval.submittedBy.uid) {
-      const applicantMsg = `Your approval request for "${approval.entityName}" (${approval.approvalType}) has been marked as "${action}" by administrator ${admin.displayName}. Reason: ${reason}`;
+      let applicantTitle = `Approval Status Update: ${action}`;
+      let applicantMsg = `Your approval request for "${approval.entityName}" (${approval.approvalType}) has been marked as "${action}" by administrator ${admin.displayName}. Reason: ${reason}`;
+      let route = '/business/dashboard';
+
+      if (isSellerApproval) {
+        if (action === 'Approve') {
+          applicantTitle = 'Seller Account Approved';
+          applicantMsg = 'Your seller/business account has been approved. You can now use seller marketplace features.';
+        } else if (action === 'Reject') {
+          applicantTitle = 'Seller Application Rejected';
+          applicantMsg = `Your seller application for "${approval.entityName}" was rejected. Reason: ${reason || 'Failed administrative review criteria.'}`;
+        } else if (action === 'Hold' || action === 'Suspend') {
+          applicantTitle = 'Seller Account Suspended';
+          applicantMsg = `Your seller account "${approval.entityName}" has been suspended. Reason: ${reason || 'Administrative action.'}`;
+        }
+      }
+
       await dispatchNotification(
         approval.submittedBy.uid,
-        `Approval Status Update: ${action}`,
+        applicantTitle,
         applicantMsg,
-        action === 'Reject' ? 'high' : 'normal'
+        action === 'Reject' || action === 'Hold' ? 'high' : 'normal',
+        route
       );
     }
 

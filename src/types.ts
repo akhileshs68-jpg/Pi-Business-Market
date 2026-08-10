@@ -489,10 +489,13 @@ export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export interface Notification {
   notificationId: string;
+  id?: string;
   recipientUid: string;
+  senderUid?: string;
   type: EnterpriseNotificationType;
   title: string;
   body: string;
+  message?: string;
   entityType?: string;
   entityId?: string;
   priority: NotificationPriority;
@@ -503,6 +506,8 @@ export interface Notification {
   pinned?: boolean;
   createdAt: string;
   linkTo?: string; // App route
+  actionUrl?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface NotificationPreference {
@@ -691,6 +696,8 @@ export interface Business {
   verificationStatus: VerificationStatus;
   kycStatus: string;
   businessStatus: BusinessStatus;
+  approvalStatus?: string;
+  status?: string;
   rating: number;
   reviewCount: number;
   followers: number;
@@ -800,6 +807,7 @@ export interface PlatformSettings {
   maxStoragePerBusinessMb: number;
   isMaintenanceMode?: boolean;
   allowNewRegistrations?: boolean;
+  communityPiUsdRate?: number;
   updatedAt: string;
 }
 

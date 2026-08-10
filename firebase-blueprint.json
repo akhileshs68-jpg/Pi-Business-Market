@@ -188,6 +188,48 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "recipientUid", "title", "message", "priority", "read", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Chat Conversation",
+      "description": "Secure, real-time internal conversation between participants",
+      "type": "object",
+      "properties": {
+        "conversationId": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string", "enum": ["direct", "order", "booking", "business_customer", "admin_support"] },
+        "businessId": { "type": "string" },
+        "storeId": { "type": "string" },
+        "productId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "relatedEntityType": { "type": "string" },
+        "relatedEntityId": { "type": "string" },
+        "status": { "type": "string" },
+        "unreadCounts": { "type": "object" },
+        "lastActivity": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["conversationId", "participants", "type", "status"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "Secure message within a chat conversation",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "messageType": { "type": "string", "enum": ["text", "image", "service_card", "business_card", "invoice", "receipt", "qrcode", "location", "voice", "emoji", "system"] },
+        "content": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"] },
+        "edited": { "type": "boolean" },
+        "deleted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["messageId", "conversationId", "senderUid", "messageType", "content", "status", "edited", "deleted"]
     }
   },
   "firestore": {
@@ -218,6 +260,14 @@
     "/approvalNotifications/{notifId}": {
       "schema": "ApprovalNotification",
       "description": "Notifications related to approval workflows"
+    },
+    "/conversations/{convId}": {
+      "schema": "Conversation",
+      "description": "Secure chat conversation document"
+    },
+    "/conversations/{convId}/messages/{msgId}": {
+      "schema": "Message",
+      "description": "Secure chat message document"
     }
   },
   "indexes": [

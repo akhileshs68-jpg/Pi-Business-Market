@@ -19,6 +19,7 @@ import { catalogService } from '../../services/catalogService';
 import { mediaService } from '../../services/mediaService';
 import { pricingEngine } from '../../services/pricing/pricingEngine';
 import { getSupportedCurrencies, formatCurrencyAmount } from '../../services/pricing/currencyRegistry';
+import { calculateCommunityPiFromLocalPrice, DEFAULT_COMMUNITY_PI_USD_RATE } from '../../services/pricing/communityPriceCalculator';
 import { Product, Category, ProductStatus } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -1190,7 +1191,7 @@ export const ProductManager: React.FC = () => {
                       </div>
 
                       {formData.pricingMode === 'EXCHANGE' ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-slate-400">Currency</label>
@@ -1220,34 +1221,121 @@ export const ProductManager: React.FC = () => {
                               />
                             </div>
                           </div>
-                          <div className="text-[11px] text-emerald-400/90 font-medium bg-slate-950/70 p-2 rounded-lg border border-slate-800/80">
-                            <span>Preview: </span>
-                            {formData.localAmount > 0 ? (
-                              <span>
-                                {formatCurrencyAmount(formData.localAmount, formData.localCurrency)}
-                                {' ≈ '}
-                                {ratePreview.piAmount ? `${ratePreview.piAmount} π` : (
-                                  <span className="text-amber-400">{ratePreview.error || 'Live Pi rate unavailable'}</span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-slate-500">Enter local amount to view preview</span>
-                            )}
+                          <div className="text-[11px] text-emerald-400/90 font-medium bg-slate-950/70 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span>Market Exchange Pricing</span>
+                              <span className="text-emerald-400 font-bold">Live Rate</span>
+                            </div>
+                            <div>
+                              <span>Preview: </span>
+                              {formData.localAmount > 0 ? (
+                                <span className="font-bold">
+                                  {formatCurrencyAmount(formData.localAmount, formData.localCurrency)}
+                                  {' ≈ '}
+                                  {ratePreview.piAmount ? `${ratePreview.piAmount} π` : (
+                                    <span className="text-amber-400">{ratePreview.error || 'Live Pi rate unavailable'}</span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">Enter local amount to view preview</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[11px] font-bold text-slate-400">Community Price (Pi) *</label>
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/tools/community-price-calculator?target=product&currency=${formData.localCurrency}&amount=${formData.localAmount}`)}
-                                className="text-[10px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 cursor-pointer"
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-400">Local Currency</label>
+                              <select
+                                value={formData.localCurrency}
+                                onChange={(e) => setFormData(prev => ({ ...prev, localCurrency: e.target.value }))}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
                               >
-                                <Calculator className="w-3 h-3" /> Calculator
-                              </button>
+                                {getSupportedCurrencies().filter(c => c.code !== 'PI').map(curr => (
+                                  <option key={curr.code} value={curr.code}>
+                                    {curr.displayName} ({curr.symbol})
+                                  </option>
+                                ))}
+                              </select>
                             </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-400">Local Price</label>
+                              <input
+                                type="number"
+                                min={0.01}
+                                step={0.01}
+                                value={formData.localAmount || ''}
+                                onChange={(e) => {
+                                  const amt = parseFloat(e.target.value) || 0;
+                                  setFormData(prev => ({ ...prev, localAmount: amt }));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                                placeholder="1000"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Community Pricing Conversion Calculator Helper */}
+                          {(() => {
+                            const calc = calculateCommunityPiFromLocalPrice(
+                              formData.localAmount || 0,
+                              formData.localCurrency || 'INR',
+                              DEFAULT_COMMUNITY_PI_USD_RATE
+                            );
+                            return (
+                              <div className="bg-slate-950/80 border border-violet-500/20 rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                                  <span className="text-[10px] font-bold text-violet-400 flex items-center gap-1 uppercase tracking-wider">
+                                    <Calculator className="w-3 h-3" /> Community Price Calculator
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 bg-violet-950/60 text-violet-300 px-2 py-0.5 rounded-full border border-violet-500/30 font-mono">
+                                    Ref: $314,159 USD/π
+                                  </span>
+                                </div>
+
+                                {formData.localAmount > 0 ? (
+                                  <div className="space-y-2 text-xs">
+                                    <div className="text-[11px] text-slate-300 space-y-1 font-mono">
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-500">Local Price:</span>
+                                        <span>{formatCurrencyAmount(formData.localAmount, formData.localCurrency)}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-500">USD Equivalent:</span>
+                                        <span className="text-emerald-400">${calc.usdEquivalent} USD</span>
+                                      </div>
+                                      <div className="flex justify-between font-bold pt-1 border-t border-slate-800">
+                                        <span className="text-slate-400">Community Pi Price:</span>
+                                        <span className="text-violet-400">{calc.communityPiAmount} π</span>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          communityPiAmount: calc.communityPiAmount,
+                                          price: calc.communityPiAmount,
+                                        }));
+                                      }}
+                                      className="w-full py-1.5 bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-200 text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
+                                    >
+                                      Use Calculated Price ({calc.communityPiAmount} π)
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-slate-500 italic">
+                                    Enter local price above to convert via the $314,159 USD/π Community Reference pipeline.
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-slate-400">Community Price (π) *</label>
                             <input
                               type="number"
                               required
@@ -1258,12 +1346,9 @@ export const ProductManager: React.FC = () => {
                                 const val = parseFloat(e.target.value) || 0;
                                 setFormData(prev => ({ ...prev, communityPiAmount: val, price: val }));
                               }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
-                              placeholder="10"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none font-bold text-violet-300"
+                              placeholder="0.0000381"
                             />
-                          </div>
-                          <div className="text-[11px] text-emerald-400 font-medium bg-slate-950/70 p-2 rounded-lg border border-slate-800/80">
-                            Preview: {formData.communityPiAmount || 0} π (Community Price)
                           </div>
                         </div>
                       )}

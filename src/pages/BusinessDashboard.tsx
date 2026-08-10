@@ -111,13 +111,17 @@ export const BusinessDashboard: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                   <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">This is your Business</p>
-                  {currentBusiness?.verificationStatus === 'Verified' ? (
-                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Verified</span>
+                  {(currentBusiness?.verificationStatus === 'Verified' || currentBusiness?.verificationStatus === 'Approved' || (currentBusiness as any)?.approvalStatus === 'approved') ? (
+                    <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Verified / Approved</span>
+                  ) : (currentBusiness?.verificationStatus === 'Rejected' || (currentBusiness as any)?.approvalStatus === 'rejected' || (currentBusiness?.businessStatus as string) === 'rejected') ? (
+                    <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Application Rejected</span>
+                  ) : (currentBusiness?.verificationStatus === 'Suspended' || (currentBusiness as any)?.approvalStatus === 'suspended' || (currentBusiness?.businessStatus as string) === 'suspended') ? (
+                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Account Suspended</span>
                   ) : (
-                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Pending Approval</span>
+                    <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">Approval Pending</span>
                   )}
-                  <span className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider">
-                    {currentBusiness?.businessStatus || 'Active'}
+                  <span className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 text-[9px] font-bold rounded-full uppercase tracking-wider capitalize">
+                    {currentBusiness?.businessStatus || currentBusiness?.status || 'Active'}
                   </span>
                 </div>
 

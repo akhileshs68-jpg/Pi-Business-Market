@@ -393,12 +393,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               </>
             ) : (
               <>
-                {orderData.orderStatus === 'dispatched' && (
+                {['shipped', 'dispatched', 'out_for_delivery', 'delivered'].includes((orderData.orderStatus || '').toLowerCase()) && (
                   <button 
                     onClick={() => handleUpdateOrderStatus('completed')}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5"
                   >
-                    Confirm Delivery
+                    <CheckCircle className="w-3.5 h-3.5" /> Confirm Receipt
                   </button>
                 )}
                 {['pending_payment', 'payment_verified'].includes(orderData.orderStatus) && (

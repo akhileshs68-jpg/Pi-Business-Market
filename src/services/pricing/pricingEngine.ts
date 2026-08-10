@@ -9,7 +9,9 @@ import {
   normalizeCurrencyCode,
   isSupportedCurrency,
   safeRoundNumber,
+  DEFAULT_COMMUNITY_PI_USD_RATE,
 } from './currencyRegistry';
+import { calculateCommunityPiFromLocalPrice } from './communityPriceCalculator';
 import { RateResolver, globalRateResolver } from './rateProvider';
 
 export class PricingEngine {
@@ -47,30 +49,7 @@ export class PricingEngine {
     }
 
     if (input.mode === 'COMMUNITY') {
-      const communityAmount = Number(input.communityPiAmount);
-      if (
-        isNaN(communityAmount) ||
-        !isFinite(communityAmount) ||
-        communityAmount <= 0
-      ) {
-        return {
-          success: false,
-          pricingMode: 'COMMUNITY',
-          localCurrency: input.localCurrency ? normalizeCurrencyCode(input.localCurrency) : 'PI',
-          localAmount: input.localAmount ? Number(input.localAmount) : null,
-          piAmount: null,
-          rateUsed: null,
-          rateSource: 'Community Defined Reference',
-          rateProvider: 'community_seller',
-          rateTimestamp: now,
-          rateStatus: 'AVAILABLE',
-          pricingEngineVersion: this.version,
-          calculatedAt: now,
-          error: 'Community Pi amount must be a positive finite number',
-        };
-      }
-
-      const piAmount = safeRoundNumber(communityAmount, 7);
+      let communityAmount = Number(input.communityPiAmount);
       const localCurrency = input.localCurrency
         ? normalizeCurrencyCode(input.localCurrency)
         : 'PI';
@@ -79,6 +58,40 @@ export class PricingEngine {
           ? safeRoundNumber(Number(input.localAmount), 2)
           : null;
 
+      // If communityPiAmount is not directly provided or invalid, attempt to derive from localAmount
+      if (
+        (isNaN(communityAmount) || !isFinite(communityAmount) || communityAmount <= 0) &&
+        localAmount !== null &&
+        localAmount > 0
+      ) {
+        const derived = calculateCommunityPiFromLocalPrice(localAmount, localCurrency);
+        communityAmount = derived.communityPiAmount;
+      }
+
+      if (
+        isNaN(communityAmount) ||
+        !isFinite(communityAmount) ||
+        communityAmount <= 0
+      ) {
+        return {
+          success: false,
+          pricingMode: 'COMMUNITY',
+          localCurrency,
+          localAmount,
+          piAmount: null,
+          rateUsed: null,
+          rateSource: 'Community Defined Reference ($314,159 USD/Pi)',
+          rateProvider: 'community_seller',
+          rateTimestamp: now,
+          rateStatus: 'AVAILABLE',
+          pricingEngineVersion: this.version,
+          calculatedAt: now,
+          error: 'Community Pi amount must be a positive finite number or derivable from local price',
+        };
+      }
+
+      const piAmount = safeRoundNumber(communityAmount, 7);
+
       return {
         success: true,
         pricingMode: 'COMMUNITY',
@@ -86,7 +99,7 @@ export class PricingEngine {
         localAmount,
         piAmount,
         rateUsed: null,
-        rateSource: 'Community Defined Reference',
+        rateSource: 'Community Defined Reference ($314,159 USD/Pi)',
         rateProvider: 'community_seller',
         rateTimestamp: now,
         rateStatus: 'AVAILABLE',
