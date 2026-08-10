@@ -55,9 +55,28 @@ export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hid
   const handleQuickAdvanceStatus = async (e: React.MouseEvent, order: Order, nextStatus: string) => {
     e.stopPropagation();
     if (!user || processingStatusId === order.orderId) return;
+
+    // Security check: Ensure user is authorized merchant for this order and NOT the buyer
+    const isOrderMerchant = (
+      user.uid === order.businessId || 
+      user.uid === order.sellerId || 
+      user.uid === order.storeId || 
+      user.role === 'seller' || 
+      user.role === 'merchant' || 
+      user.role === 'Admin' || 
+      user.role === 'Super Admin' || 
+      user.platformRole === 'admin' || 
+      user.platformRole === 'superadmin'
+    ) && user.uid !== order.buyerId && user.uid !== order.userUid;
+
+    if (!isOrderMerchant) {
+      console.warn('Unauthorized quick advance attempt blocked.');
+      return;
+    }
+
     try {
       setProcessingStatusId(order.orderId);
-      await orderService.updateOrderStatus(order.orderId, nextStatus, user.uid, 'seller', `Advanced status to ${nextStatus}`);
+      await orderService.updateOrderStatus(order.orderId, nextStatus, user.uid, 'seller', `Advanced status to ${nextStatus.replace(/_/g, ' ')}`);
       fetchOrders();
     } catch (err) {
       console.error('Failed status advance', err);
@@ -251,28 +270,74 @@ export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hid
                   <div className="flex justify-between md:justify-end items-center w-full gap-2 pt-4 md:pt-0 border-t border-slate-800 md:border-0">
                     <div className="md:hidden text-[10px] font-black text-slate-600 uppercase tracking-widest">Action</div>
                     <div className="flex items-center gap-2">
-                      {order.orderStatus === OrderStatus.NEW_ORDER && (
+                      {['paid', 'payment_verified', 'new_order', 'pending_payment'].includes((order.orderStatus || '').toLowerCase()) && (
                         <button 
+                          disabled={processingStatusId === order.orderId}
                           onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.ACCEPTED)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
                         >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                           Accept
                         </button>
                       )}
-                      {order.orderStatus === OrderStatus.ACCEPTED && (
+                      {(order.orderStatus || '').toLowerCase() === 'accepted' && (
                         <button 
+                          disabled={processingStatusId === order.orderId}
                           onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.PREPARING)}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest"
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
                         >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                           Prepare
                         </button>
                       )}
-                      {order.orderStatus === OrderStatus.PREPARING && (
+                      {(order.orderStatus || '').toLowerCase() === 'preparing' && (
                         <button 
+                          disabled={processingStatusId === order.orderId}
                           onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.PACKED)}
-                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest"
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
                         >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                           Pack
+                        </button>
+                      )}
+                      {(order.orderStatus || '').toLowerCase() === 'packed' && (
+                        <button 
+                          disabled={processingStatusId === order.orderId}
+                          onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.READY_FOR_DISPATCH)}
+                          className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          Ready Dispatch
+                        </button>
+                      )}
+                      {(order.orderStatus || '').toLowerCase() === 'ready_for_dispatch' && (
+                        <button 
+                          disabled={processingStatusId === order.orderId}
+                          onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.SHIPPED)}
+                          className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          Ship
+                        </button>
+                      )}
+                      {(order.orderStatus || '').toLowerCase() === 'shipped' && (
+                        <button 
+                          disabled={processingStatusId === order.orderId}
+                          onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.OUT_FOR_DELIVERY)}
+                          className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          Out For Delivery
+                        </button>
+                      )}
+                      {(order.orderStatus || '').toLowerCase() === 'out_for_delivery' && (
+                        <button 
+                          disabled={processingStatusId === order.orderId}
+                          onClick={(e) => handleQuickAdvanceStatus(e, order, OrderStatus.DELIVERED)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {processingStatusId === order.orderId ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          Delivered
                         </button>
                       )}
                       <button className="p-2 bg-slate-800 group-hover:bg-indigo-600 text-white rounded-xl transition-all">

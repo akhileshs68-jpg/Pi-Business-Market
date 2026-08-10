@@ -246,7 +246,15 @@ export const OrderDetails: React.FC = () => {
     }
   };
 
-  const isMerchant = user?.uid === order?.businessId || user?.uid === order?.sellerId;
+  const isMerchant = Boolean(
+    user && order && (
+      user.uid === order.businessId ||
+      user.uid === order.sellerId ||
+      user.uid === order.storeId ||
+      (store && store.ownerUid === user.uid) ||
+      ((user.role === 'seller' || user.role === 'merchant' || user.platformRole === 'seller' || user.platformRole === 'merchant' || user.role === 'Admin' || user.role === 'Super Admin' || user.platformRole === 'admin' || user.platformRole === 'superadmin') && user.uid !== order.buyerId && user.uid !== order.userUid)
+    )
+  );
 
   const handleChatAboutOrder = async () => {
     console.log('[OrderDetails Chat Step 1 ENTRY] Chat button clicked.', {
@@ -306,16 +314,34 @@ export const OrderDetails: React.FC = () => {
   };
 
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const handleUpdateStatus = async (status: string, remarks?: string) => {
     if (!order || !user || statusUpdating) return;
+
+    // Security check: If non-seller tries to run seller fulfillment status updates, reject!
+    const sellerStatuses = [
+      OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.PREPARING, 
+      OrderStatus.PACKED, OrderStatus.READY_FOR_DISPATCH, OrderStatus.SHIPPED, 
+      OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED
+    ];
+    if (sellerStatuses.includes(status as any) && !isMerchant) {
+      setActionError('UNAUTHORIZED: Buyer cannot execute seller fulfillment actions.');
+      return;
+    }
+
     try {
       setStatusUpdating(true);
+      setActionError(null);
+      setActionSuccess(null);
       const role = isMerchant ? 'seller' : 'buyer';
       await orderService.updateOrderStatus(order.orderId, status, user.uid, role, remarks);
-      fetchOrderData();
-    } catch (err) {
+      setActionSuccess(`Order status updated to ${status.replace(/_/g, ' ').toUpperCase()}`);
+      await fetchOrderData();
+    } catch (err: any) {
       console.error('Status update failed', err);
+      setActionError(err?.message || 'Failed to update order status.');
     } finally {
       setStatusUpdating(false);
     }
@@ -494,6 +520,26 @@ export const OrderDetails: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 py-8 sm:py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Feedback Banners */}
+        {actionError && (
+          <div className="mb-6 p-4 bg-rose-950/60 border border-rose-800/80 rounded-2xl flex items-center justify-between text-xs text-rose-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            <button onClick={() => setActionError(null)} className="text-rose-400 hover:text-white font-bold text-[10px] uppercase">Dismiss</button>
+          </div>
+        )}
+        {actionSuccess && (
+          <div className="mb-6 p-4 bg-emerald-950/60 border border-emerald-800/80 rounded-2xl flex items-center justify-between text-xs text-emerald-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{actionSuccess}</span>
+            </div>
+            <button onClick={() => setActionSuccess(null)} className="text-emerald-400 hover:text-white font-bold text-[10px] uppercase">Dismiss</button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 sm:mb-12">
           <div className="space-y-2">
@@ -514,49 +560,166 @@ export const OrderDetails: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             {isMerchant ? (
               <>
-                {(currentStatusClean === 'new_order' || currentStatusClean === 'payment_verified' || currentStatusClean === 'pending_payment') && (
+                {['paid', 'payment_verified', 'new_order', 'pending_payment'].includes(currentStatusClean) && (
                   <>
-                    <button onClick={() => handleUpdateStatus(OrderStatus.ACCEPTED, 'Order accepted by merchant')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20">Accept Order</button>
-                    <button onClick={() => handleUpdateStatus(OrderStatus.REJECTED, 'Order rejected by merchant')} className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Reject Order</button>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => handleUpdateStatus(OrderStatus.ACCEPTED, 'Order accepted by merchant')} 
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      ACCEPT ORDER
+                    </button>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => handleUpdateStatus(OrderStatus.REJECTED, 'Order rejected by merchant')} 
+                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      REJECT ORDER
+                    </button>
                   </>
                 )}
                 {currentStatusClean === 'accepted' && (
-                  <button onClick={() => handleUpdateStatus(OrderStatus.PREPARING, 'Items are being prepared')} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Preparing</button>
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={() => handleUpdateStatus(OrderStatus.PREPARING, 'Items are being prepared')} 
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    START PREPARING
+                  </button>
                 )}
                 {currentStatusClean === 'preparing' && (
-                  <button onClick={() => handleUpdateStatus(OrderStatus.PACKED, 'Order packed and sealed')} className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Packed</button>
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={() => handleUpdateStatus(OrderStatus.PACKED, 'Order packed and sealed')} 
+                    className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    MARK PACKED
+                  </button>
                 )}
                 {currentStatusClean === 'packed' && (
-                  <button onClick={() => setShowShipmentModal(true)} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> Dispatch / Ship</button>
+                  <>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => handleUpdateStatus(OrderStatus.READY_FOR_DISPATCH, 'Order ready for dispatch')} 
+                      className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      READY FOR DISPATCH
+                    </button>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => setShowShipmentModal(true)} 
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                    >
+                      <Truck className="w-3.5 h-3.5" /> DISPATCH / SHIP
+                    </button>
+                  </>
                 )}
-                {(currentStatusClean === 'shipped' || currentStatusClean === 'ready_for_dispatch') && (
-                  <button onClick={() => handleUpdateStatus(OrderStatus.OUT_FOR_DELIVERY, 'Out for local delivery')} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Out For Delivery</button>
+                {currentStatusClean === 'ready_for_dispatch' && (
+                  <>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => handleUpdateStatus(OrderStatus.SHIPPED, 'Order shipped via carrier')} 
+                      className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      MARK SHIPPED
+                    </button>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => setShowShipmentModal(true)} 
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                    >
+                      <Truck className="w-3.5 h-3.5" /> COURIER DISPATCH
+                    </button>
+                  </>
                 )}
-                {(currentStatusClean === 'out_for_delivery' || currentStatusClean === 'shipped') && (
-                  <button onClick={() => handleUpdateStatus(OrderStatus.DELIVERED, 'Package delivered to recipient')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Mark Delivered</button>
+                {currentStatusClean === 'shipped' && (
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={() => handleUpdateStatus(OrderStatus.OUT_FOR_DELIVERY, 'Out for local delivery')} 
+                    className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    MARK OUT FOR DELIVERY
+                  </button>
+                )}
+                {currentStatusClean === 'out_for_delivery' && (
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={() => handleUpdateStatus(OrderStatus.DELIVERED, 'Package delivered to recipient')} 
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    MARK DELIVERED
+                  </button>
                 )}
                 {currentStatusClean === 'refund_requested' && (
-                  <button onClick={handleApproveRefund} className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Approve Refund</button>
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={handleApproveRefund} 
+                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                  >
+                    Approve Refund
+                  </button>
                 )}
                 {order.escrowStatus === 'holding' && (
-                  <button onClick={handleReleaseEscrow} className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-widest transition-all">Release Escrow</button>
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={handleReleaseEscrow} 
+                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-widest transition-all disabled:opacity-50"
+                  >
+                    Release Escrow
+                  </button>
                 )}
               </>
             ) : (
               <>
                 {currentStatusClean === 'delivered' && (
                   <>
-                    <button onClick={() => handleUpdateStatus(OrderStatus.COMPLETED, 'Order confirmed & completed by buyer')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20">Confirm Receipt</button>
-                    <button onClick={() => setShowRefundModal(true)} className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Request Refund</button>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => handleUpdateStatus(OrderStatus.COMPLETED, 'Order confirmed & completed by buyer')} 
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                    >
+                      Confirm Receipt
+                    </button>
+                    <button 
+                      disabled={statusUpdating}
+                      onClick={() => setShowRefundModal(true)} 
+                      className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                    >
+                      Request Refund
+                    </button>
                   </>
                 )}
-                {['pending_payment', 'payment_verified', 'new_order', 'accepted'].includes(currentStatusClean) && (
-                  <button onClick={() => handleUpdateStatus(OrderStatus.CANCELLED, 'Cancelled by customer')} className="px-4 py-2.5 bg-rose-600/20 border border-rose-500/30 text-rose-400 hover:bg-rose-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Cancel Order</button>
+                {['pending_payment', 'payment_verified', 'paid', 'new_order', 'accepted'].includes(currentStatusClean) && (
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={() => handleUpdateStatus(OrderStatus.CANCELLED, 'Cancelled by customer')} 
+                    className="px-4 py-2.5 bg-rose-600/20 border border-rose-500/30 text-rose-400 hover:bg-rose-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                  >
+                    Cancel Order
+                  </button>
                 )}
                 {currentStatusClean === 'completed' && (
-                  <button onClick={() => setShowRefundModal(true)} className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Request Refund / Return</button>
+                  <button 
+                    disabled={statusUpdating}
+                    onClick={() => setShowRefundModal(true)} 
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                  >
+                    Request Refund / Return
+                  </button>
                 )}
-                <button onClick={() => setShowDisputeModal(true)} className="px-3 py-2 bg-rose-950/40 border border-rose-800/50 text-rose-400 hover:bg-rose-900/60 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5">
+                <button 
+                  disabled={statusUpdating}
+                  onClick={() => setShowDisputeModal(true)} 
+                  className="px-3 py-2 bg-rose-950/40 border border-rose-800/50 text-rose-400 hover:bg-rose-900/60 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
                   <AlertTriangle className="w-3.5 h-3.5" /> Open Dispute
                 </button>
               </>

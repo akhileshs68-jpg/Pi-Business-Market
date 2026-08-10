@@ -209,6 +209,8 @@ export const shippingService = {
         shipmentId,
         orderId: order.orderId,
         businessId: order.businessId,
+        sellerId: order.sellerId || order.businessId,
+        buyerId: order.buyerId || order.userUid,
         storeId: order.storeId,
         shippingMethod: method,
         status: ShipmentStatus.PENDING,

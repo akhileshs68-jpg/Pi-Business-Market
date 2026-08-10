@@ -1932,6 +1932,8 @@ export interface Shipment {
   shipmentId: string;
   orderId: string;
   businessId: string;
+  sellerId?: string;
+  buyerId?: string;
   storeId?: string;
   warehouseId?: string;
   carrierId?: string;
