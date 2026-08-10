@@ -20,6 +20,7 @@ import { getFirebaseDb } from '../firebase/config';
 import { DangerZoneCard } from '../components/danger/DangerZoneCard';
 import { DeleteConfirmationModal } from '../components/danger/DeleteConfirmationModal';
 import { DeleteProgressDialog } from '../components/danger/DeleteProgressDialog';
+import { UniversalShareModal } from '../components/sharing/UniversalShareModal';
 
 export const BusinessProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>(); // businessId, storeId, or slug
@@ -31,6 +32,13 @@ export const BusinessProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'about'>('products');
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  useEffect(() => {
+    if (profileData) {
+      document.title = `${profileData.businessName || profileData.name || 'Business Store'} | Pi Business Market`;
+    }
+  }, [profileData]);
   
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
   const [storeServices, setStoreServices] = useState<any[]>([]);
@@ -377,13 +385,7 @@ export const BusinessProfile: React.FC = () => {
   };
 
   const handleShare = () => {
-    const canonId = profileData?.id || id;
-    const url = `${window.location.origin}/business/${canonId}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    setIsShareOpen(true);
   };
 
   const handleMessageBusiness = () => {
@@ -987,6 +989,19 @@ export const BusinessProfile: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Universal Share Modal */}
+      {isShareOpen && profileData && (
+        <UniversalShareModal
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          userId={user?.uid || 'guest'}
+          entityType="business"
+          entityId={profileData.id || id!}
+          entityName={profileData.businessName || profileData.name || 'Business Store'}
+          entityImage={profileData.logoUrl || profileData.bannerUrl}
+        />
+      )}
     </div>
   );
 };

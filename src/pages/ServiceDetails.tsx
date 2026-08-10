@@ -24,7 +24,8 @@ import {
   ArrowRight,
   ChevronRight,
   Briefcase,
-  User
+  User,
+  Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from '../components/Navbar';
@@ -35,6 +36,7 @@ import { bookingService } from '../services/bookingService';
 import { doc, getDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { Service, ServicePackage, ServiceAvailability } from '../types';
+import { UniversalShareModal } from '../components/sharing/UniversalShareModal';
 
 export const ServiceDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +50,13 @@ export const ServiceDetails: React.FC = () => {
   
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isShareOpen, setIsShareOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (service) {
+      document.title = `${service.title} | Pi Service Marketplace`;
+    }
+  }, [service]);
 
   // Booking Flow State
   const [selectedPackage, setSelectedPackage] = useState<ServicePackage | null>(null);
@@ -344,12 +353,20 @@ export const ServiceDetails: React.FC = () => {
             <span className="text-slate-200 truncate max-w-[200px]">{service.title}</span>
           </div>
 
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-850 hover:border-slate-800 text-slate-400 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all self-start"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back
-          </button>
+          <div className="flex items-center gap-2 self-start">
+            <button
+              onClick={() => setIsShareOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5 text-violet-400" /> Share
+            </button>
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-850 hover:border-slate-800 text-slate-400 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
+          </div>
         </div>
 
         {/* Top Header Card */}
@@ -798,6 +815,19 @@ export const ServiceDetails: React.FC = () => {
           </div>
 
         </div>
+
+        {/* Universal Share Modal */}
+        {isShareOpen && service && (
+          <UniversalShareModal
+            isOpen={isShareOpen}
+            onClose={() => setIsShareOpen(false)}
+            userId={user?.uid || 'guest'}
+            entityType="service"
+            entityId={service.serviceId || (service as any).id || id!}
+            entityName={service.title}
+            entityImage={service.mainImage || (service as any).imageUrl}
+          />
+        )}
 
       </main>
     </div>

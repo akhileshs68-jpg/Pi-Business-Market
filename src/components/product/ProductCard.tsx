@@ -173,12 +173,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           text: text,
           url: url
         });
+        return;
       } catch (err) {
-        console.log("Error sharing", err);
+        console.log("Native share dismissed or failed", err);
       }
-    } else {
-      navigator.clipboard.writeText(url);
-      alert('Product Link Copied!');
+    }
+
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch (err) {
+      console.warn("Clipboard write failed", err);
     }
   };
 

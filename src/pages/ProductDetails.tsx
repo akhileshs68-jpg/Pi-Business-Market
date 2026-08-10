@@ -38,6 +38,7 @@ import { useAuth } from '../auth/useAuth';
 import { cartService } from '../services/cartService';
 import { resolveProductPricing, resolveVariantPricing } from '../services/pricing/pricingCompatibility';
 import { searchService } from '../services/searchService';
+import { UniversalShareModal } from '../components/sharing/UniversalShareModal';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { checkoutService } from '../services/checkoutService';
@@ -106,6 +107,7 @@ export const ProductDetails: React.FC = () => {
 
   useEffect(() => {
     if (product) {
+      document.title = `${product.productName} | Pi Business Market`;
       fetchStoreAndRelated();
       fetchAdditionalProducts();
       if (product.variants && product.variants.length > 0) {
@@ -1679,130 +1681,18 @@ export const ProductDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Social Media Sharing Modal */}
-      {isShareOpen && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setIsShareOpen(false)}
-        >
-          <div 
-            className="bg-[#0c1221] border border-slate-850 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative space-y-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-900 pb-4">
-              <div>
-                <span className="text-[9px] font-black uppercase text-indigo-400 tracking-widest block mb-0.5">Tell Others</span>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Share Product Experience</h3>
-              </div>
-              <button 
-                onClick={() => setIsShareOpen(false)}
-                className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-500 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Shared content preview */}
-            <div className="p-3 bg-slate-950/60 border border-slate-900/60 rounded-xl space-y-1.5 text-xs text-slate-400 font-medium">
-              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest block">Message Preview</span>
-              <p className="line-clamp-4 leading-normal font-mono text-[10px] text-slate-300">
-                {`Check out ${product.productName}`}
-                {Object.entries(selectedAttributes).length > 0 && ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})`}
-                {`\nPrice: ${activePrice} π\n\nLink: ${window.location.href}`}
-              </p>
-            </div>
-
-            {/* Social Channels List */}
-            <div className="grid grid-cols-4 gap-4 text-center">
-              {/* Copy Link */}
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  triggerToast('Link copied to clipboard!');
-                  setIsShareOpen(false);
-                }}
-                className="flex flex-col items-center gap-2 group cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-indigo-500 group-hover:bg-indigo-500/10 text-slate-300 group-hover:text-indigo-400 transition-all flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                </div>
-                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">Copy Link</span>
-              </button>
-
-              {/* WhatsApp */}
-              <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                  `Check out ${product.productName}` +
-                  (Object.entries(selectedAttributes).length > 0 ? ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '') +
-                  `\nPrice: ${activePrice} π\n\nLink: ${window.location.href}`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setIsShareOpen(false)}
-                className="flex flex-col items-center gap-2 group cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-emerald-500 group-hover:bg-emerald-500/10 text-slate-300 group-hover:text-emerald-400 transition-all flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                </div>
-                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">WhatsApp</span>
-              </a>
-
-              {/* Telegram */}
-              <a
-                href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(
-                  `Check out ${product.productName}` +
-                  (Object.entries(selectedAttributes).length > 0 ? ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '') +
-                  `\nPrice: ${activePrice} π`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setIsShareOpen(false)}
-                className="flex flex-col items-center gap-2 group cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-sky-500 group-hover:bg-sky-500/10 text-slate-300 group-hover:text-sky-400 transition-all flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                </div>
-                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">Telegram</span>
-              </a>
-
-              {/* Twitter / X */}
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                  `Check out ${product.productName}` +
-                  (Object.entries(selectedAttributes).length > 0 ? ` (${Object.entries(selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(', ')})` : '') +
-                  `\nPrice: ${activePrice} π\n\nLink: ${window.location.href}`
-                )}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setIsShareOpen(false)}
-                className="flex flex-col items-center gap-2 group cursor-pointer"
-              >
-                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800/80 group-hover:border-slate-400 group-hover:bg-slate-400/10 text-slate-300 group-hover:text-white transition-all flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 4l11.733 16h4.267l-11.733 -16z"/><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"/></svg>
-                </div>
-                <span className="text-[9px] font-bold text-slate-500 group-hover:text-white uppercase tracking-wider">X / Twitter</span>
-              </a>
-            </div>
-
-            {/* Native Share Option */}
-            {navigator.share && (
-              <button
-                onClick={() => {
-                  navigator.share({
-                    title: product.productName,
-                    text: `Check out ${product.productName} on Pi Business Market!`,
-                    url: window.location.href
-                  }).catch(err => console.log(err));
-                  setIsShareOpen(false);
-                }}
-                className="w-full py-3 bg-violet-600 hover:bg-violet-500 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
-              >
-                More Share Options
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Universal Share Modal Integration */}
+      {isShareOpen && product && (
+        <UniversalShareModal
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          userId={user?.uid || 'guest'}
+          entityType="product"
+          entityId={product.productId}
+          entityName={product.productName}
+          entityImage={product.mainImage || (product.imageUrls && product.imageUrls[0])}
+          onRewardEarned={(amount) => triggerToast(`Earned +${amount} BMP for sharing!`)}
+        />
       )}
     </div>
   );

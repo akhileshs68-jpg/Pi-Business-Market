@@ -14,6 +14,7 @@ import {
   CreditCard,
   Loader2,
   ShieldCheck,
+  ShieldAlert,
   User,
   ShoppingBag,
   ExternalLink,
@@ -511,6 +512,30 @@ export const OrderDetails: React.FC = () => {
             Marketplace
           </button>
         </div>
+      </div>
+    );
+  }
+
+  const isBuyer = Boolean(user && order && (user.uid === order.buyerId || user.uid === order.userUid));
+  const isAdmin = Boolean(user && (user.role === 'Admin' || user.role === 'Super Admin' || user.platformRole === 'admin' || user.platformRole === 'superadmin'));
+  const isAuthorized = isBuyer || isMerchant || isAdmin;
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mb-4 text-rose-400">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h1 className="text-xl font-bold text-white mb-2">Access Denied</h1>
+        <p className="text-sm text-slate-400 max-w-md mb-6">
+          You are not authorized to view this order. Order details are private to the buyer and seller.
+        </p>
+        <button
+          onClick={() => navigate('/orders')}
+          className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
+        >
+          View My Orders
+        </button>
       </div>
     );
   }
