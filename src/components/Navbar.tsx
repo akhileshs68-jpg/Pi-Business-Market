@@ -204,6 +204,21 @@ function NavbarComponent({
     return icons[iconName] || Compass;
   };
 
+  const getMyBusinessRoute = (roleRaw: string) => {
+    const normalized = (roleRaw || '').toLowerCase().replace(/[\s_-]/g, '_');
+    if (normalized === 'seller') return '/seller-dashboard';
+    if (normalized === 'business_owner' || normalized === 'businessowner' || normalized === 'owner') return '/business-center';
+    if (normalized === 'service_provider' || normalized === 'serviceprovider') return '/bookings';
+    return '/dashboard';
+  };
+
+  const handleDirectNav = (view: string, route: string) => {
+    if (onSearchChange) onSearchChange('');
+    if (onSearchSubmit) onSearchSubmit('');
+    onNavigate(view);
+    navigate(route);
+  };
+
   const getBottomNavItems = () => {
     return [
       { id: 'home', label: 'Home', iconName: 'Home', view: 'home' },
@@ -329,7 +344,7 @@ function NavbarComponent({
           </button>
         {/* LOGO SECTION */}
         <div 
-          onClick={() => onNavigate('discovery')}
+          onClick={() => handleDirectNav('home', '/home')}
           className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group select-none shrink-0"
           id="nav_logo_container"
         >
@@ -396,6 +411,74 @@ function NavbarComponent({
             <Search className="absolute left-2.5 top-2.5 sm:left-3 sm:top-3 w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500" />
           </div>
         </div>
+
+        {/* DESKTOP PRIMARY NAVIGATION CONTROLS */}
+        <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0" id="nav_desktop_primary_links">
+          <button
+            id="nav_desktop_home"
+            onClick={() => handleDirectNav('home', '/home')}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+              getActiveTab() === 'home'
+                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Home className="w-3.5 h-3.5 text-violet-400" />
+            <span>HOME</span>
+          </button>
+
+          <button
+            id="nav_desktop_marketplace"
+            onClick={() => handleDirectNav('marketplace', '/marketplace')}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+              getActiveTab() === 'marketplace'
+                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Store className="w-3.5 h-3.5 text-violet-400" />
+            <span>MARKETPLACE</span>
+          </button>
+
+          <button
+            id="nav_desktop_orders"
+            onClick={() => handleDirectNav('orders', '/orders')}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+              getActiveTab() === 'orders'
+                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-violet-400" />
+            <span>ORDERS</span>
+          </button>
+
+          <button
+            id="nav_desktop_my_business"
+            onClick={() => handleDirectNav('business', getMyBusinessRoute(activeRoleRaw))}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+              getActiveTab() === 'business'
+                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5 text-violet-400" />
+            <span>MY BUSINESS</span>
+          </button>
+
+          <button
+            id="nav_desktop_profile"
+            onClick={() => handleDirectNav('profile', '/profile')}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+              getActiveTab() === 'profile'
+                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-violet-400" />
+            <span>PROFILE</span>
+          </button>
+        </nav>
 
         {/* NAVIGATION / CONTROL TOOLS RIGHT */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -729,15 +812,17 @@ function NavbarComponent({
               key={item.id}
               onClick={() => {
                 if (item.id === 'home') {
-                  if (onSearchChange) onSearchChange('');
-                  if (onSearchSubmit) onSearchSubmit('');
-                  onNavigate(item.view);
-                } else if (item.id === 'discover') {
-                  onNavigate('discovery');
-                } else if (item.view === 'docs') {
-                  window.location.href = '/docs';
+                  handleDirectNav('home', '/home');
+                } else if (item.id === 'marketplace') {
+                  handleDirectNav('marketplace', '/marketplace');
+                } else if (item.id === 'orders') {
+                  handleDirectNav('orders', '/orders');
+                } else if (item.id === 'business') {
+                  handleDirectNav('business', getMyBusinessRoute(activeRoleRaw));
+                } else if (item.id === 'profile') {
+                  handleDirectNav('profile', '/profile');
                 } else {
-                  onNavigate(item.view);
+                  handleDirectNav(item.view, `/${item.view}`);
                 }
               }}
               className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"

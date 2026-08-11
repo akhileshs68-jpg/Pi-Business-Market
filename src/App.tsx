@@ -235,6 +235,14 @@ function App() {
             } 
           />
           <Route 
+            path="/discovery" 
+            element={
+              <ProtectedRoute>
+                <MarketplacePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/checkout/:sessionId" 
             element={
               <ProtectedRoute>
