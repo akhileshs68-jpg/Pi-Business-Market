@@ -17,6 +17,7 @@ import {
   CheckCircle2 
 } from 'lucide-react';
 import { SearchIndexEntry } from '../../types';
+import { ItemManagementMenu } from '../marketplace/ItemManagementMenu';
 
 interface ServiceCardProps {
   item: SearchIndexEntry;
@@ -78,6 +79,11 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ item }) => {
             <span className="px-2.5 py-1 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-full text-[9px] font-black uppercase tracking-wider text-violet-400">
               {category}
             </span>
+          </div>
+
+          {/* Three-Dot Merchant Management Menu */}
+          <div className="absolute top-3 right-3 z-20">
+            <ItemManagementMenu item={item} itemType="service" buttonVariant="floating" />
           </div>
 
           {/* Rating Badge Overlay */}

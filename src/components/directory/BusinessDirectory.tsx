@@ -33,6 +33,7 @@ import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import { PriceDisplay } from '../pricing/PriceDisplay';
+import { ItemManagementMenu } from '../marketplace/ItemManagementMenu';
 
 export interface DirectoryListing {
   id: string;
@@ -419,12 +420,15 @@ export const BusinessDirectory: React.FC = () => {
                     <span className="px-2 py-0.5 bg-violet-500/10 border border-violet-500/20 text-violet-300 text-[8px] font-black uppercase rounded">
                       {item.professionCategory}
                     </span>
-                    {item.verified && (
-                      <span className="flex items-center gap-1 text-emerald-400 text-[9px] font-bold">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Trust: {item.trustScore}</span>
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.verified && (
+                        <span className="flex items-center gap-1 text-emerald-400 text-[9px] font-bold">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Trust: {item.trustScore}</span>
+                        </span>
+                      )}
+                      <ItemManagementMenu item={item} itemType="business" buttonVariant="card" />
+                    </div>
                   </div>
 
                   <h3 className="text-sm font-black text-white group-hover:text-violet-400 transition-colors truncate">

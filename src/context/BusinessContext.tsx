@@ -228,3 +228,5 @@ export const useBusiness = () => {
   }
   return context;
 };
+
+export const useBusinessContext = useBusiness;

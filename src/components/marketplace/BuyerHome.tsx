@@ -51,6 +51,7 @@ import { getFirebaseDb } from '../../firebase/config';
 import { getProductImageUrl } from '../../utils/imageUtils';
 import { aiEngineService, AIRecommendation } from '../../services/aiEngineService';
 import { PriceDisplay } from '../pricing/PriceDisplay';
+import { ItemManagementMenu } from './ItemManagementMenu';
 
 interface BuyerHomeProps {
   user: UserType | null;
@@ -393,16 +394,19 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
           )}
         </div>
 
-        {/* Wishlist Button Top-Right */}
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          whileHover={{ scale: 1.1 }}
-          onClick={(e) => onToggleWishlist(prod.id, e)}
-          className="absolute top-2 right-2 p-1.5 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800/80 z-10 shadow-md cursor-pointer"
-          title={isSaved ? "Remove from Wishlist" : "Add to Wishlist"}
-        >
-          <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}`} />
-        </motion.button>
+        {/* Action Controls Top-Right */}
+        <div className="absolute top-2 right-2 flex items-center gap-1 z-20">
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.1 }}
+            onClick={(e) => onToggleWishlist(prod.id, e)}
+            className="p-1.5 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800/80 shadow-md cursor-pointer"
+            title={isSaved ? "Remove from Wishlist" : "Add to Wishlist"}
+          >
+            <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}`} />
+          </motion.button>
+          <ItemManagementMenu item={prod} itemType="product" buttonVariant="floating" />
+        </div>
       </div>
 
       {/* 2. COMPACT PRODUCT INFORMATION */}

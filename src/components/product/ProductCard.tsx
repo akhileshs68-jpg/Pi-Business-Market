@@ -15,6 +15,7 @@ import { cartService } from '../../services/cartService';
 import { WishlistService } from '../../services/wishlistService';
 import { PriceDisplay } from '../pricing/PriceDisplay';
 import { resolveProductPricing, resolveVariantPricing } from '../../services/pricing/pricingCompatibility';
+import { ItemManagementMenu } from '../marketplace/ItemManagementMenu';
 
 interface ProductCardProps {
   product: Product;
@@ -31,6 +32,8 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
+  onEdit,
+  onDelete,
   isMerchantView = false,
   isSelected = false,
   onSelect
@@ -353,11 +356,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest line-clamp-1 mb-0.5">
                   {product.category || 'Product'}
                 </span>
-                {rating !== null && (
-                  <span className="flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded shrink-0">
-                    <Star className="w-2.5 h-2.5 fill-current" /> {rating} {reviewCount !== null ? `(${reviewCount})` : ''}
-                  </span>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {rating !== null && (
+                    <span className="flex items-center gap-0.5 text-[8px] font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded shrink-0">
+                      <Star className="w-2.5 h-2.5 fill-current" /> {rating} {reviewCount !== null ? `(${reviewCount})` : ''}
+                    </span>
+                  )}
+                  <ItemManagementMenu 
+                    item={product} 
+                    itemType="product" 
+                    onEdit={onEdit} 
+                    onDelete={onDelete} 
+                    buttonVariant="card"
+                  />
+                </div>
               </div>
               
               <h3 className="text-xs sm:text-sm font-extrabold text-white leading-tight line-clamp-2 mt-0.5 group-hover:text-indigo-300 transition-colors">

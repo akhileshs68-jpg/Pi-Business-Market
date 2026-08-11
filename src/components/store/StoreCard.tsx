@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Store as StoreType } from '../../types';
+import { ItemManagementMenu } from '../marketplace/ItemManagementMenu';
 
 interface StoreCardProps {
   store: StoreType;
@@ -45,10 +46,14 @@ export const StoreCard: React.FC<StoreCardProps> = ({
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-indigo-900/40 to-slate-900" />
         )}
-        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/80 backdrop-blur-md rounded-xl p-1 border border-slate-700/50">
-          <button onClick={() => onEdit(store)} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"><Edit className="w-4 h-4" /></button>
-          <button onClick={() => onArchive(store)} className="p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800"><Archive className="w-4 h-4" /></button>
-          <button onClick={() => onDelete(store.storeId)} className="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800"><Trash2 className="w-4 h-4" /></button>
+        <div className="absolute top-4 right-4 flex items-center gap-1 z-20">
+          <ItemManagementMenu 
+            item={store} 
+            itemType="store" 
+            onEdit={onEdit} 
+            onDelete={onDelete} 
+            buttonVariant="floating" 
+          />
         </div>
       </div>
 

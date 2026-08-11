@@ -57,6 +57,7 @@ import { getFirebaseDb } from '../firebase/config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { bmpRewardsProvider } from '../services/wallet/providers/bmpRewardsProvider';
 import { RoleResolver } from '../services/identity/RoleResolver';
+import { WorkspaceMenu } from './navigation/WorkspaceMenu';
 
 interface NavbarProps {
   currentUser?: UserType | null;
@@ -483,6 +484,11 @@ function NavbarComponent({
         {/* NAVIGATION / CONTROL TOOLS RIGHT */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
+          {/* MY WORKSPACE DROPDOWN CONTROL */}
+          {currentUser && (
+            <WorkspaceMenu onNavigate={onNavigate} />
+          )}
+
           {/* DESKTOP ADMIN CONSOLE DIRECT LINK */}
           {isSuperAdmin && (
             <button
@@ -718,6 +724,22 @@ function NavbarComponent({
 
                 {/* Symmetrical Scrollable Sections */}
                 <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                  {/* WORKSPACE DIRECT ACCESS IN MOBILE DRAWER */}
+                  {currentUser && (
+                    <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-violet-600/20 text-violet-400 border border-violet-500/30 shadow-md">
+                          <Briefcase className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-wider">My Workspace</h4>
+                          <p className="text-[10px] text-slate-400 font-medium">Role-aware operational hub</p>
+                        </div>
+                      </div>
+                      <WorkspaceMenu onNavigate={onNavigate} closeParentMenu={() => setIsMobileMenuOpen(false)} />
+                    </div>
+                  )}
+
                   {isSuperAdmin && (
                     <div className="p-4 bg-gradient-to-r from-violet-950/80 to-indigo-950/80 rounded-2xl border border-violet-500/30 flex items-center justify-between gap-3 shadow-lg">
                       <div className="flex items-center gap-3">
