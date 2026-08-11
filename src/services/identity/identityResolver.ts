@@ -336,13 +336,13 @@ export class IdentityResolver {
       ? rawDisplayName 
       : cleanUsername;
 
-    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const superAdminPiUid = ((typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68').toLowerCase();
     const isDevMock = (cleanPiUid === 'dev_pioneer_mock' || cleanUsername === 'dev_pioneer_mock') && (
       (import.meta as any).env?.VITE_ENABLE_DEV_MOCK === 'true' ||
       (typeof window !== 'undefined' && localStorage.getItem('DEV_MOCK_AUTH_ENABLED') === 'true') ||
       Boolean((import.meta as any).env?.DEV)
     );
-    const isSuperAdmin = data.platformRole === 'superadmin' || isDevMock || (Boolean(superAdminPiUid) && (cleanPiUid === superAdminPiUid || cleanUsername === superAdminPiUid));
+    const isSuperAdmin = data.platformRole === 'superadmin' || isDevMock || (Boolean(superAdminPiUid) && (cleanPiUid.toLowerCase() === superAdminPiUid || cleanUsername.toLowerCase() === superAdminPiUid));
 
     // platformRole is independent of business capabilities
     const platformRole = isSuperAdmin ? 'superadmin' : 'user';

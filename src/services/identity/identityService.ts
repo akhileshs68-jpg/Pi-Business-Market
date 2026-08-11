@@ -58,8 +58,8 @@ export class IdentityService {
     const cleanPiUid = (!identityResolver.isPlaceholder(resolvedPiUid)) ? resolvedPiUid : cleanUsername;
     const cleanDisplayName = (!identityResolver.isPlaceholder(displayName) && displayName !== 'Pioneer') ? displayName : cleanUsername;
 
-    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
-    const isOwner = superAdminPiUid ? (cleanUsername === superAdminPiUid || cleanPiUid === superAdminPiUid || uid === superAdminPiUid) : false;
+    const superAdminPiUid = ((typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68').toLowerCase();
+    const isOwner = Boolean(superAdminPiUid) && (cleanUsername.toLowerCase() === superAdminPiUid || cleanPiUid.toLowerCase() === superAdminPiUid || uid.toLowerCase() === superAdminPiUid);
 
     if (!identity) {
       const initialRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];

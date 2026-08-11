@@ -647,10 +647,10 @@ export const authService = {
     }
 
     // Update / Save stored user with verified values
-    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const superAdminPiUid = ((typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68').toLowerCase();
     const isSuperAdminUser = existingFirestoreUser?.platformRole === 'superadmin' || 
                              storedUser?.platformRole === 'superadmin' || 
-                             (Boolean(superAdminPiUid) && (piUid === superAdminPiUid || username === superAdminPiUid));
+                             (Boolean(superAdminPiUid) && (piUid.toLowerCase() === superAdminPiUid || username.toLowerCase() === superAdminPiUid));
     let freshUser: User = {
       uid: piUid,
       piUid: piUid,

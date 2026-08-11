@@ -59,17 +59,21 @@ export class RoleResolver {
 
   isSuperAdmin(): boolean {
     if (!this.user) return false;
-    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const superAdminPiUid = ((typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || 'akhileshs68').toLowerCase();
     const isDevMock = (this.user.piUid === 'dev_pioneer_mock' || this.user.uid === 'dev_pioneer_mock' || this.user.username === 'dev_pioneer_mock') && (
       (import.meta as any).env?.VITE_ENABLE_DEV_MOCK === 'true' ||
       (typeof window !== 'undefined' && localStorage.getItem('DEV_MOCK_AUTH_ENABLED') === 'true') ||
       Boolean((import.meta as any).env?.DEV)
     );
+    const uName = (this.user.username || '').toLowerCase();
+    const pUid = (this.user.piUid || '').toLowerCase();
+    const uUid = (this.user.uid || '').toLowerCase();
+
     return (
       this.user.platformRole === 'superadmin' ||
       this.user.roles?.includes('superadmin') ||
       isDevMock ||
-      (Boolean(superAdminPiUid) && (this.user.piUid === superAdminPiUid || this.user.uid === superAdminPiUid || this.user.username === superAdminPiUid))
+      (Boolean(superAdminPiUid) && (uName === superAdminPiUid || pUid === superAdminPiUid || uUid === superAdminPiUid))
     );
   }
 
