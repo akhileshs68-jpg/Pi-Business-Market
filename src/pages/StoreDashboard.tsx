@@ -37,16 +37,28 @@ export const StoreDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [filterBusiness, setFilterBusiness] = useState<string>(businessId || 'all');
+  const searchParams = new URLSearchParams(location.search);
+  const initialTabParam = searchParams.get('tab') || searchParams.get('view') || (location.state as any)?.view || (location.state as any)?.tab;
+
   const [activeView, setActiveView] = useState<'stores' | 'products' | 'reviews' | 'marketing'>(
-    location.pathname.includes('/products') ? 'products' : 'stores'
+    location.pathname.includes('/products') 
+      ? 'products' 
+      : (initialTabParam && ['stores', 'products', 'reviews', 'marketing'].includes(initialTabParam))
+        ? (initialTabParam as any)
+        : 'stores'
   );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab') || params.get('view') || (location.state as any)?.view || (location.state as any)?.tab;
+    
     if (location.pathname.includes('/products')) {
       setActiveView('products');
+    } else if (tabParam && ['stores', 'products', 'reviews', 'marketing'].includes(tabParam)) {
+      setActiveView(tabParam as any);
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search, location.state]);
 
   const fetchData = async () => {
     console.log('[StoreDashboard] fetchData called, user:', user?.uid);

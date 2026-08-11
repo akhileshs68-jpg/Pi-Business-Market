@@ -93,8 +93,8 @@ export const WorkspaceMenu: React.FC<WorkspaceMenuProps> = ({
             { label: 'My Stores', route: '/seller-dashboard', icon: Store, view: 'seller_dashboard' },
             { label: 'My Sales / Orders', route: '/business-orders', icon: ShoppingBag, view: 'business_orders' },
             { label: 'My Customers', route: '/crm', icon: Users, view: 'crm' },
-            { label: 'My Advertising', route: '/merchant-analytics', icon: Megaphone, view: 'analytics' },
-            { label: 'My Campaigns', route: '/merchant-analytics', icon: Sparkles, view: 'analytics' },
+            { label: 'My Advertising', route: '/store-dashboard?tab=marketing', icon: Megaphone, view: 'marketing' },
+            { label: 'My Campaigns', route: '/store-dashboard?tab=marketing', icon: Sparkles, view: 'marketing' },
             { label: 'My Reports', route: '/merchant-analytics', icon: BarChart3, view: 'analytics' },
           ]
         };
@@ -114,7 +114,7 @@ export const WorkspaceMenu: React.FC<WorkspaceMenuProps> = ({
             { label: 'Services', route: '/services', icon: Briefcase, view: 'services' },
             { label: 'Customers', route: '/crm', icon: Users, view: 'crm' },
             { label: 'Orders', route: '/business-orders', icon: ShoppingBag, view: 'business_orders' },
-            { label: 'Advertising', route: '/merchant-analytics', icon: Megaphone, view: 'analytics' },
+            { label: 'Advertising', route: '/store-dashboard?tab=marketing', icon: Megaphone, view: 'marketing' },
             { label: 'Reports', route: '/merchant-analytics', icon: BarChart3, view: 'analytics' },
           ]
         };
@@ -131,7 +131,7 @@ export const WorkspaceMenu: React.FC<WorkspaceMenuProps> = ({
             { label: 'My Bookings', route: '/bookings', icon: Calendar, view: 'bookings' },
             { label: 'Availability', route: '/services', icon: Clock, view: 'services' },
             { label: 'Earnings', route: '/bookings', icon: CreditCard, view: 'bookings' },
-            { label: 'Advertising', route: '/merchant-analytics', icon: Megaphone, view: 'analytics' },
+            { label: 'Advertising', route: '/store-dashboard?tab=marketing', icon: Megaphone, view: 'marketing' },
             { label: 'Reports', route: '/merchant-analytics', icon: BarChart3, view: 'analytics' },
           ]
         };

@@ -4,12 +4,12 @@ import { useAuth } from '../auth/useAuth';
 import { useActiveRole } from '../hooks/useActiveRole';
 import { WORKSPACE_CONFIG } from '../config/workspaceConfig';
 import Navbar from '../components/Navbar';
-import { Shield, ArrowRight, Info, LogOut, ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase } from 'lucide-react';
+import { Shield, ArrowRight, Info, LogOut, ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase, Megaphone, Sparkles } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
 import { businessService } from '../services/businessService';
 
 const ICON_MAP: Record<string, React.FC<any>> = {
-  ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase
+  ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase, Megaphone, Sparkles
 };
 
 export const MyWorkspace: React.FC = () => {

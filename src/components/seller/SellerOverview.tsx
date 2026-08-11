@@ -15,7 +15,8 @@ import {
   Percent,
   Calendar,
   Lock,
-  Star
+  Star,
+  Megaphone
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -190,10 +191,11 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
           <span className="w-1.5 h-4 bg-violet-500 rounded-full inline-block" />
           Quick Actions
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {[
             { label: 'Add Product', action: 'add_product', icon: Plus, highlight: true },
             { label: 'Add Service', action: 'add_service', icon: Plus, highlight: true },
+            { label: 'Marketing & Ads', action: 'marketing', icon: Megaphone, highlight: true },
             { label: 'Inventory', action: 'inventory', icon: ShoppingBag },
             { label: 'Orders', action: 'orders', icon: ClipboardList },
             { label: 'Customers', action: 'customers', icon: Users },

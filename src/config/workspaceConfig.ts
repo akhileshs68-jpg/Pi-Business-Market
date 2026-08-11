@@ -23,6 +23,7 @@ export const WORKSPACE_CONFIG: Record<string, RoleWorkspaceConfig> = {
     title: 'Seller Workspace',
     modules: [
       { id: 'products', label: 'Products', iconName: 'ShoppingBag', description: 'Manage your catalog', path: '/store-dashboard' },
+      { id: 'marketing', label: 'Marketing & Ads', iconName: 'Megaphone', description: 'Promote products & create campaigns', path: '/store-dashboard?tab=marketing' },
       { id: 'inventory', label: 'Inventory', iconName: 'ClipboardList', description: 'Stock levels', path: '/inventory' },
       { id: 'orders', label: 'Orders', iconName: 'Clock', description: 'Fulfillment', path: '/business-orders' },
       { id: 'finance', label: 'Finance', iconName: 'CreditCard', description: 'Payments & Earnings', path: '/business-payments' },
@@ -33,6 +34,7 @@ export const WORKSPACE_CONFIG: Record<string, RoleWorkspaceConfig> = {
     title: 'Service Workspace',
     modules: [
       { id: 'services', label: 'Services', iconName: 'Briefcase', description: 'Manage offerings', path: '/services' },
+      { id: 'marketing', label: 'Marketing & Ads', iconName: 'Megaphone', description: 'Promote services & create campaigns', path: '/store-dashboard?tab=marketing' },
       { id: 'bookings', label: 'Bookings', iconName: 'Calendar', description: 'Schedule', path: '/business-orders' },
       { id: 'clients', label: 'Clients', iconName: 'Users', description: 'CRM', path: '/crm' },
       { id: 'finance', label: 'Finance', iconName: 'CreditCard', description: 'Payments', path: '/business-payments' },
@@ -43,6 +45,7 @@ export const WORKSPACE_CONFIG: Record<string, RoleWorkspaceConfig> = {
     title: 'Service Workspace',
     modules: [
       { id: 'services', label: 'Services', iconName: 'Briefcase', description: 'Manage offerings', path: '/services' },
+      { id: 'marketing', label: 'Marketing & Ads', iconName: 'Megaphone', description: 'Promote services & create campaigns', path: '/store-dashboard?tab=marketing' },
       { id: 'bookings', label: 'Bookings', iconName: 'Calendar', description: 'Schedule', path: '/business-orders' },
       { id: 'clients', label: 'Clients', iconName: 'Users', description: 'CRM', path: '/crm' },
       { id: 'finance', label: 'Finance', iconName: 'CreditCard', description: 'Payments', path: '/business-payments' },
@@ -53,6 +56,7 @@ export const WORKSPACE_CONFIG: Record<string, RoleWorkspaceConfig> = {
     title: 'Manufacturer Workspace',
     modules: [
       { id: 'production', label: 'Production', iconName: 'Briefcase', description: 'Manufacturing lines', path: '/store-dashboard' },
+      { id: 'marketing', label: 'Marketing & Ads', iconName: 'Megaphone', description: 'B2B Advertising & Campaigns', path: '/store-dashboard?tab=marketing' },
       { id: 'inventory', label: 'Inventory', iconName: 'ClipboardList', description: 'Materials & Stock', path: '/inventory' },
       { id: 'orders', label: 'Orders', iconName: 'Clock', description: 'B2B Orders', path: '/business-orders' },
       { id: 'finance', label: 'Finance', iconName: 'CreditCard', description: 'Payments', path: '/business-payments' },

@@ -6,11 +6,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WORKSPACE_CONFIG } from '../config/workspaceConfig';
-import { ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase, Megaphone, Sparkles } from 'lucide-react';
 import { useBusiness } from '../context/BusinessContext';
 
 const ICON_MAP: Record<string, React.FC<any>> = {
-  ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase
+  ShoppingBag, ClipboardList, Clock, CreditCard, Calendar, Users, FileText, CheckCircle2, BookOpen, Star, Briefcase, Megaphone, Sparkles
 };
 
 export const Sidebar: React.FC<{ activeRole: string }> = ({ activeRole }) => {
