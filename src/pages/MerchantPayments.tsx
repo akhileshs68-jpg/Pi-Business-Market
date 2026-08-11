@@ -29,10 +29,12 @@ import { ledgerService } from '../services/ledgerService';
 import { PiInAppPaymentModal } from '../components/payment/PiInAppPaymentModal';
 import { Payment, LedgerEntry, PaymentStatus } from '../types';
 import { BillingDashboardTab } from '../components/billing/BillingDashboardTab';
+import { useBusiness } from '../context/BusinessContext';
 
 export const MerchantPayments: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   
   const [payments, setPayments] = useState<Payment[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -40,11 +42,13 @@ export const MerchantPayments: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'payments' | 'ledger' | 'billing'>('billing');
   const [isInAppModalOpen, setIsInAppModalOpen] = useState(false);
   
-  const businessId = 'PI-CORP-001'; // Derived from context
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    fetchFinancialData();
-  }, []);
+    if (isWorkspaceReady || user) {
+      fetchFinancialData();
+    }
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchFinancialData = async () => {
     setLoading(true);

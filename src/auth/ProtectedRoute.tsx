@@ -109,11 +109,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Redirect Super Admin away from landing routes (/home or /) directly to /admin-console
-  if (isSuperAdmin && (location.pathname === '/home' || location.pathname === '/')) {
-    console.log('[Auth Routing Diagnostics] Super Admin on landing route, redirecting to /admin-console');
-    return <Navigate to="/admin-console" replace />;
-  }
 
   // 1. Account Status Enforcement (Suspended / Disabled)
   if ((user.status as string) === 'suspended' || (user.status as string) === 'disabled' || (user as any).isSuspended) {

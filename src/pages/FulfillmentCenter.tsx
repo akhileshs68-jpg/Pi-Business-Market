@@ -27,19 +27,23 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { shippingService } from '../services/shippingService';
 import { Shipment, ShipmentStatus, ShippingMethod } from '../types';
+import { useBusiness } from '../context/BusinessContext';
 
 export const FulfillmentCenter: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string>('all');
   
-  const businessId = 'PI-CORP-001'; // Simulated for foundation
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    fetchShipments();
-  }, []);
+    if (isWorkspaceReady || user) {
+      fetchShipments();
+    }
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchShipments = async () => {
     setLoading(true);

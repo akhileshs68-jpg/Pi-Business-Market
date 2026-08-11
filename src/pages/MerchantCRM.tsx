@@ -27,19 +27,23 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { crmService } from '../services/crmService';
 import { CustomerProfile } from '../types';
+import { useBusiness } from '../context/BusinessContext';
 
 export const MerchantCRM: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [customers, setCustomers] = useState<CustomerProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const businessId = 'PI-CORP-001'; // Simulated for foundation
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    if (isWorkspaceReady || user) {
+      fetchCustomers();
+    }
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchCustomers = async () => {
     setLoading(true);

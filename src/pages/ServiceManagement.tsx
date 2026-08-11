@@ -35,17 +35,20 @@ import { businessService } from '../services/businessService';
 import { Service, ServicePricingType, ServiceLocationType } from '../types';
 import { ServiceWizard } from '../components/service/ServiceWizard';
 import { EnterpriseServiceEngine } from '../core/service/enterpriseServiceEngine';
+import { useBusiness } from '../context/BusinessContext';
 
 export const ServiceManagement: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
-  const [businessId, setBusinessId] = useState('PI-CORP-001'); // Derived in production
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   const handleDuplicate = async (serviceId: string) => {
     setActionLoading(serviceId);
@@ -79,25 +82,6 @@ export const ServiceManagement: React.FC = () => {
     const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
-
-  useEffect(() => {
-    const resolveBusiness = async () => {
-      if (user?.uid) {
-        try {
-          const myBusinesses = await businessService.getMyBusinesses(user.uid);
-          if (myBusinesses && myBusinesses.length > 0) {
-            const bizId = myBusinesses[0].id;
-            if (bizId) {
-              setBusinessId(bizId);
-            }
-          }
-        } catch (err) {
-          console.warn('Failed to resolve business ID dynamically', err);
-        }
-      }
-    };
-    resolveBusiness();
-  }, [user]);
 
   useEffect(() => {
     fetchServices();

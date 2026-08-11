@@ -575,6 +575,25 @@ function NavbarComponent({
                         </button>
                       );
                     })}
+
+                    {isSuperAdmin && (
+                      <div className="pt-2 mt-1 border-t border-slate-800">
+                        <button
+                          onClick={() => {
+                            setIsRoleSwitcherOpen(false);
+                            onNavigate('admin');
+                            navigate('/admin-console');
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md hover:from-violet-500 hover:to-indigo-500 transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ShieldAlert className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                            <span>Admin Console</span>
+                          </div>
+                          <span className="text-[9px] font-mono bg-violet-900/60 px-1.5 py-0.5 rounded text-violet-200">SUPER</span>
+                        </button>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -699,6 +718,30 @@ function NavbarComponent({
 
                 {/* Symmetrical Scrollable Sections */}
                 <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                  {isSuperAdmin && (
+                    <div className="p-4 bg-gradient-to-r from-violet-950/80 to-indigo-950/80 rounded-2xl border border-violet-500/30 flex items-center justify-between gap-3 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-violet-600 text-amber-300 shadow-md">
+                          <ShieldAlert className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-wider">Admin Console</h4>
+                          <p className="text-[10px] text-violet-300 font-medium">Platform Control Center</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          onNavigate('admin');
+                          navigate('/admin-console');
+                        }}
+                        className="px-3.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer shrink-0"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  )}
+
                   <div className="space-y-4">
                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Marketplace Navigation</h4>
                     <div className="grid grid-cols-2 gap-3">

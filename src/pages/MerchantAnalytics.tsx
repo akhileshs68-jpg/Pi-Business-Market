@@ -18,20 +18,22 @@ import { analyticsService } from '../services/analyticsService';
 import { BusinessMetrics } from '../types';
 import { useAuth } from '../auth/useAuth';
 import Navbar from '../components/Navbar';
+import { useBusiness } from '../context/BusinessContext';
 
 export const MerchantAnalytics: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [metrics, setMetrics] = useState<BusinessMetrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
 
-  // Business ID hardcoded for simulation as per previous context or could be fetched
-  const businessId = 'PI-CORP-001'; 
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || (!isWorkspaceReady && !currentBusiness)) return;
     const loadMetrics = async () => {
+      setIsLoading(true);
       try {
         const data = await analyticsService.getBusinessMetrics(businessId);
         setMetrics(data.reverse()); // Chronological for charts
@@ -42,7 +44,7 @@ export const MerchantAnalytics: React.FC = () => {
       }
     };
     loadMetrics();
-  }, [user]);
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const latest = metrics[metrics.length - 1] || {
     metricId: '',

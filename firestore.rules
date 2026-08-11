@@ -968,15 +968,15 @@ service cloud.firestore {
           incoming().status == 'pending' &&
           (!incoming().keys().hasAny(['isPinned']) || incoming().isPinned == false) &&
           (!incoming().keys().hasAny(['isFeatured']) || incoming().isFeatured == false) &&
-          (!incoming().keys().hasAny(['paymentStatus']) || incoming().paymentStatus in ['unpaid', 'pending_payment', 'verified', 'draft'])
+          (!incoming().keys().hasAny(['paymentStatus']) || incoming().paymentStatus in ['unpaid', 'pending_payment', 'draft'])
         )
       );
       allow update: if canMutate() && isSignedIn() && (
         isAdmin() || (
           (isOwner(resource.data.merchantId) || (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId))) &&
-          !incoming().diff(existing()).affectedKeys().hasAny(['merchantId', 'businessId', 'isPinned', 'isFeatured', 'adminPriority']) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['merchantId', 'businessId', 'isPinned', 'isFeatured', 'adminPriority', 'paymentStatus', 'paymentTxId', 'verifiedAt', 'verifiedBy', 'paymentAmountPi', 'paymentMode', 'paymentVerificationSource']) &&
           !(existing().status in ['rejected', 'expired'] && incoming().status in ['active']) &&
-          (incoming().status in ['pending', 'paused', 'expired'])
+          (incoming().status in ['pending', 'paused', 'expired'] || (incoming().status == 'active' && resource.data.status == 'paused' && resource.data.paymentStatus == 'verified'))
         )
       );
       allow delete: if canMutate() && isSignedIn() && (

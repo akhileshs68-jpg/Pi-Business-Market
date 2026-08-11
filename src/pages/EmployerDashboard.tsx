@@ -33,19 +33,24 @@ import { useAuth } from '../auth/useAuth';
 import { jobService } from '../services/jobService';
 import { Job, JobApplication, HiringStatus } from '../types';
 import { JobWizard } from '../components/recruitment/JobWizard';
+import { useBusiness } from '../context/BusinessContext';
 
 export const EmployerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'listings' | 'applications'>('listings');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [businessId] = useState('PI-CORP-001');
+  
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    if (isWorkspaceReady || user) {
+      fetchJobs();
+    }
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchJobs = async () => {
     setLoading(true);

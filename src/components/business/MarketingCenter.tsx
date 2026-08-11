@@ -7,10 +7,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Megaphone, Tag, Sparkles, Percent, Calendar, Flame, Award, Zap, Flag, Plus, Trash2, CheckCircle2, TrendingUp, Users, Target, Activity, Pause, Play, Copy, Edit2, Archive, Share2, CreditCard, ShieldAlert, AlertCircle, Eye, ArrowRight, Check
 } from 'lucide-react';
-import { collection, doc, setDoc, getDocs, query, where, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, query, where, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { campaignService, Campaign, CampaignType, CampaignStatus, CtaType, AdPricingTier, AdPricingRates, DEFAULT_AD_PRICING_RATES } from '../../services/campaignService';
 import { piPaymentService } from '../../services/piPaymentService';
+import { storeService } from '../../services/storeService';
+import { productService } from '../../services/productService';
+import { serviceMarketplaceService } from '../../services/serviceMarketplaceService';
 
 interface Coupon {
   couponId: string;
@@ -59,9 +62,62 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
   const [newCampaignBgClass, setNewCampaignBgClass] = useState('from-violet-950 via-indigo-950 to-slate-950');
   const [durationDays, setDurationDays] = useState(7);
 
+  // Owned Asset States for dropdown validation
+  const [ownedStores, setOwnedStores] = useState<any[]>([]);
+  const [ownedProducts, setOwnedProducts] = useState<any[]>([]);
+  const [ownedServices, setOwnedServices] = useState<any[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [businessName, setBusinessName] = useState('My Business');
+  const [businessLogo, setBusinessLogo] = useState('');
+
   useEffect(() => {
     loadMarketingData();
   }, [businessId]);
+
+  // Synchronize campaign form inputs when selected asset changes
+  useEffect(() => {
+    if (newCampaignType === 'featured_store' && selectedStoreId) {
+      const store = ownedStores.find(s => (s.storeId || s.id) === selectedStoreId);
+      if (store) {
+        setNewCampaignTitle(`Discover ${store.storeName}`);
+        setNewCampaignDescription(store.description || `Visit our ${store.storeCategory || 'retail'} store outlet.`);
+        setNewCampaignImage(store.logoUrl || store.imageUrl || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100');
+        setNewCampaignRoute(`/store/${selectedStoreId}`);
+        setNewCampaignTier('featured_store');
+        setNewCampaignCta('visit_store');
+      }
+    }
+  }, [selectedStoreId, newCampaignType, ownedStores]);
+
+  useEffect(() => {
+    if (newCampaignType === 'featured_product' && selectedProductId) {
+      const prod = ownedProducts.find(p => (p.productId || p.id) === selectedProductId);
+      if (prod) {
+        setNewCampaignTitle(prod.name || prod.title || '');
+        setNewCampaignDescription(prod.description || prod.tagline || `Exclusive product available at our store.`);
+        setNewCampaignImage(prod.imageUrl || prod.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800');
+        setNewCampaignRoute(`/product/${selectedProductId}`);
+        setNewCampaignTier('standard_banner');
+        setNewCampaignCta('shop_now');
+      }
+    }
+  }, [selectedProductId, newCampaignType, ownedProducts]);
+
+  useEffect(() => {
+    if (newCampaignType === 'featured_service' && selectedServiceId) {
+      const serv = ownedServices.find(s => (s.serviceId || s.id) === selectedServiceId);
+      if (serv) {
+        setNewCampaignTitle(serv.title || '');
+        setNewCampaignDescription(serv.shortDescription || serv.description || `Professional business service bookable now.`);
+        setNewCampaignImage(serv.imageUrl || serv.coverImage || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800');
+        setNewCampaignRoute(`/service/${selectedServiceId}`);
+        setNewCampaignTier('sponsored_ad');
+        setNewCampaignCta('book_service');
+      }
+    }
+  }, [selectedServiceId, newCampaignType, ownedServices]);
 
   const loadMarketingData = async () => {
     if (!businessId) return;
@@ -79,6 +135,35 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
       const qCamp = query(collection(db, 'campaigns'), where('businessId', '==', businessId));
       const snapCamp = await getDocs(qCamp);
       setCampaigns(snapCamp.docs.map(d => ({ id: d.id, ...d.data() })) as Campaign[]);
+      
+      // Load owned stores
+      const storesList = await storeService.getStoresByBusiness(businessId);
+      setOwnedStores(storesList || []);
+      if (storesList && storesList.length > 0) {
+        setSelectedStoreId(storesList[0].storeId || '');
+      }
+
+      // Load owned products
+      const productsList = await productService.getStoreProducts(businessId);
+      setOwnedProducts(productsList || []);
+      if (productsList && productsList.length > 0) {
+        setSelectedProductId(productsList[0].productId || (productsList[0] as any).id || '');
+      }
+
+      // Load owned services
+      const servicesList = await serviceMarketplaceService.getServices(businessId);
+      setOwnedServices(servicesList || []);
+      if (servicesList && servicesList.length > 0) {
+        setSelectedServiceId(servicesList[0].serviceId || '');
+      }
+
+      // Load business details
+      const bizDoc = await getDoc(doc(db, 'businesses', businessId));
+      if (bizDoc.exists()) {
+        const data = bizDoc.data();
+        setBusinessName(data.businessName || data.name || 'My Business');
+        setBusinessLogo(data.logoUrl || data.logo || '');
+      }
       
     } catch (err) {
       console.warn('Failed to load marketing data', err);
@@ -139,7 +224,10 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
       const createdCamp = await campaignService.createCampaign({
         merchantId: userId,
         businessId,
-        businessName: 'My Business',
+        businessName,
+        businessLogo,
+        storeId: newCampaignType === 'featured_store' ? selectedStoreId : undefined,
+        storeName: newCampaignType === 'featured_store' ? (ownedStores.find(s => (s.storeId || s.id) === selectedStoreId)?.storeName) : undefined,
         campaignTitle: newCampaignTitle.trim(),
         shortDescription: newCampaignDescription.trim() || 'Exclusive promotion on Pi Network.',
         campaignType: newCampaignType,
@@ -352,6 +440,90 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
               {/* Left Column: Controls & Pricing */}
               <div className="space-y-4 text-xs">
                 <div>
+                  <label className="text-slate-400 font-bold block mb-1">Advertise Business Asset</label>
+                  <select
+                    value={newCampaignType}
+                    onChange={e => setNewCampaignType(e.target.value as CampaignType)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+                  >
+                    <option value="sponsored_ad">Sponsored Banner (Custom Promotion)</option>
+                    <option value="flash_sale">Flash Sale Banner (Limited Time offer)</option>
+                    <option value="featured_store">Featured Store Spotlight (Promote Store Outlet)</option>
+                    <option value="featured_product">Featured Product (Promote Shop Item)</option>
+                    <option value="featured_service">Featured Service (Promote Service Listing)</option>
+                  </select>
+                </div>
+
+                {newCampaignType === 'featured_store' && (
+                  <div>
+                    <label className="text-slate-400 font-bold block mb-1">Select Owned Store *</label>
+                    {ownedStores.length > 0 ? (
+                      <select
+                        value={selectedStoreId}
+                        onChange={e => setSelectedStoreId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+                      >
+                        {ownedStores.map(s => (
+                          <option key={s.storeId || s.id} value={s.storeId || s.id}>
+                            {s.storeName} ({s.storeCategory || 'Retail'})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-rose-400 text-[11px] font-bold mt-1 bg-rose-950/20 p-2 border border-rose-900/30 rounded-xl flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> No active store outlets found. Create a store first in the Store Outlets tab.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {newCampaignType === 'featured_product' && (
+                  <div>
+                    <label className="text-slate-400 font-bold block mb-1">Select Owned Product *</label>
+                    {ownedProducts.length > 0 ? (
+                      <select
+                        value={selectedProductId}
+                        onChange={e => setSelectedProductId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+                      >
+                        {ownedProducts.map(p => (
+                          <option key={p.productId || p.id} value={p.productId || p.id}>
+                            {p.name || p.title} ({p.price} Pi)
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-rose-400 text-[11px] font-bold mt-1 bg-rose-950/20 p-2 border border-rose-900/30 rounded-xl flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> No products found. Create products first in the Products & Services tab.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {newCampaignType === 'featured_service' && (
+                  <div>
+                    <label className="text-slate-400 font-bold block mb-1">Select Owned Service *</label>
+                    {ownedServices.length > 0 ? (
+                      <select
+                        value={selectedServiceId}
+                        onChange={e => setSelectedServiceId(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+                      >
+                        {ownedServices.map(s => (
+                          <option key={s.serviceId || s.id} value={s.serviceId || s.id}>
+                            {s.title} ({s.startingPrice || 0} Pi)
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-rose-400 text-[11px] font-bold mt-1 bg-rose-950/20 p-2 border border-rose-900/30 rounded-xl flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> No services found. Create services first in the Products & Services tab.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div>
                   <label className="text-slate-400 font-bold block mb-1">Campaign Title *</label>
                   <input
                     type="text"
@@ -490,7 +662,13 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
 
                   <button
                     onClick={handleLaunchAndPayCampaign}
-                    disabled={loading || !newCampaignTitle.trim()}
+                    disabled={
+                      loading || 
+                      !newCampaignTitle.trim() ||
+                      (newCampaignType === 'featured_store' && ownedStores.length === 0) ||
+                      (newCampaignType === 'featured_product' && ownedProducts.length === 0) ||
+                      (newCampaignType === 'featured_service' && ownedServices.length === 0)
+                    }
                     className="w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl font-black uppercase text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     <CreditCard className="w-4 h-4 text-amber-300" />

@@ -479,10 +479,19 @@ export const ProfilePage: React.FC = () => {
                     <p className="text-[10px] text-slate-500 font-medium mt-0.5">Active role projection and permissions granted across Pi Business Market</p>
                   </div>
                   {isSuperAdmin && (
-                    <span className="px-2.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[9px] font-black uppercase rounded-lg border border-violet-400/30 flex items-center gap-1 shadow-sm">
-                      <ShieldAlert className="w-3 h-3 text-amber-300 animate-pulse" />
-                      Super Admin
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-1 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[9px] font-black uppercase rounded-lg border border-violet-400/30 flex items-center gap-1 shadow-sm">
+                        <ShieldAlert className="w-3 h-3 text-amber-300 animate-pulse" />
+                        Super Admin
+                      </span>
+                      <button
+                        onClick={() => navigate('/admin-console')}
+                        className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-bold uppercase rounded-lg border border-violet-400/30 shadow-md transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>Open Admin Console</span>
+                        <ArrowRight className="w-3 h-3 text-violet-200" />
+                      </button>
+                    </div>
                   )}
                 </div>
 

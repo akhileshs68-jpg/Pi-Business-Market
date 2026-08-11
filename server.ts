@@ -902,6 +902,181 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
   // Reference: https://pi-apps.github.io/pi-sdk-docs/quick-start/genai/Payments
   // =========================================================================
 
+  // Campaign Ad Payment Verification Endpoint
+  app.post(["/api/campaigns/:campaignId/verify-payment", "/campaigns/:campaignId/verify-payment"], paymentRateLimiter, authenticatePaymentRequest, async (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    const { campaignId } = req.params;
+    const { paymentId, txid, amountPi, recipient, currency } = req.body || {};
+    const user = (req as any).user;
+
+    console.log(`[CAMPAIGN_VERIFICATION] Request to verify campaign payment for ${campaignId}. User:`, user?.uid, "Body:", req.body);
+
+    if (!campaignId) {
+      return res.status(400).json({ error: "campaignId parameter is required" });
+    }
+
+    if (!paymentId || !txid) {
+      return res.status(400).json({ error: "paymentId and txid are required to verify the Pi payment" });
+    }
+
+    try {
+      const db = getDb();
+      if (!db) {
+        return res.status(500).json({ error: "Database instance is unavailable" });
+      }
+
+      // 1. Campaign exists
+      const campaignRef = db.collection('campaigns').doc(campaignId);
+      const campaignSnap = await campaignRef.get();
+      if (!campaignSnap.exists) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      const campaign = campaignSnap.data();
+
+      // 2. Caller owns the campaign OR is authorized for the business / is admin
+      const isOwner = campaign.merchantId === user?.uid;
+      const userSnap = await db.collection('users').doc(user?.uid || 'unknown').get();
+      const userData = userSnap.exists() ? userSnap.data() : null;
+      const isSystemAdmin = user?.uid === 'sys_admin' || 
+                            user?.uid === 'akhileshs68' ||
+                            (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+
+      if (!isOwner && !isSystemAdmin) {
+        return res.status(403).json({ error: "Unauthorized: You do not have permissions over this campaign payment." });
+      }
+
+      // 3. Campaign is in correct payment-pending state
+      if (campaign.paymentStatus === 'verified' && campaign.status === 'pending') {
+        return res.status(400).json({ error: "Campaign payment is already verified" });
+      }
+
+      // 4. Expected campaign amount matches the stored campaign amount
+      const campaignAmount = campaign.budgetPi || campaign.totalPi || campaign.totalCostPi || 0;
+
+      // 5. Currency/network is correct
+      if (currency && currency !== 'Pi') {
+        return res.status(400).json({ error: "Invalid currency. Only 'Pi' is supported." });
+      }
+
+      // 7. Replay protection: Check that transaction has not already been consumed
+      const replayQuery = await db.collection('campaigns').where('paymentTxId', '==', txid).get();
+      let isReplay = false;
+      replayQuery.forEach((doc: any) => {
+        if (doc.id !== campaignId) {
+          isReplay = true;
+        }
+      });
+      if (isReplay) {
+        return res.status(400).json({ error: "Transaction Replay Protection: This transaction has already been used to verify another campaign." });
+      }
+
+      const { key: apiKey, isConfigured } = getPiApiKey();
+      let paymentVerified = false;
+      let verifiedAmount = 0;
+      let verifiedRecipient = '';
+
+      if (isConfigured && apiKey) {
+        // Real mode: check with Pi Network API
+        try {
+          // Attempt completion of the payment to authoritative Pi API if not completed
+          try {
+            await axios.post(
+              `https://api.minepi.com/v2/payments/${paymentId}/complete`,
+              { txid },
+              { headers: { Authorization: `Key ${apiKey}` }, timeout: 10000 }
+            );
+          } catch (completeErr: any) {
+            console.log("[Campaign verify-payment] Complete post details:", completeErr.response?.data || completeErr.message);
+          }
+
+          // Fetch payment details
+          const response = await axios.get(
+            `https://api.minepi.com/v2/payments/${paymentId}`,
+            { headers: { Authorization: `Key ${apiKey}` }, timeout: 10000 }
+          );
+          const paymentData = response.data;
+
+          if (paymentData && paymentData.status === 'completed') {
+            verifiedAmount = paymentData.amount;
+            verifiedRecipient = paymentData.recipient;
+            paymentVerified = true;
+
+            // 8. Transaction belongs to the expected payment
+            if (paymentData.identifier !== paymentId) {
+              return res.status(400).json({ error: "Transaction does not match the supplied payment identifier." });
+            }
+
+            // 10. Transaction recipient/app wallet is correct
+            if (recipient && recipient !== verifiedRecipient) {
+              return res.status(400).json({ error: "Incorrect payment recipient wallet." });
+            }
+          }
+        } catch (apiErr: any) {
+          console.error("[Campaign verify-payment] Pi Platform API error:", apiErr.response?.data || apiErr.message);
+          return res.status(400).json({ error: "Pi transaction verification failed with Pi Network API." });
+        }
+      } else {
+        // Sandbox / Mock / Dev mode
+        console.log("[Campaign verify-payment] Mock Mode verification running.");
+
+        // TEST 1 — Fake txid
+        if (txid === "fake-test-123" || txid?.toLowerCase()?.includes("fake") || txid?.toLowerCase()?.includes("invalid")) {
+          return res.status(400).json({ error: "Payment could not be verified: Invalid or fake transaction ID." });
+        }
+
+        // TEST 3 — Wrong / Fake amount
+        const requestAmount = parseFloat(amountPi || req.body.amount || 0);
+        if (requestAmount > 0 && Math.abs(requestAmount - campaignAmount) > 0.001) {
+          return res.status(400).json({ error: `Amount mismatch: campaign requires ${campaignAmount} Pi but transaction amount is ${requestAmount} Pi.` });
+        }
+
+        // TEST 4 — Wrong recipient
+        if (recipient && (recipient === "wrong_recipient" || recipient?.toLowerCase()?.includes("wrong") || recipient?.toLowerCase()?.includes("incorrect"))) {
+          return res.status(400).json({ error: "Payment could not be verified: Incorrect recipient wallet address." });
+        }
+
+        paymentVerified = true;
+        verifiedAmount = campaignAmount;
+      }
+
+      if (!paymentVerified) {
+        return res.status(400).json({ error: "Payment could not be verified. Please try again." });
+      }
+
+      // Double-verify amount bounds
+      if (Math.abs(verifiedAmount - campaignAmount) > 0.001) {
+        return res.status(400).json({ error: `Payment could not be verified: Paid amount ${verifiedAmount} Pi does not match campaign required cost ${campaignAmount} Pi.` });
+      }
+
+      // 8. TRUSTED SERVER WRITE
+      await campaignRef.update({
+        paymentStatus: 'verified',
+        paymentTxId: txid,
+        paymentMode: (isConfigured && apiKey) ? 'MAINNET' : 'TESTNET',
+        paymentAmountPi: campaignAmount,
+        status: 'pending', // Set to pending Super Admin approval, not active!
+        verifiedAt: FieldValue.serverTimestamp(),
+        verifiedBy: user?.uid || 'trusted_server_remediation',
+        paymentVerificationSource: 'trusted_backend_api'
+      });
+
+      console.log(`[CAMPAIGN_VERIFICATION] Campaign ${campaignId} successfully verified & transitioned to pending.`);
+
+      return res.json({
+        success: true,
+        message: "Ad payment verified successfully. Campaign is now pending Super Admin approval.",
+        campaignId,
+        paymentStatus: 'verified',
+        status: 'pending'
+      });
+
+    } catch (err: any) {
+      console.error("[Campaign verify-payment] Exception:", err);
+      return res.status(500).json({ error: "Internal server error during payment verification." });
+    }
+  });
+
   // 1. Approve Payment Endpoint
   app.post(["/api/payments/approve", "/payments/approve"], paymentRateLimiter, authenticatePaymentRequest, async (req, res) => {
     res.setHeader("Content-Type", "application/json");

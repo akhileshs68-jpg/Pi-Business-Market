@@ -15,25 +15,30 @@ export const LoginPage: React.FC = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
-      const roleResolver = new RoleResolver(user);
-      if (roleResolver.isSuperAdmin()) {
-        console.log('[Auth Routing Diagnostics] Super Admin detected, redirecting to /admin-console');
-        navigate('/admin-console', { replace: true });
+      const from = (location.state as any)?.from?.pathname;
+      if (from && from !== '/login' && from !== '/') {
+        navigate(from, { replace: true });
         return;
       }
 
-      const from = (location.state as any)?.from?.pathname || '/discovery';
-      const targetPath = from === '/login' ? '/discovery' : from;
-      
+      const activeRoleRaw = (profile?.activeRole || (user as any)?.activeRole || 'buyer').toLowerCase().replace(/[\s_-]/g, '_');
+      let targetPath = '/home';
+      if (activeRoleRaw === 'seller') {
+        targetPath = '/seller-dashboard';
+      } else if (activeRoleRaw === 'business_owner' || activeRoleRaw === 'businessowner' || activeRoleRaw === 'owner') {
+        targetPath = '/business-center';
+      } else if (activeRoleRaw === 'service_provider' || activeRoleRaw === 'serviceprovider') {
+        targetPath = '/bookings';
+      }
+
       console.log('[Auth Routing Diagnostics]', {
         currentUrl: window.location.href,
         authState: 'Authenticated',
         profileExists: !!profile,
-        routeDecision: `Redirecting away from /login to target path: ${targetPath}`,
-        redirectSourceFile: 'src/pages/LoginPage.tsx',
-        redirectSourceLine: 21
+        activeRoleRaw,
+        routeDecision: `Redirecting to role target path: ${targetPath}`
       });
-      
+
       navigate(targetPath, { replace: true });
     }
   }, [user, loading, navigate, location, profile]);

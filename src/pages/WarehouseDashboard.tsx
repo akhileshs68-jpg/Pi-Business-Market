@@ -26,17 +26,22 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../auth/useAuth';
 import { warehouseService } from '../services/warehouseService';
 import { Warehouse, WarehouseType } from '../types';
+import { useBusiness } from '../context/BusinessContext';
 
 export const WarehouseDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [businessId, setBusinessId] = useState('PI-CORP-001'); // In real app, derived from user profile
+  
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    fetchWarehouses();
-  }, []);
+    if (isWorkspaceReady || user) {
+      fetchWarehouses();
+    }
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchWarehouses = async () => {
     setLoading(true);

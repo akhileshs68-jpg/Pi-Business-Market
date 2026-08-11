@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getFirebaseDb } from '../firebase/config';
+import { getAbsoluteUrl } from '../utils/urlUtils';
 import { logger } from '../core/logger';
 import { analyticsService } from './analyticsService';
 import { notificationService } from './notificationService';
@@ -334,6 +335,111 @@ export class CampaignService {
     campaignData: Omit<Campaign, 'id' | 'impressions' | 'clicks' | 'ctr' | 'createdAt' | 'updatedAt'>
   ): Promise<Campaign> {
     const db = getFirebaseDb();
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Authentication required');
+    }
+
+    // Force merchantId to be the authenticated user's ID to prevent identity spoofing
+    if (campaignData.merchantId !== currentUser.uid) {
+      throw new Error('Unauthorized: merchantId spoofing detected.');
+    }
+
+    // Verify businessId belongs to the merchant
+    const bizRef = doc(db, 'businesses', campaignData.businessId);
+    const bizSnap = await getDoc(bizRef);
+    if (!bizSnap.exists()) {
+      throw new Error('Business not found');
+    }
+    const bizData = bizSnap.data();
+    const isOwner = bizData.ownerUid === currentUser.uid || bizData.ownerId === currentUser.uid;
+
+    // Check businessMembers as a fallback
+    let isMember = isOwner;
+    if (!isMember) {
+      const qMember = query(
+        collection(db, 'businessMembers'),
+        where('businessId', '==', campaignData.businessId),
+        where('userUid', '==', currentUser.uid),
+        where('status', '==', 'active')
+      );
+      const memberSnap = await getDocs(qMember);
+      if (!memberSnap.empty) {
+        isMember = true;
+      }
+    }
+
+    if (!isMember) {
+      throw new Error('Unauthorized: You do not have permissions over this business workspace.');
+    }
+
+    // Form Validation (Phase 6)
+    const validCampaignTypes = [
+      'featured_product', 'featured_store', 'featured_business', 'featured_service',
+      'festival', 'flash_sale', 'limited_offer', 'new_launch', 'grand_opening',
+      'sponsored_ad', 'community_announcement', 'pi_ecosystem'
+    ];
+    if (!validCampaignTypes.includes(campaignData.campaignType)) {
+      throw new Error(`Invalid Campaign Type: ${campaignData.campaignType}`);
+    }
+
+    if (!campaignData.campaignTitle || !campaignData.campaignTitle.trim()) {
+      throw new Error('Campaign title is required.');
+    }
+
+    if (!campaignData.shortDescription || !campaignData.shortDescription.trim()) {
+      throw new Error('Campaign short description is required.');
+    }
+
+    if (!campaignData.bannerImage || !campaignData.bannerImage.trim() || !campaignData.bannerImage.startsWith('http')) {
+      throw new Error('A valid banner image URL is required.');
+    }
+
+    const duration = campaignData.durationDays || 0;
+    if (!Number.isInteger(duration) || duration <= 0 || duration > 30) {
+      throw new Error(`Invalid duration: ${duration} Days. Duration must be between 1 and 30 days.`);
+    }
+
+    const tier = campaignData.adPricingTier || 'standard_banner';
+    const rates = await this.getAdPricingRates();
+    const expectedRate = rates[tier] || DEFAULT_AD_PRICING_RATES[tier];
+    
+    // Total calculation validation
+    const expectedTotal = expectedRate * duration;
+    if (Math.abs((campaignData.budgetPi || 0) - expectedTotal) > 0.01) {
+      throw new Error(`Budget calculation mismatch: Expected ${expectedTotal} Pi, got ${campaignData.budgetPi} Pi.`);
+    }
+
+    // Verify Asset References (Ensure merchants can only advertise their own products/stores/services)
+    if (campaignData.campaignType === 'featured_store' && campaignData.storeId) {
+      const storeRef = doc(db, 'stores', campaignData.storeId);
+      const storeSnap = await getDoc(storeRef);
+      if (!storeSnap.exists() || storeSnap.data().businessId !== campaignData.businessId) {
+        throw new Error('Unauthorized or invalid Store reference.');
+      }
+    } else if (campaignData.campaignType === 'featured_product' && campaignData.targetRoute) {
+      const match = campaignData.targetRoute.match(/\/product\/([a-zA-Z0-9_-]+)/);
+      if (match) {
+        const prodId = match[1];
+        const prodRef = doc(db, 'products', prodId);
+        const prodSnap = await getDoc(prodRef);
+        if (!prodSnap.exists() || prodSnap.data().businessId !== campaignData.businessId) {
+          throw new Error('Unauthorized or invalid Product reference.');
+        }
+      }
+    } else if (campaignData.campaignType === 'featured_service' && campaignData.targetRoute) {
+      const match = campaignData.targetRoute.match(/\/service\/([a-zA-Z0-9_-]+)/);
+      if (match) {
+        const servId = match[1];
+        const servRef = doc(db, 'services', servId);
+        const servSnap = await getDoc(servRef);
+        if (!servSnap.exists() || servSnap.data().businessId !== campaignData.businessId) {
+          throw new Error('Unauthorized or invalid Service reference.');
+        }
+      }
+    }
+
     const id = `camp_${Math.random().toString(36).substring(2, 12)}`;
     const now = new Date().toISOString();
 
@@ -402,6 +508,19 @@ export class CampaignService {
    */
   public async updateAdPricingRates(rates: Partial<AdPricingRates>, adminUid: string): Promise<void> {
     const db = getFirebaseDb();
+    
+    // Verify admin authority
+    const userRef = doc(db, 'users', adminUid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : null;
+    const isSystemAdmin = adminUid === 'sys_admin' || 
+                          adminUid === 'akhileshs68' ||
+                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+    
+    if (!isSystemAdmin) {
+      throw new Error('Unauthorized: Only platform administrators can modify rate cards.');
+    }
+
     const ref = doc(db, 'platformSettings', 'ad_pricing');
     await setDoc(ref, {
       rates,
@@ -433,36 +552,60 @@ export class CampaignService {
   ): Promise<void> {
     const db = getFirebaseDb();
     const ref = doc(db, 'campaigns', campaignId);
-    await updateDoc(ref, {
-      paymentStatus: 'verified',
-      paymentTxId: txid,
-      paymentMode,
-      paymentAmountPi: amountPi,
-      updatedAt: serverTimestamp()
+    
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      throw new Error('Campaign not found');
+    }
+    const camp = snap.data() as Campaign;
+    
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Authentication required');
+    }
+    
+    // Security verification: check if caller owns the campaign or is admin
+    const isOwner = camp.merchantId === currentUser.uid;
+    const userRef = doc(db, 'users', currentUser.uid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : null;
+    const isSystemAdmin = currentUser.uid === 'sys_admin' || 
+                          currentUser.uid === 'akhileshs68' ||
+                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+    
+    if (!isOwner && !isSystemAdmin) {
+      throw new Error('Unauthorized: You do not have permissions over this campaign payment.');
+    }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = await currentUser.getIdToken(true);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const url = getAbsoluteUrl(`/api/campaigns/${campaignId}/verify-payment`);
+    const body = JSON.stringify({
+      paymentId: txid,
+      txid,
+      amountPi,
+      currency: 'Pi'
     });
 
-    try {
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const camp = snap.data();
-        if (camp.merchantId) {
-          await notificationService.notify(
-            camp.merchantId,
-            'marketing_alert',
-            'Ad Payment Verified',
-            `Payment of ${amountPi} Pi for campaign "${camp.campaignTitle || 'Ad'}" was verified successfully. Pending Super Admin review.`,
-            { entityId: campaignId, entityType: 'campaign', linkTo: '/business/campaigns' }
-          );
-        }
-        await notificationService.notifyAdmins(
-          'marketing_alert',
-          'Paid Ad Campaign Ready for Review',
-          `Verified payment (${amountPi} Pi) for ad campaign "${camp.campaignTitle || 'Ad'}" by ${camp.businessName || 'Merchant'}.`,
-          { entityId: campaignId, entityType: 'campaign', linkTo: '/admin-console' }
-        );
-      }
-    } catch (err) {
-      console.warn('Notification error on campaign payment verification:', err);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body
+    });
+
+    const resText = await response.text();
+    if (!response.ok) {
+      let errMsg = 'Payment could not be verified. Please try again.';
+      try {
+        const parsed = JSON.parse(resText);
+        if (parsed && parsed.error) errMsg = parsed.error;
+      } catch (e) {}
+      throw new Error(errMsg);
     }
   }
 
@@ -478,6 +621,47 @@ export class CampaignService {
     const db = getFirebaseDb();
     const ref = doc(db, 'campaigns', campaignId);
     
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      throw new Error('Campaign not found');
+    }
+    const camp = snap.data() as Campaign;
+    
+    // Check if the caller is the merchant owner of this campaign
+    const isOwner = camp.merchantId === adminUid;
+    
+    if (!isOwner) {
+      // If not owner, caller must be an authorized administrator
+      const userRef = doc(db, 'users', adminUid);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : null;
+      const isSystemAdmin = adminUid === 'sys_admin' || 
+                            adminUid === 'akhileshs68' ||
+                            (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+      
+      if (!isSystemAdmin) {
+        throw new Error('Unauthorized: Only administrators or campaign owners can update this status.');
+      }
+    } else {
+      // If caller is the merchant, enforce strict state machine rules
+      if (status === 'active') {
+        if (camp.status !== 'paused') {
+          throw new Error('Unauthorized: Merchants can only reactivate campaigns that are currently paused.');
+        }
+        if (camp.paymentStatus !== 'verified') {
+          throw new Error('Unauthorized: Campaign cannot be activated without verified payment.');
+        }
+      } else if (status === 'paused') {
+        if (camp.status !== 'active') {
+          throw new Error('Unauthorized: Only active campaigns can be paused by merchants.');
+        }
+      } else if (status === 'expired') {
+        // Archiving / self-deletion is allowed
+      } else {
+        throw new Error(`Unauthorized: Merchants cannot transition campaign status to ${status}.`);
+      }
+    }
+
     const updatePayload: any = {
       status,
       updatedAt: serverTimestamp()
@@ -495,19 +679,15 @@ export class CampaignService {
 
     // Notify merchant owner
     try {
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const camp = snap.data();
-        if (camp.merchantId) {
-          const reasonMsg = status === 'rejected' && rejectionReason ? ` Reason: ${rejectionReason}` : '';
-          await notificationService.notify(
-            camp.merchantId,
-            'marketing_alert',
-            `Campaign Status: ${status.toUpperCase()}`,
-            `Your campaign "${camp.campaignTitle || 'Ad'}" status has been updated to ${status.toUpperCase()}.${reasonMsg}`,
-            { entityId: campaignId, entityType: 'campaign', linkTo: '/business/campaigns' }
-          );
-        }
+      if (camp.merchantId) {
+        const reasonMsg = status === 'rejected' && rejectionReason ? ` Reason: ${rejectionReason}` : '';
+        await notificationService.notify(
+          camp.merchantId,
+          'marketing_alert',
+          `Campaign Status: ${status.toUpperCase()}`,
+          `Your campaign "${camp.campaignTitle || 'Ad'}" status has been updated to ${status.toUpperCase()}.${reasonMsg}`,
+          { entityId: campaignId, entityType: 'campaign', linkTo: '/business/campaigns' }
+        );
       }
     } catch (notifErr) {
       console.warn('Campaign status update notification warning:', notifErr);
@@ -528,7 +708,7 @@ export class CampaignService {
       console.warn('Audit log creation warning:', err);
     }
 
-    logger.audit('CampaignService', `Admin ${adminUid} updated campaign ${campaignId} status to ${status}`, adminUid);
+    logger.audit('CampaignService', `Admin/Owner ${adminUid} updated campaign ${campaignId} status to ${status}`, adminUid);
   }
 
   /**
@@ -536,6 +716,19 @@ export class CampaignService {
    */
   public async togglePinCampaign(campaignId: string, isPinned: boolean, adminUid: string): Promise<void> {
     const db = getFirebaseDb();
+    
+    // Verify admin authority
+    const userRef = doc(db, 'users', adminUid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : null;
+    const isSystemAdmin = adminUid === 'sys_admin' || 
+                          adminUid === 'akhileshs68' ||
+                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+    
+    if (!isSystemAdmin) {
+      throw new Error('Unauthorized: Only platform administrators can pin campaigns.');
+    }
+
     const ref = doc(db, 'campaigns', campaignId);
     await updateDoc(ref, {
       isPinned,

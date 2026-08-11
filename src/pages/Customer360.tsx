@@ -33,11 +33,13 @@ import {
   CustomerNote, 
   LoyaltyAccount 
 } from '../types';
+import { useBusiness } from '../context/BusinessContext';
 
 export const Customer360: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [timeline, setTimeline] = useState<CustomerTimelineEvent[]>([]);
@@ -48,18 +50,20 @@ export const Customer360: React.FC = () => {
   const [noteText, setNoteText] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
 
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
+
   useEffect(() => {
-    if (customerId) {
+    if (customerId && (isWorkspaceReady || user)) {
       fetchCustomerData();
     }
-  }, [customerId]);
+  }, [customerId, user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchCustomerData = async () => {
     setLoading(true);
     try {
       // In a real app, we'd fetch the customer profile by ID
       // For now, we'll fetch all and find (since our ID is composite)
-      const allCustomers = await crmService.getBusinessCustomers('PI-CORP-001');
+      const allCustomers = await crmService.getBusinessCustomers(businessId);
       const found = allCustomers.find(c => c.customerId === customerId);
       
       if (found) {

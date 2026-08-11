@@ -24,19 +24,24 @@ import { useAuth } from '../auth/useAuth';
 import { orderService } from '../services/orderService';
 import { shippingService } from '../services/shippingService';
 import { Order, OrderStatus, ShippingMethod } from '../types';
+import { useBusiness } from '../context/BusinessContext';
 
 export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hideNavbar = false }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentBusiness, businesses, isWorkspaceReady } = useBusiness();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const businessId = user?.uid || 'PI-CORP-001';
+
+  const businessId = currentBusiness?.id || businesses[0]?.id || user?.uid || 'no-business';
 
   useEffect(() => {
-    fetchOrders();
-  }, [user]);
+    if (isWorkspaceReady || user) {
+      fetchOrders();
+    }
+  }, [user, currentBusiness, businesses, isWorkspaceReady]);
 
   const fetchOrders = async () => {
     setLoading(true);

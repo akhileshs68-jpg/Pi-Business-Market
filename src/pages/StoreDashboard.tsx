@@ -21,9 +21,11 @@ import {
   ArrowLeft,
   ChevronRight,
   AlertCircle,
-  Package
+  Package,
+  Megaphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { MarketingCenter } from '../components/business/MarketingCenter';
 
 export const StoreDashboard: React.FC = () => {
   const { businessId, storeId } = useParams<{ businessId?: string; storeId?: string }>();
@@ -35,7 +37,7 @@ export const StoreDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [filterBusiness, setFilterBusiness] = useState<string>(businessId || 'all');
-  const [activeView, setActiveView] = useState<'stores' | 'products' | 'reviews'>(
+  const [activeView, setActiveView] = useState<'stores' | 'products' | 'reviews' | 'marketing'>(
     location.pathname.includes('/products') ? 'products' : 'stores'
   );
   const [error, setError] = useState<string | null>(null);
@@ -193,6 +195,16 @@ export const StoreDashboard: React.FC = () => {
             >
               <MessageSquare size={14} /> Reputation
             </button>
+            <button
+              onClick={() => setActiveView('marketing')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeView === 'marketing' 
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                  : 'text-slate-500 hover:text-white'
+              }`}
+            >
+              <Megaphone size={14} /> Marketing & Ads
+            </button>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
@@ -264,6 +276,27 @@ export const StoreDashboard: React.FC = () => {
               Retry
             </button>
           </div>
+        ) : activeView === 'marketing' ? (
+          businesses.length === 0 ? (
+            <div className="py-16 text-center bg-slate-900/30 rounded-3xl border border-slate-800">
+              <Megaphone className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg font-black text-white mb-2">No Business Profile Found</h3>
+              <p className="text-slate-400 max-w-sm mx-auto mb-6 text-xs">
+                You must have a registered business profile to create marketing campaigns and list sponsored advertisements.
+              </p>
+              <button
+                onClick={() => navigate('/business-center')}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all"
+              >
+                Go to Business Center
+              </button>
+            </div>
+          ) : (
+            <MarketingCenter 
+              businessId={filterBusiness === 'all' ? businesses[0]?.id : filterBusiness} 
+              userId={user?.uid || ''} 
+            />
+          )
         ) : activeView === 'products' ? (
           <ProductManager />
         ) : activeView === 'reviews' ? (
