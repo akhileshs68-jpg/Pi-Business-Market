@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, getDocs, query, limit, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
+import { normalizeDateString } from '../../utils/firestoreUtils';
 
 interface EnterpriseOperationsCenterProps {
   onNavigateTab: (tab: string) => void;
@@ -33,6 +34,9 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
 
   // Raw Firestore documents stored in-memory for zero duplicated queries and instant filtering
   const [dataSources, setDataSources] = useState<{
+    users: any[];
+    services: any[];
+    shipments: any[];
     orders: any[];
     products: any[];
     businesses: any[];
@@ -45,6 +49,9 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
     universalApprovals: any[];
     reviews: any[];
   }>({
+    users: [],
+    services: [],
+    shipments: [],
     orders: [],
     products: [],
     businesses: [],
@@ -78,6 +85,9 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
     try {
       // Run queries in parallel
       const [
+        usersSnap,
+        servicesSnap,
+        shipmentsSnap,
         ordersSnap,
         productsSnap,
         businessesSnap,
@@ -90,6 +100,9 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
         approvalsSnap,
         reviewsSnap
       ] = await Promise.allSettled([
+        getDocs(query(collection(db, 'users'), limit(150))),
+        getDocs(query(collection(db, 'services'), limit(150))),
+        getDocs(query(collection(db, 'shipments'), limit(150))),
         getDocs(query(collection(db, 'orders'), limit(150))),
         getDocs(query(collection(db, 'products'), limit(150))),
         getDocs(query(collection(db, 'businesses'), limit(100))),
@@ -108,12 +121,23 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
 
       const extractDocs = (result: PromiseSettledResult<any>) => {
         if (result.status === 'fulfilled') {
-          return result.value.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+          return result.value.docs.map((d: any) => {
+            const data = d.data() || {};
+            return {
+              id: d.id,
+              ...data,
+              createdAt: normalizeDateString(data.createdAt ?? data.timestamp),
+              updatedAt: normalizeDateString(data.updatedAt)
+            };
+          });
         }
         return [];
       };
 
       setDataSources({
+        users: extractDocs(usersSnap),
+        services: extractDocs(servicesSnap),
+        shipments: extractDocs(shipmentsSnap),
         orders: extractDocs(ordersSnap),
         products: extractDocs(productsSnap),
         businesses: extractDocs(businessesSnap),
@@ -160,30 +184,79 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
   // Compute metrics in-memory
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // Executive Overview Metrics
+  const overviewMetrics = {
+    totalUsers: dataSources.users.length,
+    buyersCount: dataSources.users.filter(u => !u.platformRole || u.platformRole === 'buyer' || u.role === 'buyer' || u.role === 'user').length,
+    sellersCount: dataSources.businesses.length,
+    pendingSellers: dataSources.businesses.filter(b => 
+      ['Pending', 'Pending Audit', 'Pending Verification', 'pending_verification', 'pending'].includes(b.status || b.verificationStatus || b.approvalStatus)
+    ).length,
+    approvedSellers: dataSources.businesses.filter(b => 
+      ['approved', 'active', 'Verified'].includes(b.status || b.verificationStatus)
+    ).length,
+    suspendedSellers: dataSources.businesses.filter(b => b.status === 'suspended' || b.active === false).length,
+    totalProducts: dataSources.products.length,
+    totalServices: dataSources.services.length,
+    totalBusinesses: dataSources.businesses.length,
+    totalOrders: dataSources.orders.length,
+    paidOrders: dataSources.orders.filter(o => o.paymentStatus === 'paid' || o.paymentStatus === 'verified' || ['paid', 'payment_verified', 'accepted', 'preparing', 'packed', 'ready_for_dispatch', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'completed'].includes(o.status)).length,
+    activeShipments: dataSources.shipments.filter(s => ['in_transit', 'out_for_delivery', 'assigned', 'picked_up'].includes(s.status)).length,
+    completedOrders: dataSources.orders.filter(o => o.status === 'completed' || o.status === 'delivered').length,
+    liveAds: dataSources.campaigns.filter(c => c.status === 'active').length,
+    pendingAds: dataSources.campaigns.filter(c => c.status === 'pending').length,
+  };
+
   // SECTION 1: Live Orders
   const liveOrders = {
     new: dataSources.orders.filter(o => ['new', 'placed', 'new_order'].includes(o.status)),
     pending: dataSources.orders.filter(o => ['pending_payment', 'pending'].includes(o.status)),
+    preparing: dataSources.orders.filter(o => ['accepted', 'preparing'].includes(o.status)),
     packed: dataSources.orders.filter(o => ['packed', 'ready_for_dispatch'].includes(o.status)),
-    shipped: dataSources.orders.filter(o => ['shipped', 'out_for_delivery', 'dispatched'].includes(o.status)),
-    delivered: dataSources.orders.filter(o => ['delivered', 'completed'].includes(o.status)),
+    shipped: dataSources.orders.filter(o => ['shipped', 'dispatched'].includes(o.status)),
+    inTransit: dataSources.orders.filter(o => ['in_transit'].includes(o.status)),
+    outForDelivery: dataSources.orders.filter(o => ['out_for_delivery'].includes(o.status)),
+    delivered: dataSources.orders.filter(o => ['delivered'].includes(o.status)),
+    completed: dataSources.orders.filter(o => ['completed'].includes(o.status)),
     cancelled: dataSources.orders.filter(o => o.status === 'cancelled'),
+    disputed: dataSources.orders.filter(o => o.status === 'disputed' || o.isDisputed),
     refundRequested: dataSources.orders.filter(o => ['refund_requested', 'refund_pending'].includes(o.status)),
     refunded: dataSources.orders.filter(o => ['refund_completed', 'refund_approved', 'refunded'].includes(o.status)),
   };
 
-  // SECTION 2: Inventory Health
+  // SECTION 2: Inventory & Services Health
   const inventoryHealth = {
+    totalProducts: dataSources.products.length,
     outOfStock: dataSources.products.filter(p => p.stock === 0 || p.status === 'out-of-stock'),
     lowStock: dataSources.products.filter(p => p.stock > 0 && p.stock <= 5),
     hidden: dataSources.products.filter(p => p.status === 'draft' || p.status === 'hidden'),
     inactive: dataSources.products.filter(p => p.status === 'inactive' || p.status === 'archived'),
     pendingApproval: dataSources.products.filter(p => p.status === 'pending' || p.approvalStatus === 'pending'),
+    totalServices: dataSources.services.length,
+    activeServices: dataSources.services.filter(s => !s.status || s.status === 'active' || s.status === 'published'),
+    pendingServices: dataSources.services.filter(s => s.status === 'pending' || s.approvalStatus === 'pending'),
+    suspendedServices: dataSources.services.filter(s => s.status === 'suspended'),
   };
 
-  // SECTION 3: Business Health
+  // SECTION 3: Delivery / Logistics Control
+  const shipmentSec = {
+    total: dataSources.shipments.length,
+    created: dataSources.shipments.filter(s => ['created', 'pending'].includes(s.status)),
+    assigned: dataSources.shipments.filter(s => s.status === 'assigned'),
+    pickedUp: dataSources.shipments.filter(s => s.status === 'picked_up'),
+    inTransit: dataSources.shipments.filter(s => s.status === 'in_transit'),
+    outForDelivery: dataSources.shipments.filter(s => s.status === 'out_for_delivery'),
+    delivered: dataSources.shipments.filter(s => s.status === 'delivered'),
+    failed: dataSources.shipments.filter(s => ['failed', 'delivery_failed'].includes(s.status)),
+    delayed: dataSources.shipments.filter(s => s.isDelayed || s.status === 'delayed'),
+  };
+
+  // SECTION 4: Business Health
   const businessHealth = {
-    new: dataSources.businesses.filter(b => b.status === 'pending' || b.status === 'new' || (b.createdAt && b.createdAt.startsWith(todayStr.substring(0, 7)))),
+    total: dataSources.businesses.length,
+    new: dataSources.businesses.filter(b => b.status === 'pending' || b.status === 'new' || (b.createdAt && typeof b.createdAt === 'string' && b.createdAt.startsWith(todayStr.substring(0, 7)))),
+    approved: dataSources.businesses.filter(b => ['approved', 'active', 'Verified'].includes(b.status || b.verificationStatus)),
+    rejected: dataSources.businesses.filter(b => b.status === 'rejected'),
     suspended: dataSources.businesses.filter(b => b.status === 'suspended' || b.active === false),
     inactive: dataSources.businesses.filter(b => b.status === 'inactive'),
     pendingVerification: dataSources.businesses.filter(b => 
@@ -197,25 +270,26 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
     }),
   };
 
-  // SECTION 4: Payments
+  // SECTION 5: Payments
   const todayPiRev = dataSources.payments
-    .filter(p => (p.status || '').toLowerCase() === 'completed' && (p.currency || '').toLowerCase().includes('pi') && p.createdAt && p.createdAt.startsWith(todayStr))
+    .filter(p => (p.status || '').toLowerCase() === 'completed' && (p.currency || '').toLowerCase().includes('pi') && p.createdAt && typeof p.createdAt === 'string' && p.createdAt.startsWith(todayStr))
     .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   const todayBmpRev = dataSources.payments
-    .filter(p => (p.status || '').toLowerCase() === 'completed' && (p.currency || '').toLowerCase().includes('bmp') && p.createdAt && p.createdAt.startsWith(todayStr))
+    .filter(p => (p.status || '').toLowerCase() === 'completed' && (p.currency || '').toLowerCase().includes('bmp') && p.createdAt && typeof p.createdAt === 'string' && p.createdAt.startsWith(todayStr))
     .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   const paymentsSec = {
     todayPi: todayPiRev,
     todayBmp: todayBmpRev,
+    verified: dataSources.payments.filter(p => ['completed', 'verified', 'Paid'].includes(p.status)),
     pendingSettlements: dataSources.payments.filter(p => ['pending', 'Pending'].includes(p.status)),
     failedPayments: dataSources.payments.filter(p => ['failed', 'Failed'].includes(p.status)),
     pendingWithdrawals: dataSources.universalApprovals.filter(a => a.approvalType === 'Withdrawal Requests' && a.status === 'Pending Review'),
     refundQueue: dataSources.universalApprovals.filter(a => a.approvalType === 'Refund Requests' && a.status === 'Pending Review'),
   };
 
-  // SECTION 5: Customer Health
+  // SECTION 6: Customer & Dispute Health
   const customerHealth = {
     openDisputes: dataSources.disputes.filter(d => d.status && d.status.toUpperCase() !== 'RESOLVED' && d.status.toUpperCase() !== 'DISMISSED'),
     openTickets: dataSources.support_tickets.filter(t => !['resolved', 'closed', 'Closed', 'Resolved'].includes(t.status || '')),
@@ -227,9 +301,14 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
     ]
   };
 
-  // SECTION 6: Marketing
+  // SECTION 7: Marketing Campaigns / Ads
   const marketingHealth = {
+    pending: dataSources.campaigns.filter(c => c.status === 'pending'),
+    paymentVerified: dataSources.campaigns.filter(c => c.paymentStatus === 'verified' || c.status === 'verified'),
     runningCampaigns: dataSources.campaigns.filter(c => c.status === 'active'),
+    scheduled: dataSources.campaigns.filter(c => c.status === 'scheduled'),
+    paused: dataSources.campaigns.filter(c => c.status === 'paused'),
+    rejected: dataSources.campaigns.filter(c => c.status === 'rejected'),
     endingSoon: dataSources.campaigns.filter(c => {
       if (c.status !== 'active' || !c.endDate) return false;
       const end = new Date(c.endDate);
@@ -237,16 +316,48 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
       return diff > 0 && diff < 3 * 24 * 60 * 60 * 1000; // 3 days
     }),
     expiredCampaigns: dataSources.campaigns.filter(c => c.status === 'expired' || (c.endDate && new Date(c.endDate) < new Date())),
-    bannerPerformance: dataSources.campaigns.map(c => ({
-      name: c.title || 'Campaign',
-      ctr: c.ctr || (c.clicks && c.views ? (c.clicks / c.views) * 100 : 0)
-    })),
     featuredListings: dataSources.campaigns.filter(c => ['featured_product', 'featured_store'].includes(c.type || ''))
   };
 
-  // SECTION 8: Critical Alerts
+  // SECTION 8: Critical Alerts / Attention Required
   const criticalAlerts: any[] = [];
   
+  if (businessHealth.pendingVerification.length > 0) {
+    criticalAlerts.push({
+      id: 'pending_sellers',
+      title: 'Pending Seller Approvals',
+      desc: `${businessHealth.pendingVerification.length} seller applications waiting for verification.`,
+      severity: 'warning',
+      target: 'approvals',
+      actionLabel: 'Review Sellers',
+      items: businessHealth.pendingVerification
+    });
+  }
+
+  if (marketingHealth.pending.length > 0) {
+    criticalAlerts.push({
+      id: 'pending_ads',
+      title: 'Pending Advertisement Moderation',
+      desc: `${marketingHealth.pending.length} advertisement campaigns pending review.`,
+      severity: 'warning',
+      target: 'ad_moderation',
+      actionLabel: 'Moderate Ads',
+      items: marketingHealth.pending
+    });
+  }
+
+  if (customerHealth.openDisputes.length > 0) {
+    criticalAlerts.push({
+      id: 'open_disputes',
+      title: 'Open Customer Disputes',
+      desc: `${customerHealth.openDisputes.length} active disputes require platform resolution.`,
+      severity: 'high',
+      target: 'disputes',
+      actionLabel: 'Manage Disputes',
+      items: customerHealth.openDisputes
+    });
+  }
+
   if (dataSources.fraudSignals.length > 0) {
     criticalAlerts.push({
       id: 'fraud',
@@ -320,10 +431,10 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
           </div>
           <div>
             <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
-              System Core Operating Status
+              Platform Owner Mission Control
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Enterprise Operations Center is synchronized with live Cloud Run nodes.
+              Global marketplace health, seller performance, and operational live telemetry.
             </p>
           </div>
         </div>
@@ -337,6 +448,87 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Synchronizing...' : 'Sync Live Data'}
           </button>
+        </div>
+      </div>
+
+      {/* EXECUTIVE PLATFORM OVERVIEW - Top KPI Summary Bar */}
+      <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-indigo-950/40 border border-indigo-500/20 space-y-4 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-xs font-black text-white uppercase tracking-widest">Executive Platform Overview</h3>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-[10px] font-bold text-indigo-300 uppercase tracking-wider">
+            Live Marketplace Pulse
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div 
+            onClick={() => onNavigateTab('users')}
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group"
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-slate-200">Total Users</span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl font-black text-white">{overviewMetrics.totalUsers}</span>
+              <span className="text-[10px] text-slate-500 font-medium">({overviewMetrics.buyersCount} buyers)</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => onNavigateTab('businesses')}
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group"
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-slate-200">Sellers / Businesses</span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl font-black text-emerald-400">{overviewMetrics.approvedSellers}</span>
+              <span className="text-[10px] text-amber-400 font-bold">({overviewMetrics.pendingSellers} pending)</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => onNavigateTab('products')}
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group"
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-slate-200">Catalog Inventory</span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl font-black text-indigo-400">{overviewMetrics.totalProducts}</span>
+              <span className="text-[10px] text-slate-400">prods / {overviewMetrics.totalServices} svcs</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => onNavigateTab('orders')}
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group"
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-slate-200">Total Orders</span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl font-black text-cyan-400">{overviewMetrics.totalOrders}</span>
+              <span className="text-[10px] text-emerald-400 font-bold">({overviewMetrics.paidOrders} paid)</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => onNavigateTab('ad_moderation')}
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group"
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-slate-200">Advertisements</span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl font-black text-purple-400">{overviewMetrics.liveAds} live</span>
+              <span className="text-[10px] text-amber-400 font-bold">({overviewMetrics.pendingAds} pending)</span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => onNavigateTab('disputes')}
+            className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all cursor-pointer group"
+          >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-slate-200">Disputes & Risk</span>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className="text-xl font-black text-rose-400">{customerHealth.openDisputes.length}</span>
+              <span className="text-[10px] text-slate-400">open</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -407,7 +599,7 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
                   key: item.key,
                   label: item.label,
                   color: item.color,
-                  items: inventoryHealth[item.key as keyof typeof inventoryHealth]
+                  items: inventoryHealth[item.key as keyof typeof inventoryHealth] as any[]
                 })}
                 className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 hover:bg-slate-900 cursor-pointer hover:scale-[1.03] transition-all flex flex-col justify-between min-h-[70px] group"
               >
@@ -443,7 +635,7 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
                   key: item.key,
                   label: item.label,
                   color: item.color,
-                  items: businessHealth[item.key as keyof typeof businessHealth]
+                  items: businessHealth[item.key as keyof typeof businessHealth] as any[]
                 })}
                 className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 hover:bg-slate-900 cursor-pointer hover:scale-[1.03] transition-all flex flex-col justify-between min-h-[70px] group"
               >

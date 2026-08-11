@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { useAuth } from '../../auth/useAuth';
+import { normalizeDateString } from '../../utils/firestoreUtils';
 
 // Helper for currency formatting
 const formatPi = (value: number) => {
@@ -87,10 +88,21 @@ export const EnterpriseFinanceCenter: React.FC = () => {
         getDocs(query(collection(db, 'master_ledger'), limit(200)))
       ]);
 
-      const extractedPayments = paymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const extractedOrders = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const extractedApprovals = approvalsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const extractedLedger = ledgerSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const mapDocWithNormalizedDates = (doc: any) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: normalizeDateString(data.createdAt ?? data.timestamp),
+          updatedAt: normalizeDateString(data.updatedAt),
+          processedAt: normalizeDateString(data.processedAt)
+        };
+      };
+
+      const extractedPayments = paymentsSnap.docs.map(mapDocWithNormalizedDates);
+      const extractedOrders = ordersSnap.docs.map(mapDocWithNormalizedDates);
+      const extractedApprovals = approvalsSnap.docs.map(mapDocWithNormalizedDates);
+      const extractedLedger = ledgerSnap.docs.map(mapDocWithNormalizedDates);
 
       setPayments(extractedPayments);
       setOrders(extractedOrders);
@@ -722,14 +734,17 @@ export const EnterpriseFinanceCenter: React.FC = () => {
           { label: 'Calculated Commissions', val: formatPi(revenueStats.todayPi * 0.01) }
         ];
         headers = ['Timestamp', 'Payment ID', 'Merchant', 'Amount', 'Fee %', 'Net Payout'];
-        rows = payments.filter(p => p.createdAt?.startsWith(new Date().toISOString().split('T')[0])).map(p => [
-          p.createdAt?.split('T')[1]?.substring(0, 8) || 'N/A',
-          p.id,
-          p.businessName || 'Elite Merchant',
-          `${p.amount} ${p.currency || 'Pi'}`,
-          `${p.commissionPercentage || 1}%`,
-          `${(Number(p.amount) * (100 - (Number(p.commissionPercentage) || 1))) / 100} Pi`
-        ]);
+        rows = payments.filter(p => (typeof p.createdAt === 'string' ? p.createdAt : normalizeDateString(p.createdAt)).startsWith(new Date().toISOString().split('T')[0])).map(p => {
+          const cStr = typeof p.createdAt === 'string' ? p.createdAt : normalizeDateString(p.createdAt);
+          return [
+            cStr.split('T')[1]?.substring(0, 8) || 'N/A',
+            p.id,
+            p.businessName || 'Elite Merchant',
+            `${p.amount} ${p.currency || 'Pi'}`,
+            `${p.commissionPercentage || 1}%`,
+            `${(Number(p.amount) * (100 - (Number(p.commissionPercentage) || 1))) / 100} Pi`
+          ];
+        });
       } else if (reportType === 'weekly') {
         title = `Weekly Financial Performance Report - Past 7 Days`;
         summaryCards = [
@@ -1254,7 +1269,7 @@ export const EnterpriseFinanceCenter: React.FC = () => {
                               {row.status}
                             </span>
                           </td>
-                          <td className="p-3 text-slate-400">{row.createdAt?.split('T')[0]}</td>
+                          <td className="p-3 text-slate-400">{(typeof row.createdAt === 'string' ? row.createdAt : normalizeDateString(row.createdAt)).split('T')[0] || 'N/A'}</td>
                           <td className="p-3 text-right">
                             {row.status === 'Failed' || row.status === 'Pending Settlement' ? (
                               <button 

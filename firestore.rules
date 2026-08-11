@@ -105,8 +105,8 @@ service cloud.firestore {
 
     // 3. Collection Rules
     match /users/{uid} {
-      // User isolation: Users can read their own profile, or Admins can read any profile
-      allow read: if isSignedIn() && (isOwner(uid) || isAdmin());
+      // User profiles are publicly readable (for store profiles, candidate info, Pi verification, and identity resolution)
+      allow read: if true;
 
       // Create rule: Users can create their own doc, but cannot set admin roles
       allow create: if isSignedIn() && isOwner(uid) && (
@@ -153,16 +153,41 @@ service cloud.firestore {
 
     match /businessMembers/{memberId} {
       allow read: if isSignedIn() && (
-        resource.data.userUid == request.auth.uid || 
-        isOwner(resource.data.userUid) || 
-        (resource.data.keys().hasAll(['businessId']) && isBusinessMember(resource.data.businessId)) || 
+        resource == null ||
+        resource.data.userUid == request.auth.uid ||
+        resource.data.userUid == getPiUid() ||
+        isOwner(resource.data.userUid) ||
+        isBusinessMember(resource.data.businessId) ||
+        isBusinessOwner(resource.data.businessId) ||
+        memberId.endsWith("_" + request.auth.uid) ||
+        memberId.endsWith("_" + getPiUid()) ||
         isAdmin()
       );
-      allow create: if isSignedIn(); // Usually via transaction or invite
-      allow update, delete: if isSignedIn() && (
-        resource.data.userUid == request.auth.uid || 
-        isBusinessOwner(resource.data.businessId) || 
-        hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR'])
+      allow create: if isSignedIn() && (
+        isOwner(incoming().userUid) ||
+        isBusinessOwner(incoming().businessId) ||
+        hasBusinessRole(incoming().businessId, ['Super Admin', 'Business Admin', 'HR', 'Owner']) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource.data.userUid == request.auth.uid ||
+        resource.data.userUid == getPiUid() ||
+        isOwner(resource.data.userUid) ||
+        isBusinessOwner(resource.data.businessId) ||
+        hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR', 'Owner']) ||
+        isAdmin()
+      ) && (
+        isAdmin() ||
+        isBusinessOwner(resource.data.businessId) ||
+        !incoming().diff(existing()).affectedKeys().hasAny(['businessId', 'userUid'])
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.userUid == request.auth.uid ||
+        resource.data.userUid == getPiUid() ||
+        isOwner(resource.data.userUid) ||
+        isBusinessOwner(resource.data.businessId) ||
+        hasBusinessRole(resource.data.businessId, ['Super Admin', 'Business Admin', 'HR', 'Owner']) ||
+        isAdmin()
       );
     }
 
@@ -287,24 +312,69 @@ service cloud.firestore {
 
     match /carts/{cartId} {
       allow read: if isSignedIn() && (
-        resource.data.userUid == request.auth.uid || 
-        isOwner(resource.data.userUid) || 
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.buyerUid) ||
+        isOwner(resource.data.ownerUid) ||
+        cartId == request.auth.uid ||
+        cartId == getPiUid() ||
+        cartId.startsWith(request.auth.uid + "_") ||
+        cartId.startsWith(getPiUid() + "_") ||
         isAdmin()
       );
       allow create: if isSignedIn() && (
-        incoming().userUid == request.auth.uid || 
-        isOwner(incoming().userUid) || 
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().buyerUid) ||
+        isOwner(incoming().ownerUid) ||
+        incoming().userUid == request.auth.uid ||
+        incoming().userUid == getPiUid() ||
+        cartId == request.auth.uid ||
+        cartId == getPiUid() ||
+        cartId.startsWith(request.auth.uid + "_") ||
+        cartId.startsWith(getPiUid() + "_") ||
         isAdmin()
       );
-      allow update, delete: if isSignedIn() && (
-        resource.data.userUid == request.auth.uid || 
-        isOwner(resource.data.userUid) || 
+      allow update: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.buyerUid) ||
+        isOwner(resource.data.ownerUid) ||
+        cartId == request.auth.uid ||
+        cartId == getPiUid() ||
+        cartId.startsWith(request.auth.uid + "_") ||
+        cartId.startsWith(getPiUid() + "_") ||
+        isAdmin()
+      ) && (
+        isAdmin() ||
+        !incoming().diff(existing()).affectedKeys().hasAny(['userUid', 'buyerUid', 'ownerUid'])
+      );
+      allow delete: if isSignedIn() && (
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.buyerUid) ||
+        isOwner(resource.data.ownerUid) ||
+        cartId == request.auth.uid ||
+        cartId == getPiUid() ||
+        cartId.startsWith(request.auth.uid + "_") ||
+        cartId.startsWith(getPiUid() + "_") ||
         isAdmin()
       );
     }
 
     match /cartItems/{itemId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.buyerUid) ||
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().buyerUid) ||
+        resource.data.cartId.startsWith(request.auth.uid) ||
+        resource.data.cartId.startsWith(getPiUid()) ||
+        incoming().cartId.startsWith(request.auth.uid) ||
+        incoming().cartId.startsWith(getPiUid()) ||
+        itemId.startsWith(request.auth.uid) ||
+        itemId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /wishlists/{wishlistId} {
@@ -320,72 +390,114 @@ service cloud.firestore {
 
     match /bookings/{bookingId} {
       allow read: if isSignedIn() && (
-        isOwner(resource.data.buyerId) || 
-        isOwner(resource.data.sellerId) || 
+        resource == null ||
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.sellerId) ||
+        isOwner(resource.data.providerId) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
         isAdmin()
       );
       allow create: if isSignedIn() && (
-        isOwner(incoming().buyerId) || isAdmin()
+        isOwner(incoming().buyerId) || 
+        isOwner(incoming().userUid) || 
+        isAdmin()
       );
       allow update: if isSignedIn() && (
         isAdmin() || (
-          (isOwner(resource.data.buyerId) || isOwner(resource.data.sellerId)) &&
+          (isOwner(resource.data.buyerId) || isOwner(resource.data.userUid) || isOwner(resource.data.sellerId) || isOwner(resource.data.providerId) || (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) || (resource.data.businessId != null && isBusinessMember(resource.data.businessId))) &&
           !incoming().diff(existing()).affectedKeys().hasAny(['buyerId', 'sellerId', 'serviceId', 'businessId', 'price', 'grandTotal', 'currency'])
         )
       );
       allow delete: if isSignedIn() && (
         isOwner(resource.data.buyerId) || 
         isOwner(resource.data.sellerId) || 
+        isOwner(resource.data.providerId) || 
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
         isAdmin()
       );
     }
 
     match /shipments/{shipmentId} {
       allow read: if isSignedIn() && (
+        resource == null ||
         isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.userUid) ||
         isOwner(resource.data.sellerId) ||
-        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
         isAdmin()
       );
       allow create, update: if isSignedIn() && canMutate() && (
         isOwner(incoming().sellerId) ||
-        (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId)) ||
+        isOwner(incoming().sellerUid) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (incoming().businessId != null && isBusinessMember(incoming().businessId)) ||
         isAdmin()
       );
       allow delete: if isAdmin();
     }
 
     match /packages/{packageId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.sellerId) ||
+        isOwner(resource.data.buyerId) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        isOwner(incoming().sellerId) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (incoming().businessId != null && isBusinessMember(incoming().businessId)) ||
+        isAdmin()
+      );
     }
 
     match /trackingEvents/{eventId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (
+        isOwner(incoming().sellerId) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (incoming().businessId != null && isBusinessMember(incoming().businessId)) ||
+        isAdmin()
+      );
     }
 
     match /store_categories/{catId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /store_inventory_logs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        (incoming().businessId != null && (isBusinessOwner(incoming().businessId) || isBusinessMember(incoming().businessId))) ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /variantGroups/{groupId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && (isAdmin() || (incoming().businessId != null && isBusinessOwner(incoming().businessId)) || isOwner(incoming().sellerId) || isOwner(incoming().ownerUid));
     }
 
     match /variantOptions/{optionId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && (isAdmin() || (incoming().businessId != null && isBusinessOwner(incoming().businessId)) || isOwner(incoming().sellerId) || isOwner(incoming().ownerUid));
     }
 
     match /productVariants/{variantId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && (isAdmin() || (incoming().businessId != null && isBusinessOwner(incoming().businessId)) || isOwner(incoming().sellerId) || isOwner(incoming().ownerUid));
     }
 
     match /loyaltyTransactions/{txId} {
@@ -483,10 +595,13 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isSignedIn() && (
-        isOwner(resource.data.buyerId) || 
-        isOwner(resource.data.userUid) || 
-        isOwner(resource.data.sellerId) || 
-        (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId)) || 
+        resource == null ||
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.piUid) ||
+        isOwner(resource.data.sellerId) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
         isAdmin()
       );
       
@@ -522,51 +637,93 @@ service cloud.firestore {
     }
 
     match /wallets/{walletId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
+      allow read: if isSignedIn() && (
         resource == null || 
         isOwner(resource.data.userId) || 
-        isOwner(incoming().userId) || 
-        walletId.startsWith(request.auth.uid + "_") ||
-        walletId.startsWith(getPiUid() + "_") ||
-        isAdmin() ||
-        (incoming().userId == (resource == null ? incoming().userId : resource.data.userId) &&
-         incoming().balance >= (resource == null ? 0.0 : resource.data.balance))
+        isOwner(resource.data.userUid) || 
+        walletId.startsWith(request.auth.uid) ||
+        walletId.startsWith(getPiUid()) ||
+        isAdmin()
       );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().userId) ||
+        isOwner(incoming().userUid) ||
+        walletId.startsWith(request.auth.uid) ||
+        walletId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().userId) || isOwner(existing().userUid) || walletId.startsWith(request.auth.uid) || walletId.startsWith(getPiUid())) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['userId', 'userUid', 'balance', 'piBalance', 'piTestnetBalance'])
+        )
+      );
+      allow delete: if isAdmin();
     }
 
     match /wallet_transactions/{txId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
+      allow read: if isSignedIn() && (
         resource == null || 
         isOwner(resource.data.userId) || 
-        isOwner(incoming().userId) || 
-        isAdmin() ||
-        (incoming().type == 'CREDIT')
+        isOwner(resource.data.userUid) || 
+        isAdmin()
       );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().userId) ||
+        isOwner(incoming().userUid) ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /master_wallets/{walletId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (
+      allow read: if isSignedIn() && (
         resource == null || 
         isOwner(resource.data.userId) || 
-        isOwner(incoming().userId) || 
-        isAdmin() ||
-        (incoming().userId == (resource == null ? incoming().userId : resource.data.userId) &&
-         incoming().piTestnetBalance >= (resource == null ? 0.0 : resource.data.piTestnetBalance))
+        isOwner(resource.data.userUid) || 
+        isAdmin()
       );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().userId) ||
+        isOwner(incoming().userUid) ||
+        isAdmin()
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().userId) || isOwner(existing().userUid)) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['userId', 'userUid', 'piTestnetBalance', 'balance'])
+        )
+      );
+      allow delete: if isAdmin();
     }
 
     match /master_ledger/{ledgerId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userId) ||
+        isOwner(resource.data.userUid) ||
+        isAdmin()
+      );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().userId) ||
+        isOwner(incoming().userUid) ||
+        isAdmin()
+      );
       allow update, delete: if isAdmin();
     }
 
     match /ledger_entries/{entryId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userId) ||
+        isOwner(resource.data.userUid) ||
+        isAdmin()
+      );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().userId) ||
+        isOwner(incoming().userUid) ||
+        isAdmin()
+      );
       allow update, delete: if isAdmin();
     }
 
@@ -665,8 +822,10 @@ service cloud.firestore {
 
     match /notifications/{notifId} {
       allow read: if isSignedIn() && (
-        resource == null || 
-        resource.data.recipientUid == request.auth.uid || 
+        resource == null ||
+        resource.data.recipientUid == request.auth.uid ||
+        resource.data.recipientUid == getPiUid() ||
+        isOwner(resource.data.recipientUid) ||
         isAdmin()
       );
       allow create: if canMutate() && isSignedIn() && (
@@ -674,6 +833,8 @@ service cloud.firestore {
       );
       allow update, delete: if canMutate() && isSignedIn() && (
         resource.data.recipientUid == request.auth.uid || 
+        resource.data.recipientUid == getPiUid() ||
+        isOwner(resource.data.recipientUid) ||
         isAdmin()
       );
     }
@@ -771,23 +932,26 @@ service cloud.firestore {
 
     match /searchIndex/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (isOwner(resource.data.reviewerUid) || isAdmin());
+      allow create: if isSignedIn() && (isOwner(incoming().reviewerUid) || isOwner(incoming().userUid) || incoming().reviewerUid == request.auth.uid);
+      allow update: if isSignedIn() && (isAdmin() || ((isOwner(existing().reviewerUid) || isOwner(existing().userUid)) && !incoming().diff(existing()).affectedKeys().hasAny(['reviewerUid', 'userUid', 'targetId', 'businessId', 'rating'])));
+      allow delete: if isSignedIn() && (isOwner(existing().reviewerUid) || isOwner(existing().userUid) || isAdmin());
     }
 
     match /reputationScores/{entityId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /community_posts/{postId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && (isOwner(incoming().authorUid) || isOwner(incoming().userUid) || incoming().authorUid == request.auth.uid);
+      allow update: if isSignedIn() && (isAdmin() || ((isOwner(existing().authorUid) || isOwner(existing().userUid)) && !incoming().diff(existing()).affectedKeys().hasAny(['authorUid', 'userUid', 'postId'])));
+      allow delete: if isSignedIn() && (isOwner(existing().authorUid) || isOwner(existing().userUid) || isAdmin());
     }
 
     match /coupons/{couponId} {
@@ -803,13 +967,14 @@ service cloud.firestore {
           (incoming().merchantId == request.auth.uid || isOwner(incoming().merchantId) || (incoming().keys().hasAll(['businessId']) && isBusinessOwner(incoming().businessId))) &&
           incoming().status == 'pending' &&
           (!incoming().keys().hasAny(['isPinned']) || incoming().isPinned == false) &&
-          (!incoming().keys().hasAny(['isFeatured']) || incoming().isFeatured == false)
+          (!incoming().keys().hasAny(['isFeatured']) || incoming().isFeatured == false) &&
+          (!incoming().keys().hasAny(['paymentStatus']) || incoming().paymentStatus in ['unpaid', 'pending_payment', 'verified', 'draft'])
         )
       );
       allow update: if canMutate() && isSignedIn() && (
         isAdmin() || (
           (isOwner(resource.data.merchantId) || (resource.data.keys().hasAll(['businessId']) && isBusinessOwner(resource.data.businessId))) &&
-          !incoming().diff(existing()).affectedKeys().hasAny(['merchantId', 'businessId', 'isPinned', 'isFeatured']) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['merchantId', 'businessId', 'isPinned', 'isFeatured', 'adminPriority']) &&
           !(existing().status in ['rejected', 'expired'] && incoming().status in ['active']) &&
           (incoming().status in ['pending', 'paused', 'expired'])
         )
@@ -829,12 +994,14 @@ service cloud.firestore {
 
     match /follows/{followId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && (isOwner(incoming().followerUid) || isOwner(incoming().userUid) || incoming().followerUid == request.auth.uid);
+      allow update, delete: if isSignedIn() && (isOwner(existing().followerUid) || isOwner(existing().userUid) || isAdmin());
     }
 
     match /reviewVotes/{voteId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && (isOwner(incoming().voterUid) || isOwner(incoming().userUid) || incoming().voterUid == request.auth.uid);
+      allow update, delete: if isSignedIn() && (isOwner(existing().voterUid) || isOwner(existing().userUid) || isAdmin());
     }
 
     match /media/{mediaId} {
@@ -853,168 +1020,517 @@ service cloud.firestore {
     }
 
     match /identities/{identityId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        identityId == request.auth.uid ||
+        identityId == getPiUid() ||
+        isOwner(identityId) ||
+        (resource != null && (isOwner(resource.data.uid) || isOwner(resource.data.piUid) || resource.data.username == request.auth.uid || resource.data.username == getPiUid())) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        identityId == request.auth.uid ||
+        identityId == getPiUid() ||
+        isOwner(identityId) ||
+        isOwner(incoming().uid) ||
+        isOwner(incoming().piUid) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().uid) || isOwner(existing().piUid) || identityId == request.auth.uid || identityId == getPiUid()) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['uid', 'piUid', 'identityId', 'id'])
+        )
+      );
+      allow delete: if isSignedIn() && (
+        isOwner(existing().uid) || isOwner(existing().piUid) || identityId == request.auth.uid || identityId == getPiUid() || isAdmin()
+      );
+    }
+
+    match /reward_identities/{docId} {
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.userId) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().userId) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().userUid) || isOwner(existing().userId) || docId.startsWith(request.auth.uid) || docId.startsWith(getPiUid())) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['userUid', 'userId', 'docId', 'id'])
+        )
+      );
+      allow delete: if isSignedIn() && (
+        isOwner(existing().userUid) || isOwner(existing().userId) || docId.startsWith(request.auth.uid) || docId.startsWith(getPiUid()) || isAdmin()
+      );
+    }
+
+    match /rewards/{docId} {
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.userId) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().userId) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().userUid) || isOwner(existing().userId) || docId.startsWith(request.auth.uid) || docId.startsWith(getPiUid())) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['userUid', 'userId', 'points', 'balance', 'amount', 'rewardId', 'approved', 'status'])
+        )
+      );
+      allow delete: if isAdmin();
     }
 
     match /loyaltyAccounts/{accountId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.customerId) ||
+        accountId.endsWith(request.auth.uid) ||
+        accountId.endsWith(getPiUid()) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        isOwner(incoming().customerId) ||
+        accountId.endsWith(request.auth.uid) ||
+        accountId.endsWith(getPiUid()) ||
+        (resource != null && isOwner(resource.data.customerId)) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        isAdmin()
+      );
     }
 
     match /loyaltyTransactions/{txId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.customerId) ||
+        isOwner(resource.data.userId) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        isOwner(incoming().customerId) ||
+        isOwner(incoming().userId) ||
+        (resource != null && (isOwner(resource.data.customerId) || isOwner(resource.data.userId))) ||
+        isAdmin()
+      );
     }
 
     match /securitySessions/{sessionId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        sessionId.startsWith(request.auth.uid) ||
+        sessionId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /sessions/{sessionId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        sessionId.startsWith(request.auth.uid) ||
+        sessionId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /business_verifications/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.applicantUid) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        isOwner(incoming().applicantUid) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (resource != null && isOwner(resource.data.applicantUid)) ||
+        (resource != null && resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        isAdmin()
+      );
     }
 
     match /systemBackups/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSuperAdmin() || isAdmin();
     }
 
     match /accountDeletionRequests/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /dataExportRequests/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /privacyConsents/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /fraudSignals/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+      allow create: if isSignedIn();
     }
 
     match /securityEvents/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+      allow create: if isSignedIn();
     }
 
     match /invoices/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.buyer.uid) ||
+        isOwner(resource.data.buyer.piUid) ||
+        isOwner(resource.data.buyerUid) ||
+        isOwner(resource.data.seller.ownerUid) ||
+        isOwner(resource.data.seller.sellerId) ||
+        (resource.data.seller.businessId != null && isBusinessOwner(resource.data.seller.businessId)) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.seller.businessId != null && isBusinessMember(resource.data.seller.businessId)) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        isOwner(incoming().buyer.uid) ||
+        isOwner(incoming().buyer.piUid) ||
+        isOwner(incoming().buyerUid) ||
+        isOwner(incoming().seller.ownerUid) ||
+        isOwner(incoming().seller.sellerId) ||
+        (incoming().seller.businessId != null && isBusinessOwner(incoming().seller.businessId)) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        isOwner(resource.data.buyer.uid) ||
+        isOwner(resource.data.seller.ownerUid) ||
+        (resource.data.seller.businessId != null && isBusinessOwner(resource.data.seller.businessId)) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        isAdmin()
+      ) && (
+        isAdmin() ||
+        !incoming().diff(existing()).affectedKeys().hasAny(['invoiceId', 'orderId', 'seller', 'buyer', 'grandTotal', 'subtotal', 'currency'])
+      );
+      allow delete: if isAdmin();
     }
 
     match /receipts/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.buyerUid) ||
+        isOwner(resource.data.buyer.uid) ||
+        isOwner(resource.data.sellerUid) ||
+        (resource.data.sellerId != null && isBusinessOwner(resource.data.sellerId)) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.sellerId != null && isBusinessMember(resource.data.sellerId)) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        isOwner(incoming().buyerUid) ||
+        isOwner(incoming().sellerUid) ||
+        (incoming().sellerId != null && isBusinessOwner(incoming().sellerId)) ||
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        isAdmin()
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /attributeGroups/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /attributes/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /categories/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /categoryAttributes/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /customerNotes/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isOwner(resource.data.authorUid) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (incoming().businessId != null && isBusinessMember(incoming().businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isOwner(incoming().authorUid) ||
+        isAdmin()
+      );
     }
 
     match /customers/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.customerId) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (incoming().businessId != null && isBusinessMember(incoming().businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().customerId) ||
+        isAdmin()
+      );
     }
 
     match /customerTimeline/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.customerId) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        (incoming().businessId != null && isBusinessOwner(incoming().businessId)) ||
+        (incoming().businessId != null && isBusinessMember(incoming().businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource != null && resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().customerId) ||
+        isAdmin()
+      );
     }
 
     match /share_events/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data.userUid) || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     match /share_clicks/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (resource == null || isOwner(resource.data.userUid) || isAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     match /blockedUsers/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /reportedConversations/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+      allow create: if isSignedIn() && (isOwner(incoming().reporterUid) || isOwner(incoming().userUid) || incoming().reporterUid != null);
     }
 
     match /reviewReports/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+      allow create: if isSignedIn() && (isOwner(incoming().reporterUid) || isOwner(incoming().userUid) || incoming().reporterUid != null);
     }
 
     match /anti_cheat_audit_logs/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
 
     match /recentSearches/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /serviceAvailability/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && (isAdmin() || (incoming().businessId != null && isBusinessOwner(incoming().businessId)));
     }
 
     match /servicePackages/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if isSignedIn() && (isAdmin() || (incoming().businessId != null && isBusinessOwner(incoming().businessId)));
     }
 
     match /userWishlists/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(incoming().userUid) ||
+        docId.startsWith(request.auth.uid) ||
+        docId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
     }
 
     match /warehouseLocations/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isBusinessOwner(resource.data.businessId) ||
+        isBusinessMember(resource.data.businessId) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        isBusinessOwner(incoming().businessId) ||
+        (resource != null && isBusinessOwner(resource.data.businessId)) ||
+        isAdmin()
+      );
     }
 
     match /warehouses/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isBusinessOwner(resource.data.businessId) ||
+        isBusinessMember(resource.data.businessId) ||
+        isAdmin()
+      );
+      allow write: if isSignedIn() && (
+        isBusinessOwner(incoming().businessId) ||
+        (resource != null && isBusinessOwner(resource.data.businessId)) ||
+        isAdmin()
+      );
     }
 
     // MODULE 1: DISPUTE SYSTEM SECURITY RULES
     match /disputes/{disputeId} {
-      allow read: if true;
-      allow write: if canMutate();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.buyerId) ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.sellerId) ||
+        (resource.data.businessId != null && isBusinessOwner(resource.data.businessId)) ||
+        (resource.data.businessId != null && isBusinessMember(resource.data.businessId)) ||
+        isAdmin()
+      );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().buyerId) ||
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().sellerId) ||
+        isAdmin()
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().buyerId) || isOwner(existing().userUid) || isOwner(existing().sellerId) || (existing().businessId != null && isBusinessOwner(existing().businessId))) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['disputeId', 'orderId', 'buyerId', 'sellerId', 'amount', 'resolution'])
+        )
+      );
+      allow delete: if canMutate() && isAdmin();
 
       match /events/{eventId} {
-        allow read: if true;
-        allow write: if canMutate();
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && canMutate();
+        allow update, delete: if isAdmin();
       }
 
       match /messages/{messageId} {
-        allow read: if true;
-        allow write: if canMutate();
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && canMutate() && (
+          incoming().senderUid == request.auth.uid ||
+          incoming().senderUid == getPiUid() ||
+          isAdmin()
+        );
+        allow update, delete: if isAdmin();
       }
     }
 
     // MODULE 2: BMP TOKEN SYSTEM SECURITY RULES
     match /bmp_wallets/{walletId} {
-      allow read: if true;
-      allow write: if canMutate();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.userId) ||
+        walletId.startsWith(request.auth.uid) ||
+        walletId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow create: if canMutate() && isSignedIn() && (
+        isOwner(incoming().userUid) ||
+        isOwner(incoming().userId) ||
+        walletId.startsWith(request.auth.uid) ||
+        walletId.startsWith(getPiUid()) ||
+        isAdmin()
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() || (
+          (isOwner(existing().userUid) || isOwner(existing().userId) || walletId.startsWith(request.auth.uid) || walletId.startsWith(getPiUid())) &&
+          !incoming().diff(existing()).affectedKeys().hasAny(['balance', 'totalTokens', 'userUid', 'userId', 'stakedTokens'])
+        )
+      );
+      allow delete: if canMutate() && isAdmin();
     }
 
     match /bmp_ledger/{entryId} {
-      allow read: if true;
-      allow write: if canMutate();
+      allow read: if isSignedIn() && (
+        resource == null ||
+        isOwner(resource.data.userUid) ||
+        isOwner(resource.data.senderUid) ||
+        isOwner(resource.data.recipientUid) ||
+        isAdmin()
+      );
+      allow create: if canMutate() && isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     // MODULE 3: UNIVERSAL APPROVAL SYSTEM SECURITY RULES

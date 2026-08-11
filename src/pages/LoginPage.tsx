@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { isRealPiBrowser } from '../auth/authService';
 import { Shield, Sparkles, AlertCircle, Smartphone, Monitor } from 'lucide-react';
+import { RoleResolver } from '../services/identity/RoleResolver';
 
 export const LoginPage: React.FC = () => {
   const { user, profile, login, loading, error } = useAuth();
@@ -14,6 +15,13 @@ export const LoginPage: React.FC = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
+      const roleResolver = new RoleResolver(user);
+      if (roleResolver.isSuperAdmin()) {
+        console.log('[Auth Routing Diagnostics] Super Admin detected, redirecting to /admin-console');
+        navigate('/admin-console', { replace: true });
+        return;
+      }
+
       const from = (location.state as any)?.from?.pathname || '/discovery';
       const targetPath = from === '/login' ? '/discovery' : from;
       

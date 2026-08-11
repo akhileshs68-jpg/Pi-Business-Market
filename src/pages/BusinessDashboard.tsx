@@ -22,7 +22,8 @@ import {
   MessageSquare,
   BarChart3,
   Globe,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -155,6 +156,27 @@ export const BusinessDashboard: React.FC = () => {
                 <p className="text-slate-400 text-xs mt-1 font-semibold">
                   Category: <span className="text-indigo-400 capitalize">{currentBusiness?.category || 'General'}</span> • Type: <span className="text-indigo-400 capitalize">{currentBusiness?.businessType || 'Enterprise'}</span>
                 </p>
+
+                {/* Administrative Rejection or Suspension Reason Callout */}
+                {(currentBusiness as any)?.rejectionReason && (currentBusiness?.verificationStatus === 'Rejected' || (currentBusiness as any)?.approvalStatus === 'rejected' || (currentBusiness?.businessStatus as string) === 'rejected') && (
+                  <div className="mt-3 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-2.5 text-rose-300 text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-rose-200">Administrative Reason for Rejection:</p>
+                      <p className="mt-0.5 text-rose-300">{(currentBusiness as any).rejectionReason}</p>
+                    </div>
+                  </div>
+                )}
+
+                {(currentBusiness as any)?.suspensionReason && (currentBusiness?.verificationStatus === 'Suspended' || (currentBusiness as any)?.approvalStatus === 'suspended' || (currentBusiness?.businessStatus as string) === 'suspended') && (
+                  <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-amber-300 text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-amber-200">Administrative Reason for Suspension:</p>
+                      <p className="mt-0.5 text-amber-300">{(currentBusiness as any).suspensionReason}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

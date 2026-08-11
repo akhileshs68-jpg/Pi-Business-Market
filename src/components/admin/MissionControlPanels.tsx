@@ -8,7 +8,7 @@ import {
   Activity, Users, Store, Box, ShoppingBag, CreditCard, Award, 
   TrendingUp, MessageSquare, Megaphone, ShieldAlert, ShieldCheck, 
   Database, Server, RefreshCw, CheckCircle2, XCircle, AlertCircle,
-  Play, Pause, Trash2, Search, BarChart3, Clock, Lock, Shield, Zap, Truck
+  Play, Pause, Trash2, Search, BarChart3, Clock, Lock, Shield, Zap, Truck, DollarSign
 } from 'lucide-react';
 import { collection, getDocs, getDoc, query, limit, orderBy, getCountFromServer, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
@@ -216,29 +216,7 @@ export const UserManagementPanel = () => {
   );
 };
 
-export const BusinessManagementPanel = () => (
-  <GenericManagementPanel 
-    title="Business Summary" icon={Store} collectionName="businesses" 
-    columns={['Business Name', 'Category', 'Status']}
-    renderRow={(biz: any) => (
-      <tr key={biz.id} className="hover:bg-slate-800/20">
-        <td className="px-6 py-4">
-          <div className="font-medium text-white">{biz.name || biz.businessName || 'Unnamed'}</div>
-          <div className="text-xs text-slate-500">ID: {biz.id}</div>
-        </td>
-        <td className="px-6 py-4 text-sm text-slate-400">{biz.category || 'General'}</td>
-        <td className="px-6 py-4">
-          <span className={`px-2 py-1 rounded-md text-xs font-bold ${biz.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : biz.status === 'suspended' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'}`}>
-            {biz.status || 'Pending'}
-          </span>
-        </td>
-        <td className="px-6 py-4 text-right space-x-2">
-          <span className="text-xs text-slate-500 italic">Managed in Enterprise Tab</span>
-        </td>
-      </tr>
-    )}
-  />
-);
+export { BusinessManagementPanel } from './BusinessManagementPanel';
 
 export const StoreManagementPanel = () => {
   const { user: currentUser } = useAuth();
@@ -1436,30 +1414,73 @@ export const BackupRecoveryPanel = () => {
 export const AdModerationPanel = () => {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [rates, setRates] = useState<any>({
+    standard_banner: 5,
+    flash_sale_banner: 10,
+    featured_store: 12,
+    sponsored_ad: 8
+  });
+  const [editingRates, setEditingRates] = useState<any>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'active' | 'rejected'>('pending');
   const [loading, setLoading] = useState(true);
+  const [showRatesConfig, setShowRatesConfig] = useState(false);
 
   useEffect(() => {
-    loadCampaigns();
+    loadData();
   }, []);
 
-  const loadCampaigns = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
       const { campaignService } = await import('../../services/campaignService');
-      const data = await campaignService.getAllCampaignsForAdmin();
-      setCampaigns(data);
+      const [allCamps, currentRates] = await Promise.all([
+        campaignService.getAllCampaignsForAdmin(),
+        campaignService.getAdPricingRates()
+      ]);
+      setCampaigns(allCamps);
+      setRates(currentRates);
+      setEditingRates(currentRates);
     } catch (e) {
-      console.warn('Error loading campaigns:', e);
+      console.warn('Error loading campaigns or rates:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (id: string, status: any) => {
+  const handleSaveRates = async () => {
     try {
       const { campaignService } = await import('../../services/campaignService');
-      await campaignService.updateCampaignStatus(id, status, user?.uid || 'sys_admin');
-      await loadCampaigns();
+      await campaignService.updateAdPricingRates(editingRates, user?.uid || 'sys_admin');
+      setRates(editingRates);
+      setShowRatesConfig(false);
+      alert('Ad Pricing Rates updated successfully!');
+    } catch (e) {
+      console.error('Failed updating rates:', e);
+      alert('Failed to update ad pricing rates.');
+    }
+  };
+
+  const handleUpdateStatus = async (camp: any, status: any) => {
+    let rejectionReason: string | undefined = undefined;
+
+    if (status === 'rejected') {
+      const inputReason = prompt(`Enter administrative reason for rejecting ad campaign "${camp.campaignTitle}":`);
+      if (!inputReason || !inputReason.trim()) {
+        alert('A valid administrative reason is required to reject a campaign.');
+        return;
+      }
+      rejectionReason = inputReason.trim();
+    }
+
+    try {
+      const { campaignService } = await import('../../services/campaignService');
+      await campaignService.updateCampaignStatus(
+        camp.id, 
+        status, 
+        user?.uid || 'sys_admin',
+        rejectionReason
+      );
+      await loadData();
     } catch (e) {
       alert('Failed to update campaign status');
     }
@@ -1469,45 +1490,176 @@ export const AdModerationPanel = () => {
     try {
       const { campaignService } = await import('../../services/campaignService');
       await campaignService.togglePinCampaign(id, !currentPin, user?.uid || 'sys_admin');
-      await loadCampaigns();
+      await loadData();
     } catch (e) {
       alert('Failed to pin campaign');
     }
   };
 
+  const filteredCampaigns = campaigns.filter(c => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'pending') return c.status === 'pending' || c.paymentStatus === 'verified';
+    if (activeFilter === 'active') return c.status === 'active';
+    if (activeFilter === 'rejected') return c.status === 'rejected';
+    return true;
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-pink-500/20 rounded-xl"><Megaphone className="w-6 h-6 text-pink-400" /></div>
+          <div className="p-3 bg-pink-500/20 border border-pink-500/30 rounded-2xl text-pink-400">
+            <Megaphone className="w-6 h-6" />
+          </div>
           <div>
-            <h3 className="text-xl font-bold text-white">Ad & Campaign Moderation</h3>
-            <p className="text-xs text-slate-400">Review merchant hero banners, sponsored campaigns & promotions</p>
+            <h3 className="text-xl font-bold text-white">Paid Ad & Campaign Moderation</h3>
+            <p className="text-xs text-slate-400">Review merchant ad payments, hero banners, sponsored campaigns & rates</p>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowRatesConfig(!showRatesConfig)}
+            className="px-3.5 py-2 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>Configure Rates</span>
+          </button>
+
+          <button
+            onClick={loadData}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold"
+            title="Refresh List"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Super Admin Pricing Rate Card Config Drawer */}
+      {showRatesConfig && (
+        <div className="p-5 bg-slate-900 border border-violet-500/30 rounded-2xl space-y-4 shadow-xl">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-amber-400" /> Platform Ad Rate Card Settings (Pi / Day)
+            </h4>
+            <span className="text-[10px] text-slate-400 font-mono">Updates apply instantly to new merchant campaign quotes</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Standard Banner (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.standard_banner || 5}
+                onChange={e => setEditingRates({ ...editingRates, standard_banner: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Flash Sale Banner (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.flash_sale_banner || 10}
+                onChange={e => setEditingRates({ ...editingRates, flash_sale_banner: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Featured Store (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.featured_store || 12}
+                onChange={e => setEditingRates({ ...editingRates, featured_store: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Sponsored Hero Ad (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.sponsored_ad || 8}
+                onChange={e => setEditingRates({ ...editingRates, sponsored_ad: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800 text-xs">
+            <button
+              onClick={() => setShowRatesConfig(false)}
+              className="px-4 py-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveRates}
+              className="px-5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-bold uppercase"
+            >
+              Save Rate Changes
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs w-fit">
         <button
-          onClick={loadCampaigns}
-          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5"
+          onClick={() => setActiveFilter('pending')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold transition-all ${
+            activeFilter === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-slate-400 hover:text-white'
+          }`}
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh</span>
+          Pending Review ({campaigns.filter(c => c.status === 'pending').length})
+        </button>
+        <button
+          onClick={() => setActiveFilter('active')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold transition-all ${
+            activeFilter === 'active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Live / Active ({campaigns.filter(c => c.status === 'active').length})
+        </button>
+        <button
+          onClick={() => setActiveFilter('rejected')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold transition-all ${
+            activeFilter === 'rejected' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Rejected ({campaigns.filter(c => c.status === 'rejected').length})
+        </button>
+        <button
+          onClick={() => setActiveFilter('all')}
+          className={`px-3.5 py-1.5 rounded-xl font-bold transition-all ${
+            activeFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          All Campaigns ({campaigns.length})
         </button>
       </div>
 
       {loading ? (
         <div className="p-8 text-center text-slate-400 text-xs font-mono">Loading campaign records...</div>
+      ) : filteredCampaigns.length === 0 ? (
+        <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-slate-500 text-xs">
+          No ad campaigns match the selected filter.
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {campaigns.map(camp => (
+          {filteredCampaigns.map(camp => (
             <div key={camp.id} className="p-5 bg-slate-900/60 border border-slate-800 rounded-2xl flex flex-col justify-between space-y-4">
               <div className="flex items-start gap-3">
                 {camp.bannerImage && (
                   <img src={camp.bannerImage} alt={camp.campaignTitle} className="w-20 h-14 rounded-xl object-cover border border-slate-800 shrink-0" referrerPolicy="no-referrer" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
                     <span className="px-2 py-0.5 bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[9px] font-bold rounded uppercase">
-                      {camp.campaignType}
+                      {camp.adPricingTier || camp.campaignType}
                     </span>
                     <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase ${
                       camp.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
@@ -1518,10 +1670,37 @@ export const AdModerationPanel = () => {
                     </span>
                   </div>
                   <h4 className="text-sm font-bold text-white truncate">{camp.campaignTitle}</h4>
-                  <p className="text-xs text-slate-400 truncate">{camp.businessName}</p>
+                  <p className="text-xs text-slate-400 truncate">{camp.businessName || 'Verified Merchant'}</p>
                 </div>
               </div>
 
+              {/* Payment Verification Info Badge */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-bold">Payment Status:</span>
+                  <span className={`font-mono font-bold uppercase ${
+                    camp.paymentStatus === 'verified' ? 'text-emerald-400' : 'text-amber-400'
+                  }`}>
+                    {camp.paymentStatus || 'unpaid'}
+                  </span>
+                </div>
+                {camp.paymentTxId && (
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span>TxID: <span className="text-amber-300">{camp.paymentTxId}</span></span>
+                    <span>Amount: <span className="text-white font-bold">{camp.paymentAmountPi || camp.budgetPi || 0} Pi</span></span>
+                  </div>
+                )}
+              </div>
+
+              {/* Rejection Reason Callout */}
+              {camp.status === 'rejected' && camp.rejectionReason && (
+                <div className="p-3 bg-rose-950/40 border border-rose-500/30 rounded-xl text-xs space-y-0.5">
+                  <span className="font-bold text-rose-400 block">Rejection Reason:</span>
+                  <p className="text-slate-300 text-[11px]">{camp.rejectionReason}</p>
+                </div>
+              )}
+
+              {/* Performance Metrics */}
               <div className="grid grid-cols-3 gap-2 text-center p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-xs">
                 <div>
                   <div className="text-slate-500 text-[10px] uppercase font-bold">Impressions</div>
@@ -1537,6 +1716,7 @@ export const AdModerationPanel = () => {
                 </div>
               </div>
 
+              {/* Actions */}
               <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs gap-2">
                 <button
                   onClick={() => handleTogglePin(camp.id, camp.isPinned)}
@@ -1550,15 +1730,15 @@ export const AdModerationPanel = () => {
                 <div className="flex items-center gap-1.5">
                   {camp.status !== 'active' && (
                     <button
-                      onClick={() => handleUpdateStatus(camp.id, 'active')}
+                      onClick={() => handleUpdateStatus(camp, 'active')}
                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-bold uppercase transition-all shadow"
                     >
-                      Approve
+                      Approve & Go Live
                     </button>
                   )}
                   {camp.status === 'active' && (
                     <button
-                      onClick={() => handleUpdateStatus(camp.id, 'paused')}
+                      onClick={() => handleUpdateStatus(camp, 'paused')}
                       className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-bold uppercase transition-all shadow"
                     >
                       Pause
@@ -1566,7 +1746,7 @@ export const AdModerationPanel = () => {
                   )}
                   {camp.status !== 'rejected' && (
                     <button
-                      onClick={() => handleUpdateStatus(camp.id, 'rejected')}
+                      onClick={() => handleUpdateStatus(camp, 'rejected')}
                       className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl text-[10px] font-bold uppercase transition-all"
                     >
                       Reject

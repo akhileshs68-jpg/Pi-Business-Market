@@ -229,11 +229,11 @@ export const BusinessManagementPanel: React.FC = () => {
     await setDoc(logRef, payload);
   };
 
-  // Execute State Changes
+      // Execute State Changes
   const handleActionExecute = async () => {
     if (!selectedBiz) return;
-    if (!actionReason.trim()) {
-      alert('Please provide a reason for this administrative action.');
+    if ((actionType === 'Reject' || actionType === 'Suspend') && !actionReason.trim()) {
+      alert(`Please provide a mandatory reason for administrative ${actionType.toLowerCase()}.`);
       return;
     }
 
@@ -244,19 +244,21 @@ export const BusinessManagementPanel: React.FC = () => {
       let newVal = '';
       const nowIso = new Date().toISOString();
       const adminUid = user?.uid || 'admin';
+      const reasonToSave = actionReason.trim() || `Administrative ${actionType.toLowerCase()} action.`;
 
       switch (actionType) {
         case 'Verify':
         case 'Approve':
           updates = {
-            verificationStatus: 'Verified',
+            verificationStatus: 'Approved',
             approvalStatus: 'approved',
             businessStatus: 'active',
             status: 'active',
+            verified: true,
             approvedAt: nowIso,
             approvedBy: adminUid,
           };
-          newVal = 'Verified / Approved';
+          newVal = 'Approved';
           break;
         case 'Reject':
           updates = {
@@ -264,9 +266,10 @@ export const BusinessManagementPanel: React.FC = () => {
             approvalStatus: 'rejected',
             businessStatus: 'rejected',
             status: 'rejected',
+            verified: false,
             rejectedAt: nowIso,
             rejectedBy: adminUid,
-            rejectionReason: actionReason,
+            rejectionReason: reasonToSave,
           };
           newVal = 'Rejected';
           break;
@@ -278,16 +281,17 @@ export const BusinessManagementPanel: React.FC = () => {
             status: 'suspended',
             suspendedAt: nowIso,
             suspendedBy: adminUid,
-            suspensionReason: actionReason,
+            suspensionReason: reasonToSave,
           };
           newVal = 'Suspended';
           break;
         case 'Activate':
           updates = {
-            verificationStatus: 'Verified',
+            verificationStatus: 'Approved',
             approvalStatus: 'approved',
             businessStatus: 'active',
             status: 'active',
+            verified: true,
           };
           newVal = 'Active';
           break;
@@ -300,7 +304,7 @@ export const BusinessManagementPanel: React.FC = () => {
           break;
         case 'Delete':
           await deleteDoc(bizRef);
-          await logAdminAction(selectedBiz, 'Delete Business', selectedBiz.businessStatus, 'deleted', actionReason);
+          await logAdminAction(selectedBiz, 'Delete Business', selectedBiz.businessStatus, 'deleted', reasonToSave);
           setModalType(null);
           setSelectedBiz(null);
           setActionReason('');
@@ -318,12 +322,14 @@ export const BusinessManagementPanel: React.FC = () => {
       try {
         const appq = query(collection(db, 'universalApprovals'), where('entityId', '==', selectedBiz.id));
         const appSnap = await getDocs(appq);
-        appSnap.forEach(async (ad) => {
-          await setDoc(doc(db, 'universalApprovals', ad.id), {
-            status: actionType === 'Verify' || actionType === 'Approve' ? 'Approved' : actionType === 'Reject' ? 'Rejected' : 'On Hold',
-            updatedAt: nowIso
-          }, { merge: true });
-        });
+        if (!appSnap.empty) {
+          appSnap.forEach(async (ad) => {
+            await setDoc(doc(db, 'universalApprovals', ad.id), {
+              status: actionType === 'Verify' || actionType === 'Approve' ? 'Approved' : actionType === 'Reject' ? 'Rejected' : 'On Hold',
+              updatedAt: nowIso
+            }, { merge: true });
+          });
+        }
       } catch (appErr) {
         console.warn('Failed syncing universalApprovals record:', appErr);
       }
@@ -341,9 +347,9 @@ export const BusinessManagementPanel: React.FC = () => {
         const notifMsg = actionType === 'Verify' || actionType === 'Approve'
           ? `Congratulations! Your seller business profile "${selectedBiz.businessName}" has been approved.`
           : actionType === 'Reject'
-          ? `Your seller application for "${selectedBiz.businessName}" was rejected. Reason: ${actionReason}`
+          ? `Your seller application for "${selectedBiz.businessName}" was rejected. Reason: ${reasonToSave}`
           : actionType === 'Suspend'
-          ? `Your business profile "${selectedBiz.businessName}" has been suspended. Reason: ${actionReason}`
+          ? `Your business profile "${selectedBiz.businessName}" has been suspended. Reason: ${reasonToSave}`
           : `Your business profile "${selectedBiz.businessName}" status has been updated to ${newVal}.`;
 
         await notificationService.notify(
@@ -356,7 +362,7 @@ export const BusinessManagementPanel: React.FC = () => {
       }
 
       // Record immutable admin audit log
-      await logAdminAction(selectedBiz, `${actionType} Business`, oldVal, newVal, actionReason);
+      await logAdminAction(selectedBiz, `${actionType} Business`, oldVal, newVal, reasonToSave);
 
       setModalType(null);
       setSelectedBiz(null);
@@ -525,7 +531,7 @@ export const BusinessManagementPanel: React.FC = () => {
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>Pending Approvals</span>
             <span className="ml-1 px-1.5 py-0.2 bg-slate-950/40 rounded-full text-[10px]">
-              {businesses.filter(b => b.verificationStatus === 'Pending' || b.verificationStatus === 'Submitted' || b.verificationStatus === 'Under Review').length}
+              {businesses.filter(b => ['Pending', 'pending', 'Submitted', 'Under Review'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending').length}
             </span>
           </button>
 
@@ -567,6 +573,72 @@ export const BusinessManagementPanel: React.FC = () => {
         </div>
       </div>
 
+      {/* SELLER ACCOUNT APPROVAL QUEUE (DEDICATED CARDS SECTION) */}
+      {businesses.filter(b => ['Pending', 'pending', 'Submitted', 'Under Review', 'Pending Verification'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending').length > 0 && (
+        <div className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-6 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-amber-400" />
+              <h3 className="text-base font-black text-white tracking-tight uppercase">SELLER ACCOUNT APPROVAL QUEUE</h3>
+              <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-xs font-black">
+                {businesses.filter(b => ['Pending', 'pending', 'Submitted', 'Under Review', 'Pending Verification'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending').length} Action Required
+              </span>
+            </div>
+            <span className="text-xs text-amber-300 font-medium">Super Admin Direct Verification</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {businesses
+              .filter(b => ['Pending', 'pending', 'Submitted', 'Under Review', 'Pending Verification'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending')
+              .map(biz => (
+                <div key={biz.id} className="p-5 bg-slate-950 border border-amber-500/30 rounded-xl flex flex-col justify-between gap-4 shadow-xl">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-base font-bold text-white flex items-center gap-1.5">
+                          <Store className="w-4 h-4 text-amber-400" />
+                          {biz.businessName || biz.displayName}
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5">Category: <span className="text-indigo-400 font-semibold">{biz.category || 'General'}</span> | Type: <span className="text-slate-300 capitalize">{biz.businessType || 'Retail'}</span></p>
+                      </div>
+                      <span className="shrink-0 px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                        APPROVAL PENDING
+                      </span>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-400 space-y-1">
+                      <div>Owner/Seller: <span className="text-slate-200 font-medium">{biz.createdBy || biz.ownerUid}</span></div>
+                      <div>Location: <span className="text-slate-200 font-medium">{[biz.city, biz.state, biz.country].filter(Boolean).join(', ') || 'Global'}</span></div>
+                      <div>Registration Date: <span className="text-slate-200 font-medium">{biz.createdAt ? new Date(biz.createdAt).toLocaleDateString() : 'Recent'}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
+                    <button
+                      onClick={() => { setSelectedBiz(biz); setActionType('Approve'); setModalType('confirm_action'); }}
+                      className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" /> APPROVE
+                    </button>
+                    <button
+                      onClick={() => { setSelectedBiz(biz); setActionType('Reject'); setModalType('confirm_action'); }}
+                      className="flex-1 py-2 px-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-all shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer"
+                    >
+                      <XCircle className="w-3.5 h-3.5" /> REJECT
+                    </button>
+                    <button
+                      onClick={() => { setSelectedBiz(biz); setActionType('Suspend'); setModalType('confirm_action'); }}
+                      className="flex-1 py-2 px-2 bg-amber-600 hover:bg-amber-500 text-slate-950 rounded-lg font-black text-xs flex items-center justify-center gap-1 transition-all shadow-md shadow-amber-600/20 active:scale-95 cursor-pointer"
+                    >
+                      <Pause className="w-3.5 h-3.5" /> SUSPEND
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Main Businesses Table */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-sm">
         <div className="overflow-x-auto">
@@ -601,6 +673,10 @@ export const BusinessManagementPanel: React.FC = () => {
               ) : (
                 businesses.map(biz => {
                   const stats = businessStats[biz.id] || { stores: 0, products: 0, orders: 0, revenue: 0 };
+                  const isVerifiedOrApproved = biz.verificationStatus === 'Verified' || biz.verificationStatus === 'Approved' || (biz as any).approvalStatus === 'approved';
+                  const isRejected = biz.verificationStatus === 'Rejected' || (biz as any).approvalStatus === 'rejected';
+                  const isSuspended = biz.verificationStatus === 'Suspended' || biz.businessStatus === 'suspended' || (biz as any).approvalStatus === 'suspended';
+
                   return (
                     <tr key={biz.id} className="hover:bg-slate-800/20 transition-colors group">
                       {/* Name & Logo */}
@@ -643,20 +719,21 @@ export const BusinessManagementPanel: React.FC = () => {
 
                       {/* Verification Status */}
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          biz.verificationStatus === 'Verified' ? 'bg-emerald-500/15 text-emerald-400' :
-                          biz.verificationStatus === 'Rejected' ? 'bg-rose-500/15 text-rose-400' :
-                          'bg-amber-500/15 text-amber-400'
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          isVerifiedOrApproved ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                          isRejected ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' :
+                          isSuspended ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
+                          'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}>
-                          {biz.verificationStatus === 'Verified' ? <CheckCircle2 className="w-3 h-3" /> : null}
-                          {biz.verificationStatus === 'Rejected' ? <XCircle className="w-3 h-3" /> : null}
-                          {biz.verificationStatus || 'Pending'}
+                          {isVerifiedOrApproved ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : null}
+                          {isRejected ? <XCircle className="w-3 h-3 text-rose-400" /> : null}
+                          {isVerifiedOrApproved ? 'Approved' : isRejected ? 'Rejected' : isSuspended ? 'Suspended' : 'Approval Pending'}
                         </span>
                       </td>
 
                       {/* Active / Suspended */}
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold capitalize ${
                           biz.businessStatus === 'active' ? 'bg-emerald-500/10 text-emerald-400' :
                           biz.businessStatus === 'suspended' ? 'bg-rose-500/10 text-rose-400' :
                           'bg-slate-800 text-slate-400'
@@ -676,84 +753,77 @@ export const BusinessManagementPanel: React.FC = () => {
                       </td>
 
                       {/* Administrative actions */}
-                      <td className="px-5 py-4 text-right space-x-1 whitespace-nowrap">
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); setModalType('view'); }}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all"
-                          title="View Profile Details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        
-                        <button 
-                          onClick={() => handleEditClick(biz)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all"
-                          title="Edit Profile"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
+                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                          {/* Super Admin Direct Approvals Labeled Buttons */}
+                          <button 
+                            onClick={() => { setSelectedBiz(biz); setActionType('Approve'); setModalType('confirm_action'); }}
+                            disabled={isVerifiedOrApproved}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center gap-1 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            title="Approve Seller Account"
+                          >
+                            <CheckCircle2 className="w-3 h-3" /> APPROVE
+                          </button>
 
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); fetchBusinessAuditLogs(biz.id); setModalType('analytics'); }}
-                          className="p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg text-indigo-400 hover:text-indigo-300 transition-all"
-                          title="View Analytics & Logs"
-                        >
-                          <History className="w-3.5 h-3.5" />
-                        </button>
+                          <button 
+                            onClick={() => { setSelectedBiz(biz); setActionType('Reject'); setModalType('confirm_action'); }}
+                            disabled={isRejected}
+                            className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] flex items-center gap-1 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            title="Reject Seller Account"
+                          >
+                            <XCircle className="w-3 h-3" /> REJECT
+                          </button>
 
-                        <button 
-                          onClick={() => handleOpenSwitcher(biz)}
-                          className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg text-emerald-400 hover:text-emerald-300 transition-all"
-                          title="Open Business Dashboard (Switcher)"
-                        >
-                          <LogIn className="w-3.5 h-3.5" />
-                        </button>
+                          <button 
+                            onClick={() => { setSelectedBiz(biz); setActionType('Suspend'); setModalType('confirm_action'); }}
+                            disabled={isSuspended}
+                            className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-[10px] flex items-center gap-1 transition-all shadow-sm disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            title="Suspend Seller Account"
+                          >
+                            <Pause className="w-3 h-3" /> SUSPEND
+                          </button>
 
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); setActionType(biz.businessStatus === 'suspended' ? 'Activate' : 'Suspend'); setModalType('confirm_action'); }}
-                          className={`p-1.5 rounded-lg transition-all ${
-                            biz.businessStatus === 'suspended' 
-                              ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400' 
-                              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400'
-                          }`}
-                          title={biz.businessStatus === 'suspended' ? 'Activate Business' : 'Suspend Business'}
-                        >
-                          {biz.businessStatus === 'suspended' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                        </button>
+                          {/* Secondary options */}
+                          <button 
+                            onClick={() => { setSelectedBiz(biz); setModalType('view'); }}
+                            className="p-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all"
+                            title="View Profile Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
 
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); setActionType('Verify'); setModalType('confirm_action'); }}
-                          className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg text-emerald-400"
-                          disabled={biz.verificationStatus === 'Verified'}
-                          title="Verify Business"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        </button>
+                          <button 
+                            onClick={() => handleEditClick(biz)}
+                            className="p-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-all"
+                            title="Edit Profile"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
 
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); setActionType('Reject'); setModalType('confirm_action'); }}
-                          className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg text-rose-400"
-                          disabled={biz.verificationStatus === 'Rejected'}
-                          title="Reject Verification"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                        </button>
+                          <button 
+                            onClick={() => { setSelectedBiz(biz); fetchBusinessAuditLogs(biz.id); setModalType('analytics'); }}
+                            className="p-1 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg text-indigo-400 hover:text-indigo-300 transition-all"
+                            title="View Analytics & Audit Logs"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </button>
 
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); setActionType('Archive'); setModalType('confirm_action'); }}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-500 hover:text-slate-300"
-                          title="Archive Business"
-                        >
-                          <Archive className="w-3.5 h-3.5" />
-                        </button>
+                          <button 
+                            onClick={() => handleOpenSwitcher(biz)}
+                            className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg text-emerald-400 hover:text-emerald-300 transition-all"
+                            title="Open Business Dashboard (Switcher)"
+                          >
+                            <LogIn className="w-3.5 h-3.5" />
+                          </button>
 
-                        <button 
-                          onClick={() => { setSelectedBiz(biz); setActionType('Delete'); setModalType('confirm_action'); }}
-                          className="p-1.5 bg-rose-500/15 hover:bg-rose-500/30 rounded-lg text-rose-500 hover:text-rose-400"
-                          title="Delete Business Profile"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                          <button 
+                            onClick={() => { setSelectedBiz(biz); setActionType('Delete'); setModalType('confirm_action'); }}
+                            className="p-1 bg-rose-500/15 hover:bg-rose-500/30 rounded-lg text-rose-500 hover:text-rose-400"
+                            title="Delete Business Profile"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

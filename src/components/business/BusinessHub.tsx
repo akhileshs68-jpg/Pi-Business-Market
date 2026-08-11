@@ -170,6 +170,15 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
           </button>
 
           <button 
+            onClick={() => navigate('/home')} 
+            className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center gap-2"
+            title="Browse Marketplace as Buyer"
+          >
+            <StoreIcon className="w-4 h-4 text-violet-400" />
+            View Marketplace
+          </button>
+
+          <button 
             onClick={() => navigate(`/business/${business.id}/settings`)} 
             className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center gap-2"
           >

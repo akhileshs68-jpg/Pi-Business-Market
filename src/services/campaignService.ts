@@ -45,11 +45,38 @@ export type CampaignStatus =
   | 'completed'
   | 'expired';
 
+export type PaymentStatus =
+  | 'draft'
+  | 'pending_payment'
+  | 'verified'
+  | 'failed'
+  | 'refunded';
+
 export type CtaType = 
   | 'shop_now'
   | 'visit_store'
   | 'book_service'
   | 'learn_more';
+
+export type AdPricingTier =
+  | 'standard_banner'
+  | 'flash_sale_banner'
+  | 'featured_store'
+  | 'sponsored_ad';
+
+export interface AdPricingRates {
+  standard_banner: number;
+  flash_sale_banner: number;
+  featured_store: number;
+  sponsored_ad: number;
+}
+
+export const DEFAULT_AD_PRICING_RATES: AdPricingRates = {
+  standard_banner: 5,
+  flash_sale_banner: 10,
+  featured_store: 12,
+  sponsored_ad: 8
+};
 
 export interface Campaign {
   id: string;
@@ -71,6 +98,14 @@ export interface Campaign {
   isPinned?: boolean;
   isFeatured?: boolean;
   status: CampaignStatus;
+  paymentStatus?: PaymentStatus;
+  paymentTxId?: string;
+  paymentAmountPi?: number;
+  paymentMode?: 'TESTNET' | 'MAINNET';
+  durationDays?: number;
+  adPricingTier?: AdPricingTier;
+  rejectionReason?: string;
+  adminPriority?: number;
   startDate: string;
   endDate?: string;
   ctaType: CtaType;
@@ -346,17 +381,66 @@ export class CampaignService {
   }
 
   /**
-   * Admin updates campaign status (Approve, Reject, Pause, Resume, Expire)
+   * Get dynamic platform Ad Pricing Rates from Firestore or fallback to defaults
    */
-  public async updateCampaignStatus(campaignId: string, status: CampaignStatus, adminUid: string): Promise<void> {
+  public async getAdPricingRates(): Promise<AdPricingRates> {
+    try {
+      const db = getFirebaseDb();
+      const ref = doc(db, 'platformSettings', 'ad_pricing');
+      const snap = await getDoc(ref);
+      if (snap.exists() && snap.data().rates) {
+        return { ...DEFAULT_AD_PRICING_RATES, ...snap.data().rates };
+      }
+    } catch (err) {
+      console.warn('Failed to load ad pricing rates, using defaults:', err);
+    }
+    return DEFAULT_AD_PRICING_RATES;
+  }
+
+  /**
+   * Update platform Ad Pricing Rates (Super Admin only)
+   */
+  public async updateAdPricingRates(rates: Partial<AdPricingRates>, adminUid: string): Promise<void> {
+    const db = getFirebaseDb();
+    const ref = doc(db, 'platformSettings', 'ad_pricing');
+    await setDoc(ref, {
+      rates,
+      updatedAt: serverTimestamp(),
+      updatedBy: adminUid
+    }, { merge: true });
+
+    try {
+      const logRef = doc(collection(db, 'adminAuditLogs'));
+      await setDoc(logRef, {
+        action: 'UPDATE_AD_PRICING_RATES',
+        actorUid: adminUid,
+        newRates: rates,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Audit log creation warning:', err);
+    }
+  }
+
+  /**
+   * Mark campaign payment as verified after successful Pi Payment SDK transaction
+   */
+  public async verifyCampaignPayment(
+    campaignId: string, 
+    txid: string, 
+    paymentMode: 'TESTNET' | 'MAINNET', 
+    amountPi: number
+  ): Promise<void> {
     const db = getFirebaseDb();
     const ref = doc(db, 'campaigns', campaignId);
     await updateDoc(ref, {
-      status,
+      paymentStatus: 'verified',
+      paymentTxId: txid,
+      paymentMode,
+      paymentAmountPi: amountPi,
       updatedAt: serverTimestamp()
     });
 
-    // Notify merchant owner
     try {
       const snap = await getDoc(ref);
       if (snap.exists()) {
@@ -365,8 +449,62 @@ export class CampaignService {
           await notificationService.notify(
             camp.merchantId,
             'marketing_alert',
+            'Ad Payment Verified',
+            `Payment of ${amountPi} Pi for campaign "${camp.campaignTitle || 'Ad'}" was verified successfully. Pending Super Admin review.`,
+            { entityId: campaignId, entityType: 'campaign', linkTo: '/business/campaigns' }
+          );
+        }
+        await notificationService.notifyAdmins(
+          'marketing_alert',
+          'Paid Ad Campaign Ready for Review',
+          `Verified payment (${amountPi} Pi) for ad campaign "${camp.campaignTitle || 'Ad'}" by ${camp.businessName || 'Merchant'}.`,
+          { entityId: campaignId, entityType: 'campaign', linkTo: '/admin-console' }
+        );
+      }
+    } catch (err) {
+      console.warn('Notification error on campaign payment verification:', err);
+    }
+  }
+
+  /**
+   * Admin updates campaign status (Approve, Reject, Pause, Resume, Expire)
+   */
+  public async updateCampaignStatus(
+    campaignId: string, 
+    status: CampaignStatus, 
+    adminUid: string,
+    rejectionReason?: string
+  ): Promise<void> {
+    const db = getFirebaseDb();
+    const ref = doc(db, 'campaigns', campaignId);
+    
+    const updatePayload: any = {
+      status,
+      updatedAt: serverTimestamp()
+    };
+
+    if (status === 'active') {
+      updatePayload.isVerified = true;
+    }
+
+    if (rejectionReason) {
+      updatePayload.rejectionReason = rejectionReason;
+    }
+
+    await updateDoc(ref, updatePayload);
+
+    // Notify merchant owner
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const camp = snap.data();
+        if (camp.merchantId) {
+          const reasonMsg = status === 'rejected' && rejectionReason ? ` Reason: ${rejectionReason}` : '';
+          await notificationService.notify(
+            camp.merchantId,
+            'marketing_alert',
             `Campaign Status: ${status.toUpperCase()}`,
-            `Your campaign "${camp.campaignTitle || 'Ad'}" status has been updated to ${status.toUpperCase()}.`,
+            `Your campaign "${camp.campaignTitle || 'Ad'}" status has been updated to ${status.toUpperCase()}.${reasonMsg}`,
             { entityId: campaignId, entityType: 'campaign', linkTo: '/business/campaigns' }
           );
         }
@@ -383,6 +521,7 @@ export class CampaignService {
         actorUid: adminUid,
         targetId: campaignId,
         newStatus: status,
+        rejectionReason: rejectionReason || null,
         timestamp: serverTimestamp()
       });
     } catch (err) {
