@@ -239,7 +239,7 @@ export const ProfilePage: React.FC = () => {
   const isSuperAdmin = roleResolver.isSuperAdmin();
   const canonicalRole = roleResolver.getCanonicalRole();
   const activeRoleView = (user as any)?.activeRole || canonicalRole;
-  const platformRoleVal = user?.platformRole || (isSuperAdmin ? 'superadmin' : (user?.role || 'buyer'));
+  const platformRoleVal = isSuperAdmin ? 'superadmin' : (user?.platformRole || user?.role || 'buyer');
   const businessRoleVal = user?.businessRole || (roleResolver.isBusinessOwner() ? 'Business Owner' : (roleResolver.isSeller() ? 'Seller' : 'Customer'));
   const allResolvedRoles = Array.from(roleResolver.getResolvedRoles());
   const activePermissionsCount = permissions?.length || 12;
@@ -401,7 +401,7 @@ export const ProfilePage: React.FC = () => {
 
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-2">Platform:</span>
               <span className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-300 font-mono text-[10px] uppercase rounded-md">
-                {platformRoleVal}
+                {platformRoleVal === 'superadmin' ? 'SUPER ADMIN' : platformRoleVal === 'user' ? 'USER' : platformRoleVal}
               </span>
 
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-2">Business:</span>
@@ -551,7 +551,7 @@ export const ProfilePage: React.FC = () => {
                   </div>
                   <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80">
                     <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500 block">Platform Role</span>
-                    <p className="text-xs font-bold text-white mt-1 capitalize font-mono">{platformRoleVal}</p>
+                    <p className="text-xs font-bold text-white mt-1 uppercase font-mono">{platformRoleVal === 'superadmin' ? 'SUPER ADMIN' : platformRoleVal === 'user' ? 'USER' : platformRoleVal}</p>
                   </div>
                   <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800/80">
                     <span className="text-[9px] uppercase font-bold tracking-widest text-slate-500 block">Business Role</span>

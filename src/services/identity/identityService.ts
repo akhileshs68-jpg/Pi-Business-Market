@@ -112,7 +112,7 @@ export class IdentityService {
         identity.uid = piUid;
       }
       identity.roles = ['buyer', 'seller', 'business_owner', 'service_provider'];
-      identity.platformRole = isOwner ? 'superadmin' : 'user';
+      identity.platformRole = (identity.platformRole === 'superadmin' || isOwner) ? 'superadmin' : 'user';
       if (!identity.activeRole) {
         identity.activeRole = 'buyer';
       }

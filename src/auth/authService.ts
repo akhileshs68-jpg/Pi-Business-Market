@@ -631,13 +631,17 @@ export const authService = {
     }
 
     // Update / Save stored user with verified values
+    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const isSuperAdminUser = existingFirestoreUser?.platformRole === 'superadmin' || 
+                             storedUser?.platformRole === 'superadmin' || 
+                             (Boolean(superAdminPiUid) && (piUid === superAdminPiUid || username === superAdminPiUid));
     const freshUser: User = {
       uid: piUid,
       piUid: piUid,
       username: username,
       displayName: username,
       walletAddress: existingFirestoreUser?.walletAddress || storedUser?.walletAddress || `PI_WAL_${piUid.substring(0, 12)}`,
-      platformRole: existingFirestoreUser?.platformRole || storedUser?.platformRole || 'user',
+      platformRole: isSuperAdminUser ? 'superadmin' : 'user',
       permissions: existingFirestoreUser?.permissions || storedUser?.permissions || ['read:listings', 'create:orders'],
       roles: existingFirestoreUser?.roles || storedUser?.roles || ['buyer', 'seller', 'business_owner', 'service_provider'],
       activeRole: existingFirestoreUser?.activeRole || existingFirestoreUser?.role || storedUser?.activeRole || 'buyer',
