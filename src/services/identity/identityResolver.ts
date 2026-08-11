@@ -351,7 +351,7 @@ export class IdentityResolver {
     const resolvedRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];
 
     // activeRole is only the currently selected capability and must always be one of the four
-    let activeRole = 'buyer';
+    let activeRole = isSuperAdmin ? 'business_owner' : 'buyer';
     const rawActive = data.activeRole || data.role;
     if (rawActive) {
       const normalized = rawActive.toLowerCase().trim().replace(/[\s_-]/g, '_');

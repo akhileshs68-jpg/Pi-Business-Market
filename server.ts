@@ -524,8 +524,12 @@ async function startServer() {
     console.log("[Firebase Admin Audit] Verifying Firestore Admin connection before server startup...");
     const db = getDb();
     if (db) {
-      const collections = await db.listCollections();
-      console.log(`[Firebase Admin Audit SUCCESS] Firestore Admin connection verified. Collections count: ${collections.length}`);
+      try {
+        const collections = await db.listCollections();
+        console.log(`[Firebase Admin Audit SUCCESS] Firestore Admin connection verified. Collections count: ${collections.length}`);
+      } catch (listErr: any) {
+        console.warn(`[Firebase Admin Audit WARNING] listCollections failed (likely lack of broad database metadata permission): ${listErr.message || listErr}. Continuing with document operations.`);
+      }
 
       // Authoritative superadmin user provisioning
       const adminUid = getSuperAdminUid();
@@ -600,7 +604,7 @@ async function startServer() {
             html = await vite.transformIndexHtml(req.url, html);
             // Inject dynamically generated window.__APP_URL__ and window.__SUPER_ADMIN_PI_UID__
             const superAdminUid = getSuperAdminUid();
-            html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
+            html = html.replace(/<\s*head\s*>/i, `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
             res.setHeader("Content-Type", "text/html");
             return res.status(200).send(html);
           }
@@ -630,7 +634,7 @@ async function startServer() {
       if (fs.existsSync(indexPath)) {
         let html = fs.readFileSync(indexPath, "utf-8");
         const superAdminUid = getSuperAdminUid();
-        html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
+        html = html.replace(/<\s*head\s*>/i, `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
         return res.setHeader("Content-Type", "text/html").send(html);
       }
       res.sendFile(indexPath);
@@ -694,6 +698,103 @@ app.post(["/api/auth/pi", "/auth/pi"], async (req, res) => {
         error: "Pi authentication failed",
         details: error.response?.data || error.message,
       });
+    }
+  });
+
+  // Auth Synchronization & Elevation Endpoint (server-side authoritative state management)
+  app.post(["/api/auth/sync", "/auth/sync"], async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split('Bearer ')[1]?.trim() : null;
+      if (!token) {
+        return res.status(401).json({ error: "Unauthorized: Missing Bearer Token" });
+      }
+
+      const db = getDb();
+      if (!db) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+
+      let decodedToken: any;
+      try {
+        decodedToken = await getAuth().verifyIdToken(token);
+      } catch (err: any) {
+        console.error("[Backend Auth Sync] verifyIdToken failed:", err?.message || err);
+        return res.status(401).json({ error: "Unauthorized: Invalid token", details: err?.message });
+      }
+
+      const authenticatedFirebaseUid = decodedToken.uid;
+      if (!authenticatedFirebaseUid) {
+        return res.status(401).json({ error: "Unauthorized: Invalid token payload" });
+      }
+
+      // Resolve the authenticated Pi identity from the already verified authentication/session mechanism used by this application
+      const pointerRef = db.collection("users").doc(authenticatedFirebaseUid);
+      const pointerSnap = await pointerRef.get();
+      if (!pointerSnap.exists) {
+        return res.status(403).json({ error: "Forbidden: No verified session pointer found. Please log in first." });
+      }
+
+      const pointerData = pointerSnap.data();
+      const verifiedPiUid = pointerData?.piUid;
+      const verifiedUsername = pointerData?.username;
+
+      if (!verifiedPiUid || !verifiedUsername) {
+        return res.status(400).json({ error: "Invalid session pointer data" });
+      }
+
+      const superAdminUid = getSuperAdminUid();
+      const isSuperAdmin = (Boolean(superAdminUid) && (verifiedPiUid === superAdminUid || verifiedUsername === superAdminUid));
+
+      console.log(`[Backend Auth Sync] Checking user sync for @${verifiedUsername} (verifiedPiUid: ${verifiedPiUid}, firebaseUid: ${authenticatedFirebaseUid}). isSuperAdmin: ${isSuperAdmin}`);
+
+      // Update canonical user document
+      const canonicalRef = db.collection("users").doc(verifiedPiUid);
+      const canonicalSnap = await canonicalRef.get();
+      
+      const canonicalData: any = {
+        uid: verifiedPiUid,
+        piUid: verifiedPiUid,
+        username: verifiedUsername,
+        displayName: verifiedUsername,
+        verified: true,
+        status: "active",
+        updatedAt: new Date().toISOString()
+      };
+
+      if (isSuperAdmin) {
+        canonicalData.platformRole = "superadmin";
+        // Ensure we don't overwrite if they already switched activeRole, but if new or empty, set to business_owner
+        if (!canonicalSnap.exists || !canonicalSnap.data()?.activeRole) {
+          canonicalData.activeRole = "business_owner";
+          canonicalData.role = "Super Admin";
+        }
+      }
+
+      if (!canonicalSnap.exists) {
+        canonicalData.createdAt = new Date().toISOString();
+        canonicalData.roles = ["buyer", "seller", "business_owner", "service_provider"];
+        canonicalData.permissions = ["read:listings", "create:orders"];
+        await canonicalRef.set(canonicalData);
+      } else {
+        await canonicalRef.update(canonicalData);
+      }
+
+      // Update platformRole on the pointer document too if isSuperAdmin
+      if (isSuperAdmin) {
+        await pointerRef.update({
+          platformRole: "superadmin",
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      res.json({
+        success: true,
+        platformRole: isSuperAdmin ? "superadmin" : "user"
+      });
+    } catch (error: any) {
+      console.error("[Backend Auth Sync] Sync error:", error.message || error);
+      res.status(500).json({ error: "Synchronization failed", details: error.message });
     }
   });
 

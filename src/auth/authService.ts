@@ -479,6 +479,22 @@ export const authService = {
    */
   async verifyAndSynchronizePiAccount(forceRefresh: boolean = true): Promise<{ verifiedUser: User; piAuth: any }> {
     console.log('[PI_VERIFY_STEP 1/10] Initiating Pi Network authentication check...');
+    
+    // Ensure we are signed in anonymously to Firebase Auth beforehand
+    try {
+      const auth = getFirebaseAuth();
+      if (auth && !auth.currentUser) {
+        console.log('[AuthService] No active Firebase Auth user. Signing in anonymously...');
+        const userCredential = await signInAnonymously(auth);
+        if (userCredential?.user?.uid) {
+          localStorage.setItem('last_resolved_uid', userCredential.user.uid);
+          console.log('[AuthService] Firebase Auth anonymous sign-in successful. UID:', userCredential.user.uid);
+        }
+      }
+    } catch (authErr) {
+      console.warn('[AuthService] Pre-sign in anonymous Firebase auth error:', authErr);
+    }
+
     const isRealPi = isRealPiBrowser();
     console.log('[PI_VERIFY_STEP 1/10] Runtime environment check - isRealPiBrowser:', isRealPi);
 
@@ -635,7 +651,7 @@ export const authService = {
     const isSuperAdminUser = existingFirestoreUser?.platformRole === 'superadmin' || 
                              storedUser?.platformRole === 'superadmin' || 
                              (Boolean(superAdminPiUid) && (piUid === superAdminPiUid || username === superAdminPiUid));
-    const freshUser: User = {
+    let freshUser: User = {
       uid: piUid,
       piUid: piUid,
       username: username,
@@ -644,8 +660,8 @@ export const authService = {
       platformRole: isSuperAdminUser ? 'superadmin' : 'user',
       permissions: existingFirestoreUser?.permissions || storedUser?.permissions || ['read:listings', 'create:orders'],
       roles: existingFirestoreUser?.roles || storedUser?.roles || ['buyer', 'seller', 'business_owner', 'service_provider'],
-      activeRole: existingFirestoreUser?.activeRole || existingFirestoreUser?.role || storedUser?.activeRole || 'buyer',
-      role: existingFirestoreUser?.role || existingFirestoreUser?.activeRole || storedUser?.role || 'buyer',
+      activeRole: existingFirestoreUser?.activeRole || existingFirestoreUser?.role || storedUser?.activeRole || (isSuperAdminUser ? 'business_owner' : 'buyer'),
+      role: existingFirestoreUser?.role || existingFirestoreUser?.activeRole || storedUser?.role || (isSuperAdminUser ? 'business_owner' : 'buyer'),
       accountType: existingFirestoreUser?.accountType || storedUser?.accountType || 'individual',
       verified: true,
       kycVerified: existingFirestoreUser?.kycVerified !== undefined ? existingFirestoreUser.kycVerified : true,
@@ -695,10 +711,56 @@ export const authService = {
           }, { merge: true });
         }
 
-        // Verify read back from Firestore
+        // Retrieve current Firebase ID token and authoritatively sync with backend (e.g. for superadmin elevation)
+        let idToken: string | null = null;
+        try {
+          if (auth && auth.currentUser) {
+            console.log('[AuthService] Retrieving current Firebase ID token...');
+            idToken = await auth.currentUser.getIdToken(true);
+          }
+        } catch (tokenErr) {
+          console.warn('[AuthService] Failed to retrieve Firebase ID token:', tokenErr);
+        }
+
+        if (idToken) {
+          try {
+            console.log('[AuthService] Authoritatively synchronizing session with backend via secure Firebase ID token...');
+            const syncRes = await fetch(getAbsoluteUrl('/api/auth/sync'), {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+              }
+            });
+            if (syncRes.ok) {
+              const syncData = await syncRes.json();
+              console.log('[AuthService] Secure backend auth synchronization successful. platformRole:', syncData.platformRole);
+            } else {
+              console.warn('[AuthService] Backend auth synchronization returned non-200 status:', syncRes.status);
+            }
+          } catch (syncErr) {
+            console.warn('[AuthService] Backend auth synchronization failed:', syncErr);
+          }
+        }
+
+        // Verify read back from Firestore (will contain any server-updated fields like platformRole)
         const readSnap = await getDoc(doc(db, 'users', piUid));
         const readData = readSnap.exists() ? readSnap.data() : null;
         console.log('[VALUE_READ_FROM_FIRESTORE]', readData);
+        if (readData) {
+          // Update the local storage / memory state with the authoritative server-side values (such as platformRole, activeRole, etc.)
+          freshUser = {
+            ...freshUser,
+            platformRole: readData.platformRole || freshUser.platformRole,
+            activeRole: readData.activeRole || freshUser.activeRole,
+            role: readData.role || freshUser.role,
+            permissions: readData.permissions || freshUser.permissions,
+            roles: readData.roles || freshUser.roles,
+          };
+          PiBusinessMarketDB.setCurrentUser(freshUser);
+          latestVerifiedPiUser = freshUser;
+          console.log('[AuthService] Updated local user state from authoritative Firestore read-back:', freshUser);
+        }
       }
     } catch (fsErr) {
       console.warn('[PI_VERIFY_STEP 8/10] Firestore unavailable:', fsErr);
