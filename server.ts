@@ -48,6 +48,23 @@ const getPiApiKey = (): { key: string | null; isConfigured: boolean } => {
   return { key: isConfigured ? apiKey!.trim() : null, isConfigured };
 };
 
+// Helper to retrieve the secure platform-owner Pi UID from environment or config fallback
+const getSuperAdminUid = (): string => {
+  let uid = process.env.VITE_SUPER_ADMIN_PI_UID || "";
+  if (!uid) {
+    try {
+      const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+        uid = config.VITE_SUPER_ADMIN_PI_UID || config.superAdminPiUid || "";
+      }
+    } catch (e) {
+      console.warn("[Firebase Admin Audit] Error reading VITE_SUPER_ADMIN_PI_UID from config file:", e);
+    }
+  }
+  return uid ? uid.trim() : "";
+};
+
 const initFirebaseAdmin = (): any => {
   if (getApps().length > 0) {
     return getApps()[0];
@@ -509,6 +526,42 @@ async function startServer() {
     if (db) {
       const collections = await db.listCollections();
       console.log(`[Firebase Admin Audit SUCCESS] Firestore Admin connection verified. Collections count: ${collections.length}`);
+
+      // Authoritative superadmin user provisioning
+      const adminUid = getSuperAdminUid();
+      if (adminUid) {
+        console.log(`[Firebase Admin Audit] Server-side provisioning check for superadmin: ${adminUid}`);
+        const userRef = db.collection("users").doc(adminUid);
+        const docSnap = await userRef.get();
+        if (!docSnap.exists) {
+          console.log(`[Firebase Admin Audit] Superadmin document not found. Provisioning fresh superadmin: ${adminUid}`);
+          await userRef.set({
+            uid: adminUid,
+            piUid: adminUid,
+            username: adminUid,
+            displayName: adminUid,
+            platformRole: "superadmin",
+            activeRole: "business_owner",
+            role: "Super Admin",
+            roles: ["buyer", "seller", "business_owner", "service_provider"],
+            permissions: ["read:listings", "create:orders", "admin:access"],
+            status: "active",
+            verified: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          const data = docSnap.data();
+          if (data && data.platformRole !== "superadmin") {
+            console.log(`[Firebase Admin Audit] Elevating existing user to superadmin platformRole: ${adminUid}`);
+            await userRef.update({
+              platformRole: "superadmin",
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }
+        console.log(`[Firebase Admin Audit SUCCESS] Secure platform role verification completed for superadmin: ${adminUid}`);
+      }
     } else {
       console.warn("[Firebase Admin Audit WARNING] getDb() returned null during startup check.");
     }
@@ -546,7 +599,7 @@ async function startServer() {
             // Transform HTML with Vite (injects dev script, HMR, styling, etc.)
             html = await vite.transformIndexHtml(req.url, html);
             // Inject dynamically generated window.__APP_URL__ and window.__SUPER_ADMIN_PI_UID__
-            const superAdminUid = process.env.VITE_SUPER_ADMIN_PI_UID || "";
+            const superAdminUid = getSuperAdminUid();
             html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
             res.setHeader("Content-Type", "text/html");
             return res.status(200).send(html);
@@ -576,7 +629,7 @@ async function startServer() {
       const indexPath = path.join(distPath, "index.html");
       if (fs.existsSync(indexPath)) {
         let html = fs.readFileSync(indexPath, "utf-8");
-        const superAdminUid = process.env.VITE_SUPER_ADMIN_PI_UID || "";
+        const superAdminUid = getSuperAdminUid();
         html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
         return res.setHeader("Content-Type", "text/html").send(html);
       }

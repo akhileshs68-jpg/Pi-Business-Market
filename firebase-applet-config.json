@@ -8,5 +8,6 @@
   "messagingSenderId": "87895877897",
   "measurementId": "",
   "oAuthClientId": "87895877897-abrddbjl2d3l6r63hjh6naiaemdb792l.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "recaptchaSiteKey": "",
+  "VITE_SUPER_ADMIN_PI_UID": "akhileshs68"
 }
