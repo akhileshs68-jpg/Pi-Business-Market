@@ -545,8 +545,9 @@ async function startServer() {
             let html = fs.readFileSync(indexPath, "utf-8");
             // Transform HTML with Vite (injects dev script, HMR, styling, etc.)
             html = await vite.transformIndexHtml(req.url, html);
-            // Inject dynamically generated window.__APP_URL__
-            html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
+            // Inject dynamically generated window.__APP_URL__ and window.__SUPER_ADMIN_PI_UID__
+            const superAdminUid = process.env.VITE_SUPER_ADMIN_PI_UID || "";
+            html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
             res.setHeader("Content-Type", "text/html");
             return res.status(200).send(html);
           }
@@ -575,7 +576,8 @@ async function startServer() {
       const indexPath = path.join(distPath, "index.html");
       if (fs.existsSync(indexPath)) {
         let html = fs.readFileSync(indexPath, "utf-8");
-        html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
+        const superAdminUid = process.env.VITE_SUPER_ADMIN_PI_UID || "";
+        html = html.replace("<head>", `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
         return res.setHeader("Content-Type", "text/html").send(html);
       }
       res.sendFile(indexPath);

@@ -21,7 +21,8 @@ function injectAppUrlPlugin(): Plugin {
         appUrl = `${protocol}://${host}`;
       }
       if (appUrl) {
-        return html.replace('<head>', `<head><script>window.__APP_URL__ = "${appUrl}";</script>`);
+        const superAdminUid = process.env.VITE_SUPER_ADMIN_PI_UID || "";
+        return html.replace('<head>', `<head><script>window.__APP_URL__ = "${appUrl}"; window.__SUPER_ADMIN_PI_UID__ = "${superAdminUid}";</script>`);
       }
       return html;
     },

@@ -336,7 +336,7 @@ export class IdentityResolver {
       ? rawDisplayName 
       : cleanUsername;
 
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
     const isDevMock = (cleanPiUid === 'dev_pioneer_mock' || cleanUsername === 'dev_pioneer_mock') && (
       (import.meta as any).env?.VITE_ENABLE_DEV_MOCK === 'true' ||
       (typeof window !== 'undefined' && localStorage.getItem('DEV_MOCK_AUTH_ENABLED') === 'true') ||

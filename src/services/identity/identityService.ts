@@ -58,7 +58,7 @@ export class IdentityService {
     const cleanPiUid = (!identityResolver.isPlaceholder(resolvedPiUid)) ? resolvedPiUid : cleanUsername;
     const cleanDisplayName = (!identityResolver.isPlaceholder(displayName) && displayName !== 'Pioneer') ? displayName : cleanUsername;
 
-    const superAdminPiUid = (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
+    const superAdminPiUid = (typeof window !== 'undefined' && (window as any).__SUPER_ADMIN_PI_UID__) || (import.meta.env?.VITE_SUPER_ADMIN_PI_UID) || '';
     const isOwner = superAdminPiUid ? (cleanUsername === superAdminPiUid || cleanPiUid === superAdminPiUid || uid === superAdminPiUid) : false;
 
     if (!identity) {
