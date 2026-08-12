@@ -1449,14 +1449,16 @@ export const AdModerationPanel = () => {
 
   const handleSaveRates = async () => {
     try {
-      const { campaignService } = await import('../../services/campaignService');
-      await campaignService.updateAdPricingRates(editingRates, user?.uid || 'sys_admin');
-      setRates(editingRates);
+      const { campaignService, DEFAULT_AD_PRICING_RATES } = await import('../../services/campaignService');
+      const ratesToSave = { ...DEFAULT_AD_PRICING_RATES, ...(rates || {}), ...(editingRates || {}) };
+      await campaignService.updateAdPricingRates(ratesToSave, user?.uid || '');
+      setRates(ratesToSave);
+      setEditingRates(ratesToSave);
       setShowRatesConfig(false);
       alert('Ad Pricing Rates updated successfully!');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed updating rates:', e);
-      alert('Failed to update ad pricing rates.');
+      alert(`Failed to update ad pricing rates: ${e?.message || e || 'Unknown error'}`);
     }
   };
 
@@ -1552,8 +1554,8 @@ export const AdModerationPanel = () => {
               <label className="text-slate-400 font-bold block mb-1">Standard Banner (Pi/day)</label>
               <input 
                 type="number"
-                value={editingRates?.standard_banner || 5}
-                onChange={e => setEditingRates({ ...editingRates, standard_banner: Number(e.target.value) })}
+                value={editingRates?.standard_banner ?? 5}
+                onChange={e => setEditingRates({ ...(editingRates || {}), standard_banner: Number(e.target.value) })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
               />
             </div>
@@ -1562,8 +1564,8 @@ export const AdModerationPanel = () => {
               <label className="text-slate-400 font-bold block mb-1">Flash Sale Banner (Pi/day)</label>
               <input 
                 type="number"
-                value={editingRates?.flash_sale_banner || 10}
-                onChange={e => setEditingRates({ ...editingRates, flash_sale_banner: Number(e.target.value) })}
+                value={editingRates?.flash_sale_banner ?? 10}
+                onChange={e => setEditingRates({ ...(editingRates || {}), flash_sale_banner: Number(e.target.value) })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
               />
             </div>
@@ -1572,8 +1574,8 @@ export const AdModerationPanel = () => {
               <label className="text-slate-400 font-bold block mb-1">Featured Store (Pi/day)</label>
               <input 
                 type="number"
-                value={editingRates?.featured_store || 12}
-                onChange={e => setEditingRates({ ...editingRates, featured_store: Number(e.target.value) })}
+                value={editingRates?.featured_store ?? 12}
+                onChange={e => setEditingRates({ ...(editingRates || {}), featured_store: Number(e.target.value) })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
               />
             </div>
@@ -1582,8 +1584,38 @@ export const AdModerationPanel = () => {
               <label className="text-slate-400 font-bold block mb-1">Sponsored Hero Ad (Pi/day)</label>
               <input 
                 type="number"
-                value={editingRates?.sponsored_ad || 8}
-                onChange={e => setEditingRates({ ...editingRates, sponsored_ad: Number(e.target.value) })}
+                value={editingRates?.sponsored_ad ?? 8}
+                onChange={e => setEditingRates({ ...(editingRates || {}), sponsored_ad: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Featured Service (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.featured_service ?? 8}
+                onChange={e => setEditingRates({ ...(editingRates || {}), featured_service: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Community Announcement (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.community_announcement ?? 3}
+                onChange={e => setEditingRates({ ...(editingRates || {}), community_announcement: Number(e.target.value) })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-slate-400 font-bold block mb-1">Pi Ecosystem Feature (Pi/day)</label>
+              <input 
+                type="number"
+                value={editingRates?.pi_ecosystem ?? 15}
+                onChange={e => setEditingRates({ ...(editingRates || {}), pi_ecosystem: Number(e.target.value) })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-violet-500"
               />
             </div>

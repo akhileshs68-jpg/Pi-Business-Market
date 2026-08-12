@@ -257,32 +257,34 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
       </div>
 
       {/* Navigation Sub-Tabs Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-800/80">
-        {navigationTabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id as any)}
-              className={`px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2.5 border ${
-                active
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-                  : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-              }`}
-            >
-              <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-slate-400'}`} />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                  active ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      <div className="w-full min-w-0 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-800/80 touch-pan-x">
+        <div className="inline-flex items-center gap-2 w-max min-w-max flex-nowrap">
+          {navigationTabs.map(tab => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id as any)}
+                className={`shrink-0 px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2.5 border ${
+                  active
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                    : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-slate-400'}`} />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    active ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* TAB 1: COMMAND HUB OVERVIEW */}

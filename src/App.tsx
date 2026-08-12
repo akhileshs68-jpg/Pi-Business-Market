@@ -114,7 +114,7 @@ function App() {
           <Route 
             path="/dashboard" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'service_provider', 'superadmin']}>
                 <MyWorkspace />
               </ProtectedRoute>
             } 
@@ -122,7 +122,7 @@ function App() {
           <Route 
             path="/catalog" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <CatalogManagement />
               </ProtectedRoute>
             } 
@@ -130,7 +130,7 @@ function App() {
           <Route 
             path="/business-center" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['business_owner', 'seller_admin', 'superadmin']}>
                 <BusinessDashboard />
               </ProtectedRoute>
             } 
@@ -138,7 +138,7 @@ function App() {
           <Route 
             path="/my-business" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['business_owner', 'seller_admin', 'superadmin']}>
                 <BusinessDashboard />
               </ProtectedRoute>
             } 
@@ -167,12 +167,12 @@ function App() {
           />
 
           <Route path="/store-dashboard" element={<Navigate to="/seller-dashboard" replace />} />
-          <Route path="/seller-dashboard" element={<ProtectedRoute><StoreDashboard /></ProtectedRoute>} />
-          <Route path="/seller-dashboard/:businessId" element={<ProtectedRoute><StoreDashboard /></ProtectedRoute>} />
+          <Route path="/seller-dashboard" element={<ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}><StoreDashboard /></ProtectedRoute>} />
+          <Route path="/seller-dashboard/:businessId" element={<ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}><StoreDashboard /></ProtectedRoute>} />
           <Route 
             path="/services" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['service_provider', 'business_owner', 'seller_admin', 'superadmin']}>
                 <ServiceManagement />
               </ProtectedRoute>
             } 
@@ -181,7 +181,7 @@ function App() {
           <Route 
             path="/warehouses" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <WarehouseDashboard />
               </ProtectedRoute>
             } 
@@ -189,16 +189,8 @@ function App() {
           <Route 
             path="/inventory" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <InventoryDashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/services" 
-            element={
-              <ProtectedRoute>
-                <ServiceManagement />
               </ProtectedRoute>
             } 
           />
@@ -213,7 +205,7 @@ function App() {
           <Route 
             path="/employer/jobs" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['business_owner', 'employer', 'seller_admin', 'superadmin']}>
                 <EmployerDashboard />
               </ProtectedRoute>
             } 
@@ -281,7 +273,7 @@ function App() {
           <Route 
             path="/business-orders" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <BusinessOrderDashboard />
               </ProtectedRoute>
             } 
@@ -289,7 +281,7 @@ function App() {
           <Route 
             path="/business-payments" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <MerchantPayments />
               </ProtectedRoute>
             } 
@@ -313,7 +305,7 @@ function App() {
           <Route 
             path="/logistics" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <FulfillmentCenter />
               </ProtectedRoute>
             } 
@@ -321,7 +313,7 @@ function App() {
           <Route 
             path="/shipment/:shipmentId" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <ShipmentDetails />
               </ProtectedRoute>
             } 
@@ -329,7 +321,7 @@ function App() {
           <Route 
             path="/crm" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <MerchantCRM />
               </ProtectedRoute>
             } 
@@ -337,7 +329,7 @@ function App() {
           <Route 
             path="/crm/customer/:customerId" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <Customer360 />
               </ProtectedRoute>
             } 
@@ -369,7 +361,7 @@ function App() {
           <Route 
             path="/store/:storeId/products" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <StoreDashboard />
               </ProtectedRoute>
             } 
@@ -377,7 +369,7 @@ function App() {
           <Route 
             path="/store/:storeId" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <StoreDashboard />
               </ProtectedRoute>
             } 
@@ -385,7 +377,7 @@ function App() {
           <Route 
             path="/merchant-analytics" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['seller', 'seller_admin', 'business_owner', 'superadmin']}>
                 <MerchantAnalytics />
               </ProtectedRoute>
             } 

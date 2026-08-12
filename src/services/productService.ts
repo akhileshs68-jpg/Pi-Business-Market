@@ -208,14 +208,16 @@ export const productService = {
       const storesSnap = await getDocs(storesQuery);
       const validStoreDoc = storesSnap.docs.find(d => {
         const data = d.data();
-        return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || isInvalid(ownerId));
-      }) || storesSnap.docs[0];
+        return data.status !== 'deleted' && !isInvalid(ownerId) && (data.ownerId === ownerId || data.ownerUid === ownerId || data.userId === ownerId || data.sellerId === ownerId);
+      });
 
       if (validStoreDoc) {
         selectedStore = validStoreDoc.data();
         finalStoreId = validStoreDoc.id;
         if (isInvalid(finalBusinessId)) finalBusinessId = selectedStore.businessId;
         if (isInvalid(ownerId)) ownerId = selectedStore.ownerId || selectedStore.ownerUid;
+      } else {
+        throw new Error("Please select or create your store before adding a product.");
       }
     }
 
@@ -225,13 +227,15 @@ export const productService = {
       const bizSnap = await getDocs(bizQuery);
       const validBizDoc = bizSnap.docs.find(d => {
         const data = d.data();
-        return data.status !== 'deleted' && (data.ownerUid === ownerId || data.ownerId === ownerId || isInvalid(ownerId));
-      }) || bizSnap.docs[0];
+        return data.status !== 'deleted' && !isInvalid(ownerId) && (data.ownerUid === ownerId || data.ownerId === ownerId || data.userId === ownerId);
+      });
 
       if (validBizDoc) {
         finalBusinessId = validBizDoc.id;
         const bData = validBizDoc.data() as any;
         if (isInvalid(ownerId)) ownerId = bData.ownerUid || bData.ownerId;
+      } else {
+        throw new Error("Please select or create your business before adding a product.");
       }
     }
 
@@ -414,14 +418,16 @@ export const productService = {
       const storesSnap = await getDocs(storesQuery);
       const validStoreDoc = storesSnap.docs.find(d => {
         const data = d.data();
-        return data.status !== 'deleted' && (data.ownerId === ownerId || data.ownerUid === ownerId || isInvalid(ownerId));
-      }) || storesSnap.docs[0];
+        return data.status !== 'deleted' && !isInvalid(ownerId) && (data.ownerId === ownerId || data.ownerUid === ownerId || data.userId === ownerId || data.sellerId === ownerId);
+      });
 
       if (validStoreDoc) {
         selectedStore = validStoreDoc.data();
         finalStoreId = validStoreDoc.id;
         if (isInvalid(finalBusinessId)) finalBusinessId = selectedStore.businessId;
         if (isInvalid(ownerId)) ownerId = selectedStore.ownerId || selectedStore.ownerUid;
+      } else {
+        throw new Error("Please select or create your store before updating a product.");
       }
     }
 
@@ -431,13 +437,15 @@ export const productService = {
       const bizSnap = await getDocs(bizQuery);
       const validBizDoc = bizSnap.docs.find(d => {
         const data = d.data();
-        return data.status !== 'deleted' && (data.ownerUid === ownerId || data.ownerId === ownerId || isInvalid(ownerId));
-      }) || bizSnap.docs[0];
+        return data.status !== 'deleted' && !isInvalid(ownerId) && (data.ownerUid === ownerId || data.ownerId === ownerId || data.userId === ownerId);
+      });
 
       if (validBizDoc) {
         finalBusinessId = validBizDoc.id;
         const bData = validBizDoc.data() as any;
         if (isInvalid(ownerId)) ownerId = bData.ownerUid || bData.ownerId;
+      } else {
+        throw new Error("Please select or create your business before updating a product.");
       }
     }
 

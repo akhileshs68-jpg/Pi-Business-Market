@@ -143,48 +143,50 @@ export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hid
 
       <main className={hideNavbar ? "w-full py-2" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"}>
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 md:mb-12">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-indigo-600/20 rounded-xl text-indigo-400">
-                <ShoppingBag className="w-6 h-6" />
+              <div className="p-2 bg-indigo-600/20 rounded-xl text-indigo-400 shrink-0">
+                <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight uppercase">Enterprise Order Management</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight uppercase break-words">Enterprise Order Management</h1>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Manage order fulfillment, logistics tracking, and settlement lifecycle.</p>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Manage order fulfillment, logistics tracking, and settlement lifecycle.</p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 overflow-x-auto scrollbar-hide max-w-xl">
-            {statusFilterOptions.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setActiveStatus(opt.value)}
-                className={`px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                  activeStatus === opt.value 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                    : 'text-slate-500 hover:text-white'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div className="w-full min-w-0 lg:w-auto overflow-x-auto scrollbar-hide max-w-full touch-pan-x py-0.5">
+            <div className="inline-flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl sm:rounded-2xl border border-slate-800 w-max min-w-max flex-nowrap">
+              {statusFilterOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setActiveStatus(opt.value)}
+                  className={`shrink-0 px-3.5 sm:px-4 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap min-h-[40px] ${
+                    activeStatus === opt.value 
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                      : 'text-slate-500 hover:text-white'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 md:mb-12">
           {[
             { label: 'Active Queue', value: orders.filter(o => !['completed', 'cancelled', 'rejected'].includes((o.orderStatus || '').toLowerCase())).length, icon: Package, color: 'text-amber-400' },
             { label: 'Dispatched / In Transit', value: orders.filter(o => ['shipped', 'out_for_delivery', 'ready_for_dispatch'].includes((o.orderStatus || '').toLowerCase())).length, icon: Truck, color: 'text-indigo-400' },
             { label: 'Completed Orders', value: orders.filter(o => (o.orderStatus || '').toLowerCase() === 'completed').length, icon: CheckCircle2, color: 'text-emerald-400' },
             { label: 'Total Revenue (Pi)', value: totalRevenue.toFixed(1), icon: LayoutDashboard, color: 'text-violet-400' },
           ].map((stat, i) => (
-            <div key={i} className="p-4 sm:p-6 bg-slate-900/50 border border-slate-800 rounded-2xl sm:rounded-3xl">
-              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
-                <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
-                <p className="text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+            <div key={i} className="p-3.5 sm:p-6 bg-slate-900/50 border border-slate-800 rounded-2xl sm:rounded-3xl flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-1 mb-2 sm:mb-4">
+                <stat.icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color} shrink-0`} />
+                <p className="text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest text-right truncate">{stat.label}</p>
               </div>
-              <p className="text-xl sm:text-3xl font-black text-white">{stat.value}</p>
+              <p className="text-lg sm:text-3xl font-black text-white font-mono">{stat.value}</p>
             </div>
           ))}
         </div>
@@ -192,13 +194,13 @@ export const BusinessOrderDashboard: React.FC<{ hideNavbar?: boolean }> = ({ hid
         {/* Search & List */}
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-6">
-            <div className="relative flex-1 max-w-md">
+            <div className="relative flex-1 max-w-full md:max-w-md">
               <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
               <input 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search Order Ref, Buyer, or Item..." 
-                className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-11 pr-4 py-3 text-xs sm:text-sm text-white focus:border-indigo-500 outline-none transition-all"
               />
             </div>
           </div>

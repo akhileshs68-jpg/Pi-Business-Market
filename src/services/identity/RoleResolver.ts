@@ -29,14 +29,32 @@ export class RoleResolver {
     const rolesSet = new Set<string>();
     if (!this.user) return rolesSet;
     
-    // Every Pi user must always have these capabilities
+    // Default base role for all Pi users
     rolesSet.add('buyer');
-    rolesSet.add('seller');
-    rolesSet.add('business_owner');
-    rolesSet.add('service_provider');
 
+    if (this.user.activeRole) {
+      rolesSet.add(normalizeRole(this.user.activeRole));
+    }
+    if (this.user.role) {
+      rolesSet.add(normalizeRole(this.user.role));
+    }
     if (this.user.platformRole) {
       rolesSet.add(normalizeRole(this.user.platformRole));
+    }
+    if (Array.isArray(this.user.roles)) {
+      this.user.roles.forEach(r => rolesSet.add(normalizeRole(r)));
+    }
+    const u = this.user as any;
+    if ((u.businessIdentities && u.businessIdentities.length > 0) || u.businessId) {
+      rolesSet.add('business_owner');
+      rolesSet.add('seller');
+    }
+    if ((u.storeIdentities && u.storeIdentities.length > 0) || u.storeId) {
+      rolesSet.add('seller');
+    }
+    if (this.isSuperAdmin()) {
+      rolesSet.add('superadmin');
+      rolesSet.add('platform_admin');
     }
 
     return rolesSet;

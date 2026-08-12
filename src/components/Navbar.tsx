@@ -489,6 +489,39 @@ function NavbarComponent({
             <WorkspaceMenu onNavigate={onNavigate} />
           )}
 
+          {/* DEDICATED ROLE CONSOLE DIRECT LINKS */}
+          {currentUser && !isSuperAdmin && (activeRoleRaw === 'seller' || activeRoleRaw === 'seller_admin') && (
+            <button
+              onClick={() => {
+                onNavigate('seller_dashboard');
+                navigate('/seller-dashboard');
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl font-bold text-xs shadow-md border border-amber-400/30 transition-all cursor-pointer shrink-0"
+              id="nav_desktop_seller_console_btn"
+              title="Open My Seller Console"
+            >
+              <Store className="w-3.5 h-3.5 text-amber-200" />
+              <span className="hidden md:inline">MY SELLER CONSOLE</span>
+              <span className="md:hidden">CONSOLE</span>
+            </button>
+          )}
+
+          {currentUser && !isSuperAdmin && (activeRoleRaw === 'business_owner' || activeRoleRaw === 'owner') && (
+            <button
+              onClick={() => {
+                onNavigate('business_center');
+                navigate('/business-center');
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-xs shadow-md border border-emerald-400/30 transition-all cursor-pointer shrink-0"
+              id="nav_desktop_business_console_btn"
+              title="Open My Business Console"
+            >
+              <Building2 className="w-3.5 h-3.5 text-emerald-200" />
+              <span className="hidden md:inline">MY BUSINESS CONSOLE</span>
+              <span className="md:hidden">CONSOLE</span>
+            </button>
+          )}
+
           {/* DESKTOP ADMIN CONSOLE DIRECT LINK */}
           {isSuperAdmin && (
             <button
@@ -737,6 +770,54 @@ function NavbarComponent({
                         </div>
                       </div>
                       <WorkspaceMenu onNavigate={onNavigate} closeParentMenu={() => setIsMobileMenuOpen(false)} />
+                    </div>
+                  )}
+
+                  {!isSuperAdmin && (activeRoleRaw === 'seller' || activeRoleRaw === 'seller_admin') && (
+                    <div className="p-4 bg-gradient-to-r from-amber-950/80 to-orange-950/80 rounded-2xl border border-amber-500/30 flex items-center justify-between gap-3 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-amber-600 text-white shadow-md">
+                          <Store className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-wider">My Seller Console</h4>
+                          <p className="text-[10px] text-amber-300 font-medium">Store & Product Management</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          onNavigate('seller_dashboard');
+                          navigate('/seller-dashboard');
+                        }}
+                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer shrink-0"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  )}
+
+                  {!isSuperAdmin && (activeRoleRaw === 'business_owner' || activeRoleRaw === 'owner') && (
+                    <div className="p-4 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 rounded-2xl border border-emerald-500/30 flex items-center justify-between gap-3 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md">
+                          <Building2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-wider">My Business Console</h4>
+                          <p className="text-[10px] text-emerald-300 font-medium">Enterprise & Staff Management</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          onNavigate('business_center');
+                          navigate('/business-center');
+                        }}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer shrink-0"
+                      >
+                        Open
+                      </button>
                     </div>
                   )}
 

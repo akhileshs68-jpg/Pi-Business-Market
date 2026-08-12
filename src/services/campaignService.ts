@@ -18,7 +18,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb, getFirebaseAuth } from '../firebase/config';
 import { getAbsoluteUrl } from '../utils/urlUtils';
 import { logger } from '../core/logger';
 import { analyticsService } from './analyticsService';
@@ -504,36 +504,82 @@ export class CampaignService {
   }
 
   /**
-   * Update platform Ad Pricing Rates (Super Admin only)
+   * Update platform Ad Pricing Rates (Super Admin / Authorized Platform Admin only)
    */
   public async updateAdPricingRates(rates: Partial<AdPricingRates>, adminUid: string): Promise<void> {
     const db = getFirebaseDb();
     
-    // Verify admin authority
-    const userRef = doc(db, 'users', adminUid);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.exists() ? userSnap.data() : null;
-    const isSystemAdmin = adminUid === 'sys_admin' || 
-                          adminUid === 'akhileshs68' ||
-                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+    // Ensure Firebase Auth session exists for Firestore Security Rules
+    const auth = getFirebaseAuth();
+    if (auth && !auth.currentUser) {
+      try {
+        const { signInAnonymously } = await import('firebase/auth');
+        await signInAnonymously(auth);
+      } catch (authErr) {
+        console.warn('Firebase Auth anonymous sign in warning during rate update:', authErr);
+      }
+    }
+
+    const { authService } = await import('../auth/authService');
+    const liveUser = authService.getLatestVerifiedUser();
+
+    // Verify admin authority from trusted backend user state or live verified session
+    let userData: any = liveUser || null;
+    const effectiveUid = auth?.currentUser?.uid || adminUid;
     
-    if (!isSystemAdmin) {
+    if (!userData && effectiveUid) {
+      try {
+        const userRef = doc(db, 'users', effectiveUid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          userData = userSnap.data();
+        }
+      } catch (err) {
+        console.warn('Could not fetch user document for admin verify:', err);
+      }
+    }
+
+    const isAuthorizedAdmin = userData && (
+      userData.platformRole === 'superadmin' || 
+      userData.platformRole === 'admin' || 
+      userData.role === 'Admin' || 
+      userData.role === 'Super Admin' ||
+      (Array.isArray(userData.roles) && (userData.roles.includes('superadmin') || userData.roles.includes('admin') || userData.roles.includes('Admin') || userData.roles.includes('Super Admin')))
+    );
+    
+    if (!isAuthorizedAdmin) {
       throw new Error('Unauthorized: Only platform administrators can modify rate cards.');
     }
 
+    // Sanitize rates object to ensure no undefined values or NaNs are written to Firestore
+    const sanitizedRates: Record<string, number> = {};
+    if (rates && typeof rates === 'object') {
+      Object.keys(rates).forEach(key => {
+        const val = (rates as any)[key];
+        if (typeof val === 'number' && !isNaN(val)) {
+          sanitizedRates[key] = val;
+        } else if (val !== undefined && val !== null) {
+          const num = Number(val);
+          if (!isNaN(num)) sanitizedRates[key] = num;
+        }
+      });
+    }
+
+    const actorIdentifier = liveUser?.piUid || auth?.currentUser?.uid || adminUid || 'unknown';
+
     const ref = doc(db, 'platformSettings', 'ad_pricing');
     await setDoc(ref, {
-      rates,
+      rates: sanitizedRates,
       updatedAt: serverTimestamp(),
-      updatedBy: adminUid
+      updatedBy: actorIdentifier
     }, { merge: true });
 
     try {
       const logRef = doc(collection(db, 'adminAuditLogs'));
       await setDoc(logRef, {
         action: 'UPDATE_AD_PRICING_RATES',
-        actorUid: adminUid,
-        newRates: rates,
+        actorUid: actorIdentifier,
+        newRates: sanitizedRates,
         timestamp: serverTimestamp()
       });
     } catch (err) {

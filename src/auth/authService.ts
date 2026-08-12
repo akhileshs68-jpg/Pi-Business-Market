@@ -686,12 +686,15 @@ export const authService = {
           piUid,
           username,
           displayName: username,
+          platformRole: freshUser.platformRole,
+          role: freshUser.role,
+          roles: freshUser.roles,
           verified: true,
           status: 'active',
           updatedAt: serverTimestamp(),
           lastLogin: serverTimestamp()
         };
-        console.log('[VALUE_SAVED_TO_FIRESTORE]', { uid: piUid, username });
+        console.log('[VALUE_SAVED_TO_FIRESTORE]', { uid: piUid, username, platformRole: freshUser.platformRole });
         await setDoc(doc(db, 'users', piUid), firestoreSavePayload, { merge: true });
 
         // Synchronize active Firebase anonymous session pointer document to point to the live authenticated Pi user
@@ -705,6 +708,9 @@ export const authService = {
             firebaseUid: firebaseUid,
             username: username,
             displayName: username,
+            platformRole: freshUser.platformRole,
+            role: freshUser.role,
+            roles: freshUser.roles,
             status: 'active',
             pointer: true,
             updatedAt: serverTimestamp()

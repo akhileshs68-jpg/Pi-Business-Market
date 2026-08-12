@@ -127,7 +127,7 @@ export const StoreDashboard: React.FC = () => {
     : stores.filter(s => s.businessId === filterBusiness);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 md:p-12">
+    <div className="min-h-screen bg-slate-950 text-slate-200 p-3 sm:p-6 md:p-12">
       <div className="max-w-7xl mx-auto">
         
         {/* Breadcrumb Navigation */}
@@ -176,72 +176,76 @@ export const StoreDashboard: React.FC = () => {
 
         {/* Filters & Search */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 mb-8">
-          <div className="flex bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 self-start w-full sm:w-auto">
-            <button
-              onClick={() => setActiveView('stores')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeView === 'stores' 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                  : 'text-slate-500 hover:text-white'
-              }`}
-            >
-              <StoreIcon size={14} /> My Stores
-            </button>
-            <button
-              onClick={() => setActiveView('products')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeView === 'products' 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                  : 'text-slate-500 hover:text-white'
-              }`}
-            >
-              <Package size={14} /> Products
-            </button>
-            <button
-              onClick={() => setActiveView('reviews')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeView === 'reviews' 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                  : 'text-slate-500 hover:text-white'
-              }`}
-            >
-              <MessageSquare size={14} /> Reputation
-            </button>
-            <button
-              onClick={() => setActiveView('marketing')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeView === 'marketing' 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                  : 'text-slate-500 hover:text-white'
-              }`}
-            >
-              <Megaphone size={14} /> Marketing & Ads
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide">
-            <button 
-              onClick={() => setFilterBusiness('all')}
-              className={`px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-widest border ${
-                filterBusiness === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              All Stores
-            </button>
-            {businesses.map(biz => (
+          <div className="w-full min-w-0 lg:w-auto overflow-x-auto scrollbar-hide max-w-full touch-pan-x py-0.5">
+            <div className="inline-flex items-center gap-1 bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 w-max min-w-max flex-nowrap">
               <button
-                key={biz.id}
-                onClick={() => setFilterBusiness(biz.id)}
-                className={`px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-widest border ${
-                  filterBusiness === biz.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                onClick={() => setActiveView('stores')}
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                  activeView === 'stores' 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'text-slate-500 hover:text-white'
                 }`}
               >
-                {biz.businessName}
+                <StoreIcon size={14} className="shrink-0" /> My Stores
               </button>
-            ))}
+              <button
+                onClick={() => setActiveView('products')}
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                  activeView === 'products' 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'text-slate-500 hover:text-white'
+                }`}
+              >
+                <Package size={14} className="shrink-0" /> Products
+              </button>
+              <button
+                onClick={() => setActiveView('reviews')}
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                  activeView === 'reviews' 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'text-slate-500 hover:text-white'
+                }`}
+              >
+                <MessageSquare size={14} className="shrink-0" /> Reputation
+              </button>
+              <button
+                onClick={() => setActiveView('marketing')}
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                  activeView === 'marketing' 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'text-slate-500 hover:text-white'
+                }`}
+              >
+                <Megaphone size={14} className="shrink-0" /> Marketing & Ads
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="w-full min-w-0 lg:w-auto overflow-x-auto scrollbar-hide max-w-full touch-pan-x py-0.5">
+            <div className="inline-flex items-center gap-2 sm:gap-3 w-max min-w-max flex-nowrap">
+              <button 
+                onClick={() => setFilterBusiness('all')}
+                className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all uppercase tracking-widest border ${
+                  filterBusiness === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                All Stores
+              </button>
+              {businesses.map(biz => (
+                <button
+                  key={biz.id}
+                  onClick={() => setFilterBusiness(biz.id)}
+                  className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all uppercase tracking-widest border ${
+                    filterBusiness === biz.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {biz.businessName}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 w-full lg:w-auto">
             <div className="relative flex-1 lg:w-64">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input 
@@ -251,6 +255,45 @@ export const StoreDashboard: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* Quick Merchant Operations Shortcuts */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-8">
+          <button 
+            onClick={() => navigate('/business-orders')} 
+            className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm min-h-[44px]"
+          >
+            <BarChart3 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="truncate">Orders / Sales</span>
+          </button>
+          <button 
+            onClick={() => navigate('/inventory')} 
+            className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm min-h-[44px]"
+          >
+            <Package className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="truncate">Inventory</span>
+          </button>
+          <button 
+            onClick={() => navigate('/crm')} 
+            className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm min-h-[44px]"
+          >
+            <Users className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="truncate">Customers CRM</span>
+          </button>
+          <button 
+            onClick={() => navigate('/merchant-analytics')} 
+            className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm min-h-[44px]"
+          >
+            <BarChart3 className="w-4 h-4 text-violet-400 shrink-0" />
+            <span className="truncate">Reports & BI</span>
+          </button>
+          <button 
+            onClick={() => navigate('/business-center')} 
+            className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/50 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm col-span-2 sm:col-span-1 min-h-[44px]"
+          >
+            <Building2 className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span className="truncate">Business Profile</span>
+          </button>
         </div>
 
         {/* Stats Summary */}

@@ -357,39 +357,41 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex flex-wrap items-center bg-slate-950 p-1 border border-slate-800 rounded-2xl text-xs">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'overview' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" /> Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('campaigns')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'campaigns' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5" /> Campaigns
-          </button>
-          <button
-            onClick={() => setActiveTab('coupons')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'coupons' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Tag className="w-3.5 h-3.5" /> Coupons
-          </button>
-          <button
-            onClick={() => setActiveTab('featured')}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'featured' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" /> Featured Ads
-          </button>
+        <div className="w-full min-w-0 overflow-x-auto scrollbar-hide max-w-full touch-pan-x py-0.5">
+          <div className="inline-flex items-center gap-1 bg-slate-950 p-1 border border-slate-800 rounded-2xl text-xs w-max min-w-max flex-nowrap">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`shrink-0 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 whitespace-nowrap min-h-[38px] ${
+                activeTab === 'overview' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 shrink-0" /> Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('campaigns')}
+              className={`shrink-0 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 whitespace-nowrap min-h-[38px] ${
+                activeTab === 'campaigns' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5 shrink-0" /> Campaigns
+            </button>
+            <button
+              onClick={() => setActiveTab('coupons')}
+              className={`shrink-0 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 whitespace-nowrap min-h-[38px] ${
+                activeTab === 'coupons' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Tag className="w-3.5 h-3.5 shrink-0" /> Coupons
+            </button>
+            <button
+              onClick={() => setActiveTab('featured')}
+              className={`shrink-0 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-1.5 whitespace-nowrap min-h-[38px] ${
+                activeTab === 'featured' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 shrink-0" /> Featured Ads
+            </button>
+          </div>
         </div>
       </div>
 
