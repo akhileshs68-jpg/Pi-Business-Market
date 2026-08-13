@@ -8,12 +8,14 @@ import {
   Megaphone, Tag, Sparkles, Percent, Calendar, Flame, Award, Zap, Flag, Plus, Trash2, CheckCircle2, TrendingUp, Users, Target, Activity, Pause, Play, Copy, Edit2, Archive, Share2, CreditCard, ShieldAlert, AlertCircle, Eye, ArrowRight, Check
 } from 'lucide-react';
 import { collection, doc, setDoc, getDoc, getDocs, query, where, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getFirebaseDb } from '../../firebase/config';
+import { getFirebaseDb, getFirebaseAuth } from '../../firebase/config';
 import { campaignService, Campaign, CampaignType, CampaignStatus, CtaType, AdPricingTier, AdPricingRates, DEFAULT_AD_PRICING_RATES } from '../../services/campaignService';
 import { piPaymentService } from '../../services/piPaymentService';
 import { storeService } from '../../services/storeService';
 import { productService } from '../../services/productService';
 import { serviceMarketplaceService } from '../../services/serviceMarketplaceService';
+import { getAbsoluteUrl } from '../../utils/urlUtils';
+import { isRealPiBrowser } from '../../auth/authService';
 
 interface Coupon {
   couponId: string;
@@ -216,13 +218,15 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
     }
 
     const totalCostPi = calculateCost();
+    const auth = getFirebaseAuth();
+    const activeUserId = auth?.currentUser?.uid || userId;
 
     try {
       setLoading(true);
       
       // Step 1: Create draft campaign record
       const createdCamp = await campaignService.createCampaign({
-        merchantId: userId,
+        merchantId: activeUserId,
         businessId,
         businessName,
         businessLogo,
@@ -248,6 +252,20 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
 
       setPaymentInProgress(createdCamp.id);
 
+      // Helper function to get authorization headers for backend requests
+      const getHeaders = async (): Promise<Record<string, string>> => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          if (auth && auth.currentUser) {
+            const token = await auth.currentUser.getIdToken();
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+          }
+        } catch (authErr) {
+          console.warn('[Ad Payment] Failed to acquire auth token for callback:', authErr);
+        }
+        return headers;
+      };
+
       // Step 2: Trigger Pi Payment SDK
       await piPaymentService.createPayment({
         amount: totalCostPi,
@@ -256,14 +274,58 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
           type: 'ad_campaign_payment',
           campaignId: createdCamp.id,
           businessId,
-          merchantId: userId
+          merchantId: activeUserId
         }
       }, {
-        onReadyForServerApproval: async (paymentId) => {
-          console.log('[Ad Payment] Ready for approval:', paymentId);
+        onReadyForServerApproval: async (paymentId: string) => {
+          console.log('[Ad Payment] Ready for server approval:', paymentId);
+          const url = getAbsoluteUrl('/api/payments/approve');
+          const headers = await getHeaders();
+          const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              paymentId,
+              metadata: {
+                type: 'ad_campaign_payment',
+                campaignId: createdCamp.id,
+                businessId,
+                merchantId: activeUserId
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.error('[Ad Payment Server Approval Failed]', response.status, errText);
+            throw new Error(`Server approval failed (${response.status}): ${errText}`);
+          }
+          console.log('[Ad Payment] Server approval successful for paymentId:', paymentId);
         },
-        onReadyForServerCompletion: async (paymentId, txid) => {
-          console.log('[Ad Payment] Completed with txid:', txid);
+        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+          console.log('[Ad Payment] Ready for server completion:', paymentId, txid);
+          const url = getAbsoluteUrl('/api/payments/complete');
+          const headers = await getHeaders();
+          const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              paymentId,
+              txid,
+              metadata: {
+                type: 'ad_campaign_payment',
+                campaignId: createdCamp.id,
+                businessId,
+                merchantId: activeUserId
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.warn('[Ad Payment Server Completion Notice]', response.status, errText);
+          }
+
           await campaignService.verifyCampaignPayment(createdCamp.id, txid || paymentId, 'TESTNET', totalCostPi);
           alert(`Ad Payment of ${totalCostPi} Pi Verified! Campaign submitted for Super Admin review.`);
           setPaymentInProgress(null);
@@ -271,27 +333,34 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
           setNewCampaignDescription('');
           loadMarketingData();
         },
-        onCancel: async () => {
+        onCancel: async (paymentId: string) => {
+          console.log('[Ad Payment Cancelled]', paymentId);
           alert('Ad payment was cancelled.');
           setPaymentInProgress(null);
           loadMarketingData();
         },
-        onError: async (err) => {
-          console.error('[Ad Payment Error]', err);
-          // Auto-verify in dev/sandbox if Pi Browser extension isn't active
-          const mockTxId = `TX_AD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-          await campaignService.verifyCampaignPayment(createdCamp.id, mockTxId, 'TESTNET', totalCostPi);
-          alert(`Ad Campaign Created & Verified (${totalCostPi} Pi)! Submitted for Super Admin review.`);
-          setPaymentInProgress(null);
-          setNewCampaignTitle('');
-          setNewCampaignDescription('');
-          loadMarketingData();
+        onError: async (err: Error, paymentId?: string) => {
+          console.error('[Ad Payment Error]', err, paymentId);
+          if (!isRealPiBrowser()) {
+            console.log('[Ad Payment] Desktop / Non-Pi Browser environment detected. Applying dev fallback verification...');
+            const mockTxId = `TX_AD_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            await campaignService.verifyCampaignPayment(createdCamp.id, mockTxId, 'TESTNET', totalCostPi);
+            alert(`Ad Campaign Created & Verified (${totalCostPi} Pi - Dev Mode)! Submitted for Super Admin review.`);
+            setPaymentInProgress(null);
+            setNewCampaignTitle('');
+            setNewCampaignDescription('');
+            loadMarketingData();
+          } else {
+            alert(`Ad Campaign Payment Error: ${err.message || 'Payment launch failed.'}`);
+            setPaymentInProgress(null);
+          }
         }
       });
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed creating campaign:', err);
-      alert('Failed to launch campaign payment.');
+      const errMsg = err?.message || String(err);
+      alert(`Failed to launch campaign payment: ${errMsg}`);
     } finally {
       setLoading(false);
     }
