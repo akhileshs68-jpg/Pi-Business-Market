@@ -16,6 +16,7 @@ import { productService } from '../../services/productService';
 import { serviceMarketplaceService } from '../../services/serviceMarketplaceService';
 import { getAbsoluteUrl } from '../../utils/urlUtils';
 import { isRealPiBrowser } from '../../auth/authService';
+import { mediaService } from '../../services/mediaService';
 
 interface Coupon {
   couponId: string;
@@ -225,6 +226,15 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
       setLoading(true);
       
       // Step 1: Create draft campaign record
+      let bannerImageUrl = newCampaignImage || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800';
+      if (bannerImageUrl && !bannerImageUrl.startsWith('http') && !bannerImageUrl.startsWith('data:')) {
+        bannerImageUrl = getAbsoluteUrl(bannerImageUrl);
+      }
+
+      if (!bannerImageUrl || bannerImageUrl.startsWith('data:')) {
+        throw new Error('A valid banner image URL is required. Please upload the image or provide a valid link starting with http/https.');
+      }
+
       const createdCamp = await campaignService.createCampaign({
         merchantId: activeUserId,
         businessId,
@@ -235,7 +245,7 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
         campaignTitle: newCampaignTitle.trim(),
         shortDescription: newCampaignDescription.trim() || 'Exclusive promotion on Pi Network.',
         campaignType: newCampaignType,
-        bannerImage: newCampaignImage || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800',
+        bannerImage: bannerImageUrl,
         bgClass: newCampaignBgClass,
         targetRoute: newCampaignRoute || '/marketplace',
         offerBadge: newCampaignBadge || 'Special Offer',
@@ -691,20 +701,30 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={e => {
+                          onChange={async e => {
                             const file = e.target.files?.[0];
                             if (file) {
                               if (file.size > 5 * 1024 * 1024) {
                                 alert('Image size must be less than 5MB.');
                                 return;
                               }
-                              const reader = new FileReader();
-                              reader.onload = () => {
-                                if (typeof reader.result === 'string') {
-                                  setNewCampaignImage(reader.result);
+                              setLoading(true);
+                              try {
+                                const auth = getFirebaseAuth();
+                                const activeUserId = userId || auth?.currentUser?.uid || '';
+                                const asset = await mediaService.uploadMedia(file, activeUserId, {
+                                  module: 'businesses',
+                                  businessId: businessId,
+                                });
+                                if (asset && asset.downloadUrl) {
+                                  setNewCampaignImage(asset.downloadUrl);
                                 }
-                              };
-                              reader.readAsDataURL(file);
+                              } catch (uploadErr: any) {
+                                console.error('Failed to upload image:', uploadErr);
+                                alert(`Failed to upload image: ${uploadErr.message || String(uploadErr)}`);
+                              } finally {
+                                setLoading(false);
+                              }
                             }
                           }}
                         />
