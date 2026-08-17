@@ -804,7 +804,24 @@ export class CampaignService {
     }
     const camp = snap.data() as Campaign;
     
-    // Check if the caller is the merchant owner of this campaign
+    // 1. Resolve canonical user & check administrator privileges
+    const userData = await this.resolveCanonicalUserData(adminUid);
+    const isSystemAdmin = adminUid === 'sys_admin' || 
+                          adminUid === 'akhileshs68' ||
+                          (userData && (
+                            userData.platformRole === 'superadmin' || 
+                            userData.platformRole === 'admin' || 
+                            userData.role === 'Admin' || 
+                            userData.role === 'Super Admin' ||
+                            (Array.isArray(userData.roles) && (
+                              userData.roles.includes('superadmin') || 
+                              userData.roles.includes('admin') || 
+                              userData.roles.includes('Admin') || 
+                              userData.roles.includes('Super Admin')
+                            ))
+                          ));
+
+    // 2. Check if the caller is the merchant owner of this campaign
     let isOwner = camp.merchantId === adminUid;
     if (!isOwner && camp.merchantId) {
       try {
@@ -819,29 +836,12 @@ export class CampaignService {
       } catch (e) {}
     }
     
-    if (!isOwner) {
-      // If not owner, caller must be an authorized administrator
-      const userData = await this.resolveCanonicalUserData(adminUid);
-      const isSystemAdmin = adminUid === 'sys_admin' || 
-                            adminUid === 'akhileshs68' ||
-                            (userData && (
-                              userData.platformRole === 'superadmin' || 
-                              userData.platformRole === 'admin' || 
-                              userData.role === 'Admin' || 
-                              userData.role === 'Super Admin' ||
-                              (Array.isArray(userData.roles) && (
-                                userData.roles.includes('superadmin') || 
-                                userData.roles.includes('admin') || 
-                                userData.roles.includes('Admin') || 
-                                userData.roles.includes('Super Admin')
-                              ))
-                            ));
-      
-      if (!isSystemAdmin) {
-        throw new Error('Unauthorized: Only administrators or campaign owners can update this status.');
-      }
-    } else {
-      // If caller is the merchant, enforce strict state machine rules
+    // 3. Authorization branching: Super Admin > Merchant Owner
+    if (isSystemAdmin) {
+      // Platform administrator can execute all moderation status transitions
+      // (pending -> active, pending -> rejected, paused, active, expired, etc.)
+    } else if (isOwner) {
+      // If caller is non-admin merchant owner, enforce strict state machine rules
       if (status === 'active') {
         if (camp.status !== 'paused') {
           throw new Error('Unauthorized: Merchants can only reactivate campaigns that are currently paused.');
@@ -858,6 +858,8 @@ export class CampaignService {
       } else {
         throw new Error(`Unauthorized: Merchants cannot transition campaign status to ${status}.`);
       }
+    } else {
+      throw new Error('Unauthorized: Only administrators or campaign owners can update this status.');
     }
 
     const updatePayload: any = {
