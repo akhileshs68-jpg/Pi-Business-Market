@@ -124,14 +124,78 @@ service cloud.firestore {
         isOwner(incoming().ownerUid) || isOwner(incoming().userId) || isOwner(incoming().ownerId) || isAdmin()
       );
       allow update: if canMutate() && isSignedIn() && (isBusinessOwner(businessId) || isAdmin()) && (
-        isAdmin() || incoming().ownerUid == resource.data.ownerUid
+        isAdmin() || (
+          incoming().ownerUid == resource.data.ownerUid &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'verificationStatus', 'approvalStatus', 'businessStatus', 'status', 
+            'isVerified', 'approvedBy', 'approvedAt', 'rejectedBy', 
+            'rejectionReason', 'verificationNotes', 'active'
+          ])
+        )
       );
       allow delete: if canMutate() && isSignedIn() && (isBusinessOwner(businessId) || isAdmin());
     }
 
     match /businessMembers/{memberId} {
       allow read: if true;
-      allow create, update, delete: if canMutate();
+      allow create: if canMutate() && isSignedIn() && (
+        isAdmin() || 
+        (
+          // memberId must match businessId + "_" + userUid
+          memberId == incoming().businessId + "_" + incoming().userUid &&
+          (
+            // 1. Initial / legitimate creation of Owner matching the business ownerUid
+            (
+              incoming().role == 'Owner' &&
+              incoming().status == 'active' &&
+              (incoming().userUid == request.auth.uid || incoming().userUid == getPiUid()) &&
+              (
+                getAfter(/databases/$(database)/documents/businesses/$(incoming().businessId)).data.ownerUid == request.auth.uid ||
+                getAfter(/databases/$(database)/documents/businesses/$(incoming().businessId)).data.ownerUid == getPiUid()
+              )
+            ) ||
+            // 2. Addition of a non-owner, non-superadmin member by a Business Owner or Business Admin
+            (
+              incoming().role != 'Owner' &&
+              incoming().role != 'Super Admin' &&
+              hasBusinessRole(incoming().businessId, ['Owner', 'Super Admin'])
+            )
+          )
+        )
+      );
+      allow update: if canMutate() && isSignedIn() && (
+        isAdmin() ||
+        (
+          memberId == resource.data.businessId + "_" + resource.data.userUid &&
+          memberId == incoming().businessId + "_" + incoming().userUid &&
+          incoming().businessId == resource.data.businessId &&
+          incoming().userUid == resource.data.userUid &&
+          (
+            // 1. Business Owner edits non-owner, non-superadmin records, and cannot create/demote Owner
+            (
+              isBusinessOwner(resource.data.businessId) &&
+              incoming().role != 'Owner' &&
+              incoming().role != 'Super Admin' &&
+              resource.data.role != 'Owner'
+            ) ||
+            // 2. User leaves or updates their own preferences but cannot change role, businessId, or userUid
+            (
+              (resource.data.userUid == request.auth.uid || resource.data.userUid == getPiUid()) &&
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'businessId', 'userUid'])
+            )
+          )
+        )
+      );
+      allow delete: if canMutate() && isSignedIn() && (
+        isAdmin() ||
+        (
+          resource.data.role != 'Owner' &&
+          (
+            hasBusinessRole(resource.data.businessId, ['Owner', 'Super Admin']) ||
+            (resource.data.userUid == request.auth.uid || resource.data.userUid == getPiUid())
+          )
+        )
+      );
     }
 
     match /businessInvitations/{invitationId} {

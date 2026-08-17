@@ -21,6 +21,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
+import { isPendingSeller } from '../../utils/adminMetrics';
 import { useAuth } from '../../auth/useAuth';
 import { useBusiness } from '../../context/BusinessContext';
 import { Business } from '../../types';
@@ -531,7 +532,7 @@ export const BusinessManagementPanel: React.FC = () => {
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>Pending Approvals</span>
             <span className="ml-1 px-1.5 py-0.2 bg-slate-950/40 rounded-full text-[10px]">
-              {businesses.filter(b => ['Pending', 'pending', 'Submitted', 'Under Review'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending').length}
+              {businesses.filter(isPendingSeller).length}
             </span>
           </button>
 
@@ -574,14 +575,14 @@ export const BusinessManagementPanel: React.FC = () => {
       </div>
 
       {/* SELLER ACCOUNT APPROVAL QUEUE (DEDICATED CARDS SECTION) */}
-      {businesses.filter(b => ['Pending', 'pending', 'Submitted', 'Under Review', 'Pending Verification'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending').length > 0 && (
+      {businesses.filter(isPendingSeller).length > 0 && (
         <div className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-5 h-5 text-amber-400" />
               <h3 className="text-base font-black text-white tracking-tight uppercase">SELLER ACCOUNT APPROVAL QUEUE</h3>
               <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-xs font-black">
-                {businesses.filter(b => ['Pending', 'pending', 'Submitted', 'Under Review', 'Pending Verification'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending').length} Action Required
+                {businesses.filter(isPendingSeller).length} Action Required
               </span>
             </div>
             <span className="text-xs text-amber-300 font-medium">Super Admin Direct Verification</span>
@@ -589,7 +590,7 @@ export const BusinessManagementPanel: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {businesses
-              .filter(b => ['Pending', 'pending', 'Submitted', 'Under Review', 'Pending Verification'].includes(b.verificationStatus || (b as any).approvalStatus || '') || b.verificationStatus === 'Pending')
+              .filter(isPendingSeller)
               .map(biz => (
                 <div key={biz.id} className="p-5 bg-slate-950 border border-amber-500/30 rounded-xl flex flex-col justify-between gap-4 shadow-xl">
                   <div>

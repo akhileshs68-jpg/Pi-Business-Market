@@ -341,9 +341,45 @@ export class CampaignService {
       throw new Error('Authentication required');
     }
 
-    // Force merchantId to be the authenticated user's ID to prevent identity spoofing
-    if (campaignData.merchantId !== currentUser.uid) {
-      throw new Error('Unauthorized: merchantId spoofing detected.');
+    const { authService } = await import('../auth/authService');
+    const { PiBusinessMarketDB } = await import('./storage');
+
+    const liveUser = authService.getLatestVerifiedUser();
+    const storedUser = PiBusinessMarketDB.getCurrentUser();
+
+    // Collect all valid identity tokens/UIDs for the currently authenticated user
+    const validUserUids = new Set<string>();
+    if (currentUser?.uid) validUserUids.add(currentUser.uid);
+    if (liveUser?.piUid) validUserUids.add(liveUser.piUid);
+    if (liveUser?.uid) validUserUids.add(liveUser.uid);
+    if (storedUser?.piUid) validUserUids.add(storedUser.piUid);
+    if (storedUser?.uid) validUserUids.add(storedUser.uid);
+
+    // Dynamic resolution of canonical Pi UIDs to handle any identity mapping discrepancies
+    try {
+      const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+      const canonicalUids = await Promise.all(
+        Array.from(validUserUids).map(uid => getCanonicalRewardUserId(uid))
+      );
+      canonicalUids.forEach(uid => {
+        if (uid) validUserUids.add(uid);
+      });
+    } catch (err) {
+      console.warn('[Ad Workspace Auth] Canonical UID pre-resolution failed:', err);
+    }
+
+    // Force merchantId to be one of the authenticated user's valid UIDs to prevent identity spoofing
+    if (!validUserUids.has(campaignData.merchantId) && campaignData.merchantId) {
+      // If there is still a mismatch, try resolving merchantId as well
+      try {
+        const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+        const canonicalMerchantId = await getCanonicalRewardUserId(campaignData.merchantId);
+        if (!validUserUids.has(canonicalMerchantId)) {
+          throw new Error('Unauthorized: merchantId spoofing detected.');
+        }
+      } catch (err) {
+        throw new Error('Unauthorized: merchantId spoofing detected.');
+      }
     }
 
     // Verify businessId belongs to the merchant
@@ -353,20 +389,38 @@ export class CampaignService {
       throw new Error('Business not found');
     }
     const bizData = bizSnap.data();
-    const isOwner = bizData.ownerUid === currentUser.uid || bizData.ownerId === currentUser.uid;
+
+    const bizOwnerUids = [
+      bizData.ownerUid,
+      bizData.ownerId,
+      bizData.userId,
+      bizData.sellerId,
+      bizData.createdByUid,
+      bizData.createdBy,
+      bizData.uid
+    ].filter(Boolean);
+
+    let isOwner = bizOwnerUids.some(ownerId => validUserUids.has(ownerId));
+
+    const isSuperAdmin = (liveUser?.platformRole === 'superadmin' || liveUser?.platformRole === 'admin') ||
+                         (storedUser?.platformRole === 'superadmin' || storedUser?.platformRole === 'admin') ||
+                         Array.from(validUserUids).some(id => id === 'akhileshs68' || id === 'sys_admin');
 
     // Check businessMembers as a fallback
-    let isMember = isOwner;
+    let isMember = isOwner || isSuperAdmin;
     if (!isMember) {
-      const qMember = query(
-        collection(db, 'businessMembers'),
-        where('businessId', '==', campaignData.businessId),
-        where('userUid', '==', currentUser.uid),
-        where('status', '==', 'active')
-      );
-      const memberSnap = await getDocs(qMember);
-      if (!memberSnap.empty) {
-        isMember = true;
+      for (const userUid of Array.from(validUserUids)) {
+        const qMember = query(
+          collection(db, 'businessMembers'),
+          where('businessId', '==', campaignData.businessId),
+          where('userUid', '==', userUid),
+          where('status', '==', 'active')
+        );
+        const memberSnap = await getDocs(qMember);
+        if (!memberSnap.empty) {
+          isMember = true;
+          break;
+        }
       }
     }
 
@@ -612,13 +666,47 @@ export class CampaignService {
     }
     
     // Security verification: check if caller owns the campaign or is admin
-    const isOwner = camp.merchantId === currentUser.uid;
+    const { authService } = await import('../auth/authService');
+    const { PiBusinessMarketDB } = await import('./storage');
+
+    const liveUser = authService.getLatestVerifiedUser();
+    const storedUser = PiBusinessMarketDB.getCurrentUser();
+
+    const validUserUids = new Set<string>();
+    if (currentUser?.uid) validUserUids.add(currentUser.uid);
+    if (liveUser?.piUid) validUserUids.add(liveUser.piUid);
+    if (liveUser?.uid) validUserUids.add(liveUser.uid);
+    if (storedUser?.piUid) validUserUids.add(storedUser.piUid);
+    if (storedUser?.uid) validUserUids.add(storedUser.uid);
+
+    // Dynamic resolution of canonical Pi UIDs to handle any identity mapping discrepancies
+    try {
+      const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+      const canonicalUids = await Promise.all(
+        Array.from(validUserUids).map(uid => getCanonicalRewardUserId(uid))
+      );
+      canonicalUids.forEach(uid => {
+        if (uid) validUserUids.add(uid);
+      });
+    } catch (err) {
+      console.warn('[Ad Payment Auth] Canonical UID pre-resolution failed:', err);
+    }
+
+    let isOwner = validUserUids.has(camp.merchantId);
+    if (!isOwner && camp.merchantId) {
+      try {
+        const { getCanonicalRewardUserId } = await import('./rewards/rewardIdentityResolver');
+        const canonicalMerchantId = await getCanonicalRewardUserId(camp.merchantId);
+        isOwner = validUserUids.has(canonicalMerchantId);
+      } catch (err) {}
+    }
     const userRef = doc(db, 'users', currentUser.uid);
     const userSnap = await getDoc(userRef);
     const userData = userSnap.exists() ? userSnap.data() : null;
-    const isSystemAdmin = currentUser.uid === 'sys_admin' || 
-                          currentUser.uid === 'akhileshs68' ||
-                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+    const isSystemAdmin = Array.from(validUserUids).some(id => id === 'sys_admin' || id === 'akhileshs68') ||
+                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin')) ||
+                          (liveUser && (liveUser.platformRole === 'superadmin' || liveUser.platformRole === 'admin')) ||
+                          (storedUser && (storedUser.platformRole === 'superadmin' || storedUser.platformRole === 'admin'));
     
     if (!isOwner && !isSystemAdmin) {
       throw new Error('Unauthorized: You do not have permissions over this campaign payment.');

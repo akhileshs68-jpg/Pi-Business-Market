@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { collection, getDocs, query, limit, where, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getFirebaseDb } from '../../firebase/config';
 import { normalizeDateString } from '../../utils/firestoreUtils';
+import { calculateCanonicalAdminMetrics, isPendingSeller, isPaidOrder, isPendingSettlement } from '../../utils/adminMetrics';
 
 interface EnterpriseOperationsCenterProps {
   onNavigateTab: (tab: string) => void;
@@ -100,20 +101,20 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
         approvalsSnap,
         reviewsSnap
       ] = await Promise.allSettled([
-        getDocs(query(collection(db, 'users'), limit(150))),
-        getDocs(query(collection(db, 'services'), limit(150))),
-        getDocs(query(collection(db, 'shipments'), limit(150))),
-        getDocs(query(collection(db, 'orders'), limit(150))),
-        getDocs(query(collection(db, 'products'), limit(150))),
-        getDocs(query(collection(db, 'businesses'), limit(100))),
-        getDocs(query(collection(db, 'payments'), limit(150))),
-        getDocs(query(collection(db, 'disputes'), limit(100))),
-        getDocs(query(collection(db, 'support_tickets'), limit(100))),
-        getDocs(query(collection(db, 'campaigns'), limit(100))),
-        getDocs(query(collection(db, 'notifications'), limit(100))),
-        getDocs(query(collection(db, 'fraudSignals'), limit(100))),
-        getDocs(query(collection(db, 'universalApprovals'), limit(100))),
-        getDocs(query(collection(db, 'reviews'), limit(100))),
+        getDocs(query(collection(db, 'users'), limit(500))),
+        getDocs(query(collection(db, 'services'), limit(500))),
+        getDocs(query(collection(db, 'shipments'), limit(500))),
+        getDocs(query(collection(db, 'orders'), limit(500))),
+        getDocs(query(collection(db, 'products'), limit(500))),
+        getDocs(query(collection(db, 'businesses'), limit(500))),
+        getDocs(query(collection(db, 'payments'), limit(500))),
+        getDocs(query(collection(db, 'disputes'), limit(500))),
+        getDocs(query(collection(db, 'support_tickets'), limit(500))),
+        getDocs(query(collection(db, 'campaigns'), limit(500))),
+        getDocs(query(collection(db, 'notifications'), limit(500))),
+        getDocs(query(collection(db, 'fraudSignals'), limit(500))),
+        getDocs(query(collection(db, 'universalApprovals'), limit(500))),
+        getDocs(query(collection(db, 'reviews'), limit(500))),
       ]);
 
       const t1 = performance.now();
@@ -174,150 +175,23 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
 
   useEffect(() => {
     loadOperationsData();
-    // Refresh system health parameters dynamically every 15 seconds
+    // Refresh system health parameters dynamically every 60 seconds
     const interval = setInterval(() => {
       loadOperationsData();
-    }, 15000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Compute metrics in-memory
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  // Executive Overview Metrics
-  const overviewMetrics = {
-    totalUsers: dataSources.users.length,
-    buyersCount: dataSources.users.filter(u => !u.platformRole || u.platformRole === 'buyer' || u.role === 'buyer' || u.role === 'user').length,
-    sellersCount: dataSources.businesses.length,
-    pendingSellers: dataSources.businesses.filter(b => 
-      ['Pending', 'Pending Audit', 'Pending Verification', 'pending_verification', 'pending'].includes(b.status || b.verificationStatus || b.approvalStatus)
-    ).length,
-    approvedSellers: dataSources.businesses.filter(b => 
-      ['approved', 'active', 'Verified'].includes(b.status || b.verificationStatus)
-    ).length,
-    suspendedSellers: dataSources.businesses.filter(b => b.status === 'suspended' || b.active === false).length,
-    totalProducts: dataSources.products.length,
-    totalServices: dataSources.services.length,
-    totalBusinesses: dataSources.businesses.length,
-    totalOrders: dataSources.orders.length,
-    paidOrders: dataSources.orders.filter(o => o.paymentStatus === 'paid' || o.paymentStatus === 'verified' || ['paid', 'payment_verified', 'accepted', 'preparing', 'packed', 'ready_for_dispatch', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'completed'].includes(o.status)).length,
-    activeShipments: dataSources.shipments.filter(s => ['in_transit', 'out_for_delivery', 'assigned', 'picked_up'].includes(s.status)).length,
-    completedOrders: dataSources.orders.filter(o => o.status === 'completed' || o.status === 'delivered').length,
-    liveAds: dataSources.campaigns.filter(c => c.status === 'active').length,
-    pendingAds: dataSources.campaigns.filter(c => c.status === 'pending').length,
-  };
-
-  // SECTION 1: Live Orders
-  const liveOrders = {
-    new: dataSources.orders.filter(o => ['new', 'placed', 'new_order'].includes(o.status)),
-    pending: dataSources.orders.filter(o => ['pending_payment', 'pending'].includes(o.status)),
-    preparing: dataSources.orders.filter(o => ['accepted', 'preparing'].includes(o.status)),
-    packed: dataSources.orders.filter(o => ['packed', 'ready_for_dispatch'].includes(o.status)),
-    shipped: dataSources.orders.filter(o => ['shipped', 'dispatched'].includes(o.status)),
-    inTransit: dataSources.orders.filter(o => ['in_transit'].includes(o.status)),
-    outForDelivery: dataSources.orders.filter(o => ['out_for_delivery'].includes(o.status)),
-    delivered: dataSources.orders.filter(o => ['delivered'].includes(o.status)),
-    completed: dataSources.orders.filter(o => ['completed'].includes(o.status)),
-    cancelled: dataSources.orders.filter(o => o.status === 'cancelled'),
-    disputed: dataSources.orders.filter(o => o.status === 'disputed' || o.isDisputed),
-    refundRequested: dataSources.orders.filter(o => ['refund_requested', 'refund_pending'].includes(o.status)),
-    refunded: dataSources.orders.filter(o => ['refund_completed', 'refund_approved', 'refunded'].includes(o.status)),
-  };
-
-  // SECTION 2: Inventory & Services Health
-  const inventoryHealth = {
-    totalProducts: dataSources.products.length,
-    outOfStock: dataSources.products.filter(p => p.stock === 0 || p.status === 'out-of-stock'),
-    lowStock: dataSources.products.filter(p => p.stock > 0 && p.stock <= 5),
-    hidden: dataSources.products.filter(p => p.status === 'draft' || p.status === 'hidden'),
-    inactive: dataSources.products.filter(p => p.status === 'inactive' || p.status === 'archived'),
-    pendingApproval: dataSources.products.filter(p => p.status === 'pending' || p.approvalStatus === 'pending'),
-    totalServices: dataSources.services.length,
-    activeServices: dataSources.services.filter(s => !s.status || s.status === 'active' || s.status === 'published'),
-    pendingServices: dataSources.services.filter(s => s.status === 'pending' || s.approvalStatus === 'pending'),
-    suspendedServices: dataSources.services.filter(s => s.status === 'suspended'),
-  };
-
-  // SECTION 3: Delivery / Logistics Control
-  const shipmentSec = {
-    total: dataSources.shipments.length,
-    created: dataSources.shipments.filter(s => ['created', 'pending'].includes(s.status)),
-    assigned: dataSources.shipments.filter(s => s.status === 'assigned'),
-    pickedUp: dataSources.shipments.filter(s => s.status === 'picked_up'),
-    inTransit: dataSources.shipments.filter(s => s.status === 'in_transit'),
-    outForDelivery: dataSources.shipments.filter(s => s.status === 'out_for_delivery'),
-    delivered: dataSources.shipments.filter(s => s.status === 'delivered'),
-    failed: dataSources.shipments.filter(s => ['failed', 'delivery_failed'].includes(s.status)),
-    delayed: dataSources.shipments.filter(s => s.isDelayed || s.status === 'delayed'),
-  };
-
-  // SECTION 4: Business Health
-  const businessHealth = {
-    total: dataSources.businesses.length,
-    new: dataSources.businesses.filter(b => b.status === 'pending' || b.status === 'new' || (b.createdAt && typeof b.createdAt === 'string' && b.createdAt.startsWith(todayStr.substring(0, 7)))),
-    approved: dataSources.businesses.filter(b => ['approved', 'active', 'Verified'].includes(b.status || b.verificationStatus)),
-    rejected: dataSources.businesses.filter(b => b.status === 'rejected'),
-    suspended: dataSources.businesses.filter(b => b.status === 'suspended' || b.active === false),
-    inactive: dataSources.businesses.filter(b => b.status === 'inactive'),
-    pendingVerification: dataSources.businesses.filter(b => 
-      ['Pending', 'Pending Audit', 'Pending Verification', 'pending_verification', 'pending'].includes(b.status || b.verificationStatus || b.approvalStatus) || 
-      b.verificationStatus === 'Pending' || 
-      b.approvalStatus === 'pending'
-    ),
-    noActivity: dataSources.businesses.filter(b => {
-      const bId = b.businessId || b.id;
-      return !dataSources.orders.some(o => o.businessId === bId);
-    }),
-  };
-
-  // SECTION 5: Payments
-  const todayPiRev = dataSources.payments
-    .filter(p => (p.status || '').toLowerCase() === 'completed' && (p.currency || '').toLowerCase().includes('pi') && p.createdAt && typeof p.createdAt === 'string' && p.createdAt.startsWith(todayStr))
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-  const todayBmpRev = dataSources.payments
-    .filter(p => (p.status || '').toLowerCase() === 'completed' && (p.currency || '').toLowerCase().includes('bmp') && p.createdAt && typeof p.createdAt === 'string' && p.createdAt.startsWith(todayStr))
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-  const paymentsSec = {
-    todayPi: todayPiRev,
-    todayBmp: todayBmpRev,
-    verified: dataSources.payments.filter(p => ['completed', 'verified', 'Paid'].includes(p.status)),
-    pendingSettlements: dataSources.payments.filter(p => ['pending', 'Pending'].includes(p.status)),
-    failedPayments: dataSources.payments.filter(p => ['failed', 'Failed'].includes(p.status)),
-    pendingWithdrawals: dataSources.universalApprovals.filter(a => a.approvalType === 'Withdrawal Requests' && a.status === 'Pending Review'),
-    refundQueue: dataSources.universalApprovals.filter(a => a.approvalType === 'Refund Requests' && a.status === 'Pending Review'),
-  };
-
-  // SECTION 6: Customer & Dispute Health
-  const customerHealth = {
-    openDisputes: dataSources.disputes.filter(d => d.status && d.status.toUpperCase() !== 'RESOLVED' && d.status.toUpperCase() !== 'DISMISSED'),
-    openTickets: dataSources.support_tickets.filter(t => !['resolved', 'closed', 'Closed', 'Resolved'].includes(t.status || '')),
-    unreadNotifications: dataSources.notifications.filter(n => n.status === 'unread' || n.read === false),
-    negativeReviews: dataSources.reviews.filter(r => Number(r.rating) <= 2),
-    highPriorityComplaints: [
-      ...dataSources.support_tickets.filter(t => ['high', 'urgent', 'Urgent', 'High'].includes(t.priority || '')),
-      ...dataSources.disputes.filter(d => d.severity === 'high' || d.severity === 'critical')
-    ]
-  };
-
-  // SECTION 7: Marketing Campaigns / Ads
-  const marketingHealth = {
-    pending: dataSources.campaigns.filter(c => c.status === 'pending'),
-    paymentVerified: dataSources.campaigns.filter(c => c.paymentStatus === 'verified' || c.status === 'verified'),
-    runningCampaigns: dataSources.campaigns.filter(c => c.status === 'active'),
-    scheduled: dataSources.campaigns.filter(c => c.status === 'scheduled'),
-    paused: dataSources.campaigns.filter(c => c.status === 'paused'),
-    rejected: dataSources.campaigns.filter(c => c.status === 'rejected'),
-    endingSoon: dataSources.campaigns.filter(c => {
-      if (c.status !== 'active' || !c.endDate) return false;
-      const end = new Date(c.endDate);
-      const diff = end.getTime() - new Date().getTime();
-      return diff > 0 && diff < 3 * 24 * 60 * 60 * 1000; // 3 days
-    }),
-    expiredCampaigns: dataSources.campaigns.filter(c => c.status === 'expired' || (c.endDate && new Date(c.endDate) < new Date())),
-    featuredListings: dataSources.campaigns.filter(c => ['featured_product', 'featured_store'].includes(c.type || ''))
-  };
+  // Compute metrics in-memory using single canonical calculation pipeline
+  const {
+    overviewMetrics,
+    liveOrders,
+    inventoryHealth,
+    businessHealth,
+    paymentsSec,
+    customerHealth,
+    marketingHealth,
+  } = calculateCanonicalAdminMetrics(dataSources);
 
   // SECTION 8: Critical Alerts / Attention Required
   const criticalAlerts: any[] = [];
@@ -548,10 +422,14 @@ export const EnterpriseOperationsCenter = ({ onNavigateTab }: EnterpriseOperatio
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'New Orders', val: liveOrders.new.length, key: 'new', color: 'text-indigo-400' },
-              { label: 'Pending', val: liveOrders.pending.length, key: 'pending', color: 'text-amber-400' },
+              { label: 'Pending Payment', val: liveOrders.pending.length, key: 'pending', color: 'text-amber-400' },
+              { label: 'Preparing', val: liveOrders.preparing.length, key: 'preparing', color: 'text-purple-400' },
               { label: 'Packed', val: liveOrders.packed.length, key: 'packed', color: 'text-pink-400' },
               { label: 'Shipped', val: liveOrders.shipped.length, key: 'shipped', color: 'text-blue-400' },
+              { label: 'In Transit', val: liveOrders.inTransit.length, key: 'inTransit', color: 'text-cyan-400' },
+              { label: 'Out for Delivery', val: liveOrders.outForDelivery.length, key: 'outForDelivery', color: 'text-teal-400' },
               { label: 'Delivered', val: liveOrders.delivered.length, key: 'delivered', color: 'text-emerald-400' },
+              { label: 'Completed', val: liveOrders.completed.length, key: 'completed', color: 'text-emerald-500' },
               { label: 'Cancelled', val: liveOrders.cancelled.length, key: 'cancelled', color: 'text-slate-500' },
               { label: 'Refund Req.', val: liveOrders.refundRequested.length, key: 'refundRequested', color: 'text-rose-400' },
               { label: 'Refunded', val: liveOrders.refunded.length, key: 'refunded', color: 'text-violet-400' },

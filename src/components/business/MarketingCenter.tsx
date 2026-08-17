@@ -219,7 +219,7 @@ export const MarketingCenter: React.FC<Props> = ({ businessId, userId }) => {
 
     const totalCostPi = calculateCost();
     const auth = getFirebaseAuth();
-    const activeUserId = auth?.currentUser?.uid || userId;
+    const activeUserId = userId || auth?.currentUser?.uid || '';
 
     try {
       setLoading(true);

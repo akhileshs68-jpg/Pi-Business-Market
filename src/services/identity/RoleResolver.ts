@@ -33,7 +33,10 @@ export class RoleResolver {
     rolesSet.add('buyer');
 
     if (this.user.activeRole) {
-      rolesSet.add(normalizeRole(this.user.activeRole));
+      const normActive = normalizeRole(this.user.activeRole);
+      if (normActive === 'buyer' || (Array.isArray(this.user.roles) && this.user.roles.some(r => normalizeRole(r) === normActive)) || normalizeRole(this.user.platformRole) === normActive) {
+        rolesSet.add(normActive);
+      }
     }
     if (this.user.role) {
       rolesSet.add(normalizeRole(this.user.role));
@@ -100,23 +103,32 @@ export class RoleResolver {
   }
 
   isBusinessOwner(): boolean {
-    return true;
+    if (!this.user) return false;
+    if (this.isSuperAdmin()) return true;
+    const resolved = this.getResolvedRoles();
+    return resolved.has('business_owner');
   }
 
   isSeller(): boolean {
-    return true;
+    if (!this.user) return false;
+    if (this.isSuperAdmin()) return true;
+    const resolved = this.getResolvedRoles();
+    return resolved.has('seller');
   }
 
   isServiceProvider(): boolean {
-    return true;
+    if (!this.user) return false;
+    if (this.isSuperAdmin()) return true;
+    const resolved = this.getResolvedRoles();
+    return resolved.has('service_provider');
   }
 
   isBuyer(): boolean {
-    return true;
+    return this.user !== null;
   }
 
   isCustomer(): boolean {
-    return true;
+    return this.user !== null;
   }
 }
 

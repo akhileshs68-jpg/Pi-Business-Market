@@ -142,7 +142,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return (
         userRoleSet.has(norm) || 
         userCanonical === norm || 
-        activeRole === norm ||
         user.platformRole === norm ||
         user.roles?.includes(norm) ||
         user.roles?.includes(r)

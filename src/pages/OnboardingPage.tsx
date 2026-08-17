@@ -147,7 +147,7 @@ export const OnboardingPage: React.FC = () => {
   };
 
   const handleFinalSave = async () => {
-    if (!user) return;
+    if (!user || loading) return;
     setLoading(true);
     setError(null);
 
@@ -191,7 +191,7 @@ export const OnboardingPage: React.FC = () => {
         displayName,
         photoUrl: photoUrl || undefined,
         activeRole: 'seller', // default to active seller since they set up a business
-        roles: [...(user.roles || []), 'seller', 'buyer'],
+        roles: Array.from(new Set([...(user.roles || []), 'seller', 'buyer', 'business_owner'])),
         profileCompleted: true,
         onboardingCompleted: true,
         status: 'active'

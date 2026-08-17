@@ -128,9 +128,9 @@ export class IdentityResolver {
       piUid: canonicalPiUid,
       username: canonicalPiUid,
       displayName: canonicalPiUid,
-      roles: ['buyer', 'seller', 'business_owner', 'superadmin'],
-      platformRole: 'superadmin',
-      accountType: 'business',
+      roles: ['buyer'],
+      platformRole: 'user',
+      accountType: 'individual',
       status: 'active'
     }, currentFirebaseUid || canonicalPiUid);
 
@@ -244,7 +244,8 @@ export class IdentityResolver {
       firebaseUid: firebaseUid,
       username: firebaseUid,
       displayName: firebaseUid,
-      roles: ['buyer', 'seller', 'business_owner', 'service_provider'],
+      roles: ['buyer'],
+      platformRole: 'user',
       status: 'active'
     }, firebaseUid);
 
@@ -347,22 +348,35 @@ export class IdentityResolver {
     // platformRole is independent of business capabilities
     const platformRole = isSuperAdmin ? 'superadmin' : 'user';
 
-    // Every Pi user must always have these capabilities
-    const resolvedRoles: SystemRole[] = ['buyer', 'seller', 'business_owner', 'service_provider'];
+    // Resolve actual roles saved on the user profile or fallback to 'buyer'
+    const resolvedRoles: SystemRole[] = Array.isArray(data.roles) && data.roles.length > 0
+      ? (data.roles as SystemRole[])
+      : ['buyer'];
 
-    // activeRole is only the currently selected capability and must always be one of the four
+    // Ensure Super Admin has superadmin role as well
+    if (isSuperAdmin && !resolvedRoles.includes('superadmin')) {
+      resolvedRoles.push('superadmin');
+    }
+
+    // activeRole is only the currently selected capability projection
     let activeRole = isSuperAdmin ? 'business_owner' : 'buyer';
     const rawActive = data.activeRole || data.role;
     if (rawActive) {
       const normalized = rawActive.toLowerCase().trim().replace(/[\s_-]/g, '_');
+      let targetActive: SystemRole | null = null;
       if (normalized === 'buyer' || normalized === 'customer') {
-        activeRole = 'buyer';
+        targetActive = 'buyer';
       } else if (normalized === 'seller') {
-        activeRole = 'seller';
+        targetActive = 'seller';
       } else if (normalized === 'business_owner' || normalized === 'merchant' || normalized === 'owner' || normalized === 'businessowner') {
-        activeRole = 'business_owner';
+        targetActive = 'business_owner';
       } else if (normalized === 'service_provider' || normalized === 'serviceprovider') {
-        activeRole = 'service_provider';
+        targetActive = 'service_provider';
+      }
+
+      // Only allow shifting activeRole if the user is authorized to perform that role
+      if (targetActive && (resolvedRoles.includes(targetActive) || isSuperAdmin)) {
+        activeRole = targetActive;
       }
     }
 
