@@ -754,6 +754,39 @@ export class CampaignService {
   }
 
   /**
+   * Helper to resolve the canonical user profile document for authorization checks,
+   * properly following pointer documents (Firebase Auth UID -> canonical Pi UID).
+   */
+  private async resolveCanonicalUserData(uid: string): Promise<Record<string, any> | null> {
+    if (!uid) return null;
+    const db = getFirebaseDb();
+    try {
+      const userRef = doc(db, 'users', uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) return null;
+      
+      const data = userSnap.data();
+      if (data && data.pointer === true) {
+        const canonicalPiUid = data.targetPiUid || data.piUid;
+        if (!canonicalPiUid || canonicalPiUid === uid) {
+          return null;
+        }
+        const canonicalRef = doc(db, 'users', canonicalPiUid);
+        const canonicalSnap = await getDoc(canonicalRef);
+        if (!canonicalSnap.exists()) {
+          return null;
+        }
+        return canonicalSnap.data();
+      }
+      
+      return data;
+    } catch (err) {
+      console.warn('[CampaignService] Failed to resolve canonical user data for uid:', uid, err);
+      return null;
+    }
+  }
+
+  /**
    * Admin updates campaign status (Approve, Reject, Pause, Resume, Expire)
    */
   public async updateCampaignStatus(
@@ -772,16 +805,37 @@ export class CampaignService {
     const camp = snap.data() as Campaign;
     
     // Check if the caller is the merchant owner of this campaign
-    const isOwner = camp.merchantId === adminUid;
+    let isOwner = camp.merchantId === adminUid;
+    if (!isOwner && camp.merchantId) {
+      try {
+        const userRef = doc(db, 'users', adminUid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const uData = userSnap.data();
+          if (uData.pointer && (uData.targetPiUid === camp.merchantId || uData.piUid === camp.merchantId)) {
+            isOwner = true;
+          }
+        }
+      } catch (e) {}
+    }
     
     if (!isOwner) {
       // If not owner, caller must be an authorized administrator
-      const userRef = doc(db, 'users', adminUid);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.exists() ? userSnap.data() : null;
+      const userData = await this.resolveCanonicalUserData(adminUid);
       const isSystemAdmin = adminUid === 'sys_admin' || 
                             adminUid === 'akhileshs68' ||
-                            (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+                            (userData && (
+                              userData.platformRole === 'superadmin' || 
+                              userData.platformRole === 'admin' || 
+                              userData.role === 'Admin' || 
+                              userData.role === 'Super Admin' ||
+                              (Array.isArray(userData.roles) && (
+                                userData.roles.includes('superadmin') || 
+                                userData.roles.includes('admin') || 
+                                userData.roles.includes('Admin') || 
+                                userData.roles.includes('Super Admin')
+                              ))
+                            ));
       
       if (!isSystemAdmin) {
         throw new Error('Unauthorized: Only administrators or campaign owners can update this status.');
@@ -861,13 +915,22 @@ export class CampaignService {
   public async togglePinCampaign(campaignId: string, isPinned: boolean, adminUid: string): Promise<void> {
     const db = getFirebaseDb();
     
-    // Verify admin authority
-    const userRef = doc(db, 'users', adminUid);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.exists() ? userSnap.data() : null;
+    // Verify admin authority with pointer resolution
+    const userData = await this.resolveCanonicalUserData(adminUid);
     const isSystemAdmin = adminUid === 'sys_admin' || 
                           adminUid === 'akhileshs68' ||
-                          (userData && (userData.platformRole === 'superadmin' || userData.platformRole === 'admin' || userData.role === 'Admin' || userData.role === 'Super Admin'));
+                          (userData && (
+                            userData.platformRole === 'superadmin' || 
+                            userData.platformRole === 'admin' || 
+                            userData.role === 'Admin' || 
+                            userData.role === 'Super Admin' ||
+                            (Array.isArray(userData.roles) && (
+                              userData.roles.includes('superadmin') || 
+                              userData.roles.includes('admin') || 
+                              userData.roles.includes('Admin') || 
+                              userData.roles.includes('Super Admin')
+                            ))
+                          ));
     
     if (!isSystemAdmin) {
       throw new Error('Unauthorized: Only platform administrators can pin campaigns.');
