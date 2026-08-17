@@ -508,9 +508,19 @@ export class CampaignService {
       updatedAt: now
     };
 
+    // Sanitize newCampaign payload to strip any keys with 'undefined' values,
+    // protecting Firestore setDoc from throwing "Unsupported field value: undefined" errors.
+    const sanitizedCampaign: Record<string, any> = {};
+    Object.keys(newCampaign).forEach(key => {
+      const val = (newCampaign as any)[key];
+      if (val !== undefined) {
+        sanitizedCampaign[key] = val;
+      }
+    });
+
     const ref = doc(db, 'campaigns', id);
     await setDoc(ref, {
-      ...newCampaign,
+      ...sanitizedCampaign,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
