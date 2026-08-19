@@ -143,8 +143,9 @@ export const ServiceManagement: React.FC = () => {
             <p className="text-slate-500 font-medium">Marketplace for professional services and expertise.</p>
           </div>
           <button 
+            type="button"
             onClick={() => setIsWizardOpen(true)}
-            className="flex items-center gap-3 px-8 py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-black uppercase tracking-widest text-sm transition-all shadow-xl shadow-violet-600/20 active:scale-95"
+            className="min-h-[44px] flex items-center justify-center gap-3 px-8 py-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-violet-600/20 active:scale-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
           >
             <Plus className="w-5 h-5" />
             Publish Service
@@ -175,7 +176,11 @@ export const ServiceManagement: React.FC = () => {
                </div>
                <h4 className="text-white font-black text-lg mb-2 relative z-10 uppercase tracking-tight">Availability Rules</h4>
                <p className="text-violet-100/70 text-xs font-medium mb-6 relative z-10">Configure your global working hours and holiday blackout dates.</p>
-               <button className="w-full py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative z-10 border border-white/10">
+               <button 
+                 type="button"
+                 onClick={() => setIsWizardOpen(true)}
+                 className="min-h-[44px] w-full py-3 px-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative z-10 border border-white/10 cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+               >
                  Manage Schedule
                </button>
             </div>
@@ -185,12 +190,13 @@ export const ServiceManagement: React.FC = () => {
           <div className="lg:col-span-3 space-y-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
               <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input 
+                  id="service-search-input"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search Service Portfolio..." 
-                  className="w-full bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:border-violet-500 outline-none transition-all"
+                  className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                 />
               </div>
             </div>
@@ -201,13 +207,14 @@ export const ServiceManagement: React.FC = () => {
                 <p className="text-sm font-black text-slate-600 uppercase tracking-widest animate-pulse">Scanning Service Registry...</p>
               </div>
             ) : filteredServices.length === 0 ? (
-              <div className="py-32 text-center bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-[3rem]">
+              <div className="py-32 text-center bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-[3rem] px-6">
                 <Briefcase className="w-16 h-16 text-slate-700 mx-auto mb-6" />
                 <h3 className="text-2xl font-bold text-white mb-2">No Services Found</h3>
-                <p className="text-slate-500 max-w-sm mx-auto mb-10">Begin offering your expertise to the Pi Network community by publishing your first service.</p>
+                <p className="text-slate-500 max-w-sm mx-auto mb-10 text-xs">Begin offering your expertise to the Pi Network community by publishing your first service.</p>
                 <button 
+                  type="button"
                   onClick={() => setIsWizardOpen(true)}
-                  className="px-10 py-4 bg-violet-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-violet-600/20"
+                  className="min-h-[44px] px-10 py-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-violet-600/20 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none inline-flex items-center justify-center"
                 >
                   Launch New Service
                 </button>
@@ -224,7 +231,7 @@ export const ServiceManagement: React.FC = () => {
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="w-full md:w-48 h-48 rounded-3xl bg-slate-950 border border-slate-800 relative overflow-hidden group-hover:scale-105 transition-transform shrink-0">
                         {service.mainImage ? (
-                          <img src={service.mainImage} alt={service.title} className="w-full h-full object-cover" />
+                          <img src={service.mainImage} alt={service.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Briefcase className="w-12 h-12 text-slate-800" />
@@ -270,24 +277,29 @@ export const ServiceManagement: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <button 
+                              type="button"
+                              aria-label="Duplicate Service"
                               disabled={actionLoading === service.serviceId}
                               onClick={() => handleDuplicate(service.serviceId)}
                               title="Duplicate Service"
-                              className="p-3 bg-slate-800 hover:bg-violet-600 text-slate-300 hover:text-white rounded-xl transition-all"
+                              className="min-h-[44px] min-w-[44px] flex items-center justify-center p-3 bg-slate-800 hover:bg-violet-600 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                             >
                               <Archive className="w-4 h-4" />
                             </button>
                             <button 
+                              type="button"
+                              aria-label="Delete Service"
                               disabled={actionLoading === service.serviceId}
                               onClick={() => handleDelete(service.serviceId)}
                               title="Delete Service"
-                              className="p-3 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded-xl transition-all"
+                              className="min-h-[44px] min-w-[44px] flex items-center justify-center p-3 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                             <button 
+                              type="button"
                               onClick={() => setIsWizardOpen(true)}
-                              className="flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                              className="min-h-[44px] flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                             >
                               Manage <ChevronRight className="w-4 h-4" />
                             </button>

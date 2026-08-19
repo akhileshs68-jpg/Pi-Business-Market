@@ -42,69 +42,69 @@ export const ReputationWidget: React.FC<ReputationWidgetProps> = ({ entityId, en
     }
   };
 
-  if (loading) return <div className="h-48 bg-slate-900/50 rounded-[2.5rem] animate-pulse" />;
+  if (loading) return <div className="h-48 bg-slate-900/50 rounded-2xl border border-slate-800 animate-pulse" />;
 
   if (!score) return (
-    <div className="p-8 bg-slate-900/50 border border-slate-800 rounded-[2.5rem] flex items-center gap-6">
-      <div className="w-16 h-16 bg-slate-800 rounded-3xl flex items-center justify-center text-slate-600">
-        <Activity size={32} />
+    <div className="p-6 sm:p-8 bg-slate-900/50 border border-slate-800 rounded-2xl flex items-center gap-5">
+      <div className="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
+        <Activity size={28} />
       </div>
       <div>
-        <h4 className="text-sm font-black text-white uppercase">Building Reputation</h4>
-        <p className="text-xs text-slate-500 font-medium">Be the first to provide feedback for this {entityType}.</p>
+        <h4 className="text-xs font-black text-white uppercase tracking-wider">Building Reputation</h4>
+        <p className="text-xs text-slate-400 font-medium mt-0.5">Be the first to provide verified feedback for this {entityType}.</p>
       </div>
     </div>
   );
 
   return (
-    <div className="p-8 bg-slate-900 border border-slate-800 rounded-[2.5rem] space-y-8 relative overflow-hidden group">
-      <div className="flex items-start justify-between relative z-10">
+    <div className="p-6 sm:p-8 bg-slate-900 border border-slate-800 rounded-2xl space-y-6 relative overflow-hidden group shadow-xl">
+      <div className="flex items-start justify-between relative z-10 gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Reputation Score</span>
-            <ShieldCheck size={14} className="text-emerald-500" />
+            <span className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Reputation Score</span>
+            <ShieldCheck size={14} className="text-emerald-400" />
           </div>
-          <div className="flex items-end gap-3">
-            <h3 className="text-5xl font-black text-white leading-none">{score.overallRating.toFixed(1)}</h3>
-            <div className="pb-1">
-              <RatingStars rating={score.overallRating} size={18} className="mb-1" />
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{score.reviewCount} Total Reviews</p>
+          <div className="flex items-end gap-3 flex-wrap">
+            <h3 className="text-4xl sm:text-5xl font-black text-white leading-none font-mono">{score.overallRating.toFixed(1)}</h3>
+            <div className="pb-0.5">
+              <RatingStars rating={score.overallRating} size={16} className="mb-1" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{score.reviewCount} Total Reviews</p>
             </div>
           </div>
         </div>
         
-        <div className="p-4 bg-slate-950 border border-slate-800 rounded-3xl">
+        <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl shrink-0">
           <div className="text-center">
-            <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Trust Score</p>
-            <p className="text-2xl font-black text-white">{score.trustScore}%</p>
+            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Trust Score</p>
+            <p className="text-xl sm:text-2xl font-black text-white font-mono">{score.trustScore}%</p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 relative z-10">
-        <div className="p-4 bg-slate-950/50 rounded-2xl border border-slate-800/50 flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
+        <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800/80 flex items-center gap-3">
+          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0">
             <CheckCircle2 size={16} />
           </div>
-          <div>
-            <p className="text-[10px] font-black text-white uppercase">{score.verifiedReviewCount}</p>
-            <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Verified</p>
+          <div className="min-w-0">
+            <p className="text-xs font-black text-white font-mono truncate">{score.verifiedReviewCount}</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">Verified Purchases</p>
           </div>
         </div>
-        <div className="p-4 bg-slate-950/50 rounded-2xl border border-slate-800/50 flex items-center gap-3">
-          <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl">
+        <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800/80 flex items-center gap-3">
+          <div className="p-2 bg-violet-500/10 text-violet-400 rounded-lg shrink-0">
             <TrendingUp size={16} />
           </div>
-          <div>
-            <p className="text-[10px] font-black text-white uppercase">{score.responseRate || 100}%</p>
-            <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Response</p>
+          <div className="min-w-0">
+            <p className="text-xs font-black text-white font-mono truncate">{score.responseRate || 100}%</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">Response Rate</p>
           </div>
         </div>
       </div>
 
-      {/* Decorative SVG Pattern */}
-      <div className="absolute top-0 right-0 -mr-16 -mt-16 text-indigo-600/5 group-hover:text-indigo-600/10 transition-colors">
-        <Award size={200} strokeWidth={0.5} />
+      {/* Subtle decorative background icon */}
+      <div className="absolute top-0 right-0 -mr-12 -mt-12 text-violet-600/5 group-hover:text-violet-600/10 transition-colors pointer-events-none">
+        <Award size={180} strokeWidth={0.5} />
       </div>
     </div>
   );

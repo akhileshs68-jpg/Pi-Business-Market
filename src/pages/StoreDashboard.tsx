@@ -177,43 +177,51 @@ export const StoreDashboard: React.FC = () => {
         {/* Filters & Search */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6 mb-8">
           <div className="w-full min-w-0 lg:w-auto overflow-x-auto scrollbar-hide max-w-full touch-pan-x py-0.5">
-            <div className="inline-flex items-center gap-1 bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 w-max min-w-max flex-nowrap">
+            <div className="inline-flex items-center gap-1 bg-slate-900 p-1 rounded-xl sm:rounded-2xl border border-slate-800 w-max min-w-max flex-nowrap" role="tablist" aria-label="Store dashboard views">
               <button
+                role="tab"
+                aria-selected={activeView === 'stores'}
                 onClick={() => setActiveView('stores')}
-                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all min-h-[44px] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   activeView === 'stores' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                    : 'text-slate-500 hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <StoreIcon size={14} className="shrink-0" /> My Stores
               </button>
               <button
+                role="tab"
+                aria-selected={activeView === 'products'}
                 onClick={() => setActiveView('products')}
-                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all min-h-[44px] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   activeView === 'products' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                    : 'text-slate-500 hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Package size={14} className="shrink-0" /> Products
               </button>
               <button
+                role="tab"
+                aria-selected={activeView === 'reviews'}
                 onClick={() => setActiveView('reviews')}
-                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all min-h-[44px] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   activeView === 'reviews' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                    : 'text-slate-500 hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <MessageSquare size={14} className="shrink-0" /> Reputation
               </button>
               <button
+                role="tab"
+                aria-selected={activeView === 'marketing'}
                 onClick={() => setActiveView('marketing')}
-                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all min-h-[40px] ${
+                className={`shrink-0 whitespace-nowrap flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg sm:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all min-h-[44px] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   activeView === 'marketing' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                    : 'text-slate-500 hover:text-white'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Megaphone size={14} className="shrink-0" /> Marketing & Ads
@@ -225,8 +233,8 @@ export const StoreDashboard: React.FC = () => {
             <div className="inline-flex items-center gap-2 sm:gap-3 w-max min-w-max flex-nowrap">
               <button 
                 onClick={() => setFilterBusiness('all')}
-                className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all uppercase tracking-widest border ${
-                  filterBusiness === 'all' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                className={`shrink-0 whitespace-nowrap min-h-[44px] px-3.5 sm:px-4 py-2 rounded-xl text-[10px] font-bold transition-all uppercase tracking-widest border cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
+                  filterBusiness === 'all' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
                 All Stores
@@ -235,8 +243,8 @@ export const StoreDashboard: React.FC = () => {
                 <button
                   key={biz.id}
                   onClick={() => setFilterBusiness(biz.id)}
-                  className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-[9px] sm:text-[10px] font-bold transition-all uppercase tracking-widest border ${
-                    filterBusiness === biz.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                  className={`shrink-0 whitespace-nowrap min-h-[44px] px-3.5 sm:px-4 py-2 rounded-xl text-[10px] font-bold transition-all uppercase tracking-widest border cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
+                    filterBusiness === biz.id ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {biz.businessName}

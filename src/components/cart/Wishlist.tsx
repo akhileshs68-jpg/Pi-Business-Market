@@ -232,17 +232,20 @@ export const Wishlist: React.FC<WishlistProps> = ({
 
   if (items.length === 0) {
     return (
-      <div className="bg-slate-900/20 border border-slate-800/60 p-10 rounded-2xl flex flex-col items-center justify-center text-center">
-        <Heart className="w-10 h-10 text-slate-700 mb-4 animate-pulse" />
-        <h3 className="text-base font-bold text-slate-300">No saved items yet.</h3>
-        <p className="text-xs text-slate-500 max-w-xs mt-1 mb-6 leading-relaxed">
-          Tap the wishlist heart icon on products or services to keep track of items you love.
+      <div className="bg-slate-900/40 border border-slate-800/80 p-12 rounded-3xl flex flex-col items-center justify-center text-center max-w-xl mx-auto my-6">
+        <div className="w-16 h-16 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center mb-5 shadow-xl">
+          <Heart className="w-8 h-8 text-rose-500/80" />
+        </div>
+        <h3 className="text-base font-bold text-white uppercase tracking-tight">Your Wishlist is Empty</h3>
+        <p className="text-xs text-slate-400 max-w-sm mt-1.5 mb-6 leading-relaxed">
+          Save products and services you want to track by clicking the heart icon anywhere across the marketplace.
         </p>
         <button 
           onClick={handleAddDemoWishlistItem}
-          className="py-2.5 px-5 bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all border border-slate-800 cursor-pointer flex items-center gap-1.5"
+          aria-label="Add demo items to wishlist"
+          className="min-h-[44px] px-6 py-2.5 bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all border border-slate-800 cursor-pointer flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <Sparkles className="w-4 h-4 text-amber-400" />
           <span>Add Wishlist Demo Items</span>
         </button>
       </div>
@@ -251,62 +254,66 @@ export const Wishlist: React.FC<WishlistProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center pb-2 border-b border-slate-800/40">
-        <h2 className="text-sm font-bold text-slate-400 flex items-center gap-2 uppercase tracking-wider">
+      <div className="flex justify-between items-center pb-3 border-b border-slate-800/80">
+        <h2 className="text-sm font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
           <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
           <span>My Wishlist ({items.length})</span>
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {items.map((item) => (
           <motion.div 
             key={item.wishlistId}
             layout
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-slate-900/40 border border-slate-850 p-4 rounded-xl flex items-center gap-4 hover:border-slate-800 transition-all group"
+            className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-2xl flex items-center gap-4 hover:border-slate-700/80 transition-all group relative"
           >
             {/* Image */}
-            <div className="w-16 h-16 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 shrink-0 relative flex items-center justify-center">
+            <div className="w-20 h-20 bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shrink-0 relative flex items-center justify-center">
               {item.imageUrl ? (
                 <img 
                   src={item.imageUrl} 
                   alt={item.name} 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+                  }}
                 />
               ) : (
-                <ShoppingBag className="w-5 h-5 text-slate-600" />
+                <ShoppingBag className="w-6 h-6 text-slate-600" />
               )}
-              <span className="absolute bottom-1 left-1 text-[8px] font-black uppercase tracking-widest px-1 py-0.2 bg-slate-950/80 text-slate-500 rounded border border-slate-850">
-                {item.entityType === 'service' ? 'Serv' : 'Prod'}
+              <span className="absolute bottom-1 left-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-slate-950/90 text-slate-300 rounded border border-slate-800">
+                {item.entityType === 'service' ? 'Service' : 'Product'}
               </span>
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
               <div className="min-w-0">
-                <h4 className="text-xs font-bold text-white truncate uppercase tracking-tight">{item.name}</h4>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
-                  <Store className="w-3 h-3 text-violet-400" />
+                <h4 className="text-sm font-bold text-white truncate hover:text-violet-400 transition-colors">{item.name}</h4>
+                <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                  <Store className="w-3.5 h-3.5 text-violet-400 shrink-0" />
                   <span className="truncate">{item.sellerName || 'Pi Merchant'}</span>
                 </p>
-                <p className="text-xs font-bold text-violet-400 font-mono mt-1">{item.price} Pi</p>
+                <p className="text-xs font-black text-violet-400 font-mono mt-1">{item.price.toFixed(2)} Pi</p>
               </div>
 
-              <div className="flex items-center gap-3 mt-3">
+              <div className="flex items-center gap-2 mt-3">
                 <button 
                   onClick={() => handleMoveToCart(item)}
                   disabled={actionLoading === item.wishlistId}
-                  className="px-3 py-1.5 bg-violet-600/10 hover:bg-violet-600 text-violet-400 hover:text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                  aria-label={`Move ${item.name} to cart`}
+                  className="min-h-[44px] px-3.5 py-2 bg-violet-600/10 hover:bg-violet-600 text-violet-400 hover:text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                 >
                   {actionLoading === item.wishlistId ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <>
                       <span>Add to Cart</span>
-                      <ArrowRight className="w-3 h-3" />
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}
                 </button>
@@ -314,10 +321,11 @@ export const Wishlist: React.FC<WishlistProps> = ({
                 <button 
                   onClick={() => handleRemove(item.wishlistId)}
                   disabled={actionLoading === item.wishlistId}
-                  className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                  aria-label={`Remove ${item.name} from wishlist`}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-slate-800 rounded-xl text-slate-400 hover:text-rose-400 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                   title="Remove"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>

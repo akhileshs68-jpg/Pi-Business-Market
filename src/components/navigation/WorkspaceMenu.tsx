@@ -159,7 +159,10 @@ export const WorkspaceMenu: React.FC<WorkspaceMenuProps> = ({
       {/* TRIGGER CONTROL */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-violet-900/80 to-indigo-900/80 hover:from-violet-800 hover:to-indigo-800 border border-violet-500/40 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:shadow-violet-500/10 cursor-pointer active:scale-95"
+        aria-label="My Workspace"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-violet-900/80 to-indigo-900/80 hover:from-violet-800 hover:to-indigo-800 border border-violet-500/40 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:shadow-violet-500/10 cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
         id="nav_my_workspace_btn"
         title="My Workspace"
       >

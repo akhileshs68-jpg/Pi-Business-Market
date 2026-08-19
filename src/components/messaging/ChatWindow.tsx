@@ -22,7 +22,6 @@ import {
   ShoppingBag,
   Store,
   User,
-  AlertTriangle,
   Ban,
   Flag,
   QrCode,
@@ -33,9 +32,10 @@ import {
   HelpCircle,
   Truck,
   CheckCircle,
-  Play,
   PlayCircle,
-  Info
+  Info,
+  ArrowLeft,
+  ShieldCheck
 } from 'lucide-react';
 import { Conversation, Message, MessageType } from '../../types';
 import { messagingService } from '../../services/messagingService';
@@ -44,11 +44,13 @@ import { orderService } from '../../services/orderService';
 interface ChatWindowProps {
   conversation: Conversation;
   currentUserUid: string;
+  onBack?: () => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   conversation,
-  currentUserUid
+  currentUserUid,
+  onBack
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -126,15 +128,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Subscribe to real-time message stream
   useEffect(() => {
-    // Reset typing status on conversation change
     setIsTyping(false);
-
-    // Auto mark as read on window display
     messagingService.markAsRead(conversation.conversationId, currentUserUid);
 
     const unsubscribe = messagingService.subscribeToMessages(conversation.conversationId, (data) => {
       setMessages(data);
-      // Trigger a light typing response simulation if incoming messages are fresh
       if (data.length > 0 && data[data.length - 1].senderUid !== currentUserUid) {
         setIsTyping(true);
         const timer = setTimeout(() => setIsTyping(false), 2500);
@@ -147,7 +145,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     };
   }, [conversation.conversationId, currentUserUid]);
 
-  // Scroll to bottom when messages list changes
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
@@ -177,7 +174,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         currentUserUid,
         contentToSend,
         typeToSend,
-        undefined, // Attachments list
+        undefined,
         overrideMetadata,
         replyingTo?.messageId || undefined,
         senderRole
@@ -189,7 +186,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       setReplyingTo(null);
     } catch (err: any) {
       console.error('Send message failed:', err);
-      alert(err.message || 'Failed to dispatch message.');
     } finally {
       setIsSending(false);
     }
@@ -203,9 +199,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       if (isBlocked) {
         await messagingService.unblockUser(currentUserUid, otherUid);
         setIsBlocked(false);
-        alert('User has been unblocked.');
       } else {
-        if (confirm('Are you sure you want to block communications with this user?')) {
+        if (window.confirm('Are you sure you want to block communications with this user?')) {
           await messagingService.blockUser(currentUserUid, otherUid);
           setIsBlocked(true);
         }
@@ -223,7 +218,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       await messagingService.reportConversation(conversation.conversationId, currentUserUid, reportReason);
       setReportReason('');
       setShowReportDialog(false);
-      alert('This conversation was securely reported. Our security team will review it immediately.');
     } catch (err) {
       console.error('Failed to file abuse report:', err);
     }
@@ -244,10 +238,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         `Status updated from within Inbox Order Hub.`
       );
       
-      // Auto-refresh order info
       fetchOrderDetails();
       
-      // Send a system reference message to log this update in the chat
       await handleSend(
         undefined,
         'system',
@@ -256,17 +248,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       );
     } catch (err) {
       console.error('Order status update failed:', err);
-      alert('Unable to process status change.');
     }
   };
 
-  // Participant naming helper
   const getPartnerDisplayName = () => {
     const isMerchant = currentUserUid === orderData?.sellerId || currentUserUid === orderData?.businessId;
     if (conversation.orderId) {
-      return isMerchant ? 'Customer Support' : (conversation.businessId || 'Pi Vendor');
+      return isMerchant ? 'Customer Support' : (conversation.businessId || 'Pi Merchant');
     }
-    return conversation.businessId || 'Secure Partner';
+    return conversation.businessId || 'Direct Merchant Chat';
   };
 
   const isMeSender = (senderId: string) => {
@@ -274,69 +264,100 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#030712] relative flex-1" id="chat-window">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-100 relative flex-1" id="chat-window">
       {/* 1. Header Area with Options Dropdown */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-900 bg-[#070b19]/90 backdrop-blur z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/10 to-indigo-500/20 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-400">
-            {conversation.orderId ? <ShoppingBag className="w-5 h-5 text-indigo-400" /> : <User className="w-5 h-5" />}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-900/80 bg-slate-950 z-20">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Mobile Back Button */}
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back to conversations list"
+              className="md:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+
+          <div className="w-10 h-10 rounded-xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center font-bold text-violet-400 shrink-0">
+            {conversation.orderId ? <ShoppingBag className="w-5 h-5" /> : <User className="w-5 h-5" />}
           </div>
-          <div>
-            <h2 className="text-xs font-black text-white uppercase tracking-tight">
-              {getPartnerDisplayName()}
-            </h2>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
+                {getPartnerDisplayName()}
+              </h2>
+              <span title="Verified Merchant">
+                <ShieldCheck className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                Active Secure Pi Connection
+              <span className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
+              <span className="text-[10px] text-slate-400 font-semibold truncate">
+                Verified Pi Network Partner
               </span>
             </div>
           </div>
         </div>
 
         {/* Action Triggers */}
-        <div className="flex items-center gap-2 relative" ref={optionsRef}>
+        <div className="flex items-center gap-1.5 sm:gap-2 relative shrink-0" ref={optionsRef}>
           <button 
+            type="button"
             onClick={() => setShowCallScreen('voice')}
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-850 text-slate-400 hover:text-white hover:border-slate-700 transition-all shadow-md"
-            title="Secure Voice Call"
+            aria-label="Start Voice Call"
+            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <Phone className="w-4 h-4" />
           </button>
           <button 
+            type="button"
             onClick={() => setShowCallScreen('video')}
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-850 text-slate-400 hover:text-white hover:border-slate-700 transition-all shadow-md"
-            title="Secure Video Call"
+            aria-label="Start Video Call"
+            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <Video className="w-4 h-4" />
           </button>
           
           <button 
+            type="button"
             onClick={() => setShowOptionsMenu(!showOptionsMenu)}
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-850 text-slate-400 hover:text-white hover:border-slate-700 transition-all shadow-md"
-            title="More Options"
+            aria-label="More conversation options"
+            aria-expanded={showOptionsMenu}
+            className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
 
           {/* Expanded Dropdown Options */}
           {showOptionsMenu && (
-            <div className="absolute right-0 top-12 bg-slate-950 border border-slate-800 rounded-xl py-1.5 w-52 shadow-2xl z-30">
-              <button 
-                onClick={handleToggleBlock}
-                className="w-full text-left px-4 py-2.5 text-xs text-rose-400 hover:bg-rose-500/10 font-bold flex items-center gap-2.5 transition-colors"
-              >
-                <Ban className="w-4 h-4" /> {isBlocked ? 'Unblock Communications' : 'Block User Connection'}
-              </button>
-              <button 
-                onClick={() => { setShowReportDialog(true); setShowOptionsMenu(false); }}
-                className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-900 font-bold flex items-center gap-2.5 transition-colors"
-              >
-                <Flag className="w-4 h-4 text-indigo-400" /> Report Abuse/Spam
-              </button>
-              <div className="border-t border-slate-900 my-1" />
-              <div className="px-4 py-2 text-[8px] text-slate-500 font-black uppercase tracking-widest">
-                ID: {conversation.conversationId.substring(0, 16)}...
+            <div 
+              role="menu"
+              className="absolute right-0 top-12 bg-slate-900 border border-slate-800 rounded-xl py-1.5 w-56 shadow-2xl z-30 divide-y divide-slate-800/80"
+            >
+              <div className="py-1">
+                <button 
+                  type="button"
+                  role="menuitem"
+                  onClick={handleToggleBlock}
+                  className="w-full text-left px-4 py-2.5 min-h-[44px] text-xs text-rose-400 hover:bg-rose-500/10 font-bold flex items-center gap-2.5 transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
+                >
+                  <Ban className="w-4 h-4" />
+                  <span>{isBlocked ? 'Unblock Partner' : 'Block Partner'}</span>
+                </button>
+                <button 
+                  type="button"
+                  role="menuitem"
+                  onClick={() => { setShowReportDialog(true); setShowOptionsMenu(false); }}
+                  className="w-full text-left px-4 py-2.5 min-h-[44px] text-xs text-slate-300 hover:bg-slate-800 font-bold flex items-center gap-2.5 transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
+                >
+                  <Flag className="w-4 h-4 text-violet-400" />
+                  <span>Report Conversation</span>
+                </button>
+              </div>
+              <div className="px-4 py-2 text-[9px] text-slate-400 font-mono">
+                Chat ID: {conversation.conversationId.substring(0, 14)}...
               </div>
             </div>
           )}
@@ -345,49 +366,52 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* 2. Enterprise Order Status Integration Bar */}
       {orderData && (
-        <div className="bg-indigo-950/20 border-b border-indigo-500/10 px-6 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4 z-10 shadow-lg">
+        <div className="bg-slate-900/90 border-b border-slate-800 px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-              <ShoppingBag className="w-5 h-5 text-indigo-400" />
+            <div className="w-9 h-9 rounded-lg bg-violet-600/15 border border-violet-500/20 flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-4 h-4 text-violet-400" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">Order:</span>
-                <span className="text-[11px] font-black text-white uppercase tracking-wider bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded-md">
-                  {orderData.orderNumber || conversation.orderId?.substring(0, 8).toUpperCase()}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-slate-400 font-bold uppercase">Order</span>
+                <span className="text-xs font-bold text-white bg-slate-950 border border-slate-800 px-2 py-0.5 rounded-md">
+                  #{orderData.orderNumber || conversation.orderId?.substring(0, 8).toUpperCase()}
                 </span>
-                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                  orderData.orderStatus === 'completed' || orderData.orderStatus === 'paid'
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  orderData.orderStatus === 'completed' || orderData.orderStatus === 'paid' || orderData.orderStatus === 'delivered'
                     ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 animate-pulse'
+                    : 'bg-violet-500/10 border-violet-500/20 text-violet-300'
                 }`}>
                   {orderData.orderStatus?.replace(/_/g, ' ')}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium mt-1">
-                Grand Total: <span className="text-amber-400 font-extrabold">{orderData.grandTotal || orderData.totalAmount || 0} Pi Testnet</span> • Status: <span className="text-white font-bold">{orderData.paymentStatus || 'unpaid'}</span>
+              <p className="text-[11px] text-slate-300 font-medium mt-0.5">
+                Total: <span className="text-violet-400 font-bold">{orderData.grandTotal || orderData.totalAmount || 0} π</span> • Payment: <span className="text-white font-bold capitalize">{orderData.paymentStatus || 'unpaid'}</span>
               </p>
             </div>
           </div>
 
           {/* Quick Action Buttons per role */}
-          <div className="flex items-center gap-2 self-start md:self-auto">
+          <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
             {currentUserUid === orderData.sellerId || currentUserUid === orderData.businessId ? (
               <>
                 {orderData.orderStatus === 'pending_payment' && (
                   <button 
+                    type="button"
                     onClick={() => handleUpdateOrderStatus('payment_verified')}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md"
+                    className="px-3 py-2 min-h-[40px] bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
-                    Verify Pi Payment
+                    Verify Payment
                   </button>
                 )}
                 {orderData.orderStatus === 'payment_verified' && (
                   <button 
+                    type="button"
                     onClick={() => handleUpdateOrderStatus('dispatched')}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-1"
+                    className="px-3 py-2 min-h-[40px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
-                    <Truck className="w-3.5 h-3.5" /> Ship Cargo
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Ship Cargo</span>
                   </button>
                 )}
               </>
@@ -395,16 +419,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               <>
                 {['shipped', 'dispatched', 'out_for_delivery', 'delivered'].includes((orderData.orderStatus || '').toLowerCase()) && (
                   <button 
+                    type="button"
                     onClick={() => handleUpdateOrderStatus('completed')}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5"
+                    className="px-3 py-2 min-h-[40px] bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
-                    <CheckCircle className="w-3.5 h-3.5" /> Confirm Receipt
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>Confirm Receipt</span>
                   </button>
                 )}
                 {['pending_payment', 'payment_verified'].includes(orderData.orderStatus) && (
                   <button 
+                    type="button"
                     onClick={() => handleUpdateOrderStatus('cancelled')}
-                    className="px-3.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-900/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                    className="px-3 py-2 min-h-[40px] bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     Cancel Order
                   </button>
@@ -412,76 +439,81 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               </>
             )}
             <button 
+              type="button"
               onClick={() => window.open(`/order-details/${conversation.orderId}`, '_blank')}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-all"
+              className="px-3 py-2 min-h-[40px] bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
-              <ExternalLink className="w-3.5 h-3.5" /> Full Hub
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Order Details</span>
             </button>
           </div>
         </div>
       )}
 
       {/* 3. Message List Sandbox */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-900 scrollbar-track-transparent">
-        {messages.map((msg, index) => {
+      <div 
+        className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 scrollbar-thin scrollbar-thumb-slate-900 scrollbar-track-transparent"
+        role="region"
+        aria-label="Conversation messages"
+      >
+        {messages.map((msg) => {
           const isMe = isMeSender(msg.senderUid);
-          const reactions = msg.metadata?.reactions || {};
 
           return (
             <React.Fragment key={msg.messageId}>
               {/* SYSTEM MESSAGE FORMAT */}
               {msg.messageType === 'system' ? (
-                <div className="flex justify-center my-4 animate-fade-in">
-                  <div className="bg-indigo-950/20 border border-indigo-500/10 px-4 py-2 rounded-2xl flex items-center gap-2 max-w-lg shadow-inner">
-                    <Info className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest leading-relaxed text-center">
+                <div className="flex justify-center my-3">
+                  <div className="bg-slate-900/90 border border-slate-800 px-4 py-2 rounded-xl flex items-center gap-2 max-w-lg shadow-sm">
+                    <Info className="w-4 h-4 text-violet-400 shrink-0" />
+                    <span className="text-xs font-medium text-slate-300 leading-relaxed text-center">
                       {msg.content}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-3 animate-fade-in`}>
+                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} items-end gap-2.5`}>
                   {/* Left avatar if not me */}
                   {!isMe && (
-                    <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center font-bold text-[10px] text-indigo-400 uppercase shrink-0">
-                      {msg.senderRole?.substring(0, 1) || 'U'}
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center font-bold text-xs text-violet-400 uppercase shrink-0">
+                      {msg.senderRole?.substring(0, 1) || 'M'}
                     </div>
                   )}
 
                   <div className="flex flex-col max-w-[85%] sm:max-w-md relative group">
                     <div className={`
-                      p-4 rounded-2xl relative transition-all shadow-md
+                      p-3.5 sm:p-4 rounded-2xl relative transition-all shadow-md
                       ${isMe 
-                        ? 'bg-indigo-600 text-white rounded-tr-none border border-indigo-500' 
-                        : 'bg-slate-950 text-slate-100 rounded-tl-none border border-slate-900'}
+                        ? 'bg-violet-600 text-white rounded-tr-none border border-violet-500' 
+                        : 'bg-slate-900 text-slate-100 rounded-tl-none border border-slate-800'}
                     `}>
                       {/* Replying indicator */}
                       {msg.replyTo && (
-                        <div className="mb-2.5 p-2 bg-slate-900/60 rounded-lg border-l-4 border-indigo-400 text-[10px] text-slate-300 italic truncate max-w-full">
-                          Reply Reference
+                        <div className="mb-2 p-2 bg-slate-950/40 rounded-lg border-l-4 border-violet-400 text-xs text-slate-300 italic truncate max-w-full">
+                          Replying to message
                         </div>
                       )}
 
                       {/* TEXT MESSAGE */}
                       {msg.messageType === 'text' && (
-                        <p className="text-xs sm:text-sm font-medium leading-relaxed whitespace-pre-wrap select-text">
+                        <p className="text-xs sm:text-sm font-normal leading-relaxed whitespace-pre-wrap select-text break-words">
                           {msg.content}
                         </p>
                       )}
 
                       {/* OVERSIZED EMOJI MESSAGE */}
                       {msg.messageType === 'emoji' && (
-                        <span className="text-4xl block py-1 select-none leading-none">
+                        <span className="text-3xl sm:text-4xl block py-1 select-none leading-none">
                           {msg.content}
                         </span>
                       )}
 
                       {/* IMAGE ATTACHMENT */}
                       {msg.messageType === 'image' && (
-                        <div className="rounded-xl overflow-hidden border border-slate-900 bg-slate-950 max-w-xs shadow-lg">
+                        <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 max-w-xs shadow-lg">
                           <img 
                             src={msg.content} 
-                            alt="Attachment View" 
+                            alt="Attachment" 
                             className="w-full object-cover max-h-56 select-none"
                             referrerPolicy="no-referrer"
                           />
@@ -490,19 +522,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                       {/* PDF DOCUMENT */}
                       {msg.messageType === 'pdf' && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between gap-4 max-w-xs shadow-md">
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3 max-w-xs shadow-md">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className="w-9 h-9 rounded-lg bg-rose-500/10 flex items-center justify-center border border-rose-500/20 shrink-0">
-                              <FileText className="w-5 h-5 text-rose-500" />
+                              <FileText className="w-5 h-5 text-rose-400" />
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[11px] font-black text-slate-200 uppercase tracking-tight truncate">Enterprise_Invoice.pdf</p>
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest block">Adobe PDF Document</span>
+                              <p className="text-xs font-bold text-slate-200 truncate">Document.pdf</p>
+                              <span className="text-[10px] text-slate-400">PDF Attachment</span>
                             </div>
                           </div>
                           <button 
+                            type="button"
                             onClick={() => window.open(msg.content, '_blank')}
-                            className="p-1.5 rounded bg-slate-950 hover:bg-slate-850 text-slate-400 hover:text-white border border-slate-850 transition-colors"
+                            aria-label="Download PDF document"
+                            className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
                           >
                             <Download className="w-4 h-4" />
                           </button>
@@ -511,19 +545,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                       {/* PRODUCT CARD IN CATALOG */}
                       {msg.messageType === 'product_card' && (
-                        <div className="bg-slate-900/95 border border-slate-800 rounded-xl overflow-hidden max-w-xs shadow-xl">
-                          <img src={msg.metadata?.mainImage || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400'} alt="Product" className="h-32 w-full object-cover border-b border-slate-850" referrerPolicy="no-referrer" />
-                          <div className="p-3.5">
-                            <span className="text-[8px] font-black bg-violet-500/15 text-violet-400 border border-violet-500/20 uppercase tracking-widest px-1.5 py-0.5 rounded block w-max mb-1.5">Product</span>
-                            <h4 className="text-[11px] font-black text-white uppercase tracking-tight truncate">{msg.content}</h4>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{msg.metadata?.brand || 'Premium Brand'}</p>
-                            <div className="flex items-center justify-between mt-3.5 border-t border-slate-850 pt-3">
-                              <span className="text-xs font-black text-amber-400">{msg.metadata?.price || 0} Pi Coin</span>
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden max-w-xs shadow-xl">
+                          <img src={msg.metadata?.mainImage || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400'} alt="Product" className="h-32 w-full object-cover border-b border-slate-800" referrerPolicy="no-referrer" />
+                          <div className="p-3.5 space-y-2">
+                            <span className="text-[9px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/20 uppercase tracking-wider px-1.5 py-0.5 rounded inline-block">Product</span>
+                            <h4 className="text-xs font-bold text-white truncate">{msg.content}</h4>
+                            <p className="text-[11px] text-slate-400">{msg.metadata?.brand || 'Catalog item'}</p>
+                            <div className="flex items-center justify-between border-t border-slate-850 pt-2.5">
+                              <span className="text-xs font-extrabold text-violet-400">{msg.metadata?.price || 0} π</span>
                               <button 
+                                type="button"
                                 onClick={() => window.open(`/product/${msg.metadata?.productId || 'PROD_1'}`, '_blank')}
-                                className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-[9px] font-black uppercase tracking-widest rounded-md flex items-center gap-1 transition-all"
+                                className="px-3 py-1.5 min-h-[36px] bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                               >
-                                Buy now <ExternalLink className="w-3 h-3" />
+                                <span>View Product</span>
+                                <ExternalLink className="w-3 h-3" />
                               </button>
                             </div>
                           </div>
@@ -532,104 +568,105 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                       {/* SERVICE CARD IN REGISTRY */}
                       {msg.messageType === 'service_card' && (
-                        <div className="bg-slate-900/95 border border-slate-800 rounded-xl p-4 max-w-xs shadow-xl">
-                          <span className="text-[8px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 uppercase tracking-widest px-1.5 py-0.5 rounded block w-max mb-2">Service Listing</span>
-                          <h4 className="text-[11px] font-black text-white uppercase tracking-tight truncate">{msg.content}</h4>
-                          <p className="text-[9px] text-slate-400 font-medium leading-relaxed mt-1.5 line-clamp-2">{msg.metadata?.description || 'Professional on-demand custom enterprise design service.'}</p>
-                          <div className="mt-3.5 border-t border-slate-850 pt-3.5 flex items-center justify-between">
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Starting Rate:</span>
-                            <span className="text-[11px] font-extrabold text-amber-400">{msg.metadata?.price || 15} Pi/hr</span>
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 max-w-xs shadow-xl space-y-2">
+                          <span className="text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 uppercase tracking-wider px-1.5 py-0.5 rounded inline-block">Service Listing</span>
+                          <h4 className="text-xs font-bold text-white truncate">{msg.content}</h4>
+                          <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{msg.metadata?.description || 'Custom service listing on Pi Market.'}</p>
+                          <div className="border-t border-slate-850 pt-2.5 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400 font-semibold">Rate:</span>
+                            <span className="text-xs font-bold text-emerald-400">{msg.metadata?.price || 15} π/hr</span>
                           </div>
                         </div>
                       )}
 
                       {/* BUSINESS / STORE REGISTRY CARD */}
                       {msg.messageType === 'business_card' && (
-                        <div className="bg-slate-900/95 border border-slate-800 rounded-xl p-4 max-w-xs shadow-xl">
-                          <div className="flex items-start gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-violet-600/15 border border-violet-500/20 flex items-center justify-center shrink-0">
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 max-w-xs shadow-xl space-y-2.5">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-violet-600/15 border border-violet-500/20 flex items-center justify-center shrink-0">
                               <Store className="w-4 h-4 text-violet-400" />
                             </div>
                             <div className="min-w-0">
-                              <h4 className="text-[11px] font-black text-white uppercase tracking-tight truncate">{msg.content}</h4>
-                              <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest block mt-0.5">{msg.metadata?.category || 'Registry Entity'}</span>
+                              <h4 className="text-xs font-bold text-white truncate">{msg.content}</h4>
+                              <span className="text-[10px] text-slate-400 block">{msg.metadata?.category || 'Merchant Store'}</span>
                             </div>
                           </div>
-                          <p className="text-[9px] text-slate-400 font-medium mt-3 leading-relaxed line-clamp-2">{msg.metadata?.description}</p>
+                          <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{msg.metadata?.description}</p>
                           <button 
+                            type="button"
                             onClick={() => window.open(`/store/${msg.metadata?.businessId || 'BUS_1'}`, '_blank')}
-                            className="w-full mt-3.5 py-1.5 bg-slate-950 hover:bg-slate-850 text-[9px] text-white font-black uppercase tracking-widest rounded-lg border border-slate-850 flex items-center justify-center gap-1 transition-all"
+                            className="w-full py-2 min-h-[38px] bg-slate-900 hover:bg-slate-800 text-xs text-white font-bold rounded-xl border border-slate-800 flex items-center justify-center gap-1.5 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                           >
-                            Visit Store <ExternalLink className="w-3 h-3" />
+                            <span>Visit Store</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}
 
                       {/* ORDER REFERENCE CARD */}
                       {msg.messageType === 'order_ref' && (
-                        <div className="bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-4 max-w-xs shadow-xl">
-                          <div className="flex items-center justify-between mb-3 border-b border-indigo-500/10 pb-2">
-                            <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Order Reference</span>
-                            <span className="text-[10px] font-black text-white tracking-widest uppercase bg-slate-950 px-2 py-0.5 rounded-md border border-slate-850">
+                        <div className="bg-slate-950 border border-violet-500/20 rounded-xl p-3.5 max-w-xs shadow-xl space-y-2">
+                          <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                            <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wider">Order Reference</span>
+                            <span className="text-xs font-bold text-white bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
                               #{msg.content.substring(0, 8).toUpperCase()}
                             </span>
                           </div>
-                          <div className="space-y-1 text-[10px] text-slate-300">
-                            <p className="font-bold uppercase tracking-wider">Grand Total: <span className="text-amber-400 font-black">{msg.metadata?.grandTotal || '0'} Pi</span></p>
-                            <p className="text-[9px] font-medium mt-1">Payment Status: <span className="text-emerald-400 font-bold uppercase">{msg.metadata?.paymentStatus || 'verified'}</span></p>
+                          <div className="space-y-1 text-xs text-slate-300">
+                            <p className="font-semibold">Total: <span className="text-violet-400 font-bold">{msg.metadata?.grandTotal || '0'} π</span></p>
+                            <p className="text-[11px] text-slate-400">Payment: <span className="text-emerald-400 font-bold uppercase">{msg.metadata?.paymentStatus || 'verified'}</span></p>
                           </div>
                         </div>
                       )}
 
                       {/* INVOICE CARD */}
                       {msg.messageType === 'invoice' && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 max-w-xs shadow-xl">
-                          <div className="flex items-center gap-2 mb-3.5 border-b border-slate-850 pb-2.5">
-                            <div className="p-1 rounded-md bg-indigo-500/10 text-indigo-400">
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 max-w-xs shadow-xl space-y-2.5">
+                          <div className="flex items-center gap-2 border-b border-slate-850 pb-2">
+                            <div className="p-1 rounded-md bg-violet-500/10 text-violet-400">
                               <Receipt className="w-4 h-4" />
                             </div>
-                            <span className="text-[9px] font-black text-white uppercase tracking-widest">Enterprise Invoice</span>
+                            <span className="text-xs font-bold text-white">Merchant Invoice</span>
                           </div>
-                          <div className="space-y-1.5 text-[10px] text-slate-300">
+                          <div className="space-y-1 text-xs text-slate-300">
                             <p className="flex justify-between">
-                              <span className="font-bold uppercase text-[8px] text-slate-500 tracking-wider">Invoice No:</span>
-                              <span className="font-black text-white text-[9px] tracking-wider">INV-{msg.content.substring(0, 6).toUpperCase()}</span>
+                              <span className="text-slate-400 text-[11px]">Invoice No:</span>
+                              <span className="font-bold text-white">INV-{msg.content.substring(0, 6).toUpperCase()}</span>
                             </p>
                             <p className="flex justify-between">
-                              <span className="font-bold uppercase text-[8px] text-slate-500 tracking-wider">Total Due:</span>
-                              <span className="text-amber-400 font-extrabold">{msg.metadata?.grandTotal || '0.00'} Pi</span>
+                              <span className="text-slate-400 text-[11px]">Total Due:</span>
+                              <span className="text-violet-400 font-bold">{msg.metadata?.grandTotal || '0.00'} π</span>
                             </p>
                           </div>
                           <button 
-                            onClick={() => alert(`Pi Sandbox: Initiating secure payment of ${msg.metadata?.grandTotal || 0} Pi...`)}
-                            className="w-full mt-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-[10px] font-black text-slate-950 uppercase tracking-widest rounded-lg shadow-md flex items-center justify-center gap-1.5 transition-all"
+                            type="button"
+                            onClick={() => window.open(`/order-details/${msg.content}`, '_blank')}
+                            className="w-full py-2 min-h-[40px] bg-violet-600 hover:bg-violet-500 text-xs font-bold text-white rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                           >
-                            <Coins className="w-3.5 h-3.5" /> Pay Invoice with Pi
+                            <Coins className="w-3.5 h-3.5" />
+                            <span>Pay Invoice with Pi</span>
                           </button>
                         </div>
                       )}
 
                       {/* PI RECEIPT COMPLIANT DOCUMENT */}
                       {msg.messageType === 'receipt' && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 max-w-xs shadow-xl relative overflow-hidden">
-                          <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-full border-b border-l border-emerald-500/20 flex items-center justify-center">
-                            <CheckCircle className="w-5 h-5 text-emerald-400" />
-                          </div>
-                          <div className="flex items-center gap-2 mb-3 border-b border-slate-850 pb-2">
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 max-w-xs shadow-xl space-y-2.5">
+                          <div className="flex items-center gap-2 border-b border-slate-850 pb-2">
                             <div className="p-1 rounded bg-emerald-500/10 text-emerald-400">
                               <CheckCircle className="w-4 h-4" />
                             </div>
-                            <span className="text-[9px] font-black text-white uppercase tracking-widest">Payment Receipt</span>
+                            <span className="text-xs font-bold text-white">Payment Receipt</span>
                           </div>
-                          <div className="space-y-1 text-[10px] text-slate-300 mb-3">
-                            <p className="flex justify-between"><span className="text-slate-500 text-[8px] uppercase font-bold tracking-wider">Receipt ID:</span><span className="text-white font-black text-[9px] tracking-wider">RCP-{msg.content.substring(0, 6).toUpperCase()}</span></p>
-                            <p className="flex justify-between"><span className="text-slate-500 text-[8px] uppercase font-bold tracking-wider">Paid Amount:</span><span className="text-emerald-400 font-extrabold">{msg.metadata?.grandTotal || '0.00'} Pi</span></p>
+                          <div className="space-y-1 text-xs text-slate-300">
+                            <p className="flex justify-between"><span className="text-slate-400 text-[11px]">Receipt ID:</span><span className="text-white font-bold">RCP-{msg.content.substring(0, 6).toUpperCase()}</span></p>
+                            <p className="flex justify-between"><span className="text-slate-400 text-[11px]">Paid:</span><span className="text-emerald-400 font-bold">{msg.metadata?.grandTotal || '0.00'} π</span></p>
                           </div>
-                          <div className="bg-slate-950 border border-slate-850 p-2 rounded-lg flex items-center gap-2.5">
-                            <QrCode className="w-7 h-7 text-white shrink-0" />
-                            <div>
-                              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest block leading-tight">Blockchain Signed</span>
-                              <span className="text-[8px] font-bold text-slate-300 leading-none truncate w-32 block">{msg.metadata?.qrVerificationCode || 'PI_SIG_HASH_8291'}</span>
+                          <div className="bg-slate-900 border border-slate-800 p-2 rounded-lg flex items-center gap-2">
+                            <QrCode className="w-6 h-6 text-white shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-[9px] font-bold text-slate-400 block">Blockchain Signed</span>
+                              <span className="text-[10px] font-mono text-slate-200 truncate block">{msg.metadata?.qrVerificationCode || 'PI_SIG_HASH_8291'}</span>
                             </div>
                           </div>
                         </div>
@@ -637,59 +674,63 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                       {/* SECURE QR CODE REFERENCE */}
                       {msg.messageType === 'qrcode' && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 max-w-xs shadow-xl flex flex-col items-center justify-center text-center">
-                          <div className="p-4 bg-white border-4 border-slate-950 rounded-xl mb-3 shadow-inner">
-                            <QrCode className="w-24 h-24 text-slate-950" />
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 max-w-xs shadow-xl flex flex-col items-center justify-center text-center">
+                          <div className="p-3 bg-white border-2 border-slate-800 rounded-xl mb-2.5">
+                            <QrCode className="w-20 h-20 text-slate-950" />
                           </div>
-                          <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest block leading-none mb-1">Verify on Pi Chain</span>
-                          <span className="text-[9px] font-bold text-slate-400 truncate w-48 block">{msg.content}</span>
+                          <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider block mb-0.5">Verify on Pi Chain</span>
+                          <span className="text-xs font-mono text-slate-400 truncate max-w-[200px] block">{msg.content}</span>
                         </div>
                       )}
 
                       {/* LOCATION PIN CARD */}
                       {msg.messageType === 'location' && (
-                        <div className="bg-slate-950 border border-slate-850 rounded-xl overflow-hidden max-w-xs shadow-xl">
-                          <div className="h-28 bg-indigo-950/20 flex flex-col items-center justify-center relative p-4 text-center border-b border-slate-850">
-                            <MapPin className="w-8 h-8 text-rose-500 animate-bounce mb-1" />
-                            <span className="text-[10px] font-bold text-slate-300 truncate w-full">{msg.content}</span>
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden max-w-xs shadow-xl">
+                          <div className="h-24 bg-slate-900 flex flex-col items-center justify-center p-3 text-center border-b border-slate-800">
+                            <MapPin className="w-6 h-6 text-rose-500 mb-1" />
+                            <span className="text-xs font-medium text-slate-200 truncate w-full">{msg.content}</span>
                           </div>
                           <button 
+                            type="button"
                             onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(msg.content)}`, '_blank')}
-                            className="w-full py-2 bg-slate-900 hover:bg-slate-850 text-[9px] font-black text-white uppercase tracking-widest flex items-center justify-center gap-1 transition-all"
+                            className="w-full py-2.5 min-h-[40px] bg-slate-900 hover:bg-slate-800 text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" /> Open Maps
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Open in Maps</span>
                           </button>
                         </div>
                       )}
 
                       {/* VOICE MEMO PLAYBACK */}
                       {msg.messageType === 'voice' && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3.5 max-w-xs shadow-md">
+                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center gap-3 max-w-xs shadow-md">
                           <button 
-                            onClick={() => alert('Simulated audio message playback started...')}
-                            className="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition-colors shrink-0"
+                            type="button"
+                            aria-label="Play voice recording"
+                            onClick={() => {}}
+                            className="w-9 h-9 rounded-full bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
                           >
                             <PlayCircle className="w-5 h-5 fill-white" />
                           </button>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                               {[3, 7, 5, 8, 4, 6, 3, 5, 7, 4, 6, 8, 3, 5, 4].map((h, i) => (
-                                <span key={i} className="w-0.5 bg-indigo-500/80 rounded" style={{ height: `${h * 2}px` }} />
+                                <span key={i} className="w-0.5 bg-violet-400/80 rounded" style={{ height: `${h * 2}px` }} />
                               ))}
                             </div>
-                            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-1 block">Voice Record • 0:14</span>
+                            <span className="text-[10px] text-slate-400 font-medium mt-1 block">Voice memo • 0:14</span>
                           </div>
                         </div>
                       )}
                     </div>
 
                     {/* Meta Timestamp & Read status indicators */}
-                    <div className={`flex items-center gap-1.5 mt-1.5 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider select-none">
+                    <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <span className="text-[10px] font-medium text-slate-400 select-none">
                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {isMe && (
-                        <span title={msg.status}>
+                        <span title={msg.status} aria-label={`Message status: ${msg.status}`}>
                           <CheckCheck className={`w-3.5 h-3.5 ${msg.status === 'read' ? 'text-emerald-400' : 'text-slate-500'}`} />
                         </span>
                       )}
@@ -704,12 +745,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {/* Dynamic typing status message */}
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-slate-950 border border-slate-900 rounded-2xl rounded-tl-none px-4 py-3.5 flex items-center gap-2 max-w-xs shadow-lg">
-              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block">Merchant typing</span>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-2 max-w-xs shadow-md">
+              <span className="text-xs font-bold text-violet-400">Merchant is typing</span>
               <div className="flex gap-1 items-center h-2">
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -720,136 +761,159 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* 4. Reply quotation reference floating panel */}
       {replyingTo && (
-        <div className="bg-[#070b19]/90 border-t border-indigo-500/20 px-6 py-2.5 flex items-center justify-between text-xs text-indigo-300 backdrop-blur z-10">
+        <div className="bg-slate-900/95 border-t border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-slate-300 z-10">
           <div className="flex items-center gap-2 min-w-0">
-            <CornerUpLeft className="w-4 h-4 text-indigo-400 shrink-0" />
+            <CornerUpLeft className="w-4 h-4 text-violet-400 shrink-0" />
             <div className="min-w-0">
-              <span className="font-bold uppercase tracking-wider text-[8px] text-indigo-400 block">Replying to message:</span>
-              <p className="truncate text-[11px] text-slate-300 leading-tight">{replyingTo.content}</p>
+              <span className="font-bold text-[10px] text-violet-400 block">Replying to:</span>
+              <p className="truncate text-xs text-slate-200">{replyingTo.content}</p>
             </div>
           </div>
-          <button onClick={() => setReplyingTo(null)} className="p-1 rounded bg-slate-900 border border-slate-800 hover:text-white transition-colors">
-            <X className="w-3.5 h-3.5" />
+          <button 
+            type="button"
+            onClick={() => setReplyingTo(null)} 
+            aria-label="Cancel reply"
+            className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg bg-slate-950 border border-slate-800 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* 5. Message Composer Bar */}
-      <div className="p-4 sm:p-6 bg-[#070b19]/90 border-t border-slate-900 relative z-10">
+      <div className="p-3 sm:p-4 bg-slate-950 border-t border-slate-900/80 relative z-10 pb-safe">
         <form 
+          id="chat-message-form"
           onSubmit={handleSend}
-          className="relative flex items-center gap-3 bg-slate-950 border border-slate-850 rounded-2xl px-4 py-2 focus-within:ring-4 focus-within:ring-indigo-500/10 focus-within:border-indigo-500 transition-all shadow-inner"
+          className="relative flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-violet-400 focus-within:border-violet-500 transition-all shadow-inner"
         >
-          {/* Dynamic selector trigger */}
+          {/* Dynamic attachment trigger */}
           <button 
             type="button"
             onClick={() => setShowAttachments(!showAttachments)}
-            className="p-2.5 text-slate-400 hover:text-indigo-400 rounded-xl transition-colors shrink-0"
-            title="Attach Enterprise Card"
+            aria-label="Attach card or document"
+            aria-expanded={showAttachments}
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-violet-400 rounded-xl transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <Paperclip className="w-5 h-5" />
           </button>
           
+          <label htmlFor="chat-message-input" className="sr-only">
+            Type message
+          </label>
           <input
+            id="chat-message-input"
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type message secure on Pi Chain..."
-            className="flex-1 bg-transparent py-2.5 text-xs sm:text-sm text-white outline-none placeholder:text-slate-500"
+            placeholder="Type a message to merchant..."
+            className="flex-1 bg-transparent py-2 min-h-[40px] text-xs sm:text-sm text-white outline-none placeholder:text-slate-500"
           />
           <button
             type="submit"
             disabled={!inputValue.trim() || isSending}
+            aria-label="Send message"
             className={`
-              p-2.5 rounded-xl transition-all shadow-md shrink-0
+              p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all shadow-md shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none
               ${inputValue.trim() && !isSending 
-                ? 'bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105 active:scale-95' 
-                : 'bg-slate-900 text-slate-500 cursor-not-allowed shadow-none'}
+                ? 'bg-violet-600 text-white hover:bg-violet-500 hover:scale-105 active:scale-95' 
+                : 'bg-slate-950 text-slate-600 cursor-not-allowed shadow-none'}
             `}
           >
-            <Send className="w-4.5 h-4.5" />
+            <Send className="w-4 h-4" />
           </button>
         </form>
 
         {/* Advanced attachments panels */}
         {showAttachments && (
-          <div className="absolute bottom-20 left-6 right-6 bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-2xl grid grid-cols-2 sm:grid-cols-4 gap-2 z-20 animate-fade-in">
+          <div className="absolute bottom-20 left-4 right-4 sm:left-6 sm:right-6 bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-2xl grid grid-cols-2 sm:grid-cols-4 gap-2 z-20">
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'image', 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=60')}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <ImageIcon className="w-4 h-4 text-indigo-400" /> Share Image
+              <ImageIcon className="w-4 h-4 text-violet-400 shrink-0" />
+              <span>Share Image</span>
             </button>
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'pdf', 'https://businessmarketpi.com/assets/invoices/INV_848292.pdf')}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <FileText className="w-4 h-4 text-rose-400" /> Share invoice
+              <FileText className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Share Invoice</span>
             </button>
             <button 
               type="button"
-              onClick={() => handleSend(undefined, 'product_card', 'Supreme Comfort Sneakers (Limited Pi Edition)', { productId: 'PROD_1', brand: 'Nike Air Max', price: 15, mainImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=60' })}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              onClick={() => handleSend(undefined, 'product_card', 'Supreme Comfort Sneakers', { productId: 'PROD_1', brand: 'Nike Air Max', price: 15, mainImage: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&auto=format&fit=crop&q=60' })}
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <ShoppingBag className="w-4 h-4 text-violet-400" /> Catalog Product
+              <ShoppingBag className="w-4 h-4 text-violet-400 shrink-0" />
+              <span>Catalog Product</span>
             </button>
             <button 
               type="button"
-              onClick={() => handleSend(undefined, 'service_card', 'Full-Stack Blockchain Smart Contract Audit', { category: 'Smart Contracts', description: 'Complete security and compliance audit for high-volume enterprise Solidity or Rust contracts on the Pi network.', price: 25 })}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              onClick={() => handleSend(undefined, 'service_card', 'Smart Contract Audit', { category: 'Security', description: 'Complete security audit for Pi network integration.', price: 25 })}
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Registry Service
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Service Listing</span>
             </button>
             <button 
               type="button"
-              onClick={() => handleSend(undefined, 'business_card', 'Pi Electronics Megastore', { businessId: 'BUS_1', category: 'Premium Electronics', description: 'Certified global distributor of consumer smart devices and verified electronics gadgets.' })}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              onClick={() => handleSend(undefined, 'business_card', 'Pi Electronics Megastore', { businessId: 'BUS_1', category: 'Electronics', description: 'Certified distributor of consumer smart devices.' })}
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <Store className="w-4 h-4 text-sky-400" /> Store/Business
+              <Store className="w-4 h-4 text-sky-400 shrink-0" />
+              <span>Store Profile</span>
             </button>
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'invoice', 'INV_77812', { grandTotal: '15.00' })}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <Receipt className="w-4 h-4 text-amber-500" /> Send Invoice
+              <Receipt className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Send Invoice</span>
             </button>
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'receipt', 'RCP_90412', { grandTotal: '15.00', qrVerificationCode: 'PI_RECEIPT_VERIFIED_77812904' })}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <CheckCircle className="w-4 h-4 text-emerald-400" /> Send Receipt
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Send Receipt</span>
             </button>
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'qrcode', 'PI_SECURE_QR_VALIDATOR_99812402')}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <QrCode className="w-4 h-4 text-white" /> QR Signature
+              <QrCode className="w-4 h-4 text-violet-400 shrink-0" />
+              <span>QR Signature</span>
             </button>
             <button 
               type="button"
-              onClick={() => handleSend(undefined, 'location', '302 Pi Avenue, Block 7, San Francisco, CA')}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              onClick={() => handleSend(undefined, 'location', '302 Pi Avenue, San Francisco, CA')}
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <MapPin className="w-4 h-4 text-rose-400" /> Location Pin
+              <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Location Pin</span>
             </button>
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'voice', 'Voice Record Memo')}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <Volume2 className="w-4 h-4 text-sky-400" /> Voice Message
+              <Volume2 className="w-4 h-4 text-sky-400 shrink-0" />
+              <span>Voice Memo</span>
             </button>
             <button 
               type="button"
               onClick={() => handleSend(undefined, 'emoji', '🚀🔥💪🏼')}
-              className="flex items-center gap-2.5 p-2.5 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-bold uppercase tracking-wider border border-slate-850"
+              className="flex items-center gap-2 p-2.5 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-all text-left text-xs font-semibold border border-slate-800 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
-              <HelpCircle className="w-4 h-4 text-amber-400" /> Quick Emojis
+              <HelpCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Quick Emojis</span>
             </button>
           </div>
         )}
@@ -857,26 +921,33 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* 6. Secure Calling Platform Overlay Modal */}
       {showCallScreen && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-8 text-center animate-fade-in text-white">
-          <div className="w-24 h-24 rounded-[2rem] bg-indigo-600 border border-indigo-500 animate-pulse flex items-center justify-center shadow-3xl mb-8">
-            {showCallScreen === 'voice' ? <Phone className="w-10 h-10 text-white" /> : <Video className="w-10 h-10 text-white" />}
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="Secure Call Dialog"
+          className="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center text-white"
+        >
+          <div className="w-20 h-20 rounded-3xl bg-violet-600 border border-violet-500 flex items-center justify-center shadow-2xl mb-6">
+            {showCallScreen === 'voice' ? <Phone className="w-8 h-8 text-white" /> : <Video className="w-8 h-8 text-white" />}
           </div>
-          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Encrypted Chain Call</span>
-          <h2 className="text-2xl font-black uppercase tracking-tight mb-2">{getPartnerDisplayName()}</h2>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-12">Ringing Securely...</p>
+          <span className="text-xs font-bold text-violet-400 uppercase tracking-wider block mb-1">Encrypted Call</span>
+          <h2 className="text-xl font-bold mb-1">{getPartnerDisplayName()}</h2>
+          <p className="text-slate-400 text-xs font-medium mb-8">Connecting securely over Pi network...</p>
           
-          <div className="flex gap-6">
+          <div className="flex gap-4">
             <button 
+              type="button"
               onClick={() => setShowCallScreen(null)} 
-              className="px-6 py-3 bg-rose-600 hover:bg-rose-500 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all"
+              className="px-6 py-3 min-h-[44px] bg-rose-600 hover:bg-rose-500 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
               Hang Up
             </button>
             <button 
-              onClick={() => alert("Simulated secure connection established!")} 
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg transition-all"
+              type="button"
+              onClick={() => setShowCallScreen(null)} 
+              className="px-6 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
-              Accept
+              Connect Call
             </button>
           </div>
         </div>
@@ -884,32 +955,43 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* 7. Abuse/Report Dialog Overlay */}
       {showReportDialog && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-up">
-            <div className="flex items-center gap-2.5 mb-4 text-rose-400">
-              <ShieldAlert className="w-6 h-6" />
-              <h3 className="text-base font-black uppercase tracking-tight text-white">Report Conversation</h3>
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="Report Conversation"
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center gap-2.5 text-rose-400">
+              <ShieldAlert className="w-5 h-5" />
+              <h3 className="text-base font-bold text-white">Report Conversation</h3>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              Please outline your reason for reporting this conversation. Our professional marketplace compliance team will review all audit logs and message history within 24 hours.
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Please describe the issue with this merchant or conversation (e.g. suspicious activity, payment issues). Our compliance team reviews reports promptly.
             </p>
+            <label htmlFor="report-reason-input" className="sr-only">
+              Report Reason
+            </label>
             <textarea
+              id="report-reason-input"
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
-              placeholder="Detail the issue (e.g., spam, payment fraud, suspicious behavior)..."
-              className="w-full h-28 bg-slate-950 border border-slate-850 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none mb-5"
+              placeholder="Detail the issue..."
+              className="w-full h-28 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all resize-none"
             />
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-1">
               <button
+                type="button"
                 onClick={() => { setShowReportDialog(false); setReportReason(''); }}
-                className="px-4 py-2 bg-slate-950 hover:bg-slate-850 text-slate-300 text-xs font-bold uppercase tracking-wider rounded-lg border border-slate-850 transition-colors"
+                className="px-4 py-2 min-h-[44px] bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl border border-slate-800 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSubmitReport}
                 disabled={!reportReason.trim()}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-black uppercase tracking-wider rounded-lg transition-all"
+                className="px-4 py-2 min-h-[44px] bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 Submit Report
               </button>

@@ -12,7 +12,7 @@ export interface NavigationItem {
 
 export const MAIN_NAVIGATION: NavigationItem[] = [
   { id: 'home', label: 'Home', iconName: 'Home', view: 'home' },
-  { id: 'marketplace', label: 'Marketplace', iconName: 'Store', view: 'marketplace' },
+  { id: 'marketplace', label: 'Shop', iconName: 'Store', view: 'marketplace' },
   { id: 'orders', label: 'Orders', iconName: 'Clock', view: 'orders' },
   { id: 'business', label: 'My Business', iconName: 'Briefcase', view: 'my-business' },
   { id: 'tools', label: 'Tools', iconName: 'Wrench', view: 'tools' },

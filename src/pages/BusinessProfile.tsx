@@ -480,8 +480,10 @@ export const BusinessProfile: React.FC = () => {
         {/* Navigation Breadcrumb */}
         <div className="flex items-center justify-between">
           <button 
+            type="button"
+            aria-label="Go back"
             onClick={() => navigate(-1)}
-            className="group text-slate-400 hover:text-white flex items-center gap-2 text-xs font-bold transition-colors"
+            className="group min-h-[44px] text-slate-400 hover:text-white flex items-center gap-2 text-xs font-bold transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-xl px-2"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Back
@@ -489,8 +491,9 @@ export const BusinessProfile: React.FC = () => {
 
           {isOwner && (
             <button 
+              type="button"
               onClick={() => navigate('/business-center')}
-              className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-all flex items-center gap-2"
+              className="min-h-[44px] px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-all flex items-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
               <Briefcase className="w-4 h-4" />
               Open Business Center
@@ -499,7 +502,7 @@ export const BusinessProfile: React.FC = () => {
         </div>
 
         {/* Hero Cover & Profile Header */}
-        <div className="relative rounded-3xl overflow-hidden bg-slate-900 border border-slate-800/80 shadow-2xl">
+        <div className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800/80 shadow-2xl">
           {/* Cover Banner */}
           <div className="aspect-[16/9] md:aspect-[3.5/1] bg-gradient-to-tr from-violet-950 via-slate-900 to-indigo-950 w-full relative overflow-hidden">
             {profileData?.coverImageUrl ? (
@@ -513,8 +516,10 @@ export const BusinessProfile: React.FC = () => {
           {/* Action Buttons Overlay */}
           <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
             <button 
+              type="button"
+              aria-label="Share business"
               onClick={handleShare}
-              className="px-4 py-2 bg-slate-900/80 backdrop-blur border border-slate-700/80 rounded-xl text-xs font-bold text-white hover:bg-slate-800 flex items-center gap-2 transition-all shadow-lg"
+              className="min-h-[44px] px-4 py-2 bg-slate-900/80 backdrop-blur border border-slate-700/80 rounded-xl text-xs font-bold text-white hover:bg-slate-800 flex items-center gap-2 transition-all shadow-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
               {copied ? 'Copied Link' : 'Share'}
@@ -522,8 +527,9 @@ export const BusinessProfile: React.FC = () => {
 
             {isOwner && (
               <button 
+                type="button"
                 onClick={() => setIsEditing(!isEditing)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all"
+                className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 {isEditing ? <Eye className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
                 {isEditing ? 'View Public Profile' : 'Edit Profile'}
@@ -586,8 +592,9 @@ export const BusinessProfile: React.FC = () => {
             {/* Customer Contact Button */}
             {!isOwner && user && (
               <button 
+                type="button"
                 onClick={handleMessageBusiness}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 shrink-0"
+                className="min-h-[44px] px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 <MessageSquare className="w-4 h-4" />
                 Contact Business
@@ -598,7 +605,7 @@ export const BusinessProfile: React.FC = () => {
 
         {/* Content View Modes: Form vs Public View */}
         {isEditing ? (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8">
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8">
             <h2 className="text-lg font-black text-white mb-6">Edit Business Profile Details</h2>
             <BusinessProfileForm
               generalFields={roleConfig.generalFields}
@@ -612,8 +619,9 @@ export const BusinessProfile: React.FC = () => {
             {/* Tab Navigation Controls */}
             <div className="flex items-center gap-2 border-b border-slate-800/80 pb-4">
               <button 
+                type="button"
                 onClick={() => setActiveTab('products')}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`min-h-[44px] px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   activeTab === 'products'
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
                     : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
@@ -627,8 +635,9 @@ export const BusinessProfile: React.FC = () => {
               </button>
 
               <button 
+                type="button"
                 onClick={() => setActiveTab('about')}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`min-h-[44px] px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   activeTab === 'about'
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
                     : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
@@ -652,8 +661,9 @@ export const BusinessProfile: React.FC = () => {
 
                   {isOwner && (
                     <button 
+                      type="button"
                       onClick={() => navigate('/business-center?tab=catalog&subTab=products&action=add_product')}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                      className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     >
                       <Plus className="w-4 h-4" /> Add Product
                     </button>
@@ -672,7 +682,7 @@ export const BusinessProfile: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-12 text-center flex flex-col items-center justify-center">
+                  <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
                     <div className="w-16 h-16 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-600 mb-4">
                       <Package className="w-8 h-8" />
                     </div>
@@ -682,8 +692,9 @@ export const BusinessProfile: React.FC = () => {
                     </p>
                     {isOwner && (
                       <button 
+                        type="button"
                         onClick={() => navigate('/business-center?tab=catalog&subTab=products&action=add_product')}
-                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                        className="min-h-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                       >
                         <Plus className="w-4 h-4" /> Create First Product
                       </button>
@@ -698,7 +709,7 @@ export const BusinessProfile: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Description Column */}
                 <div className="lg:col-span-2 space-y-6">
-                  <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 sm:p-8 space-y-4">
+                  <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-4">
                     <h3 className="text-lg font-black text-white flex items-center gap-2">
                       <Building2 className="w-5 h-5 text-indigo-400" />
                       About {profileData?.businessName || 'Business'}
@@ -710,7 +721,7 @@ export const BusinessProfile: React.FC = () => {
 
                   {/* Services section if available */}
                   {storeServices.length > 0 && (
-                    <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 sm:p-8 space-y-4">
+                    <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 sm:p-8 space-y-4">
                       <h3 className="text-lg font-black text-white flex items-center gap-2">
                         <Briefcase className="w-5 h-5 text-violet-400" />
                         Services Offered ({storeServices.length})
@@ -720,7 +731,7 @@ export const BusinessProfile: React.FC = () => {
                           <div 
                             key={svc.id} 
                             onClick={() => setSelectedServiceForBooking(svc)}
-                            className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 hover:border-violet-500/50 transition-all cursor-pointer space-y-3 relative group flex flex-col justify-between"
+                            className="bg-slate-950/60 p-5 rounded-2xl border border-slate-800 hover:border-violet-500/50 transition-all cursor-pointer space-y-3 relative group flex flex-col justify-between focus-within:ring-2 focus-within:ring-violet-400"
                           >
                             <div className="space-y-1">
                               <h4 className="text-sm font-black text-white group-hover:text-violet-400 transition-colors uppercase tracking-tight">{svc.serviceName || svc.title || 'Service'}</h4>
@@ -731,7 +742,8 @@ export const BusinessProfile: React.FC = () => {
                                 {svc.price !== undefined ? `${svc.price} π` : 'Contact for Quote'}
                               </span>
                               <button 
-                                className="px-3 py-1 bg-violet-600/10 hover:bg-violet-600 border border-violet-500/20 hover:border-violet-500 text-violet-400 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+                                type="button"
+                                className="min-h-[44px] px-3 py-1 bg-violet-600/10 hover:bg-violet-600 border border-violet-500/20 hover:border-violet-500 text-violet-400 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                               >
                                 Book Service
                               </button>
@@ -745,7 +757,7 @@ export const BusinessProfile: React.FC = () => {
 
                 {/* Sidebar Details Column */}
                 <div className="space-y-6">
-                  <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 space-y-4">
+                  <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 space-y-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-3">
                       Business Details
                     </h4>
@@ -867,7 +879,7 @@ export const BusinessProfile: React.FC = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: "spring", duration: 0.5 }}
-              className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-lg p-6 sm:p-8 relative overflow-hidden shadow-2xl z-10 space-y-6"
+              className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 sm:p-8 relative overflow-hidden shadow-2xl z-10 space-y-6"
             >
               {/* Header */}
               <div className="flex items-start justify-between">
@@ -884,9 +896,10 @@ export const BusinessProfile: React.FC = () => {
                 </div>
                 <button
                   type="button"
+                  aria-label="Close dialog"
                   disabled={bookingSubmitting}
                   onClick={() => setSelectedServiceForBooking(null)}
-                  className="p-2 bg-slate-950 border border-slate-850 hover:border-slate-700 text-slate-500 hover:text-white rounded-full transition-all disabled:opacity-50"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 bg-slate-950 border border-slate-850 hover:border-slate-700 text-slate-500 hover:text-white rounded-full transition-all disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -932,7 +945,7 @@ export const BusinessProfile: React.FC = () => {
                         disabled={bookingSubmitting}
                         value={bookingDate}
                         onChange={(e) => setBookingDate(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all cursor-pointer"
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -945,7 +958,7 @@ export const BusinessProfile: React.FC = () => {
                         disabled={bookingSubmitting}
                         value={bookingTime}
                         onChange={(e) => setBookingTime(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all cursor-pointer"
                       />
                     </div>
                   </div>
@@ -971,14 +984,14 @@ export const BusinessProfile: React.FC = () => {
                       type="button"
                       disabled={bookingSubmitting}
                       onClick={() => setSelectedServiceForBooking(null)}
-                      className="px-4 py-2 bg-slate-950 hover:bg-slate-900 border border-slate-850 text-slate-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                      className="min-h-[44px] px-4 py-2 bg-slate-950 hover:bg-slate-900 border border-slate-850 text-slate-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={bookingSubmitting || !user}
-                      className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 active:scale-95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     >
                       {bookingSubmitting ? 'Requesting...' : 'Request Booking'}
                     </button>

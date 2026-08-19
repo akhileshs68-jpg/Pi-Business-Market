@@ -22,7 +22,7 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
   onSelect 
 }) => {
   return (
-    <div className={`flex items-center gap-1 ${className}`}>
+    <div className={`flex items-center gap-1 ${className}`} role="img" aria-label={`Rating: ${rating.toFixed(1)} out of ${max} stars`}>
       {[...Array(max)].map((_, i) => {
         const starValue = i + 1;
         const isActive = starValue <= Math.round(rating);
@@ -32,8 +32,13 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
             key={i}
             type="button"
             disabled={!onSelect}
+            aria-label={onSelect ? `Rate ${starValue} of ${max} stars` : undefined}
             onClick={() => onSelect?.(starValue)}
-            className={`${onSelect ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'}`}
+            className={`${
+              onSelect 
+                ? 'min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer hover:scale-110 transition-transform focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-lg' 
+                : 'cursor-default'
+            }`}
           >
             <Star 
               size={size} 

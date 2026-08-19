@@ -93,15 +93,17 @@ export const StoreManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/40 p-5 rounded-3xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
         <div>
           <h4 className="text-sm font-black text-white">Commercial Outlet Workstations</h4>
-          <p className="text-xs text-slate-500">Configure fulfillment, branding assets, and status metrics.</p>
+          <p className="text-xs text-slate-400">Configure fulfillment, branding assets, and status metrics.</p>
         </div>
 
         <button
+          type="button"
           onClick={() => setShowWizard(true)}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer self-start sm:self-auto"
+          className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer self-start sm:self-auto shadow-md shadow-violet-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+          aria-label="Add new store outlet"
         >
           <Plus className="w-4 h-4" />
           Add Store Outlet
@@ -116,24 +118,24 @@ export const StoreManager: React.FC = () => {
             return (
               <div 
                 key={s.storeId}
-                className="bg-slate-900/30 border border-slate-800 rounded-3xl p-6 space-y-6 hover:border-slate-700/80 transition-all flex flex-col justify-between"
+                className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 space-y-6 hover:border-slate-700/80 transition-all flex flex-col justify-between"
               >
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-3 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl">
-                        <StoreIcon className="w-5 h-5 text-indigo-400" />
+                      <div className="p-3 bg-violet-600/10 border border-violet-500/20 rounded-2xl">
+                        <StoreIcon className="w-5 h-5 text-violet-400" />
                       </div>
                       <div>
                         <h4 className="text-base font-extrabold text-white flex items-center gap-2">
                           {s.storeName}
                           {isPaused && (
-                            <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[8px] uppercase font-bold rounded-full">
+                            <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] uppercase font-bold rounded-full">
                               Paused
                             </span>
                           )}
                         </h4>
-                        <p className="text-xs text-slate-500">{s.city || 'Central Outlet'}, {s.country || 'Global'}</p>
+                        <p className="text-xs text-slate-400">{s.city || 'Central Outlet'}, {s.country || 'Global'}</p>
                       </div>
                     </div>
 
@@ -144,10 +146,10 @@ export const StoreManager: React.FC = () => {
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-400 line-clamp-2">{s.description || 'Primary merchant fulfillment workstation.'}</p>
+                  <p className="text-xs text-slate-300 line-clamp-2">{s.description || 'Primary merchant fulfillment workstation.'}</p>
 
                   {/* Micro-Analytics Section */}
-                  <div className="grid grid-cols-3 gap-3 bg-slate-950/40 p-3 rounded-2xl border border-slate-800/80">
+                  <div className="grid grid-cols-3 gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80">
                     <div className="text-center">
                       <span className="text-[9px] text-slate-500 uppercase font-bold block">Followers</span>
                       <span className="text-xs font-bold text-white mt-0.5 block">{s.followers || 0}</span>
@@ -158,7 +160,7 @@ export const StoreManager: React.FC = () => {
                     </div>
                     <div className="text-center">
                       <span className="text-[9px] text-slate-500 uppercase font-bold block">Outlet Type</span>
-                      <span className="text-[10px] font-bold text-indigo-400 mt-0.5 block truncate capitalize">{s.storeType || 'Retail'}</span>
+                      <span className="text-[10px] font-bold text-violet-400 mt-0.5 block truncate capitalize">{s.storeType || 'Retail'}</span>
                     </div>
                   </div>
 
@@ -177,24 +179,29 @@ export const StoreManager: React.FC = () => {
 
                 <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-3">
                   <button
+                    type="button"
                     onClick={() => handleTogglePause(s)}
                     disabled={actionLoading === s.storeId}
-                    className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 flex-1"
+                    className="min-h-[44px] px-3.5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 flex-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none disabled:opacity-50"
+                    aria-label={isPaused ? `Resume outlet ${s.storeName}` : `Pause outlet ${s.storeName}`}
                   >
                     {isPaused ? (
                       <>
-                        <Play className="w-3.5 h-3.5 text-emerald-400" /> Resume Outlet
+                        <Play className="w-4 h-4 text-emerald-400" /> Resume Outlet
                       </>
                     ) : (
                       <>
-                        <Pause className="w-3.5 h-3.5 text-amber-400" /> Pause Outlet
+                        <Pause className="w-4 h-4 text-amber-400" /> Pause Outlet
                       </>
                     )}
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => handleOpenEdit(s)}
-                    className="p-2.5 bg-slate-950 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/20 text-indigo-400 rounded-xl transition-all"
+                    className="min-h-[44px] min-w-[44px] p-2.5 bg-slate-950 hover:bg-violet-600/10 border border-slate-800 hover:border-violet-500/20 text-violet-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                    aria-label={`Edit configuration for ${s.storeName}`}
+                    title="Edit Store Configuration"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -204,13 +211,14 @@ export const StoreManager: React.FC = () => {
           })}
         </div>
       ) : (
-        <div className="py-20 text-center bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
+        <div className="py-20 text-center bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
           <StoreIcon className="w-10 h-10 text-slate-700 mx-auto mb-3" />
           <h4 className="text-base font-bold text-white">No Outlets Formed</h4>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-6">Create physical or digital stores to categorize inventory distribution.</p>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-6">Create physical or digital stores to categorize inventory distribution.</p>
           <button 
+            type="button"
             onClick={() => setShowWizard(true)}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl"
+            className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl shadow-md shadow-violet-600/20 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
           >
             Launch First Outlet
           </button>
@@ -260,80 +268,88 @@ export const StoreManager: React.FC = () => {
 
               <form onSubmit={handleSaveEdit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400">Store Outlet Name *</label>
+                  <label htmlFor="edit-store-name" className="text-xs font-bold text-slate-300">Store Outlet Name *</label>
                   <input 
+                    id="edit-store-name"
                     type="text" 
                     required
                     value={editData.storeName}
                     onChange={(e) => setEditData(prev => ({ ...prev, storeName: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none"
+                    className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400">Category / Industry *</label>
+                  <label htmlFor="edit-store-cat" className="text-xs font-bold text-slate-300">Category / Industry *</label>
                   <input 
+                    id="edit-store-cat"
                     type="text" 
                     required
                     value={editData.storeCategory}
                     onChange={(e) => setEditData(prev => ({ ...prev, storeCategory: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none"
+                    className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                     placeholder="e.g. Groceries, Tech Accessories"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400">Description *</label>
+                  <label htmlFor="edit-store-desc" className="text-xs font-bold text-slate-300">Description *</label>
                   <textarea 
+                    id="edit-store-desc"
                     required
+                    rows={3}
                     value={editData.description}
                     onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none min-h-[80px]"
+                    className="w-full min-h-[90px] bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all resize-y"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400">Contact Email *</label>
+                    <label htmlFor="edit-store-email" className="text-xs font-bold text-slate-300">Contact Email *</label>
                     <input 
+                      id="edit-store-email"
                       type="email" 
                       required
                       value={editData.email}
                       onChange={(e) => setEditData(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none"
+                      className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400">Contact Phone *</label>
+                    <label htmlFor="edit-store-phone" className="text-xs font-bold text-slate-300">Contact Phone *</label>
                     <input 
+                      id="edit-store-phone"
                       type="text" 
                       required
                       value={editData.phone}
                       onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none"
+                      className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400">City</label>
+                    <label htmlFor="edit-store-city" className="text-xs font-bold text-slate-300">City</label>
                     <input 
+                      id="edit-store-city"
                       type="text" 
                       value={editData.city}
                       onChange={(e) => setEditData(prev => ({ ...prev, city: e.target.value }))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none"
+                      className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400">Country</label>
+                    <label htmlFor="edit-store-country" className="text-xs font-bold text-slate-300">Country</label>
                     <input 
+                      id="edit-store-country"
                       type="text" 
                       value={editData.country}
                       onChange={(e) => setEditData(prev => ({ ...prev, country: e.target.value }))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 outline-none"
+                      className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                     />
                   </div>
                 </div>
@@ -342,14 +358,14 @@ export const StoreManager: React.FC = () => {
                   <button 
                     type="button"
                     onClick={() => setIsEditOpen(false)}
-                    className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-bold text-xs rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit"
                     disabled={savingEdit}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg"
+                    className="min-h-[44px] px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     {savingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Save Specifications

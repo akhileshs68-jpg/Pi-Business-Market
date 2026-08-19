@@ -231,16 +231,18 @@ export const ServiceManager: React.FC = () => {
             <input 
               type="text"
               placeholder="Search services..."
+              aria-label="Search service listings"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:border-emerald-500 outline-none w-56 transition-all"
+              className="pl-10 pr-4 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none w-56 transition-all"
             />
           </div>
 
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 outline-none cursor-pointer focus:border-emerald-500"
+            aria-label="Filter service listings by status"
+            className="px-3.5 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="published">Published</option>
@@ -251,7 +253,8 @@ export const ServiceManager: React.FC = () => {
 
         <button
           onClick={handleOpenCreate}
-          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer self-start sm:self-auto"
+          className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer self-start sm:self-auto focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+          aria-label="Create new service listing"
         >
           <Plus className="w-4 h-4" />
           Create Service Listing
@@ -316,20 +319,26 @@ export const ServiceManager: React.FC = () => {
                     <button
                       onClick={() => handleToggleStatus(s)}
                       disabled={actionLoading === s.serviceId}
-                      className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl text-xs transition-all flex items-center gap-1"
+                      className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl text-xs transition-all flex items-center justify-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none disabled:opacity-50"
+                      aria-label={s.status === 'published' ? `Pause ${s.title}` : `Activate ${s.title}`}
+                      title={s.status === 'published' ? 'Pause Service' : 'Activate Service'}
                     >
-                      {s.status === 'published' ? <Pause size={14} /> : <Play size={14} />}
+                      {s.status === 'published' ? <Pause size={16} /> : <Play size={16} />}
                       <span className="hidden xl:inline">{s.status === 'published' ? 'Pause' : 'Activate'}</span>
                     </button>
                     <button
                       onClick={() => handleOpenEdit(s)}
-                      className="p-2 bg-slate-950 hover:bg-emerald-600/10 border border-slate-800 hover:border-emerald-500/20 text-emerald-400 rounded-xl transition-all"
+                      className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-emerald-600/10 border border-slate-800 hover:border-emerald-500/20 text-emerald-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                      aria-label={`Edit ${s.title}`}
+                      title="Edit Service"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(s.serviceId)}
-                      className="p-2 bg-slate-950 hover:bg-rose-600/10 border border-slate-800 hover:border-rose-500/20 text-rose-400 rounded-xl transition-all"
+                      className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-rose-600/10 border border-slate-800 hover:border-rose-500/20 text-rose-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                      aria-label={`Delete ${s.title}`}
+                      title="Delete Service"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -394,24 +403,26 @@ export const ServiceManager: React.FC = () => {
                     <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest border-b border-slate-800/60 pb-1.5">Specification Info</h4>
                     
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Service Title *</label>
+                      <label htmlFor="service-form-title" className="text-xs font-bold text-slate-300">Service Title *</label>
                       <input 
+                        id="service-form-title"
                         type="text" 
                         required
                         value={formData.title}
                         onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="e.g. Professional Smart Contract Auditing"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Category *</label>
+                        <label htmlFor="service-form-category" className="text-xs font-bold text-slate-300">Category *</label>
                         <select
+                          id="service-form-category"
                           value={formData.category}
                           onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none cursor-pointer focus:border-emerald-500"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer transition-all"
                         >
                           <option value="Consulting">Consulting & Advisory</option>
                           <option value="Development">Software Development</option>
@@ -422,11 +433,12 @@ export const ServiceManager: React.FC = () => {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Location Type *</label>
+                        <label htmlFor="service-form-location-type" className="text-xs font-bold text-slate-300">Location Type *</label>
                         <select
+                          id="service-form-location-type"
                           value={formData.locationType}
                           onChange={(e) => setFormData(prev => ({ ...prev, locationType: e.target.value as any }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none cursor-pointer focus:border-emerald-500"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer transition-all"
                         >
                           <option value="online">Fully Online / Digital</option>
                           <option value="on_premise">On-Premise (My Office)</option>
@@ -436,23 +448,26 @@ export const ServiceManager: React.FC = () => {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Service Area / Scope</label>
+                      <label htmlFor="service-form-area" className="text-xs font-bold text-slate-300">Service Area / Scope</label>
                       <input 
+                        id="service-form-area"
                         type="text" 
                         value={formData.serviceArea}
                         onChange={(e) => setFormData(prev => ({ ...prev, serviceArea: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="e.g. Global, New York Region"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Service Outline / Scope of Work *</label>
+                      <label htmlFor="service-form-desc" className="text-xs font-bold text-slate-300">Service Outline / Scope of Work *</label>
                       <textarea 
+                        id="service-form-desc"
                         required
+                        rows={4}
                         value={formData.description}
                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none min-h-[100px]"
+                        className="w-full min-h-[100px] bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all resize-y"
                         placeholder="Detail exact deliverables, hours included, etc..."
                       />
                     </div>
@@ -462,74 +477,79 @@ export const ServiceManager: React.FC = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest border-b border-slate-800/60 pb-1.5">Pricing & Hours</h4>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Base Price (Pi) *</label>
+                        <label htmlFor="service-form-price" className="text-xs font-bold text-slate-300">Base Price (Pi) *</label>
                         <input 
+                          id="service-form-price"
                           type="number" 
                           required
                           min={0.001}
                           step={0.001}
                           value={formData.basePrice}
                           onChange={(e) => setFormData(prev => ({ ...prev, basePrice: parseFloat(e.target.value) || 0 }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Estimated Duration (mins)</label>
+                        <label htmlFor="service-form-duration" className="text-xs font-bold text-slate-300">Estimated Duration (mins)</label>
                         <input 
+                          id="service-form-duration"
                           type="number" 
                           min={5}
                           value={formData.duration}
                           onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 60 }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Weekly Available Days</label>
+                        <label htmlFor="service-form-days" className="text-xs font-bold text-slate-300">Weekly Available Days</label>
                         <input 
+                          id="service-form-days"
                           type="text" 
                           value={formData.availableDays}
                           onChange={(e) => setFormData(prev => ({ ...prev, availableDays: e.target.value }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                           placeholder="Monday - Friday"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Standard Daily Hours</label>
+                        <label htmlFor="service-form-hours" className="text-xs font-bold text-slate-300">Standard Daily Hours</label>
                         <input 
+                          id="service-form-hours"
                           type="text" 
                           value={formData.availableTime}
                           onChange={(e) => setFormData(prev => ({ ...prev, availableTime: e.target.value }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                           placeholder="09:00 AM - 05:00 PM"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Service Banner / Image URL</label>
+                      <label htmlFor="service-form-image" className="text-xs font-bold text-slate-300">Service Banner / Image URL</label>
                       <input 
+                        id="service-form-image"
                         type="url" 
                         value={formData.imageUrl}
                         onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-emerald-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="https://images.unsplash.com/photo-..."
                       />
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2.5">
+                    <div className="flex items-center gap-3 min-h-[44px] pt-1">
                       <input 
                         type="checkbox"
                         id="booking-req-check"
                         checked={formData.bookingRequired}
                         onChange={(e) => setFormData(prev => ({ ...prev, bookingRequired: e.target.checked }))}
-                        className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-emerald-500 focus:ring-emerald-500"
+                        className="w-5 h-5 rounded bg-slate-950 border-slate-800 text-emerald-500 focus-visible:ring-2 focus-visible:ring-violet-400 cursor-pointer"
                       />
                       <label htmlFor="booking-req-check" className="text-xs font-bold text-slate-300 cursor-pointer selection:bg-transparent">
                         Requires Upfront Booking Request
@@ -538,18 +558,18 @@ export const ServiceManager: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-5">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 border-t border-slate-800 pt-5">
                   <button 
                     type="button"
                     onClick={() => setIsFormOpen(false)}
-                    className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit"
                     disabled={savingForm}
-                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/10"
+                    className="min-h-[44px] px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/10 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     {savingForm && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Save Service Listing

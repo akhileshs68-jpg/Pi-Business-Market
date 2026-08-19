@@ -6,6 +6,7 @@ import { isFirebaseConfigured } from '../firebase/config';
 import { EnterpriseIdentity, Permission } from '../services/identity/identityTypes';
 import { identityService } from '../services/identity/identityService';
 import { RoleResolver } from '../services/identity/RoleResolver';
+import { PiBusinessMarketDB } from '../services/storage';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -254,7 +255,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 2. Instantly update local storage and memory states
       try {
-        const { PiBusinessMarketDB } = await import('../services/storage');
         const storedUser = PiBusinessMarketDB.getCurrentUser();
         if (storedUser && (storedUser.uid === user.uid || storedUser.piUid === user.uid)) {
           PiBusinessMarketDB.setCurrentUser({ ...storedUser, ...updates });

@@ -1484,7 +1484,6 @@ export const AdModerationPanel = () => {
       );
       await loadData();
     } catch (e) {
-      console.error('Failed to update campaign status:', e);
       alert('Failed to update campaign status');
     }
   };

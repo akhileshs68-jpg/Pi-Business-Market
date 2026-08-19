@@ -135,17 +135,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
             {/* Header */}
             <div className="p-6 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600/10 rounded-xl text-indigo-400">
+                <div className="p-2 bg-violet-600/10 rounded-xl text-violet-400">
                   <ShoppingBag className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-white uppercase tracking-tight">Shopping Bag</h2>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  <h2 className="text-lg font-bold text-white uppercase tracking-tight">Shopping Bag</h2>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     {items.length} {items.length === 1 ? 'Item' : 'Items'}
                   </p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white">
+              <button 
+                onClick={onClose} 
+                aria-label="Close cart drawer"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -154,19 +158,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {loading ? (
                 <div className="h-full flex flex-col items-center justify-center gap-4">
-                  <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Retrieving your bag...</p>
+                  <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Retrieving your bag...</p>
                 </div>
               ) : items.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center px-12">
-                  <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6">
-                    <ShoppingBag className="w-8 h-8 text-slate-600" />
+                <div className="h-full flex flex-col items-center justify-center text-center px-8">
+                  <div className="w-16 h-16 bg-slate-800/80 border border-slate-700 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
+                    <ShoppingBag className="w-8 h-8 text-violet-400" />
                   </div>
-                  <h3 className="text-lg font-black text-white uppercase mb-2">Bag is empty</h3>
-                  <p className="text-xs text-slate-500 font-medium mb-8">Looks like you haven't added anything to your cart yet.</p>
+                  <h3 className="text-lg font-bold text-white uppercase mb-2">Bag is empty</h3>
+                  <p className="text-xs text-slate-400 font-medium mb-8 leading-relaxed">Looks like you haven't added anything to your cart yet.</p>
                   <button 
                     onClick={onClose}
-                    className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    className="w-full min-h-[44px] py-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-violet-600/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                   >
                     Start Shopping
                   </button>
@@ -174,21 +178,28 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
               ) : (
                 items.map((item) => (
                   <div key={item.itemId} className="flex gap-4 group">
-                    <div className="w-20 h-20 bg-slate-800 rounded-2xl overflow-hidden border border-slate-700">
+                    <div className="w-20 h-20 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shrink-0 flex items-center justify-center">
                       {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name} 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+                          }}
+                        />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ShoppingBag className="w-6 h-6 text-slate-600" />
-                        </div>
+                        <ShoppingBag className="w-6 h-6 text-slate-600" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className="text-sm font-bold text-white truncate uppercase">{item.name}</h4>
+                        <h4 className="text-sm font-bold text-white truncate">{item.name}</h4>
                         <button 
                           onClick={() => handleRemove(item.itemId)}
-                          className="p-1 text-slate-600 hover:text-rose-500 transition-colors"
+                          aria-label={`Remove ${item.name} from bag`}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-rose-400 transition-colors rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer -mr-2"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -196,16 +207,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                       <div className="mb-3">
                         {item.pricingMode === 'EXCHANGE' && item.localAmount && item.localCurrency ? (
                           <div className="flex flex-col">
-                            <span className="text-[11px] font-bold text-slate-200">
+                            <span className="text-xs font-bold text-slate-200">
                               {formatCurrencyAmount(item.localAmount, item.localCurrency)}
                             </span>
-                            <span className="text-[10px] font-black text-indigo-400">
+                            <span className="text-xs font-bold text-violet-400 font-mono">
                               ≈ {(item.piUnitPrice ?? item.unitPrice).toFixed(2)} π
                             </span>
                           </div>
                         ) : item.pricingMode === 'COMMUNITY' ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-black text-violet-400">
+                            <span className="text-xs font-black text-violet-400 font-mono">
                               {(item.communityPiAmount ?? item.unitPrice).toFixed(2)} π
                             </span>
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
@@ -213,30 +224,36 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                             </span>
                           </div>
                         ) : (
-                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                          <p className="text-xs font-black text-violet-400 font-mono">
                             {item.unitPrice} π
                           </p>
                         )}
                       </div>
                       
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+                        <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
                           <button 
                             onClick={() => handleUpdateQuantity(item.itemId, item.quantity - 1)}
-                            className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400"
+                            aria-label={`Decrease quantity of ${item.name}`}
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-slate-800 rounded-lg transition-colors text-slate-300 hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Minus className="w-4 h-4" />
                           </button>
-                          <span className="w-8 text-center text-xs font-black text-white">{item.quantity}</span>
+                          <span className="w-8 text-center text-xs font-black text-white font-mono">{item.quantity}</span>
                           <button 
                             onClick={() => handleUpdateQuantity(item.itemId, item.quantity + 1)}
-                            className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400"
+                            aria-label={`Increase quantity of ${item.name}`}
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-slate-800 rounded-lg transition-colors text-slate-300 hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-4 h-4" />
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors tooltip-trigger" title="Save for Later">
+                          <button 
+                            aria-label={`Save ${item.name} for later`}
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-violet-400 transition-colors rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400" 
+                            title="Save for Later"
+                          >
                             <Bookmark className="w-4 h-4" />
                           </button>
                           {item.pricingMode === 'EXCHANGE' && item.localAmount && item.localCurrency ? (
@@ -244,12 +261,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
                               <p className="text-xs font-bold text-slate-300">
                                 {formatCurrencyAmount(item.localAmount * item.quantity, item.localCurrency)}
                               </p>
-                              <p className="text-[10px] font-black text-indigo-400">
+                              <p className="text-xs font-bold text-violet-400 font-mono">
                                 ≈ {(item.subtotal || ((item.piUnitPrice ?? item.unitPrice) * item.quantity)).toFixed(2)} π
                               </p>
                             </div>
                           ) : (
-                            <p className="text-sm font-black text-white">
+                            <p className="text-sm font-black text-violet-400 font-mono">
                               {(item.subtotal || ((item.piUnitPrice ?? item.unitPrice) * item.quantity)).toFixed(2)} π
                             </p>
                           )}
@@ -264,63 +281,48 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, userUid
             {/* Footer Summary */}
             {items.length > 0 && cart && (
               <div className="bg-slate-950 border-t border-slate-800 flex flex-col mt-auto">
-                {/* Coupon Code Section */}
-                <div className="px-6 py-4 border-b border-slate-800/50">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Ticket className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input 
-                        type="text" 
-                        placeholder="Have a coupon code?" 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600 font-bold uppercase tracking-widest"
-                      />
-                    </div>
-                    <button className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
-                      Apply
-                    </button>
-                  </div>
-                </div>
-
                 {/* Delivery Estimate */}
-                <div className="px-6 py-3 bg-indigo-500/5 flex items-center gap-3">
-                  <Clock className="w-4 h-4 text-indigo-400" />
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Estimated Delivery: <span className="text-white">3-5 Business Days</span></p>
+                <div className="px-6 py-3 bg-violet-600/5 border-b border-slate-800/60 flex items-center gap-3">
+                  <Clock className="w-4 h-4 text-violet-400 shrink-0" />
+                  <p className="text-xs text-slate-300 font-medium">Estimated Delivery: <span className="text-white font-bold">3-5 Business Days</span></p>
                 </div>
 
                 <div className="p-6 pb-6">
                   <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <div className="flex justify-between text-xs font-semibold text-slate-400">
                       <span>Subtotal</span>
-                      <span className="text-white">{cart.subtotal} Pi</span>
+                      <span className="text-white font-mono font-bold">{cart.subtotal} Pi</span>
                     </div>
-                    <div className="flex justify-between text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                    <div className="flex justify-between text-xs font-semibold text-emerald-400">
                       <span>Discount</span>
-                      <span>-0.00 Pi</span>
+                      <span className="font-mono font-bold">-0.00 Pi</span>
                     </div>
-                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <div className="flex justify-between text-xs font-semibold text-slate-400">
                       <span>Tax (5%)</span>
-                      <span className="text-white">{cart.tax.toFixed(2)} Pi</span>
+                      <span className="text-slate-300 font-mono font-bold">{cart.tax.toFixed(2)} Pi</span>
                     </div>
-                    <div className="flex justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <div className="flex justify-between text-xs font-semibold text-slate-400">
                       <span>Shipping</span>
-                      <span className="text-white">{cart.shipping > 0 ? `${cart.shipping} Pi` : 'FREE'}</span>
+                      <span className="text-slate-300 font-mono font-bold">{cart.shipping > 0 ? `${cart.shipping} Pi` : 'FREE'}</span>
                     </div>
                     <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
-                      <span className="text-xs font-black text-white uppercase tracking-widest">Total Amount</span>
-                      <span className="text-xl font-black text-white">{cart.grandTotal.toFixed(2)} Pi</span>
+                      <span className="text-sm font-bold text-white">Total Amount</span>
+                      <span className="text-xl font-black text-violet-400 font-mono">{cart.grandTotal.toFixed(2)} Pi</span>
                     </div>
                   </div>
 
                   <button 
                     onClick={handleCheckout}
                     disabled={processing}
-                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-3"
+                    aria-label="Proceed to Checkout"
+                    className="w-full min-h-[50px] py-4 bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all shadow-xl shadow-violet-600/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                   >
                     {processing ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <>
-                        Proceed to Checkout <ArrowRight className="w-5 h-5" />
+                        <span>Proceed to Checkout</span>
+                        <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>

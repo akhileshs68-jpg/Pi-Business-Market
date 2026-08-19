@@ -135,8 +135,10 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            aria-label="Close dispute modal"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
           >
             <X className="w-5 h-5" />
           </button>
@@ -145,7 +147,10 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {error && (
-            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+            <div 
+              role="alert"
+              className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2"
+            >
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -153,13 +158,14 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
 
           {/* Category Dropdown */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="dispute-category" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
               Dispute Category <span className="text-rose-400">*</span>
             </label>
             <select
+              id="dispute-category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500/50"
+              className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none focus:border-rose-500/50"
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -171,30 +177,32 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
 
           {/* Issue Summary */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="dispute-summary" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
               Issue Summary / Headline <span className="text-rose-400">*</span>
             </label>
             <input
+              id="dispute-summary"
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Item received is damaged / missing parts"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50"
+              className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none focus:border-rose-500/50"
               maxLength={120}
             />
           </div>
 
           {/* Detailed Explanation */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="dispute-description" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
               Detailed Explanation <span className="text-rose-400">*</span>
             </label>
             <textarea
+              id="dispute-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               placeholder="Describe what went wrong, tracking details, or unfulfilled promises..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50 resize-none"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-sm text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none focus:border-rose-500/50 resize-none"
             />
             <p className="text-[11px] text-slate-500 mt-1">
               Minimum 15 characters. This will be reviewed by the merchant and platform moderators.
@@ -204,28 +212,29 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
           {/* Requested Refund Amount */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="dispute-refund" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
                 Requested Refund (Pi)
               </label>
               <div className="relative">
                 <input
+                  id="dispute-refund"
                   type="number"
                   step="0.01"
                   min="0"
                   max={order.grandTotal || 99999}
                   value={requestedRefund}
                   onChange={(e) => setRequestedRefund(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-amber-400 font-mono font-bold focus:outline-none focus:border-rose-500/50"
+                  className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-amber-400 font-mono font-bold focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none focus:border-rose-500/50"
                 />
-                <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
                 Order Total
-              </label>
-              <div className="w-full bg-slate-950/50 border border-slate-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-400 font-mono">
+              </span>
+              <div className="w-full min-h-[44px] bg-slate-950/50 border border-slate-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-400 font-mono flex items-center">
                 {order.grandTotal?.toFixed(2) || '0.00'} Pi
               </div>
             </div>
@@ -233,21 +242,22 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
 
           {/* Image & Document Attachment Upload */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <label htmlFor="dispute-attachment" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
               Evidence Attachments (Image URL)
             </label>
             <div className="flex gap-2">
               <input
+                id="dispute-attachment"
                 type="url"
                 value={attachmentUrl}
                 onChange={(e) => setAttachmentUrl(e.target.value)}
                 placeholder="https://example.com/evidence-photo.jpg"
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500/50"
+                className="flex-1 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none focus:border-rose-500/50"
               />
               <button
                 type="button"
                 onClick={handleAddAttachment}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                className="min-h-[44px] px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
               >
                 <Upload className="w-3.5 h-3.5" />
                 Add
@@ -264,7 +274,8 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveAttachment(idx)}
-                      className="text-slate-500 hover:text-rose-400 p-0.5"
+                      aria-label={`Remove attachment ${idx + 1}`}
+                      className="min-h-[28px] min-w-[28px] flex items-center justify-center text-slate-500 hover:text-rose-400 p-0.5 rounded focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -280,14 +291,14 @@ export const OpenDisputeModal: React.FC<OpenDisputeModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2 transition-all"
+              className="min-h-[44px] px-6 py-2.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2 transition-all focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
             >
               {isSubmitting ? (
                 <>

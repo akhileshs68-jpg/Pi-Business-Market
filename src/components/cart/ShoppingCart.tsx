@@ -296,24 +296,24 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-12 py-16 bg-slate-900/40 border border-slate-800/80 rounded-3xl relative overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-40 bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="flex flex-col items-center justify-center text-center p-10 sm:p-14 bg-slate-900/40 border border-slate-800/80 rounded-3xl relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
         
         <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-500 shadow-xl">
-          <ShoppingBag className="w-8 h-8" />
+          <ShoppingBag className="w-8 h-8 text-violet-400" />
         </div>
         
-        <h3 className="text-xl font-bold text-white mb-2">Your cart is empty.</h3>
+        <h3 className="text-xl font-bold text-white mb-2">Your shopping cart is empty</h3>
         <p className="text-slate-400 text-sm max-w-sm mb-8 leading-relaxed">
-          Discover products, services, and opportunities across the entire Pi network.
+          Discover physical products, certified on-chain services, and marketplace opportunities across the Pi Network.
         </p>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-xs">
           <button 
             onClick={() => navigate('/discovery')}
-            className="w-full py-3 px-6 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-violet-600/10 cursor-pointer"
+            className="w-full min-h-[44px] py-3 px-6 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-violet-600/20 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
           >
-            Continue Shopping
+            Explore Marketplace
           </button>
         </div>
       </div>
@@ -329,27 +329,30 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 bg-violet-950/60 border border-violet-800/80 rounded-2xl flex items-center justify-between text-xs text-violet-200"
+            role="status"
+            aria-live="polite"
+            className="p-4 bg-violet-950/60 border border-violet-800/80 rounded-2xl flex items-center justify-between text-xs text-violet-200 shadow-lg backdrop-blur-sm"
           >
-            <div className="flex items-center gap-2">
-              <RotateCcw className="w-4 h-4 text-violet-400" />
-              <span>Removed <strong>{undoItem.name}</strong> from cart.</span>
+            <div className="flex items-center gap-2.5">
+              <RotateCcw className="w-4 h-4 text-violet-400 shrink-0" />
+              <span>Removed <strong className="text-white">{undoItem.name}</strong> from your cart.</span>
             </div>
             <button 
               onClick={handleRestoreUndo}
               disabled={actionLoading === 'undo'}
-              className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 font-bold text-white rounded-lg transition-colors flex items-center gap-1"
+              aria-label={`Undo removal of ${undoItem.name}`}
+              className="min-h-[44px] px-4 py-2 bg-violet-600 hover:bg-violet-500 font-bold text-white rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 shadow-md shadow-violet-600/20"
             >
-              {actionLoading === 'undo' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Undo'}
+              {actionLoading === 'undo' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Undo'}
             </button>
           </motion.div>
         )}
 
         {/* Validation Issues Alert */}
         {!validation.isValid && (
-          <div className="p-4 bg-amber-950/40 border border-amber-800/60 rounded-2xl space-y-2 text-xs text-amber-200">
+          <div role="alert" className="p-4 bg-amber-950/40 border border-amber-800/60 rounded-2xl space-y-2 text-xs text-amber-200">
             <div className="flex items-center gap-2 font-bold text-amber-400">
-              <AlertTriangle className="w-4 h-4" />
+              <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>Cart Item Validation Notice</span>
             </div>
             <ul className="list-disc list-inside space-y-1 text-amber-300/80">
@@ -363,15 +366,16 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
         <div className="flex justify-between items-center pb-4 border-b border-slate-800/80">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span>Shopping Items</span>
-            <span className="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full font-bold">
+            <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700/60 px-2.5 py-1 rounded-full font-bold">
               {totalItems} {totalItems === 1 ? 'Item' : 'Items'}
             </span>
           </h2>
           <button 
             onClick={handleClearCart}
-            className="text-xs text-slate-500 hover:text-rose-400 font-bold transition-colors flex items-center gap-1.5"
+            aria-label="Clear all items in cart"
+            className="min-h-[44px] px-3.5 py-2 text-xs text-slate-400 hover:text-rose-400 font-bold transition-colors flex items-center gap-1.5 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
             <span>Clear Cart</span>
           </button>
         </div>
@@ -381,14 +385,14 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
           {sellerGroups.map((group) => (
             <div key={group.sellerId} className="space-y-4">
               {/* Seller Header */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/80 border border-slate-800 rounded-xl">
+              <div className="flex items-center justify-between px-4 py-3 bg-slate-900/80 border border-slate-800 rounded-xl">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
                   <Store className="w-4 h-4 text-violet-400" />
                   <span className="uppercase tracking-wider">Merchant:</span>
                   <span className="text-white">{group.sellerName}</span>
                 </div>
-                <div className="text-[11px] font-bold text-slate-400 font-mono">
-                  Subtotal: {group.subtotal.toFixed(2)} Pi
+                <div className="text-xs font-bold text-slate-300 font-mono">
+                  Subtotal: <span className="text-violet-400">{group.subtotal.toFixed(2)} Pi</span>
                 </div>
               </div>
 
@@ -412,11 +416,14 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                             alt={item.name} 
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+                            }}
                           />
                         ) : (
                           <ShoppingBag className="w-6 h-6 text-slate-600" />
                         )}
-                        <span className="absolute top-1.5 left-1.5 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-sm text-slate-400 border border-slate-800">
+                        <span className="absolute top-1.5 left-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-950/80 backdrop-blur-sm text-slate-300 border border-slate-800">
                           {isService ? 'Service' : 'Product'}
                         </span>
                       </div>
@@ -427,11 +434,11 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                           {/* Header */}
                           <div className="flex justify-between items-start gap-4">
                             <div className="min-w-0">
-                              <h3 className="text-base font-bold text-white truncate hover:text-violet-400 transition-colors cursor-pointer">
+                              <h3 className="text-base font-bold text-white truncate hover:text-violet-400 transition-colors">
                                 {item.name}
                               </h3>
-                              <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                                <Store className="w-3.5 h-3.5 text-violet-400" />
+                              <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Store className="w-3.5 h-3.5 text-violet-400 shrink-0" />
                                 <span className="font-medium truncate">
                                   {group.sellerName}
                                 </span>
@@ -443,7 +450,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                                   <p className="text-sm font-bold text-slate-200">
                                     {formatCurrencyAmount(item.localAmount, item.localCurrency)} <span className="text-xs text-slate-500 font-normal">each</span>
                                   </p>
-                                  <p className="text-xs font-bold text-violet-400">
+                                  <p className="text-xs font-bold text-violet-400 font-mono">
                                     ≈ {(item.piUnitPrice ?? item.unitPrice).toFixed(2)} π
                                   </p>
                                   <p className="text-xs font-bold text-slate-300 mt-1">
@@ -453,23 +460,23 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                               ) : item.pricingMode === 'COMMUNITY' ? (
                                 <>
                                   <div className="flex items-center gap-1.5">
-                                    <p className="text-base font-black text-violet-400">
+                                    <p className="text-base font-black text-violet-400 font-mono">
                                       {(item.communityPiAmount ?? item.unitPrice).toFixed(2)} π
                                     </p>
                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
                                       Community
                                     </span>
                                   </div>
-                                  <p className="text-sm font-bold text-slate-300 mt-0.5">
+                                  <p className="text-xs font-bold text-slate-300 mt-0.5 font-mono">
                                     Subtotal: {((item.communityPiAmount ?? item.unitPrice) * item.quantity).toFixed(2)} π
                                   </p>
                                 </>
                               ) : (
                                 <>
-                                  <p className="text-base font-black text-violet-400">
+                                  <p className="text-base font-black text-violet-400 font-mono">
                                     {item.unitPrice} π <span className="text-xs text-slate-500 font-normal">each</span>
                                   </p>
-                                  <p className="text-sm font-bold text-slate-300 mt-0.5">
+                                  <p className="text-xs font-bold text-slate-300 mt-0.5 font-mono">
                                     Subtotal: {((item.piUnitPrice ?? item.unitPrice) * item.quantity).toFixed(2)} π
                                   </p>
                                 </>
@@ -479,30 +486,32 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 
                           {/* Service customization */}
                           {isService && (
-                            <div className="mt-3 flex flex-wrap gap-3 p-3 bg-slate-950/45 border border-slate-800/40 rounded-xl">
+                            <div className="mt-3 flex flex-wrap gap-3 p-3 bg-slate-950/60 border border-slate-800/60 rounded-xl">
                               {/* Service Date */}
-                              <div className="flex-1 min-w-[120px] space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                                  <Calendar className="w-3 h-3 text-violet-400" />
+                              <div className="flex-1 min-w-[140px] space-y-1">
+                                <label htmlFor={`service-date-${item.itemId}`} className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                                  <Calendar className="w-3.5 h-3.5 text-violet-400" />
                                   <span>Preferred Date</span>
                                 </label>
                                 <input 
+                                  id={`service-date-${item.itemId}`}
                                   type="date"
                                   value={item.serviceDate || '2026-08-01'}
                                   onChange={(e) => handleUpdateServiceDateTime(item, e.target.value, item.serviceTime || '12:00')}
-                                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 font-medium focus:outline-none focus:border-violet-500 transition-colors"
+                                  className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 transition-colors"
                                 />
                               </div>
                               {/* Service Time */}
-                              <div className="flex-1 min-w-[120px] space-y-1">
-                                <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-violet-400" />
+                              <div className="flex-1 min-w-[140px] space-y-1">
+                                <label htmlFor={`service-time-${item.itemId}`} className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-violet-400" />
                                   <span>Preferred Time</span>
                                 </label>
                                 <select 
+                                  id={`service-time-${item.itemId}`}
                                   value={item.serviceTime || '12:00'}
                                   onChange={(e) => handleUpdateServiceDateTime(item, item.serviceDate || '2026-08-01', e.target.value)}
-                                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 font-medium focus:outline-none focus:border-violet-500 transition-colors cursor-pointer"
+                                  className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 transition-colors cursor-pointer"
                                 >
                                   <option value="09:00">09:00 AM</option>
                                   <option value="10:00">10:00 AM</option>
@@ -519,15 +528,16 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                         </div>
 
                         {/* Actions & Controls */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-800/30">
+                        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-800/40">
                           <div className="flex items-center gap-3">
                             {/* Save for Later */}
                             <button 
                               onClick={() => handleSaveForLater(item)}
                               disabled={actionLoading === item.itemId}
-                              className="text-xs text-slate-400 hover:text-violet-400 font-bold transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                              aria-label={`Save ${item.name} for later`}
+                              className="min-h-[44px] px-3 py-2 text-xs text-slate-400 hover:text-violet-400 font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 rounded-xl"
                             >
-                              <Bookmark className="w-3.5 h-3.5" />
+                              <Bookmark className="w-4 h-4" />
                               <span>Save for Later</span>
                             </button>
 
@@ -535,9 +545,10 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                             <button 
                               onClick={() => handleBuyNow(item)}
                               disabled={actionLoading === item.itemId}
-                              className="text-xs text-emerald-400 hover:text-emerald-300 font-bold transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                              aria-label={`Buy ${item.name} now`}
+                              className="min-h-[44px] px-3 py-2 text-xs text-emerald-400 hover:text-emerald-300 font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-xl"
                             >
-                              <Zap className="w-3.5 h-3.5" />
+                              <Zap className="w-4 h-4" />
                               <span>Buy Now</span>
                             </button>
 
@@ -545,32 +556,35 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                             <button 
                               onClick={() => handleRemoveItem(item)}
                               disabled={actionLoading === item.itemId}
-                              className="text-xs text-slate-500 hover:text-rose-400 font-bold transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                              aria-label={`Remove ${item.name} from cart`}
+                              className="min-h-[44px] px-3 py-2 text-xs text-slate-400 hover:text-rose-400 font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 rounded-xl"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                               <span>Remove</span>
                             </button>
                           </div>
 
                           {/* Quantity Selector for Products */}
                           {!isService && (
-                            <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-850 p-1 rounded-xl shadow-inner">
+                            <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-xl shadow-inner">
                               <button 
                                 onClick={() => handleUpdateQuantity(item, item.quantity - 1)}
                                 disabled={item.quantity <= 1 || actionLoading === item.itemId}
-                                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                                aria-label={`Decrease quantity of ${item.name}`}
+                                className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                               >
-                                <Minus className="w-3.5 h-3.5" />
+                                <Minus className="w-4 h-4" />
                               </button>
-                              <span className="w-8 text-center text-xs font-black text-white font-mono">
+                              <span className="w-9 text-center text-xs font-black text-white font-mono" aria-label={`Quantity: ${item.quantity}`}>
                                 {item.quantity}
                               </span>
                               <button 
                                 onClick={() => handleUpdateQuantity(item, item.quantity + 1)}
                                 disabled={actionLoading === item.itemId || (item.stock !== undefined && item.quantity >= item.stock)}
-                                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                                aria-label={`Increase quantity of ${item.name}`}
+                                className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                               >
-                                <Plus className="w-3.5 h-3.5" />
+                                <Plus className="w-4 h-4" />
                               </button>
                             </div>
                           )}
@@ -587,7 +601,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 
       {/* Summary Section */}
       <div className="space-y-6">
-        <div className="bg-slate-900/50 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden">
+        <div className="lg:sticky lg:top-24 bg-slate-900/50 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden">
           {/* Accent decoration */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-violet-600/5 rounded-full blur-2xl pointer-events-none" />
           
@@ -597,7 +611,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
           </h2>
 
           {/* Coupon Engine Box */}
-          <div className="mb-6 space-y-2 p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+          <div className="mb-6 space-y-2 p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
               <span className="flex items-center gap-1.5">
                 <Ticket className="w-4 h-4 text-amber-400" />
@@ -606,7 +620,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
               {appliedCoupon && (
                 <button 
                   onClick={handleRemoveCoupon} 
-                  className="text-[10px] text-rose-400 hover:underline uppercase"
+                  className="text-xs text-rose-400 hover:underline uppercase font-bold cursor-pointer"
                 >
                   Remove
                 </button>
@@ -614,12 +628,12 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
             </div>
 
             {appliedCoupon ? (
-              <div className="p-2.5 bg-emerald-950/30 border border-emerald-800/50 rounded-xl flex items-center justify-between text-xs">
+              <div className="p-3 bg-emerald-950/30 border border-emerald-800/50 rounded-xl flex items-center justify-between text-xs">
                 <div>
                   <span className="font-mono font-black text-emerald-400">{appliedCoupon.code}</span>
-                  <p className="text-[10px] text-slate-400">{appliedCoupon.description}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{appliedCoupon.description}</p>
                 </div>
-                <span className="font-black text-emerald-400">
+                <span className="font-black text-emerald-400 font-mono text-sm">
                   -{summary.couponDiscount.toFixed(2)} Pi
                 </span>
               </div>
@@ -630,11 +644,13 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value)}
                   placeholder="e.g. PIFESTIVAL2026"
-                  className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white uppercase font-mono placeholder:normal-case placeholder:font-sans focus:outline-none focus:border-violet-500"
+                  aria-label="Enter coupon code"
+                  className="flex-1 min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white uppercase font-mono placeholder:normal-case placeholder:font-sans focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                 />
                 <button 
                   onClick={handleApplyCoupon}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors"
+                  aria-label="Apply coupon"
+                  className="min-h-[44px] px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                 >
                   Apply
                 </button>
@@ -642,44 +658,44 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
             )}
 
             {couponError && (
-              <p className="text-[11px] text-rose-400 font-medium px-1">{couponError}</p>
+              <p role="alert" className="text-xs text-rose-400 font-medium px-1 mt-1">{couponError}</p>
             )}
           </div>
 
           <div className="space-y-3.5 mb-8">
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400 font-semibold">Total Items</span>
+              <span className="text-slate-400 font-medium">Total Items</span>
               <span className="text-white font-mono font-bold">{totalItems}</span>
             </div>
 
             {summary.productSubtotal > 0 && (
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-semibold">Product Subtotal</span>
+                <span className="text-slate-400 font-medium">Product Subtotal</span>
                 <span className="text-white font-mono font-bold">{summary.productSubtotal.toFixed(2)} Pi</span>
               </div>
             )}
 
             {summary.serviceSubtotal > 0 && (
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-semibold">Service Subtotal</span>
+                <span className="text-slate-400 font-medium">Service Subtotal</span>
                 <span className="text-white font-mono font-bold">{summary.serviceSubtotal.toFixed(2)} Pi</span>
               </div>
             )}
 
             {summary.couponDiscount > 0 && (
               <div className="flex justify-between items-center text-xs">
-                <span className="text-emerald-400 font-semibold">Coupon Discount</span>
+                <span className="text-emerald-400 font-medium">Coupon Discount</span>
                 <span className="text-emerald-400 font-mono font-bold">-{summary.couponDiscount.toFixed(2)} Pi</span>
               </div>
             )}
 
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400 font-semibold">Estimated Shipping</span>
+              <span className="text-slate-400 font-medium">Estimated Shipping</span>
               <span className="text-slate-300 font-mono font-bold">+{summary.shipping.toFixed(2)} Pi</span>
             </div>
 
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400 font-semibold">Tax (5%)</span>
+              <span className="text-slate-400 font-medium">Tax (5%)</span>
               <span className="text-slate-300 font-mono font-bold">+{summary.tax.toFixed(2)} Pi</span>
             </div>
 
@@ -699,7 +715,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
             {/* BMP Rewards Preview Badge */}
             <div className="p-3 bg-gradient-to-r from-amber-500/10 to-violet-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 font-bold text-amber-300">
-                <Zap className="w-4 h-4 text-amber-400" />
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>BMP Rewards Preview</span>
               </div>
               <span className="font-mono font-black text-amber-400">
@@ -737,7 +753,8 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
                 }
               }}
               disabled={actionLoading === 'checkout' || !validation.isValid}
-              className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-violet-600/10 cursor-pointer flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              aria-label="Proceed to Checkout"
+              className="w-full min-h-[48px] py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-violet-600/20 cursor-pointer flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               {actionLoading === 'checkout' ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Proceed to Checkout</span>}
               <ArrowRight className="w-4 h-4" />
@@ -745,18 +762,19 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 
             <button 
               onClick={() => navigate('/discovery')}
-              className="w-full py-3 bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold rounded-2xl text-xs uppercase tracking-widest transition-all border border-slate-800 cursor-pointer"
+              aria-label="Continue Shopping"
+              className="w-full min-h-[44px] py-3 bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-2xl text-xs uppercase tracking-wider transition-all border border-slate-800 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               Continue Shopping
             </button>
           </div>
 
           {/* Secure Payment Note */}
-          <div className="mt-6 p-4 bg-slate-950/60 border border-slate-850 rounded-2xl flex items-start gap-3">
+          <div className="mt-6 p-4 bg-slate-950/60 border border-slate-800 rounded-2xl flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">Secured Pi Network Tx</h4>
-              <p className="text-[10px] text-slate-500 leading-normal">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Secured Pi Network Tx</h4>
+              <p className="text-xs text-slate-400 leading-normal">
                 Payments are safely routed via standard Pi SDK escrow. Non-custodial, peer-to-peer, fully decentralized.
               </p>
             </div>

@@ -93,7 +93,7 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
     <div className="space-y-10" id="seller_overview_container">
       
       {/* SECTION 1: Store Header */}
-      <section id="seller_store_header" className="relative rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl">
+      <section id="seller_store_header" className="relative rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-violet-600/10 blur-3xl -mr-20 -mt-20 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-600/5 blur-3xl -ml-20 -mb-20 pointer-events-none" />
 
@@ -101,8 +101,8 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
           <div className="flex items-center gap-5">
             {/* Store Logo */}
             <div className="relative shrink-0">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 p-[2px] shadow-lg">
-                <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center overflow-hidden">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 p-[2px] shadow-lg">
+                <div className="w-full h-full rounded-[10px] bg-slate-950 flex items-center justify-center overflow-hidden">
                   <img 
                     src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=150&auto=format&fit=crop&q=60" 
                     alt="Pi-Enterprise" 
@@ -132,7 +132,7 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
           </div>
 
           {/* Store Status Control */}
-          <div className="flex items-center gap-3 self-end md:self-auto bg-slate-950/80 border border-slate-800 p-2 rounded-2xl">
+          <div className="flex items-center gap-3 self-end md:self-auto bg-slate-950/80 border border-slate-800 p-2 rounded-xl">
             <div className="px-3">
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Store Status</span>
               <span className={`text-xs font-black uppercase tracking-wider ${storeOpen ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -140,8 +140,9 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
               </span>
             </div>
             <button
+              type="button"
               onClick={() => setStoreOpen(!storeOpen)}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
+              className={`min-h-[44px] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                 storeOpen 
                   ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/10' 
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/10'
@@ -204,8 +205,9 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
           ].map((act, idx) => (
             <button
               key={idx}
+              type="button"
               onClick={() => onActionClick(act.action)}
-              className={`flex flex-col items-center justify-center p-4 rounded-2xl border text-center gap-2.5 transition-all cursor-pointer group select-none ${
+              className={`flex flex-col items-center justify-center p-4 min-h-[44px] rounded-2xl border text-center gap-2.5 transition-all cursor-pointer group select-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                 act.highlight 
                   ? 'bg-violet-600 hover:bg-violet-500 border-violet-500 text-white shadow-lg shadow-violet-600/10' 
                   : 'bg-slate-900/40 hover:bg-slate-800/80 border-slate-850 text-slate-300 hover:text-white'
@@ -233,8 +235,9 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
               Recent Orders
             </h2>
             <button 
+              type="button"
               onClick={() => onActionClick('orders')}
-              className="text-[10px] font-black text-violet-400 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1"
+              className="min-h-[44px] px-2 text-[10px] font-black text-violet-400 hover:text-white uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-lg"
             >
               All Orders <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
@@ -301,8 +304,9 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
               Low Stock Alert
             </h2>
             <button 
+              type="button"
               onClick={() => onActionClick('inventory')}
-              className="text-[10px] font-black text-rose-400 hover:text-white uppercase tracking-widest transition-colors"
+              className="min-h-[44px] px-2 text-[10px] font-black text-rose-400 hover:text-white uppercase tracking-wider transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-lg"
             >
               Restock
             </button>
@@ -331,8 +335,9 @@ export const SellerOverview: React.FC<SellerOverviewProps> = ({ onActionClick })
                 </div>
                 
                 <button 
+                  type="button"
                   onClick={() => onActionClick('inventory')}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-violet-600 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all text-slate-400"
+                  className="min-h-[44px] px-3.5 py-1.5 bg-slate-800 hover:bg-violet-600 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all text-slate-400 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                 >
                   Restock
                 </button>

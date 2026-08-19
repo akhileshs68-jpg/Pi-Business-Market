@@ -223,7 +223,7 @@ function NavbarComponent({
   const getBottomNavItems = () => {
     return [
       { id: 'home', label: 'Home', iconName: 'Home', view: 'home' },
-      { id: 'marketplace', label: 'Marketplace', iconName: 'Store', view: 'marketplace' },
+      { id: 'marketplace', label: 'Shop', iconName: 'Store', view: 'marketplace' },
       { id: 'orders', label: 'Orders', iconName: 'Clock', view: 'orders' },
       { id: 'business', label: 'My Business', iconName: 'Briefcase', view: 'my-business' },
       { id: 'profile', label: 'Profile', iconName: 'User', view: 'profile' }
@@ -336,9 +336,12 @@ function NavbarComponent({
           {/* MENU DRAWER TOGGLE BUTTON FOR ALL NAVIGATION (ADMIN, BIZ CENTER, ETC) */}
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 transition-all border border-slate-800 flex items-center gap-1 cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 transition-all border border-slate-800 flex items-center gap-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             id="nav_menu_button"
             title="Navigation Menu"
+            aria-label="Open navigation menu"
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile_nav_drawer"
           >
             <Menu className="w-4 h-4 text-violet-400" />
             <span className="hidden md:inline text-xs font-bold text-slate-300">Menu</span>
@@ -346,7 +349,16 @@ function NavbarComponent({
         {/* LOGO SECTION */}
         <div 
           onClick={() => handleDirectNav('home', '/home')}
-          className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group select-none shrink-0"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleDirectNav('home', '/home');
+            }
+          }}
+          tabIndex={0}
+          role="button"
+          aria-label="Pi Marketplace Home"
+          className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group select-none shrink-0 rounded-xl focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
           id="nav_logo_container"
         >
           <div className="w-7.5 h-7.5 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-violet-500/10 group-hover:scale-105 transition-transform border border-violet-500/20">
@@ -407,77 +419,88 @@ function NavbarComponent({
                 }
               }}
               placeholder={searchPlaceholder || "Search products, services, businesses or stores..."}
-              className="w-full bg-slate-900 border border-slate-850 focus:border-violet-500 rounded-xl py-1.5 pl-7 sm:pl-9 pr-3 text-[10px] sm:text-xs font-bold text-white placeholder:text-slate-600 outline-none transition-all shadow-inner"
+              aria-label="Search products, services, businesses or stores"
+              className="w-full bg-slate-900 border border-slate-850 focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-xl py-1.5 pl-7 sm:pl-9 pr-3 text-[10px] sm:text-xs font-bold text-white placeholder:text-slate-600 outline-none transition-all shadow-inner"
             />
             <Search className="absolute left-2.5 top-2.5 sm:left-3 sm:top-3 w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-500" />
           </div>
         </div>
 
         {/* DESKTOP PRIMARY NAVIGATION CONTROLS */}
-        <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0" id="nav_desktop_primary_links">
+        <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0" id="nav_desktop_primary_links" aria-label="Desktop Primary Navigation">
           <button
             id="nav_desktop_home"
             onClick={() => handleDirectNav('home', '/home')}
-            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+            aria-label="Home"
+            aria-current={getActiveTab() === 'home' ? 'page' : undefined}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               getActiveTab() === 'home'
-                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                ? 'bg-violet-600/15 text-violet-300 border border-violet-500/30 shadow-sm'
                 : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Home className="w-3.5 h-3.5 text-violet-400" />
-            <span>HOME</span>
+            <Home className="w-4 h-4 text-violet-400" />
+            <span>Home</span>
           </button>
 
           <button
             id="nav_desktop_marketplace"
             onClick={() => handleDirectNav('marketplace', '/marketplace')}
-            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+            aria-label="Shop"
+            aria-current={getActiveTab() === 'marketplace' ? 'page' : undefined}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               getActiveTab() === 'marketplace'
-                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                ? 'bg-violet-600/15 text-violet-300 border border-violet-500/30 shadow-sm'
                 : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Store className="w-3.5 h-3.5 text-violet-400" />
-            <span>MARKETPLACE</span>
+            <Store className="w-4 h-4 text-violet-400" />
+            <span>Shop</span>
           </button>
 
           <button
             id="nav_desktop_orders"
             onClick={() => handleDirectNav('orders', '/orders')}
-            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+            aria-label="Orders"
+            aria-current={getActiveTab() === 'orders' ? 'page' : undefined}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               getActiveTab() === 'orders'
-                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                ? 'bg-violet-600/15 text-violet-300 border border-violet-500/30 shadow-sm'
                 : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Clock className="w-3.5 h-3.5 text-violet-400" />
-            <span>ORDERS</span>
+            <Clock className="w-4 h-4 text-violet-400" />
+            <span>Orders</span>
           </button>
 
           <button
             id="nav_desktop_my_business"
             onClick={() => handleDirectNav('business', getMyBusinessRoute(activeRoleRaw))}
-            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+            aria-label="My Business"
+            aria-current={getActiveTab() === 'business' ? 'page' : undefined}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               getActiveTab() === 'business'
-                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                ? 'bg-violet-600/15 text-violet-300 border border-violet-500/30 shadow-sm'
                 : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <Briefcase className="w-3.5 h-3.5 text-violet-400" />
-            <span>MY BUSINESS</span>
+            <Briefcase className="w-4 h-4 text-violet-400" />
+            <span>My Business</span>
           </button>
 
           <button
             id="nav_desktop_profile"
             onClick={() => handleDirectNav('profile', '/profile')}
-            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+            aria-label="Profile"
+            aria-current={getActiveTab() === 'profile' ? 'page' : undefined}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               getActiveTab() === 'profile'
-                ? 'bg-violet-600/20 text-violet-300 border border-violet-500/40 shadow-sm'
+                ? 'bg-violet-600/15 text-violet-300 border border-violet-500/30 shadow-sm'
                 : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
             }`}
           >
-            <User className="w-3.5 h-3.5 text-violet-400" />
-            <span>PROFILE</span>
+            <User className="w-4 h-4 text-violet-400" />
+            <span>Profile</span>
           </button>
         </nav>
 
@@ -645,7 +668,8 @@ function NavbarComponent({
           {/* VISUAL CART TOGGLE */}
           <button
             onClick={() => setIsCartOpen(true)}
-            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition-all relative flex items-center gap-1 sm:gap-1.5 cursor-pointer shadow-md border border-violet-500/30"
+            aria-label={`Shopping cart, ${displayCartCount} items`}
+            className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition-all relative flex items-center gap-1 sm:gap-1.5 cursor-pointer shadow-md border border-violet-500/30 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             id="nav_cart_button"
           >
             <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -659,7 +683,8 @@ function NavbarComponent({
           {/* PROFILE ICON */}
           <button
             onClick={() => onNavigate('profile')}
-            className={`p-0.5 rounded-full border transition-all cursor-pointer ${
+            aria-label="My Profile"
+            className={`p-0.5 rounded-full border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               currentView === 'profile' ? 'bg-violet-600 border-violet-500' : 'bg-slate-900 border-slate-800 hover:border-slate-700'
             }`}
             title="My Profile"
@@ -942,10 +967,11 @@ function NavbarComponent({
       document.body
     )}
 
-    {/* BOTTOM NAVIGATION BAR - PREMIUM GLASS DESIGN WITH ACTIVE GLOWS */}
+    {/* BOTTOM NAVIGATION BAR - POLISHED ACCESSIBLE DESIGN */}
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-50 bg-[#080d19]/90 backdrop-blur-xl border-t border-slate-900 px-2 shadow-[0_-8px_32px_0_rgba(0,0,0,0.5)]"
-      style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom))' }}
+      className="fixed bottom-0 left-0 right-0 z-50 bg-[#080d19]/95 backdrop-blur-xl border-t border-slate-900 px-2 shadow-lg"
+      style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom, 0px))' }}
+      aria-label="Mobile Bottom Navigation"
     >
       <div className="flex items-center justify-around h-16 max-w-md sm:max-w-lg md:max-w-xl mx-auto relative">
         {getBottomNavItems().map((item) => {
@@ -971,18 +997,19 @@ function NavbarComponent({
                   handleDirectNav(item.view, `/${item.view}`);
                 }
               }}
-              className="flex flex-col items-center justify-center gap-1.5 flex-1 h-full transition-all relative focus:outline-none"
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
+              className="flex flex-col items-center justify-center gap-1 flex-1 h-full min-h-[48px] transition-all relative cursor-pointer rounded-xl focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
-              <motion.div whileTap={{ scale: 0.88 }} className="flex flex-col items-center">
-                <Icon className={`w-5 h-5 transition-all ${isActive ? 'text-violet-400 scale-110' : 'text-slate-500 hover:text-slate-350'}`} />
-                <span className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${isActive ? 'text-slate-200 font-black' : 'text-slate-500'}`}>
+              <motion.div whileTap={{ scale: 0.92 }} className="flex flex-col items-center">
+                <Icon className={`w-5 h-5 transition-all ${isActive ? 'text-violet-400 scale-105' : 'text-slate-400 hover:text-slate-200'}`} />
+                <span className={`text-[10px] sm:text-xs font-medium tracking-tight mt-0.5 max-w-full px-0.5 truncate text-center ${isActive ? 'text-slate-100 font-semibold' : 'text-slate-400'}`}>
                   {item.label}
                 </span>
               </motion.div>
               {isActive && (
-                <motion.div 
-                  layoutId="active_bottom_tab_glow" 
-                  className="absolute -bottom-1.5 w-8 h-1 bg-violet-500 rounded-full blur-[2.5px]" 
+                <div 
+                  className="absolute bottom-1 w-6 h-0.5 bg-violet-500 rounded-full" 
                 />
               )}
             </button>

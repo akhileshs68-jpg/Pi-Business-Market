@@ -44,11 +44,12 @@ export const Sidebar: React.FC<{ activeRole: string }> = ({ activeRole }) => {
           return (
             <button
               key={mod.id}
+              type="button"
               onClick={() => navigate(mod.path)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+              className="w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
-              <Icon className="w-4 h-4" />
-              {mod.label}
+              <Icon className="w-4 h-4 text-slate-400 group-hover:text-violet-400 shrink-0" />
+              <span className="truncate">{mod.label}</span>
             </button>
           );
         })}

@@ -116,16 +116,20 @@ export const CatalogManagement: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800">
+          <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800" role="tablist" aria-label="Catalog view options">
             <button 
+              role="tab"
+              aria-selected={activeTab === 'categories'}
               onClick={() => setActiveTab('categories')}
-              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-500 hover:text-white'}`}
+              className={`min-h-[44px] px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${activeTab === 'categories' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-500 hover:text-white'}`}
             >
               Categories
             </button>
             <button 
+              role="tab"
+              aria-selected={activeTab === 'attributes'}
               onClick={() => setActiveTab('attributes')}
-              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'attributes' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-500 hover:text-white'}`}
+              className={`min-h-[44px] px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${activeTab === 'attributes' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-500 hover:text-white'}`}
             >
               Attributes
             </button>
@@ -157,13 +161,14 @@ export const CatalogManagement: React.FC = () => {
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-slate-800">
-                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Marketplace Utilities</h4>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Marketplace Utilities</h4>
                   <button 
                     onClick={handleSeed}
                     disabled={seeding}
-                    className="w-full flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs font-bold text-slate-400 hover:text-white hover:border-violet-500/50 transition-all"
+                    aria-label="Seed marketplace taxonomy"
+                    className="min-h-[44px] w-full flex items-center justify-center gap-2 p-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs font-bold text-slate-300 hover:text-white hover:border-violet-500/50 transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer disabled:opacity-50"
                   >
-                    {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    {seeding ? <Loader2 className="w-4 h-4 animate-spin text-violet-400" /> : <RefreshCw className="w-4 h-4 text-violet-400" />}
                     Seed Marketplace Taxonomy
                   </button>
                 </div>
@@ -174,7 +179,8 @@ export const CatalogManagement: React.FC = () => {
                   setSelectedCategory(undefined);
                   setIsCategoryWizardOpen(true);
                 }}
-                className="w-full group p-6 bg-violet-600 hover:bg-violet-500 text-white rounded-3xl font-black uppercase tracking-widest text-sm transition-all shadow-xl shadow-violet-600/20 flex items-center justify-center gap-3"
+                aria-label={activeTab === 'categories' ? 'Create new category' : 'Create new attribute'}
+                className="min-h-[52px] w-full group p-4 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-violet-600/20 flex items-center justify-center gap-3 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
               >
                 <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
                 {activeTab === 'categories' ? 'Create Category' : 'New Attribute'}
@@ -196,10 +202,10 @@ export const CatalogManagement: React.FC = () => {
                       <div className="py-24 text-center bg-slate-900/30 border border-slate-800 border-dashed rounded-3xl">
                         <FolderTree className="w-12 h-12 text-slate-700 mx-auto mb-4" />
                         <h3 className="text-xl font-bold text-white mb-2">No Categories Found</h3>
-                        <p className="text-slate-500 mb-8 max-w-xs mx-auto">Build your enterprise taxonomy by creating the first category.</p>
+                        <p className="text-slate-400 mb-8 max-w-xs mx-auto text-xs">Build your enterprise taxonomy by creating the first category.</p>
                         <button 
                           onClick={() => setIsCategoryWizardOpen(true)}
-                          className="px-8 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                          className="min-h-[44px] px-8 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
                         >
                           Create First Category
                         </button>
@@ -246,7 +252,7 @@ export const CatalogManagement: React.FC = () => {
                               <Tag className="w-4 h-4 text-violet-400" />
                               {group.name}
                             </h4>
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
                               {groupAttrs.length} Attributes
                             </span>
                           </div>
@@ -256,21 +262,34 @@ export const CatalogManagement: React.FC = () => {
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
                                     <p className="font-bold text-white text-sm">{attr.name}</p>
-                                    {attr.required && <span className="w-1 h-1 bg-red-500 rounded-full" title="Required" />}
+                                    {attr.required && <span className="w-1.5 h-1.5 bg-rose-500 rounded-full" title="Required" />}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-mono text-violet-400 uppercase">{attr.dataType}</span>
-                                    {attr.unit && <span className="text-[10px] text-slate-500 font-mono">({attr.unit})</span>}
+                                    {attr.unit && <span className="text-[10px] text-slate-400 font-mono">({attr.unit})</span>}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button className="p-1.5 text-slate-500 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
-                                  <button className="p-1.5 text-slate-500 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                                <div className="flex items-center gap-1 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    aria-label={`Edit attribute ${attr.name}`}
+                                    className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    aria-label={`Delete attribute ${attr.name}`}
+                                    className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-slate-400 hover:text-rose-400 rounded-xl hover:bg-rose-500/10 transition-all focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               </div>
                             ))}
-                            <button className="p-4 bg-slate-950/30 border border-slate-800 border-dashed rounded-2xl flex items-center justify-center gap-2 text-slate-600 hover:text-slate-400 hover:bg-slate-900/50 transition-all group">
-                              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                            <button 
+                              aria-label={`Add attribute to group ${group.name}`}
+                              className="min-h-[56px] p-4 bg-slate-950/30 border border-slate-800 border-dashed rounded-2xl flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-900/50 hover:border-violet-500/40 transition-all group focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
+                            >
+                              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform text-violet-400" />
                               <span className="text-[10px] font-black uppercase tracking-widest">Add Attr to {group.name}</span>
                             </button>
                           </div>
@@ -311,39 +330,50 @@ const CategoryItem: React.FC<{
     <div className="bg-slate-900/30 border border-slate-800/50 rounded-2xl overflow-hidden">
       <div 
         onClick={onToggle}
-        className="p-4 flex items-center gap-4 hover:bg-slate-800/50 cursor-pointer transition-colors"
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        aria-label={`Category ${category.name}, ${expanded ? 'expanded' : 'collapsed'}`}
+        className="p-4 flex items-center gap-4 hover:bg-slate-800/50 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
       >
         <div className={`transition-transform ${expanded ? 'rotate-90' : ''}`}>
           {subcategories.length > 0 ? <ChevronRight className="w-4 h-4 text-slate-500" /> : <div className="w-4" />}
         </div>
         
-        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xl">
+        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xl shrink-0">
           {category.icon || '📁'}
         </div>
 
-        <div className="flex-1">
-          <h4 className="font-bold text-white">{category.name}</h4>
-          <p className="text-[10px] font-mono text-slate-500 uppercase">{category.slug}</p>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-bold text-white truncate">{category.name}</h4>
+          <p className="text-[10px] font-mono text-slate-400 uppercase truncate">{category.slug}</p>
         </div>
 
         <div className="flex items-center gap-2">
           {category.featured && (
-            <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 text-[8px] font-black uppercase rounded-lg border border-amber-500/20">Featured</span>
+            <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 text-[8px] font-black uppercase rounded-lg border border-amber-500/20">Featured</span>
           )}
           <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase border ${
-            category.status === 'active' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'
+            category.status === 'active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'
           }`}>
             {category.status}
           </span>
           <button 
             onClick={(e) => { e.stopPropagation(); onEdit(category); }}
-            className="p-2 text-slate-500 hover:text-white rounded-lg"
+            aria-label={`Edit category ${category.name}`}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onDelete(category.categoryId); }}
-            className="p-2 text-slate-500 hover:text-red-400 rounded-lg"
+            aria-label={`Delete category ${category.name}`}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-slate-400 hover:text-rose-400 rounded-xl hover:bg-rose-500/10 transition-all focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -356,7 +386,7 @@ const CategoryItem: React.FC<{
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-t border-slate-800/50 bg-slate-950/20 pl-8 pb-4"
+            className="border-t border-slate-800/50 bg-slate-950/20 pl-6 sm:pl-8 pb-4"
           >
             <div className="space-y-2 mt-2 pr-4">
               {subcategories.map(sub => (

@@ -22,6 +22,7 @@ import { getAbsoluteUrl } from '../utils/urlUtils';
 import { User, UserRole } from '../types';
 import { identityService } from '../services/identity/identityService';
 import { removeUndefinedFields } from '../utils/firestoreUtils';
+import { PiBusinessMarketDB } from '../services/storage';
 
 export interface RoleConfig {
   id: string;
@@ -615,7 +616,6 @@ export const authService = {
 
     // Step 7: Compare stored values with current authenticated session
     console.log('[PI_VERIFY_STEP 7/10] Comparing stored session with live authenticated session...');
-    const { PiBusinessMarketDB } = await import('../services/storage');
     const storedUser = PiBusinessMarketDB.getCurrentUser();
     const storedPiUid = storedUser?.piUid || localStorage.getItem('last_pi_uid');
     const storedUsername = storedUser?.username;
@@ -973,7 +973,6 @@ export const authService = {
 
       // Synchronize changes to local storage and the live in-memory user reference
       try {
-        const { PiBusinessMarketDB } = await import('../services/storage');
         const storedUser = PiBusinessMarketDB.getCurrentUser();
         if (storedUser && (storedUser.uid === uid || storedUser.piUid === uid)) {
           const updated = { ...storedUser, ...updates };

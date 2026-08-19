@@ -23,6 +23,7 @@ import { getAbsoluteUrl } from '../utils/urlUtils';
 import { logger } from '../core/logger';
 import { analyticsService } from './analyticsService';
 import { notificationService } from './notificationService';
+import { PiBusinessMarketDB } from './storage';
 
 export type CampaignType = 
   | 'featured_product'
@@ -342,7 +343,6 @@ export class CampaignService {
     }
 
     const { authService } = await import('../auth/authService');
-    const { PiBusinessMarketDB } = await import('./storage');
 
     const liveUser = authService.getLatestVerifiedUser();
     const storedUser = PiBusinessMarketDB.getCurrentUser();
@@ -677,7 +677,6 @@ export class CampaignService {
     
     // Security verification: check if caller owns the campaign or is admin
     const { authService } = await import('../auth/authService');
-    const { PiBusinessMarketDB } = await import('./storage');
 
     const liveUser = authService.getLatestVerifiedUser();
     const storedUser = PiBusinessMarketDB.getCurrentUser();

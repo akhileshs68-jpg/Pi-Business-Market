@@ -75,6 +75,60 @@ export const OrderDetails: React.FC = () => {
   const [isDisputing, setIsDisputing] = useState(false);
   const [disputeError, setDisputeError] = useState<string | null>(null);
   const [copiedQr, setCopiedQr] = useState(false);
+  const [copiedOrderNumber, setCopiedOrderNumber] = useState(false);
+  const [copiedAwb, setCopiedAwb] = useState(false);
+
+  const getSemanticBadge = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (['completed', 'delivered'].includes(s)) {
+      return {
+        className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        icon: CheckCircle2
+      };
+    }
+    if (['cancelled', 'rejected', 'returned', 'failed'].includes(s)) {
+      return {
+        className: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+        icon: XCircle
+      };
+    }
+    if (['refund_requested', 'refund_approved', 'disputed', 'holding'].includes(s)) {
+      return {
+        className: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        icon: AlertTriangle
+      };
+    }
+    if (['shipped', 'out_for_delivery', 'in_transit', 'ready_for_dispatch', 'packed'].includes(s)) {
+      return {
+        className: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+        icon: Truck
+      };
+    }
+    if (['preparing', 'accepted', 'processing'].includes(s)) {
+      return {
+        className: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+        icon: Clock
+      };
+    }
+    return {
+      className: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+      icon: Clock
+    };
+  };
+
+  const handleCopyOrderNumber = () => {
+    if (!order?.orderNumber) return;
+    navigator.clipboard.writeText(order.orderNumber);
+    setCopiedOrderNumber(true);
+    setTimeout(() => setCopiedOrderNumber(false), 2000);
+  };
+
+  const handleCopyAwbNumber = () => {
+    if (!order?.trackingNumber) return;
+    navigator.clipboard.writeText(order.trackingNumber);
+    setCopiedAwb(true);
+    setTimeout(() => setCopiedAwb(false), 2000);
+  };
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -563,42 +617,67 @@ export const OrderDetails: React.FC = () => {
             </div>
             <button onClick={() => setActionSuccess(null)} className="text-emerald-400 hover:text-white font-bold text-[10px] uppercase">Dismiss</button>
           </div>
-        )}
-
-        {/* Header */}
+        )}        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 sm:mb-12">
           <div className="space-y-2">
-            <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 hover:text-white mb-4 transition-colors">
+            <button 
+              type="button"
+              onClick={() => navigate(-1)} 
+              className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-2 transition-colors min-h-[44px] px-2 -ml-2 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-xl"
+            >
               <ArrowLeft className="w-4 h-4" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Back to History</span>
+              <span className="text-xs font-bold uppercase tracking-wider">Back to History</span>
             </button>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter truncate">Order {order.orderNumber}</h1>
-              <span className="px-3 py-1 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
-                {order.orderStatus.replace(/_/g, ' ')}
-              </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight truncate">
+                Order #{order.orderNumber}
+              </h1>
+              <button
+                type="button"
+                onClick={handleCopyOrderNumber}
+                aria-label={`Copy order number ${order.orderNumber}`}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-violet-300 rounded-xl transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none -my-2"
+              >
+                {copiedOrderNumber ? (
+                  <Check className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+              {(() => {
+                const badge = getSemanticBadge(order.orderStatus);
+                const BadgeIcon = badge.icon;
+                return (
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border shrink-0 ${badge.className}`}>
+                    <BadgeIcon className="w-3.5 h-3.5" />
+                    {order.orderStatus.replace(/_/g, ' ')}
+                  </span>
+                );
+              })()}
             </div>
-            <p className="text-xs text-slate-500 font-medium">Placed on {formatDate(order.createdAt)}</p>
+            <p className="text-xs text-slate-400 font-medium">Placed on {formatDate(order.createdAt)}</p>
           </div>
 
           {/* Action Button Strip */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {isMerchant ? (
               <>
                 {['paid', 'payment_verified', 'new_order', 'pending_payment'].includes(currentStatusClean) && (
                   <>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => handleUpdateStatus(OrderStatus.ACCEPTED, 'Order accepted by merchant')} 
-                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5"
+                      className="min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
                     >
                       {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                       ACCEPT ORDER
                     </button>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => handleUpdateStatus(OrderStatus.REJECTED, 'Order rejected by merchant')} 
-                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      className="min-h-[44px] px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
                     >
                       {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                       REJECT ORDER
@@ -607,9 +686,10 @@ export const OrderDetails: React.FC = () => {
                 )}
                 {currentStatusClean === 'accepted' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={() => handleUpdateStatus(OrderStatus.PREPARING, 'Items are being prepared')} 
-                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    className="min-h-[44px] px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-violet-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     START PREPARING
@@ -617,9 +697,10 @@ export const OrderDetails: React.FC = () => {
                 )}
                 {currentStatusClean === 'preparing' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={() => handleUpdateStatus(OrderStatus.PACKED, 'Order packed and sealed')} 
-                    className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    className="min-h-[44px] px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none"
                   >
                     {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     MARK PACKED
@@ -628,46 +709,51 @@ export const OrderDetails: React.FC = () => {
                 {currentStatusClean === 'packed' && (
                   <>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => handleUpdateStatus(OrderStatus.READY_FOR_DISPATCH, 'Order ready for dispatch')} 
-                      className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      className="min-h-[44px] px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:outline-none"
                     >
                       {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                       READY FOR DISPATCH
                     </button>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => setShowShipmentModal(true)} 
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                      className="min-h-[44px] px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-md shadow-violet-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     >
-                      <Truck className="w-3.5 h-3.5" /> DISPATCH / SHIP
+                      <Truck className="w-4 h-4" /> DISPATCH / SHIP
                     </button>
                   </>
                 )}
                 {currentStatusClean === 'ready_for_dispatch' && (
                   <>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => handleUpdateStatus(OrderStatus.SHIPPED, 'Order shipped via carrier')} 
-                      className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                      className="min-h-[44px] px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:outline-none"
                     >
                       {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                       MARK SHIPPED
                     </button>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => setShowShipmentModal(true)} 
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                      className="min-h-[44px] px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-md shadow-violet-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     >
-                      <Truck className="w-3.5 h-3.5" /> COURIER DISPATCH
+                      <Truck className="w-4 h-4" /> COURIER DISPATCH
                     </button>
                   </>
                 )}
                 {currentStatusClean === 'shipped' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={() => handleUpdateStatus(OrderStatus.OUT_FOR_DELIVERY, 'Out for local delivery')} 
-                    className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    className="min-h-[44px] px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:outline-none"
                   >
                     {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     MARK OUT FOR DELIVERY
@@ -675,9 +761,10 @@ export const OrderDetails: React.FC = () => {
                 )}
                 {currentStatusClean === 'out_for_delivery' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={() => handleUpdateStatus(OrderStatus.DELIVERED, 'Package delivered to recipient')} 
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5"
+                    className="min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
                   >
                     {statusUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     MARK DELIVERED
@@ -685,18 +772,20 @@ export const OrderDetails: React.FC = () => {
                 )}
                 {currentStatusClean === 'refund_requested' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={handleApproveRefund} 
-                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                    className="min-h-[44px] px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
                   >
                     Approve Refund
                   </button>
                 )}
                 {order.escrowStatus === 'holding' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={handleReleaseEscrow} 
-                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-widest transition-all disabled:opacity-50"
+                    className="min-h-[44px] px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs uppercase tracking-wider transition-all disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none"
                   >
                     Release Escrow
                   </button>
@@ -707,16 +796,18 @@ export const OrderDetails: React.FC = () => {
                 {currentStatusClean === 'delivered' && (
                   <>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => handleUpdateStatus(OrderStatus.COMPLETED, 'Order confirmed & completed by buyer')} 
-                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                      className="min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
                     >
                       Confirm Receipt
                     </button>
                     <button 
+                      type="button"
                       disabled={statusUpdating}
                       onClick={() => setShowRefundModal(true)} 
-                      className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                      className="min-h-[44px] px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none"
                     >
                       Request Refund
                     </button>
@@ -724,128 +815,177 @@ export const OrderDetails: React.FC = () => {
                 )}
                 {['pending_payment', 'payment_verified', 'paid', 'new_order', 'accepted'].includes(currentStatusClean) && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={() => handleUpdateStatus(OrderStatus.CANCELLED, 'Cancelled by customer')} 
-                    className="px-4 py-2.5 bg-rose-600/20 border border-rose-500/30 text-rose-400 hover:bg-rose-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                    className="min-h-[44px] px-4 py-2.5 bg-rose-600/20 border border-rose-500/30 text-rose-300 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
                   >
                     Cancel Order
                   </button>
                 )}
                 {currentStatusClean === 'completed' && (
                   <button 
+                    type="button"
                     disabled={statusUpdating}
                     onClick={() => setShowRefundModal(true)} 
-                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+                    className="min-h-[44px] px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                   >
                     Request Refund / Return
                   </button>
                 )}
                 <button 
+                  type="button"
                   disabled={statusUpdating}
                   onClick={() => setShowDisputeModal(true)} 
-                  className="px-3 py-2 bg-rose-950/40 border border-rose-800/50 text-rose-400 hover:bg-rose-900/60 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  className="min-h-[44px] px-3.5 py-2.5 bg-rose-950/40 border border-rose-800/50 text-rose-300 hover:bg-rose-900/60 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" /> Open Dispute
                 </button>
               </>
             )}
 
-            <button onClick={handleChatAboutOrder} className="px-3.5 py-2.5 bg-indigo-600/15 border border-indigo-500/20 hover:bg-indigo-600/30 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={handleChatAboutOrder} 
+              className="min-h-[44px] px-3.5 py-2.5 bg-violet-600/15 border border-violet-500/30 hover:bg-violet-600/25 text-violet-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            >
               <MessageSquare className="w-3.5 h-3.5" /> Chat
             </button>
-            <button onClick={handleOpenInvoice} className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={handleOpenInvoice} 
+              className="min-h-[44px] px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
+            >
               <Printer className="w-3.5 h-3.5" /> Invoice
             </button>
-            <button onClick={handleOpenReceipt} className="px-3.5 py-2.5 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={handleOpenReceipt} 
+              className="min-h-[44px] px-3.5 py-2.5 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white text-emerald-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+            >
               <FileText className="w-3.5 h-3.5" /> Receipt
             </button>
-            <button onClick={() => handleOpenVerify()} className="px-3.5 py-2.5 bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600 hover:text-white text-violet-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={() => handleOpenVerify()} 
+              className="min-h-[44px] px-3.5 py-2.5 bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600 hover:text-white text-violet-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            >
               <QrCode className="w-3.5 h-3.5" /> Verify QR
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 sm:gap-10">
           {/* Left Column: Details */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
 
             {/* QR Verification Card */}
             {order.qrVerificationCode && (
-              <section className="bg-gradient-to-r from-indigo-950/60 to-slate-900/80 border border-indigo-500/30 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-white p-2 rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
-                    <QrCode className="w-12 h-12 text-slate-950" />
+              <section className="bg-gradient-to-r from-violet-950/40 via-slate-900/80 to-slate-900/80 border border-violet-500/30 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-5">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white p-2 rounded-xl flex items-center justify-center shrink-0 shadow-md">
+                    <QrCode className="w-10 h-10 sm:w-12 sm:h-12 text-slate-950" />
                   </div>
                   <div>
-                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Store Pickup & Dispatch QR Token</span>
-                    <p className="text-sm font-mono font-bold text-white tracking-wider">{order.qrVerificationCode}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Present code to store clerk or delivery agent to verify exchange.</p>
+                    <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider block mb-1">
+                      Store Pickup & Delivery Verification Token
+                    </span>
+                    <p className="text-xs sm:text-sm font-mono font-bold text-white tracking-wider break-all">
+                      {order.qrVerificationCode}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Present code to merchant or delivery courier to verify receipt.
+                    </p>
                   </div>
                 </div>
                 <button 
+                  type="button"
                   onClick={handleCopyQr}
-                  className="px-4 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shrink-0"
+                  aria-label="Copy QR Verification Token"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-violet-600/20 hover:bg-violet-600/40 border border-violet-500/30 text-violet-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 shrink-0 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                 >
                   {copiedQr ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  {copiedQr ? 'Copied' : 'Copy QR Token'}
+                  <span>{copiedQr ? 'Copied' : 'Copy Token'}</span>
                 </button>
               </section>
             )}
 
             {/* Products List */}
-            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
-              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 sm:mb-8 flex items-center gap-3">
-                <Package className="w-6 h-6 text-indigo-400" /> Order Products & Services ({items.length})
+            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-7">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                <Package className="w-5 h-5 text-violet-400" /> 
+                Order Products & Services ({items.length})
               </h2>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {items.map((item) => (
-                  <div key={item.itemId || item.productId} className="space-y-4 bg-slate-950/50 border border-slate-800/50 rounded-2xl p-4 sm:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
+                  <div key={item.itemId || item.productId} className="space-y-4 bg-slate-950/60 border border-slate-800/60 rounded-xl p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
                         {(item as any).imageUrl ? (
                           <img src={(item as any).imageUrl} alt={item.productName} className="w-full h-full object-cover" />
                         ) : (
-                          <ShoppingBag className="w-8 h-8 text-slate-700" />
+                          <ShoppingBag className="w-6 h-6 text-slate-600" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm sm:text-base font-bold text-white uppercase truncate mb-1">{item.productName}</h4>
-                        <div className="flex flex-wrap items-center gap-3 mb-2">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-900 px-2 py-1 rounded">SKU: {item.sku || 'N/A'}</span>
-                          {item.variantId && <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-800 px-2 py-1 rounded">Variant: {item.variantId}</span>}
-                          {item.isService && <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded">Service</span>}
+                        <h4 className="text-sm sm:text-base font-bold text-white uppercase truncate mb-1">
+                          {item.productName}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                            SKU: {item.sku || 'N/A'}
+                          </span>
+                          {item.variantId && (
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-800 px-2 py-0.5 rounded">
+                              Variant: {item.variantId}
+                            </span>
+                          )}
+                          {item.isService && (
+                            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                              Service
+                            </span>
+                          )}
                         </div>
                         
-                        <div className="flex items-end justify-between mt-4">
+                        <div className="flex items-end justify-between mt-3 pt-3 border-t border-slate-850">
                            <div>
-                             <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Price per unit</p>
-                             <p className="text-sm font-bold text-white">{item.unitPrice.toFixed(2)} Pi</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Price</p>
+                             <p className="text-xs sm:text-sm font-bold text-white">{item.unitPrice.toFixed(2)} Pi</p>
                            </div>
                            <div className="text-center px-4">
-                             <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Qty</p>
-                             <p className="text-sm font-bold text-white">x{item.quantity}</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Qty</p>
+                             <p className="text-xs sm:text-sm font-bold text-white">x{item.quantity}</p>
                            </div>
                            <div className="text-right">
-                             <p className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Total</p>
-                             <p className="text-base sm:text-lg font-black text-indigo-400">{item.subtotal.toFixed(2)} Pi</p>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Subtotal</p>
+                             <p className="text-sm sm:text-base font-black text-violet-300">{item.subtotal.toFixed(2)} Pi</p>
                            </div>
                         </div>
                       </div>
                     </div>
 
                     {!isMerchant && (
-                      <div className="pt-4 mt-4 border-t border-slate-800/50 flex flex-wrap gap-2">
-                         <button onClick={() => navigate(`/product/${item.productId}`)} className="flex-1 min-w-[120px] px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-                           <ExternalLink className="w-3 h-3" /> View Product
+                      <div className="pt-3 border-t border-slate-800/60 flex flex-wrap gap-2">
+                         <button 
+                           type="button"
+                           onClick={() => navigate(`/product/${item.productId}`)} 
+                           className="flex-1 min-w-[120px] min-h-[44px] px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
+                         >
+                           <ExternalLink className="w-3.5 h-3.5" /> View Product
                          </button>
-                         <button onClick={() => navigate(`/product/${item.productId}`)} className="flex-1 min-w-[120px] px-3 py-2 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-                           <RotateCcw className="w-3 h-3" /> Buy Again
+                         <button 
+                           type="button"
+                           onClick={() => navigate(`/product/${item.productId}`)} 
+                           className="flex-1 min-w-[120px] min-h-[44px] px-3 py-2 bg-violet-600/10 text-violet-300 border border-violet-500/20 hover:bg-violet-600 hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                         >
+                           <RotateCcw className="w-3.5 h-3.5" /> Buy Again
                          </button>
                          
                         {(order.orderStatus === OrderStatus.COMPLETED || order.orderStatus === OrderStatus.DELIVERED) && reviewingItemId !== item.itemId && (
                           <button 
+                            type="button"
                             onClick={() => setReviewingItemId(item.itemId)}
-                            className="w-full sm:w-auto px-4 py-2 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all mt-2 sm:mt-0"
+                            className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-emerald-600/10 text-emerald-300 border border-emerald-500/20 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-600 hover:text-white transition-all focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
                           >
                             Review Item
                           </button>
@@ -853,7 +993,7 @@ export const OrderDetails: React.FC = () => {
                       </div>
                     )}
                     {reviewingItemId === item.itemId && (
-                      <div className="mt-4">
+                      <div className="mt-4 pt-4 border-t border-slate-800">
                         <ReviewForm 
                           entityId={item.productId}
                           entityType="product"
@@ -870,43 +1010,45 @@ export const OrderDetails: React.FC = () => {
             </section>
 
             {/* Price Breakdown */}
-            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-5 sm:p-8">
-              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <Tag className="w-6 h-6 text-emerald-400" /> Financial Statement
+            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-7">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight mb-5 flex items-center gap-3">
+                <Tag className="w-5 h-5 text-emerald-400" /> Financial Summary
               </h2>
               
-              <div className="space-y-4">
-                <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-slate-400">
                   <span>Product Subtotal</span>
-                  <span className="text-white">{(order.subtotal || 0).toFixed(2)} Pi</span>
+                  <span className="text-white font-bold">{(order.subtotal || 0).toFixed(2)} Pi</span>
                 </div>
-                <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400">
-                  <span>Shipping Charge</span>
-                  <span className="text-white">+{(order.shipping || 0).toFixed(2)} Pi</span>
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-slate-400">
+                  <span>Shipping Fee</span>
+                  <span className="text-white font-bold">+{(order.shipping || 0).toFixed(2)} Pi</span>
                 </div>
-                <div className="flex justify-between text-xs sm:text-sm font-bold text-emerald-400">
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-emerald-400">
                   <span>Discount Applied</span>
-                  <span>-{(order.discount || 0).toFixed(2)} Pi</span>
+                  <span className="font-bold">-{(order.discount || 0).toFixed(2)} Pi</span>
                 </div>
-                <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-400 border-b border-slate-800 pb-4">
-                  <span>Tax (GST/VAT)</span>
-                  <span className="text-white">+{(order.tax || 0).toFixed(2)} Pi</span>
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-slate-400 border-b border-slate-800/80 pb-3">
+                  <span>Tax (Estimated)</span>
+                  <span className="text-white font-bold">+{(order.tax || 0).toFixed(2)} Pi</span>
                 </div>
                 
-                <div className="pt-2 flex justify-between items-end border-b border-slate-800 pb-4">
+                <div className="pt-2 flex justify-between items-end border-b border-slate-800/80 pb-4">
                   <div>
-                    <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Grand Total</span>
-                    <span className="text-2xl sm:text-3xl font-black text-indigo-400">{(order.grandTotal || 0).toFixed(2)} Pi</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Grand Total</span>
+                    <span className="text-2xl sm:text-3xl font-black text-violet-300">
+                      {(order.grandTotal || 0).toFixed(2)} <span className="text-sm font-bold text-slate-400">Pi</span>
+                    </span>
                   </div>
                   <div className="text-right">
-                    <span className="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-black uppercase tracking-widest">
+                    <span className="inline-block px-3 py-1 bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 rounded-full text-[10px] font-bold uppercase tracking-wider">
                       Paid via {order.paymentStatus || 'Verified'}
                     </span>
                   </div>
                 </div>
 
                 {order.bmpRewardsEarned ? (
-                  <div className="pt-2 flex justify-between text-xs font-bold text-amber-400 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                  <div className="pt-2 flex justify-between text-xs font-bold text-amber-300 bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
                     <span>BMP Loyalty Tokens Earned</span>
                     <span>+{order.bmpRewardsEarned.toFixed(2)} BMP</span>
                   </div>
@@ -916,35 +1058,35 @@ export const OrderDetails: React.FC = () => {
 
             {/* Seller Information */}
             {store && !isMerchant && (
-              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-                <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                  <StoreIcon className="w-5 h-5 text-amber-400" /> Seller Info
+              <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-7">
+                <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight mb-5 flex items-center gap-3">
+                  <StoreIcon className="w-5 h-5 text-amber-400" /> Merchant Information
                 </h2>
                 
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                   <div className="w-20 h-20 bg-slate-950 border-2 border-slate-800 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+                   <div className="w-16 h-16 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
                      {store.logoUrl ? (
                        <img src={store.logoUrl} alt={store.storeName} className="w-full h-full object-cover" />
                      ) : (
-                       <StoreIcon className="w-8 h-8 text-slate-700" />
+                       <StoreIcon className="w-7 h-7 text-slate-600" />
                      )}
                    </div>
                    
-                   <div className="flex-1 text-center sm:text-left space-y-2">
+                   <div className="flex-1 text-center sm:text-left space-y-1.5">
                      <div className="flex items-center justify-center sm:justify-start gap-2">
-                       <h3 className="text-xl font-black text-white uppercase">{store.storeName}</h3>
+                       <h3 className="text-base sm:text-lg font-black text-white uppercase">{store.storeName}</h3>
                        {store.verified && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                      </div>
-                     <p className="text-xs font-bold text-slate-400 flex items-center justify-center sm:justify-start gap-1">
-                       <User className="w-3 h-3" /> Partner Merchant
+                     <p className="text-xs font-medium text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+                       <User className="w-3.5 h-3.5" /> Verified Partner Merchant
                      </p>
                      
-                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-2">
-                        <span className="flex items-center gap-1 text-[10px] font-black text-amber-400 uppercase bg-amber-400/10 px-2 py-1 rounded">
+                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1.5">
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-300 uppercase bg-amber-400/10 px-2 py-0.5 rounded">
                           <Star className="w-3 h-3 fill-amber-400" /> {store.rating || 'New'} ({store.reviewCount || 0} reviews)
                         </span>
                         {(store.city || store.country) && (
-                          <span className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase bg-slate-800 px-2 py-1 rounded">
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase bg-slate-800 px-2 py-0.5 rounded">
                             <MapPinIcon className="w-3 h-3" /> {store.city} {store.country}
                           </span>
                         )}
@@ -952,10 +1094,18 @@ export const OrderDetails: React.FC = () => {
                    </div>
                    
                    <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
-                     <button onClick={() => navigate(`/store/${store.storeId}`)} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                     <button 
+                       type="button"
+                       onClick={() => navigate(`/store/${store.storeId}`)} 
+                       className="flex-1 min-h-[44px] px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
+                     >
                        Visit Store
                      </button>
-                     <button onClick={handleChatAboutOrder} className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">
+                     <button 
+                       type="button"
+                       onClick={handleChatAboutOrder} 
+                       className="flex-1 min-h-[44px] px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                     >
                        Chat
                      </button>
                    </div>
@@ -963,24 +1113,24 @@ export const OrderDetails: React.FC = () => {
               </section>
             )}
 
-            {/* Shipping & Delivery Address */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-                <div className="flex justify-between items-center mb-4 sm:mb-6">
+            {/* Shipping & Delivery Address + Payment Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6">
+                <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-indigo-400" /> Shipping Address
+                    <Truck className="w-4 h-4 text-violet-400" /> Shipping & Delivery
                   </h3>
                 </div>
                 {order.shippingAddress ? (
                   <div className="space-y-4">
-                    <div className="border-b border-slate-800/50 pb-4">
-                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Recipient Name</p>
+                    <div className="border-b border-slate-800/60 pb-3">
+                      <p className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">Recipient</p>
                       <p className="text-xs font-bold text-slate-200">{order.shippingAddress.fullName}</p>
-                      <p className="text-xs font-bold text-slate-400 mt-1">{order.shippingAddress.phone || 'N/A'}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{order.shippingAddress.phone || 'N/A'}</p>
                     </div>
                     
                     <div className="pb-2">
-                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Delivery Address</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">Delivery Address</p>
                       <p className="text-xs text-slate-300 font-medium leading-relaxed">
                         {order.shippingAddress.street}<br/>
                         {order.shippingAddress.city}, {order.shippingAddress.state}<br/>
@@ -989,88 +1139,101 @@ export const OrderDetails: React.FC = () => {
                     </div>
 
                     {(order.trackingNumber || order.shipmentId || order.courierName) && (
-                      <div className="pt-4 border-t border-slate-800/50 space-y-3">
+                      <div className="pt-3 border-t border-slate-800/60 space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Courier Partner</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded">
-                            {order.courierName || 'TEST COURIER (Simulated Integration)'}
+                          <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider">Courier</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-violet-500/10 text-violet-300 border border-violet-500/20 px-2 py-0.5 rounded">
+                            {order.courierName || 'Logistics Partner'}
                           </span>
                         </div>
 
-                        <div className="bg-slate-950 p-3 rounded-2xl border border-slate-850 space-y-1.5">
-                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Air Waybill (AWB) Tracking ID</p>
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Air Waybill (AWB) Tracking ID</p>
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-mono font-bold text-amber-400 tracking-wider">
-                              {order.trackingNumber || 'TEST-AWB-PI-LOGISTICS'}
+                            <span className="text-xs font-mono font-bold text-amber-300 tracking-wider break-all">
+                              {order.trackingNumber || 'AWB-PENDING'}
                             </span>
-                            <button
-                              onClick={() => {
-                                if (order.trackingNumber) {
-                                  navigator.clipboard.writeText(order.trackingNumber);
-                                  const event = new CustomEvent('toast', { detail: { message: 'AWB Tracking Number Copied!', type: 'success' } });
-                                  window.dispatchEvent(event);
-                                }
-                              }}
-                              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
-                            >
-                              Copy AWB
-                            </button>
+                            {order.trackingNumber && (
+                              <button
+                                type="button"
+                                onClick={handleCopyAwbNumber}
+                                aria-label={`Copy AWB tracking number ${order.trackingNumber}`}
+                                className="min-h-[44px] px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none shrink-0"
+                              >
+                                {copiedAwb ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span className="text-emerald-400 text-[10px]">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span className="text-[10px]">Copy AWB</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
 
                         {order.shipmentId && (
                           <button
+                            type="button"
                             onClick={() => navigate(`/shipment/${order.shipmentId}`)}
-                            className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                            className="w-full min-h-[44px] py-2.5 bg-violet-600/20 hover:bg-violet-600/40 text-violet-200 border border-violet-500/30 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-violet-400"
                           >
-                            <Truck className="w-3.5 h-3.5" /> View Live Tracking History
+                            <Truck className="w-4 h-4" /> Live Tracking Status
                           </button>
                         )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-[10px] sm:text-xs text-slate-600 italic">No address required (Digital/Service)</p>
+                  <p className="text-xs text-slate-500 italic py-2">Digital Delivery / In-Person Service</p>
                 )}
               </section>
 
-              <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 sm:mb-6 flex items-center gap-2">
+              <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6">
+                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-tight mb-4 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-amber-400" /> Payment & Escrow
                 </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Method</span>
-                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Pi Testnet / BMP Wallet</span>
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-800/60 pb-2.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Method</span>
+                    <span className="text-xs font-bold text-white uppercase flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Pi Network / BMP
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Payment Verified</span>
-                    <span className="text-xs font-bold text-emerald-400 uppercase">Yes (Blockchain)</span>
+                  <div className="flex items-center justify-between border-b border-slate-800/60 pb-2.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Payment Verified</span>
+                    <span className="text-xs font-bold text-emerald-300 uppercase">Verified On-Chain</span>
                   </div>
-                  <div className="flex items-center justify-between border-b border-slate-800/50 pb-3">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">Escrow Protection</span>
-                    <span className="text-xs font-bold text-amber-400 uppercase">{order.escrowStatus || 'Active (Holding)'}</span>
+                  <div className="flex items-center justify-between border-b border-slate-800/60 pb-2.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Escrow Protection</span>
+                    <span className="text-xs font-bold text-amber-300 uppercase">{order.escrowStatus || 'Active (Holding)'}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-500 uppercase">TX Hash</span>
-                    <span className="text-xs font-mono text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded truncate max-w-[140px]">{order.paymentTxId || 'PI_TX_' + order.orderId.substring(0,6)}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">TX Hash</span>
+                    <span className="text-xs font-mono text-violet-300 bg-violet-950/40 px-2 py-0.5 rounded border border-violet-800/40 truncate max-w-[140px]">
+                      {order.paymentTxId || 'PI_TX_' + order.orderId.substring(0, 8)}
+                    </span>
                   </div>
                 </div>
               </section>
             </div>
           </div>
 
-          {/* Right Column: Order Timeline */}
-          <div className="lg:col-span-1 space-y-8">
-            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <Navigation className="w-5 h-5 text-indigo-400" /> Order Lifecycle
+          {/* Right Column: Order Timeline & Audit */}
+          <div className="lg:col-span-1 space-y-6 sm:space-y-8">
+            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
+                <Navigation className="w-5 h-5 text-violet-400" /> Order Lifecycle
               </h2>
               
               <div className="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-800">
                 {[
                   { label: 'Order Placed', status: 'completed', time: order.createdAt },
-                  { label: 'Payment Verified', status: order.paymentVerifiedAt ? 'completed' : 'completed', time: order.paymentVerifiedAt || order.createdAt },
+                  { label: 'Payment Verified', status: 'completed', time: order.paymentVerifiedAt || order.createdAt },
                   { label: 'Seller Accepted', status: order.acceptedAt ? 'completed' : (currentStatusClean === 'accepted' ? 'current' : 'pending'), time: order.acceptedAt },
                   { label: 'Preparing Items', status: order.preparingAt ? 'completed' : (currentStatusClean === 'preparing' ? 'current' : 'pending'), time: order.preparingAt },
                   { label: 'Packed & Sealed', status: order.packedAt ? 'completed' : (currentStatusClean === 'packed' ? 'current' : 'pending'), time: order.packedAt },
@@ -1080,23 +1243,30 @@ export const OrderDetails: React.FC = () => {
                   { label: 'Delivered', status: order.deliveredAt ? 'completed' : (currentStatusClean === 'delivered' ? 'current' : 'pending'), time: order.deliveredAt },
                   { label: 'Completed', status: order.completedAt ? 'completed' : (currentStatusClean === 'completed' ? 'current' : 'pending'), time: order.completedAt }
                 ].map((step, i) => (
-                  <div key={i} className="relative pl-10">
-                    <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-slate-950 flex items-center justify-center z-10 ${
-                      step.status === 'completed' ? 'bg-emerald-500' :
-                      step.status === 'current' ? 'bg-amber-400 scale-110 shadow-[0_0_10px_rgba(251,191,36,0.5)]' :
-                      'bg-slate-800'
+                  <div key={i} className="relative pl-9">
+                    <div className={`absolute left-0 top-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 transition-all ${
+                      step.status === 'completed' 
+                        ? 'bg-emerald-500 border-emerald-400 text-slate-950' 
+                        : step.status === 'current' 
+                        ? 'bg-violet-600 border-violet-400 text-white shadow-md shadow-violet-600/40 ring-4 ring-violet-500/20' 
+                        : 'bg-slate-900 border-slate-800 text-slate-600'
                     }`}>
-                      {step.status === 'completed' && <CheckCircle2 className="w-3 h-3 text-slate-950" />}
+                      {step.status === 'completed' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      {step.status === 'current' && <div className="w-2 h-2 bg-white rounded-full animate-pulse" />}
                     </div>
                     <div>
-                      <p className={`text-[11px] sm:text-xs font-bold uppercase tracking-tight ${
-                        step.status === 'completed' ? 'text-white' :
-                        step.status === 'current' ? 'text-amber-400' :
+                      <p className={`text-xs font-bold uppercase tracking-tight ${
+                        step.status === 'completed' ? 'text-slate-200' :
+                        step.status === 'current' ? 'text-violet-300 font-black' :
                         'text-slate-500'
                       }`}>
                         {step.label}
                       </p>
-                      {step.time && <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{formatDate(step.time)}</p>}
+                      {step.time && (
+                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          {formatDate(step.time)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1104,24 +1274,31 @@ export const OrderDetails: React.FC = () => {
             </section>
 
             {/* Audit Log / Activity */}
-            <section className="bg-slate-900/50 border border-slate-800 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8">
-              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
-                <Clock className="w-5 h-5 text-violet-400" /> History Audit Log
+            <section className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6">
+              <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight mb-5 flex items-center gap-3">
+                <Clock className="w-5 h-5 text-violet-400" /> Activity Log
               </h2>
               
-              <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+              <div className="space-y-3.5 max-h-72 overflow-y-auto pr-1">
                 {(order.activityLogs || []).map((log, i) => (
-                  <div key={i} className="border-b border-slate-800/50 pb-3 last:border-0 last:pb-0">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{formatDate(log.timestamp)}</p>
+                  <div key={i} className="border-b border-slate-800/60 pb-3 last:border-0 last:pb-0">
+                    <p className="text-[10px] font-bold text-violet-300 uppercase tracking-wider mb-0.5">
+                      {formatDate(log.timestamp)}
+                    </p>
                     <p className="text-xs font-medium text-slate-300">{log.message}</p>
                   </div>
                 ))}
                 {(!order.activityLogs || order.activityLogs.length === 0) && timeline.map((event, i) => (
-                  <div key={i} className="border-b border-slate-800/50 pb-3 last:border-0 last:pb-0">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{formatDate(event.createdAt)}</p>
+                  <div key={i} className="border-b border-slate-800/60 pb-3 last:border-0 last:pb-0">
+                    <p className="text-[10px] font-bold text-violet-300 uppercase tracking-wider mb-0.5">
+                      {formatDate(event.createdAt)}
+                    </p>
                     <p className="text-xs font-medium text-slate-300">{event.message}</p>
                   </div>
                 ))}
+                {(!order.activityLogs || order.activityLogs.length === 0) && timeline.length === 0 && (
+                  <p className="text-xs text-slate-500 italic">No activity recorded yet.</p>
+                )}
               </div>
             </section>
           </div>
@@ -1130,12 +1307,16 @@ export const OrderDetails: React.FC = () => {
         {/* Shipment Creation Modal */}
         {showShipmentModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md">
-              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-6">Create Shipment & Dispatch</h2>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 w-full max-w-md shadow-2xl">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight mb-6">
+                Create Shipment & Dispatch
+              </h2>
               
               <div className="space-y-4 mb-8">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Delivery Method</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Delivery Method
+                  </label>
                   <select 
                     value={shipmentMethod}
                     onChange={(e) => {
@@ -1146,7 +1327,7 @@ export const OrderDetails: React.FC = () => {
                         if (!trackingNumber) setTrackingNumber(`TEST-AWB-PI-${Math.random().toString(36).substring(2,8).toUpperCase()}`);
                       }
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 min-h-[44px] text-xs font-medium text-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500/20"
                   >
                     <option value="">Select Method</option>
                     <option value="store_pickup">Store Pickup</option>
@@ -1158,29 +1339,37 @@ export const OrderDetails: React.FC = () => {
                 
                 {shipmentMethod === 'courier' && (
                   <>
-                    <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl space-y-1">
-                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block">Test Courier Adapter Active</span>
-                      <p className="text-[11px] text-slate-300">Simulated Air Waybill (AWB) generation for Pi Network Testnet fulfillment workflow.</p>
+                    <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-violet-300 uppercase tracking-wider block">
+                        Test Courier Adapter Active
+                      </span>
+                      <p className="text-xs text-slate-300">
+                        Simulated Air Waybill (AWB) generation for Pi Network Testnet fulfillment workflow.
+                      </p>
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Courier Partner Name</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        Courier Partner Name
+                      </label>
                       <input 
                         type="text" 
                         value={courierName}
                         onChange={(e) => setCourierName(e.target.value)}
                         placeholder="TEST COURIER (Simulated Integration)"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 min-h-[44px] text-xs font-medium text-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500/20"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Air Waybill / Tracking ID</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        Air Waybill / Tracking ID
+                      </label>
                       <input 
                         type="text" 
                         value={trackingNumber}
                         onChange={(e) => setTrackingNumber(e.target.value)}
                         placeholder="TEST-AWB-PI-XXXXXX"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 min-h-[44px] text-xs font-medium text-white focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-500/20"
                       />
                     </div>
                   </>
@@ -1189,15 +1378,17 @@ export const OrderDetails: React.FC = () => {
               
               <div className="flex gap-3">
                 <button 
+                  type="button"
                   onClick={() => setShowShipmentModal(false)}
-                  className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all focus-visible:ring-2 focus-visible:ring-slate-400"
                 >
                   Cancel
                 </button>
                 <button 
+                  type="button"
                   onClick={handleCreateShipment}
                   disabled={!shipmentMethod}
-                  className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all"
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md shadow-violet-600/20 transition-all focus-visible:ring-2 focus-visible:ring-violet-400"
                 >
                   Dispatch
                 </button>
@@ -1209,37 +1400,54 @@ export const OrderDetails: React.FC = () => {
         {/* Refund Request Modal */}
         {showRefundModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-md space-y-6">
-              <h2 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 w-full max-w-md space-y-6 shadow-2xl">
+              <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
                 <RotateCcw className="w-5 h-5 text-amber-400" /> Request Return / Refund
               </h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Reason for Refund</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Reason for Refund
+                  </label>
                   <textarea 
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
                     placeholder="Describe issue with product or order delivery..."
                     rows={3}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm font-medium text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-medium text-white focus:outline-none focus:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500/20"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Requested Amount (Pi)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Requested Amount (Pi)
+                  </label>
                   <input 
                     type="number"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value ? Number(e.target.value) : '')}
                     placeholder={`Max: ${order.grandTotal} Pi`}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 min-h-[44px] text-xs font-medium text-white focus:outline-none focus:border-amber-500 focus-visible:ring-2 focus-visible:ring-amber-500/20"
                   />
                 </div>
               </div>
               
               <div className="flex gap-3">
-                <button onClick={() => setShowRefundModal(false)} className="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest">Cancel</button>
-                <button onClick={handleRequestRefund} disabled={!refundReason} className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest">Submit Request</button>
+                <button 
+                  type="button"
+                  onClick={() => setShowRefundModal(false)} 
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all focus-visible:ring-2 focus-visible:ring-slate-400"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleRequestRefund} 
+                  disabled={!refundReason} 
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all focus-visible:ring-2 focus-visible:ring-amber-400"
+                >
+                  Submit Request
+                </button>
               </div>
             </div>
           </div>

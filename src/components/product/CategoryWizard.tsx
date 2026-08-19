@@ -120,40 +120,40 @@ export const CategoryWizard: React.FC<CategoryWizardProps> = ({
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2 col-span-2 sm:col-span-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Category Name</label>
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Category Name</label>
               <input 
                 required
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all"
+                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                 placeholder="e.g., Electronics"
               />
             </div>
             <div className="space-y-2 col-span-2 sm:col-span-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">URL Slug</label>
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">URL Slug</label>
               <input 
                 required
                 value={formData.slug}
                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all font-mono text-xs"
+                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all font-mono text-xs"
                 placeholder="electronics"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</label>
+            <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Description</label>
             <textarea 
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all h-24 resize-none"
+              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all h-24 resize-none"
               placeholder="Detailed category description..."
             />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Parent Category</label>
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Parent Category</label>
               <select 
                 value={formData.parentId}
                 onChange={(e) => {
@@ -164,7 +164,7 @@ export const CategoryWizard: React.FC<CategoryWizardProps> = ({
                     level: parent ? parent.level + 1 : 0 
                   });
                 }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all"
+                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all cursor-pointer"
               >
                 <option value="">Root Level</option>
                 {categories.filter(c => c.categoryId !== initialCategory?.categoryId).map(cat => (
@@ -175,11 +175,11 @@ export const CategoryWizard: React.FC<CategoryWizardProps> = ({
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</label>
+              <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Status</label>
               <select 
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as CategoryStatus })}
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white focus:border-violet-500 outline-none transition-all"
+                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all cursor-pointer"
               >
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
@@ -189,38 +189,38 @@ export const CategoryWizard: React.FC<CategoryWizardProps> = ({
           </div>
 
           <div className="flex items-center gap-8 p-4 bg-slate-950/50 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input 
                 type="checkbox"
                 checked={formData.featured}
                 onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
-                className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500"
+                className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 focus-visible:ring-2 focus-visible:ring-violet-400"
               />
               <span className="text-xs font-bold text-white">Featured Category</span>
-            </div>
-            <div className="flex items-center gap-2">
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
               <input 
                 type="checkbox"
                 checked={formData.visibility === 'public'}
                 onChange={(e) => setFormData({ ...formData, visibility: e.target.checked ? 'public' : 'private' })}
-                className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500"
+                className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 focus-visible:ring-2 focus-visible:ring-violet-400"
               />
               <span className="text-xs font-bold text-white">Public Visibility</span>
-            </div>
+            </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
             <button 
               type="button"
               onClick={onClose}
-              className="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all"
+              className="min-h-[44px] px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
               Discard
             </button>
             <button 
               type="submit"
               disabled={loading}
-              className="px-8 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-violet-600/20 flex items-center gap-2"
+              className="min-h-[44px] px-8 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-violet-600/20 flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer disabled:opacity-50"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {initialCategory ? 'Update Taxonomy' : 'Create Category'}

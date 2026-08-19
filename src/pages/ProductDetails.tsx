@@ -799,8 +799,10 @@ export const ProductDetails: React.FC = () => {
           {/* Back button */}
           <div className="flex items-center gap-4">
             <button 
+              type="button"
               onClick={() => navigate(-1)} 
-              className="flex items-center justify-center p-2.5 bg-slate-900 hover:bg-slate-805 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl transition-all shadow-md group"
+              aria-label="Go back"
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] p-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl transition-all shadow-md group focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             </button>
@@ -817,23 +819,25 @@ export const ProductDetails: React.FC = () => {
               placeholder={`Search products or merchants...`} 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#030712] border border-slate-850 hover:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl py-2 px-4 pl-10 text-xs font-medium text-slate-200 placeholder-slate-600 outline-none transition-all shadow-inner"
+              className="w-full bg-[#030712] border border-slate-850 hover:border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl py-2 px-4 pl-10 text-xs font-medium text-slate-200 placeholder-slate-600 outline-none transition-all shadow-inner min-h-[44px]"
             />
-            <Search className="w-4 h-4 text-slate-600 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-slate-600 absolute left-3.5 top-3.5" />
             <button 
               type="submit" 
-              className="absolute right-2 top-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all shadow-md"
+              className="absolute right-2 top-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all shadow-md min-h-[32px] cursor-pointer"
             >
               Search
             </button>
           </form>
 
           {/* Quick Access Actions: Cart, Share, Wishlist */}
-          <div className="flex items-center gap-3.5 self-end md:self-auto">
+          <div className="flex items-center gap-3 self-end md:self-auto">
             {/* Wishlist toggle */}
             <button 
+              type="button"
               onClick={handleToggleWishlist}
-              className={`p-2.5 rounded-xl border transition-all flex items-center justify-center shadow-md relative group ${
+              aria-label={isWishlisted ? 'Remove from favorites' : 'Add to favorites'}
+              className={`min-h-[44px] min-w-[44px] p-2.5 rounded-xl border transition-all flex items-center justify-center shadow-md relative group focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer ${
                 isWishlisted 
                   ? 'bg-rose-500/10 border-rose-500/30 text-rose-500 hover:bg-rose-500/20' 
                   : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200'
@@ -845,8 +849,10 @@ export const ProductDetails: React.FC = () => {
 
             {/* Share action */}
             <button 
+              type="button"
               onClick={handleShare}
-              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition-all shadow-md group"
+              aria-label="Share product"
+              className="min-h-[44px] min-w-[44px] p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition-all shadow-md group focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer flex items-center justify-center"
               title="Share Product"
             >
               <Share2 className="w-4.5 h-4.5" />
@@ -854,8 +860,10 @@ export const ProductDetails: React.FC = () => {
 
             {/* Cart with count badge */}
             <button 
+              type="button"
               onClick={() => navigate('/cart')}
-              className="px-4 py-2.5 bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 text-indigo-400 hover:text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 relative"
+              aria-label="View shopping bag"
+              className="min-h-[44px] px-4 py-2.5 bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 text-indigo-400 hover:text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 relative focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
               title="View Shopping Bag"
             >
               <ShoppingBag className="w-4 h-4" />
@@ -880,7 +888,7 @@ export const ProductDetails: React.FC = () => {
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               onClick={() => setIsLightboxOpen(true)}
-              className="aspect-square bg-slate-900 border border-slate-800/80 rounded-2xl sm:rounded-[2rem] overflow-hidden relative group shadow-2xl shadow-violet-950/5 flex items-center justify-center cursor-zoom-in"
+              className="aspect-square bg-slate-900 border border-slate-800/80 rounded-2xl overflow-hidden relative group shadow-2xl shadow-violet-950/5 flex items-center justify-center cursor-zoom-in"
             >
               {showVideo ? (
                 <div className="w-full h-full flex items-center justify-center bg-slate-950">
@@ -897,6 +905,9 @@ export const ProductDetails: React.FC = () => {
                   className="w-full h-full object-cover transition-transform duration-100 ease-out" 
                   style={zoomStyle}
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600';
+                  }}
                 />
               )}
               
@@ -904,21 +915,25 @@ export const ProductDetails: React.FC = () => {
               {currentGallery.length > 1 && !showVideo && (
                 <>
                   <button
+                    type="button"
+                    aria-label="Previous image"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedImageIndex(prev => (prev - 1 + currentGallery.length) % currentGallery.length);
                     }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white border border-slate-800/85 hover:scale-105 active:scale-95 transition-all z-20 flex items-center justify-center cursor-pointer"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] p-2.5 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white border border-slate-800/85 hover:scale-105 active:scale-95 transition-all z-20 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     title="Previous Image"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m15 18-6-6 6-6"/></svg>
                   </button>
                   <button
+                    type="button"
+                    aria-label="Next image"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedImageIndex(prev => (prev + 1) % currentGallery.length);
                     }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white border border-slate-800/85 hover:scale-105 active:scale-95 transition-all z-20 flex items-center justify-center cursor-pointer"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] p-2.5 rounded-full bg-slate-950/70 hover:bg-slate-950 text-white border border-slate-800/85 hover:scale-105 active:scale-95 transition-all z-20 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     title="Next Image"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m9 18 6-6-6-6"/></svg>
@@ -946,8 +961,10 @@ export const ProductDetails: React.FC = () => {
               {/* Wishlist Heart Overlay */}
               <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10" onClick={(e) => e.stopPropagation()}>
                 <button 
+                  type="button"
+                  aria-label={isWishlisted ? 'Remove from favorites' : 'Add to favorites'}
                   onClick={handleToggleWishlist}
-                  className={`p-3.5 rounded-2xl backdrop-blur-md transition-all shadow-xl ${
+                  className={`min-h-[44px] min-w-[44px] p-3.5 rounded-2xl backdrop-blur-md transition-all shadow-xl flex items-center justify-center focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer ${
                     isWishlisted 
                       ? 'bg-rose-500 text-white scale-105 shadow-rose-500/30' 
                       : 'bg-slate-950/50 text-white hover:bg-slate-950/80 hover:scale-105'
@@ -964,20 +981,32 @@ export const ProductDetails: React.FC = () => {
                 {currentGallery.map((img: string, idx: number) => (
                   <button
                     key={idx}
+                    type="button"
+                    aria-label={`View preview ${idx + 1}`}
                     onClick={() => { setSelectedImageIndex(idx); setShowVideo(false); }}
-                    className={`aspect-square w-16 sm:w-20 rounded-xl overflow-hidden border-2 bg-slate-900 transition-all shrink-0 ${
+                    className={`aspect-square w-16 sm:w-20 rounded-xl overflow-hidden border-2 bg-slate-900 transition-all shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                       selectedImageIndex === idx && !showVideo
                         ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
                         : 'border-slate-850 hover:border-slate-700'
                     }`}
                   >
-                    <img src={img} alt={`${product.productName} preview ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <img 
+                      src={img} 
+                      alt={`${product.productName} preview ${idx + 1}`} 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300';
+                      }}
+                    />
                   </button>
                 ))}
                 {/* Product Video Thumbnail */}
                 <button
+                  type="button"
+                  aria-label="View product video"
                   onClick={() => setShowVideo(true)}
-                  className={`aspect-square w-16 sm:w-20 rounded-xl overflow-hidden border-2 bg-slate-900 relative flex items-center justify-center transition-all shrink-0 ${
+                  className={`aspect-square w-16 sm:w-20 rounded-xl overflow-hidden border-2 bg-slate-900 relative flex items-center justify-center transition-all shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     showVideo 
                       ? 'border-violet-500 shadow-lg shadow-violet-500/10 scale-[1.03]' 
                       : 'border-slate-850 hover:border-slate-700'
@@ -1099,12 +1128,14 @@ export const ProductDetails: React.FC = () => {
                             return (
                               <button
                                 key={val}
+                                type="button"
+                                aria-label={`Select color ${val}`}
                                 onClick={() => {
                                   setSelectedAttributes(prev => ({ ...prev, [attrName]: val }));
                                   setSelectedImageIndex(0); // reset image index on variant change
                                 }}
                                 style={{ backgroundColor: visualColor }}
-                                className={`w-9 h-9 rounded-full border-2 relative transition-all ${
+                                className={`w-10 h-10 min-h-[44px] min-w-[44px] rounded-full border-2 relative transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                                   isSelected 
                                     ? 'border-violet-500 ring-4 ring-violet-500/20 scale-105' 
                                     : 'border-slate-800 hover:border-slate-600 hover:scale-105'
@@ -1122,10 +1153,12 @@ export const ProductDetails: React.FC = () => {
                             return (
                               <button
                                 key={val}
+                                type="button"
+                                aria-label={`Select ${attrName} ${val}`}
                                 onClick={() => {
                                   setSelectedAttributes(prev => ({ ...prev, [attrName]: val }));
                                 }}
-                                className={`px-4.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                                className={`min-h-[44px] px-4.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                                   isSelected 
                                     ? 'bg-violet-600/10 border-violet-500 text-white shadow-lg' 
                                     : 'bg-[#030712] border-slate-850 text-slate-400 hover:text-white hover:border-slate-700 hover:scale-102'
@@ -1146,15 +1179,19 @@ export const ProductDetails: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Quantity Selection</span>
                 <div className="flex items-center justify-between sm:justify-start gap-3 bg-slate-900/80 border border-slate-800 rounded-2xl p-2 w-full sm:w-auto inline-flex">
                   <button 
+                    type="button"
+                    aria-label="Decrease quantity"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-3 hover:bg-slate-800 rounded-xl transition-colors text-slate-400"
+                    className="min-h-[44px] min-w-[44px] p-3 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-12 text-center text-sm font-black text-white">{quantity}</span>
+                  <span className="w-12 text-center text-sm font-black text-white select-none">{quantity}</span>
                   <button 
+                    type="button"
+                    aria-label="Increase quantity"
                     onClick={() => setQuantity(quantity + 1)}
-                    className="p-3 hover:bg-slate-800 rounded-xl transition-colors text-slate-400"
+                    className="min-h-[44px] min-w-[44px] p-3 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -1168,9 +1205,11 @@ export const ProductDetails: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-4">
                 {/* Add to Shopping Bag */}
                 <button 
+                  type="button"
+                  aria-label="Add to shopping bag"
                   onClick={handleAddToCart}
                   disabled={isAdding}
-                  className={`flex-1 py-4 px-6 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2.5 active:scale-[0.98] ${
+                  className={`flex-1 min-h-[44px] py-4 px-6 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     added 
                       ? 'bg-emerald-600 text-white shadow-emerald-600/10' 
                       : 'bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-800/80 text-white'
@@ -1191,9 +1230,11 @@ export const ProductDetails: React.FC = () => {
 
                 {/* Direct Buy Now Checkout link */}
                 <button 
+                  type="button"
+                  aria-label="Pi Pay Now"
                   onClick={handleBuyNow}
                   disabled={isBuying}
-                  className="flex-1 py-4 px-6 bg-violet-600 hover:bg-violet-500 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-violet-600/10 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                  className="flex-1 min-h-[44px] py-4 px-6 bg-violet-600 hover:bg-violet-500 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-violet-600/10 transition-all flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                 >
                   {isBuying ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1207,8 +1248,10 @@ export const ProductDetails: React.FC = () => {
 
               {/* Message Merchant Quick Link */}
               <button 
+                type="button"
+                aria-label="Message Merchant"
                 onClick={handleMessageMerchant}
-                className="w-full py-3 px-4 rounded-xl bg-[#030712] border border-slate-850 hover:bg-slate-900 text-slate-400 hover:text-white transition-all font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] py-3 px-4 rounded-xl bg-[#030712] border border-slate-850 hover:bg-slate-900 text-slate-400 hover:text-white transition-all font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 <MessageSquare className="w-4 h-4" />
                 Message Merchant
@@ -1219,8 +1262,9 @@ export const ProductDetails: React.FC = () => {
             <div className="border-t border-slate-900 pt-6 space-y-4">
               <div className="flex border-b border-slate-900 text-xs font-black uppercase tracking-wider">
                 <button
+                  type="button"
                   onClick={() => setActiveTab('overview')}
-                  className={`pb-3.5 px-4 relative transition-all ${
+                  className={`min-h-[44px] pb-3.5 px-4 relative transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     activeTab === 'overview' ? 'text-indigo-400 font-extrabold' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
@@ -1230,8 +1274,9 @@ export const ProductDetails: React.FC = () => {
                   )}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab('specifications')}
-                  className={`pb-3.5 px-4 relative transition-all ${
+                  className={`min-h-[44px] pb-3.5 px-4 relative transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     activeTab === 'specifications' ? 'text-indigo-400 font-extrabold' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
@@ -1241,8 +1286,9 @@ export const ProductDetails: React.FC = () => {
                   )}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab('shipping')}
-                  className={`pb-3.5 px-4 relative transition-all ${
+                  className={`min-h-[44px] pb-3.5 px-4 relative transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     activeTab === 'shipping' ? 'text-indigo-400 font-extrabold' : 'text-slate-500 hover:text-slate-300'
                   }`}
                 >
@@ -1387,14 +1433,18 @@ export const ProductDetails: React.FC = () => {
 
               <div className="flex gap-3 w-full md:w-auto border-t md:border-t-0 border-slate-800/60 pt-4 md:pt-0">
                 <button 
+                  type="button"
+                  aria-label="Visit Store"
                   onClick={() => navigate(`/store/${store.storeId}/products`)}
-                  className="flex-1 md:flex-none px-6 py-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                  className="flex-1 md:flex-none min-h-[44px] px-6 py-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none flex items-center justify-center"
                 >
                   Visit Store
                 </button>
                 <button 
+                  type="button"
+                  aria-label="Chat with merchant"
                   onClick={handleMessageMerchant}
-                  className="flex-1 md:flex-none px-6 py-3 bg-violet-600/10 hover:bg-violet-600 text-violet-400 hover:text-white border border-violet-500/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                  className="flex-1 md:flex-none min-h-[44px] px-6 py-3 bg-violet-600/10 hover:bg-violet-600 text-violet-400 hover:text-white border border-violet-500/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none flex items-center justify-center"
                 >
                   Chat Now
                 </button>
@@ -1631,8 +1681,10 @@ export const ProductDetails: React.FC = () => {
         >
           {/* Close Button */}
           <button
+            type="button"
+            aria-label="Close image preview"
             onClick={() => setIsLightboxOpen(false)}
-            className="absolute top-6 right-6 p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white transition-all z-55 hover:scale-105"
+            className="absolute top-6 right-6 min-h-[44px] min-w-[44px] p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1641,20 +1693,24 @@ export const ProductDetails: React.FC = () => {
           {currentGallery.length > 1 && (
             <>
               <button
+                type="button"
+                aria-label="Previous image"
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedImageIndex(prev => (prev - 1 + currentGallery.length) % currentGallery.length);
                 }}
-                className="absolute left-6 p-4 rounded-full bg-slate-900/60 border border-slate-800 text-white hover:bg-slate-900 transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer"
+                className="absolute left-6 min-h-[44px] min-w-[44px] p-4 rounded-full bg-slate-900/60 border border-slate-800 text-white hover:bg-slate-900 transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="m15 18-6-6 6-6"/></svg>
               </button>
               <button
+                type="button"
+                aria-label="Next image"
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedImageIndex(prev => (prev + 1) % currentGallery.length);
                 }}
-                className="absolute right-6 p-4 rounded-full bg-slate-900/60 border border-slate-800 text-white hover:bg-slate-900 transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer"
+                className="absolute right-6 min-h-[44px] min-w-[44px] p-4 rounded-full bg-slate-900/60 border border-slate-800 text-white hover:bg-slate-900 transition-all z-55 hover:scale-105 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="m9 18 6-6-6-6"/></svg>
               </button>
@@ -1671,6 +1727,9 @@ export const ProductDetails: React.FC = () => {
               alt={product.productName} 
               className="max-w-full max-h-full object-contain rounded-xl select-none"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800';
+              }}
             />
           </div>
 
@@ -1724,7 +1783,15 @@ const CarouselProductCard = ({ prod, badge, onClick }: any) => {
     className="min-w-[200px] sm:min-w-[240px] max-w-[240px] bg-slate-900/60 hover:bg-slate-900 border border-slate-855 hover:border-indigo-500/40 rounded-2xl p-4 flex flex-col group cursor-pointer transition-all duration-300 hover:-translate-y-1 shadow-lg shrink-0"
   >
     <div className="aspect-square bg-slate-950 rounded-xl overflow-hidden relative mb-3">
-      <img src={getProductImageUrl(prod)} alt={prod.productName || prod.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
+      <img 
+        src={getProductImageUrl(prod)} 
+        alt={prod.productName || prod.title} 
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+        referrerPolicy="no-referrer"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400';
+        }}
+      />
       {badge && (
         <span className="absolute top-2 left-2 px-2 py-0.5 bg-indigo-600 text-white font-black text-[8px] uppercase tracking-wider rounded">
           {badge}

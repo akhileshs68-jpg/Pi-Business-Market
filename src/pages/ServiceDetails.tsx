@@ -355,14 +355,18 @@ export const ServiceDetails: React.FC = () => {
 
           <div className="flex items-center gap-2 self-start">
             <button
+              type="button"
+              aria-label="Share service"
               onClick={() => setIsShareOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+              className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/30 text-violet-300 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
               <Share2 className="w-3.5 h-3.5 text-violet-400" /> Share
             </button>
             <button
+              type="button"
+              aria-label="Go back"
               onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-850 hover:border-slate-800 text-slate-400 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+              className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-850 hover:border-slate-800 text-slate-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </button>
@@ -370,7 +374,7 @@ export const ServiceDetails: React.FC = () => {
         </div>
 
         {/* Top Header Card */}
-        <div className="bg-slate-900/40 border border-slate-900 rounded-[2.5rem] p-6 sm:p-8 space-y-6">
+        <div className="bg-slate-900/40 border border-slate-900 rounded-2xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-col lg:flex-row justify-between gap-6">
             <div className="space-y-3 max-w-3xl">
               <span className="px-2.5 py-1 bg-violet-600/10 border border-violet-500/20 text-violet-400 rounded-full text-[9px] font-black uppercase tracking-wider inline-block">
@@ -419,7 +423,7 @@ export const ServiceDetails: React.FC = () => {
             </div>
 
             {/* Price Info Box */}
-            <div className="bg-slate-950/60 p-6 rounded-3xl border border-slate-850/60 flex flex-col justify-center min-w-[200px] lg:text-right">
+            <div className="bg-slate-950/60 p-6 rounded-2xl border border-slate-850/60 flex flex-col justify-center min-w-[200px] lg:text-right">
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Starting Price</span>
               <div className="text-2xl sm:text-3xl font-black text-violet-400 uppercase tracking-tight">
                 {service.basePrice || 0} <span className="text-lg">{currencySymbol}</span>
@@ -440,7 +444,7 @@ export const ServiceDetails: React.FC = () => {
           <div className="lg:col-span-2 space-y-8">
             
             {/* Service Specific Info */}
-            <div className="bg-slate-900/20 border border-slate-900/60 rounded-[2.5rem] p-6 sm:p-8 space-y-6">
+            <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl p-6 sm:p-8 space-y-6">
               <h3 className="text-sm font-black text-white uppercase tracking-wider border-b border-slate-900 pb-3">
                 Service Profile & Summary
               </h3>
@@ -478,7 +482,7 @@ export const ServiceDetails: React.FC = () => {
             </div>
 
             {/* Packages Comparison Section */}
-            <div className="bg-slate-900/20 border border-slate-900/60 rounded-[2.5rem] p-6 sm:p-8 space-y-6">
+            <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl p-6 sm:p-8 space-y-6">
               <div>
                 <h3 className="text-sm font-black text-white uppercase tracking-wider">
                   Available Service Packages
@@ -494,7 +498,7 @@ export const ServiceDetails: React.FC = () => {
                   {packages.map((pkg) => (
                     <div 
                       key={pkg.packageId}
-                      className={`p-5 rounded-3xl border transition-all flex flex-col justify-between cursor-pointer ${
+                      className={`p-5 rounded-2xl border transition-all flex flex-col justify-between cursor-pointer focus-within:ring-2 focus-within:ring-violet-400 ${
                         selectedPackage?.packageId === pkg.packageId 
                           ? 'bg-violet-600/10 border-violet-500 shadow-xl shadow-violet-500/5' 
                           : 'bg-slate-950/30 border-slate-900 hover:border-slate-850'
@@ -529,7 +533,7 @@ export const ServiceDetails: React.FC = () => {
                       <div className="pt-4 mt-4 border-t border-slate-900/60">
                         <button
                           type="button"
-                          className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                          className={`w-full min-h-[44px] py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                             selectedPackage?.packageId === pkg.packageId 
                               ? 'bg-violet-600 hover:bg-violet-500 text-white shadow-md' 
                               : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800'
@@ -543,7 +547,7 @@ export const ServiceDetails: React.FC = () => {
                 </div>
               ) : (
                 /* Fallback/Default Single Consultation Card */
-                <div className="p-5 rounded-3xl border bg-violet-600/10 border-violet-500 shadow-xl shadow-violet-500/5">
+                <div className="p-5 rounded-2xl border bg-violet-600/10 border-violet-500 shadow-xl shadow-violet-500/5">
                   <div className="space-y-4">
                     <div className="flex justify-between items-start">
                       <div>
@@ -578,7 +582,7 @@ export const ServiceDetails: React.FC = () => {
             </div>
 
             {/* Availability Detail Block */}
-            <div className="bg-slate-900/20 border border-slate-900/60 rounded-[2.5rem] p-6 sm:p-8 space-y-4">
+            <div className="bg-slate-900/20 border border-slate-900/60 rounded-2xl p-6 sm:p-8 space-y-4">
               <h3 className="text-sm font-black text-white uppercase tracking-wider">
                 Availability & Scheduling Policy
               </h3>
@@ -633,7 +637,7 @@ export const ServiceDetails: React.FC = () => {
           {/* Sticky Booking CTA Sidebar */}
           <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24">
             
-            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
               
               {/* Card Header */}
               <div className="space-y-1">
@@ -699,7 +703,7 @@ export const ServiceDetails: React.FC = () => {
                             disabled={bookingSubmitting}
                             value={bookingDate}
                             onChange={(e) => setBookingDate(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none transition-all cursor-pointer"
+                            className="w-full bg-slate-950 border border-slate-850 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 rounded-xl px-3 py-2.5 min-h-[44px] text-xs text-white placeholder-slate-600 focus:outline-none transition-all cursor-pointer"
                           />
                         </div>
                         
@@ -729,7 +733,7 @@ export const ServiceDetails: React.FC = () => {
                                     disabled={!slot.isAvailable || bookingSubmitting}
                                     onClick={() => setBookingTime(slot.time)}
                                     title={slot.reason || (slot.isAvailable ? 'Available' : 'Reserved')}
-                                    className={`py-1.5 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border text-center ${
+                                    className={`min-h-[44px] py-2 px-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border text-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                                       isSelected
                                         ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-600/20'
                                         : slot.isAvailable
@@ -776,7 +780,7 @@ export const ServiceDetails: React.FC = () => {
                         <button
                           type="submit"
                           disabled={bookingSubmitting || !bookingDate || !bookingTime}
-                          className="w-full py-3 bg-violet-600 hover:bg-violet-500 active:scale-98 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full min-h-[44px] py-3.5 bg-violet-600 hover:bg-violet-500 active:scale-98 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/10 transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         >
                           {bookingSubmitting ? (
                             <>
@@ -797,7 +801,7 @@ export const ServiceDetails: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => navigate('/login')}
-                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                        className="w-full min-h-[44px] py-2.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                       >
                         Sign In / Register
                       </button>

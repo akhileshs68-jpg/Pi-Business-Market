@@ -83,35 +83,41 @@ export const MyWorkspace: React.FC = () => {
           </div>
 
           {bizLoading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-violet-500"></div>
             </div>
           ) : !hasBusiness ? (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 text-center flex flex-col items-center justify-center space-y-4">
-              <Info className="w-12 h-12 text-slate-500" />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-4 shadow-xl">
+              <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400">
+                <Info className="w-7 h-7" />
+              </div>
               <h2 className="text-xl font-bold text-white">No Business Found</h2>
-              <p className="text-slate-400 max-w-md text-sm">
-                To manage inventory, sales, and stores, you first need to create a business.
+              <p className="text-slate-400 max-w-md text-sm leading-relaxed">
+                To manage inventory, sales, and stores, you first need to create a business entity on the Pi consensus ledger.
               </p>
               <button
+                type="button"
                 onClick={() => navigate('/create-business')}
-                className="mt-4 px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors cursor-pointer"
+                className="mt-2 min-h-[44px] px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-all shadow-md shadow-violet-600/20 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 Create Your First Business
               </button>
             </div>
           ) : isBuyer ? (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 text-center flex flex-col items-center justify-center space-y-4">
-              <Info className="w-12 h-12 text-slate-500" />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-4 shadow-xl">
+              <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400">
+                <Info className="w-7 h-7" />
+              </div>
               <h2 className="text-xl font-bold text-white">No Business Modules</h2>
-              <p className="text-slate-400 max-w-md text-sm">
-                You are currently in the standard Buyer role. To access business modules, activate a business role from your Profile.
+              <p className="text-slate-400 max-w-md text-sm leading-relaxed">
+                You are currently in the standard Buyer role. To access merchant and provider operational modules, activate a business role from your Profile.
               </p>
               <button
-                onClick={() => navigate('/profile')}
-                className="mt-4 px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors"
+                type="button"
+                onClick={() => navigate('/profile?tab=settings')}
+                className="mt-2 min-h-[44px] px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-all shadow-md shadow-violet-600/20 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
-                Go to Profile
+                Switch Role in Settings
               </button>
             </div>
           ) : (
@@ -121,18 +127,27 @@ export const MyWorkspace: React.FC = () => {
                 return (
                   <div
                     key={mod.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => navigate(mod.path)}
-                    className="bg-slate-900/40 border border-slate-800/50 p-6 rounded-3xl hover:bg-slate-900 hover:border-violet-500/50 transition-all cursor-pointer group flex flex-col justify-between"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(mod.path);
+                      }
+                    }}
+                    className="bg-slate-900/60 border border-slate-800/80 p-6 rounded-2xl hover:bg-slate-900 hover:border-violet-500/50 transition-all cursor-pointer group flex flex-col justify-between shadow-lg focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     <div>
-                      <div className="w-12 h-12 rounded-xl bg-violet-600/10 flex items-center justify-center mb-5 text-violet-400 group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center mb-5 text-violet-400 group-hover:scale-105 transition-transform">
                         <Icon className="w-6 h-6" />
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-2">{mod.label}</h3>
-                      <p className="text-slate-400 text-sm">{mod.description}</p>
+                      <h3 className="text-lg font-bold text-white mb-2">{mod.label}</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">{mod.description}</p>
                     </div>
-                    <div className="mt-8 flex items-center text-violet-400 font-bold text-xs uppercase tracking-widest gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Access Module <ArrowRight className="w-4 h-4" />
+                    <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center text-violet-400 font-bold text-xs uppercase tracking-widest gap-2">
+                      <span>Access Module</span>
+                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
                 );

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useId } from 'react';
 
 export interface CheckoutInputProps {
   label: string;
@@ -12,6 +12,8 @@ export interface CheckoutInputProps {
   placeholder?: string;
   type?: string;
   required?: boolean;
+  id?: string;
+  disabled?: boolean;
 }
 
 export const CheckoutInput: React.FC<CheckoutInputProps> = ({ 
@@ -20,20 +22,34 @@ export const CheckoutInput: React.FC<CheckoutInputProps> = ({
   onChange, 
   placeholder,
   type = 'text',
-  required = false
-}) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-      {label}
-      {required && <span className="text-rose-500 ml-1">*</span>}
-    </label>
-    <input 
-      type={type}
-      value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
-      placeholder={placeholder}
-      required={required}
-      className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-sm font-bold text-white focus:border-indigo-500 outline-none transition-all placeholder:text-slate-700"
-    />
-  </div>
-);
+  required = false,
+  id: customId,
+  disabled = false
+}) => {
+  const generatedId = useId();
+  const inputId = customId || generatedId;
+
+  return (
+    <div className="space-y-1.5">
+      <label 
+        htmlFor={inputId}
+        className="block text-xs font-semibold text-slate-400 uppercase tracking-wider ml-0.5"
+      >
+        {label}
+        {required && <span className="text-rose-400 ml-1" aria-hidden="true">*</span>}
+      </label>
+      <input 
+        id={inputId}
+        type={type}
+        value={value}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        aria-required={required}
+        disabled={disabled}
+        className="w-full min-h-[44px] bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500 focus-visible:ring-2 focus-visible:ring-violet-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      />
+    </div>
+  );
+};
+

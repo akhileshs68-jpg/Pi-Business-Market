@@ -49,6 +49,8 @@ import { aiEngineService, BusinessInsight } from '../../services/aiEngineService
 import { MarketingCenter } from './MarketingCenter';
 import { BusinessVerificationModal } from './BusinessVerificationModal';
 import { useAuth } from '../../auth/useAuth';
+import { crmService } from '../../services/crmService';
+import { CustomerProfile } from '../../types';
 import { ProductManager } from './ProductManager';
 import { ServiceManager } from './ServiceManager';
 import { CategoryManager } from './CategoryManager';
@@ -99,6 +101,7 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
   const [aiInsights, setAiInsights] = useState<BusinessInsight[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [businessCustomers, setBusinessCustomers] = useState<CustomerProfile[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
   const [showVerificationModal, setShowVerificationModal] = useState<boolean>(false);
   const [orderFilterStatus, setOrderFilterStatus] = useState<string>('all');
@@ -114,6 +117,9 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
 
       const fetchedOrders = await UniversalBusinessService.getBusinessOrders(business.id, orderFilterStatus);
       setOrders(fetchedOrders);
+
+      const fetchedCustomers = await crmService.getBusinessCustomers(business.id);
+      setBusinessCustomers(fetchedCustomers || []);
 
       const logs = await UniversalBusinessService.getBusinessAuditLogs(business.id);
       setAuditLogs(logs);
@@ -159,11 +165,12 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
         <div className="flex flex-wrap items-center gap-3">
           <button 
             onClick={() => setShowVerificationModal(true)} 
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
+            className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
               isVerified 
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
                 : 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
             }`}
+            aria-label={isVerified ? 'Enterprise Verified Status' : 'Submit Verification Documents'}
           >
             <ShieldCheck className="w-4 h-4" />
             {isVerified ? 'Enterprise Verified' : 'Submit Verification Docs'}
@@ -171,16 +178,18 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
 
           <button 
             onClick={() => navigate('/home')} 
-            className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center gap-2"
+            className="min-h-[44px] px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             title="Browse Marketplace as Buyer"
+            aria-label="Browse Marketplace as Buyer"
           >
             <StoreIcon className="w-4 h-4 text-violet-400" />
             View Marketplace
           </button>
 
           <button 
-            onClick={() => navigate(`/business/${business.id}/settings`)} 
-            className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center gap-2"
+            onClick={() => handleTabChange('identity')} 
+            className="min-h-[44px] px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            aria-label="Open Business Settings"
           >
             <Settings className="w-4 h-4" />
             Settings
@@ -188,7 +197,8 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
 
           <button 
             onClick={() => navigate(`/business/${business.id}`)} 
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+            className="min-h-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            aria-label="View Public Storefront Profile"
           >
             <Eye className="w-4 h-4" />
             View Public Profile
@@ -257,7 +267,7 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
       </div>
 
       {/* Navigation Sub-Tabs Bar */}
-      <div className="w-full min-w-0 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-800/80 touch-pan-x">
+      <div className="w-full min-w-0 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-800/80 touch-pan-x" role="tablist" aria-label="Business operations tabs">
         <div className="inline-flex items-center gap-2 w-max min-w-max flex-nowrap">
           {navigationTabs.map(tab => {
             const Icon = tab.icon;
@@ -265,8 +275,10 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
             return (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={active}
                 onClick={() => handleTabChange(tab.id as any)}
-                className={`shrink-0 px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2.5 border ${
+                className={`shrink-0 min-h-[44px] px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2.5 border cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                   active
                     ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
                     : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
@@ -310,7 +322,7 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
                 <button
                   key={idx}
                   onClick={() => mod.action ? mod.action() : navigate(mod.path)}
-                  className="p-5 bg-slate-900/40 border border-slate-800/80 hover:border-indigo-500/50 rounded-2xl flex flex-col items-start text-left gap-3 transition-all hover:bg-slate-900 group"
+                  className="p-5 bg-slate-900/40 border border-slate-800/80 hover:border-indigo-500/50 rounded-2xl flex flex-col items-start text-left gap-3 transition-all hover:bg-slate-900 group min-h-[44px] cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                 >
                   <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl group-hover:border-indigo-500/40 transition-colors">
                     <mod.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
@@ -629,32 +641,136 @@ export const BusinessHub: React.FC<BusinessHubProps> = ({ business, onBack }) =>
       {/* TAB 6: CUSTOMER CRM */}
       {activeTab === 'customers' && (
         <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 sm:p-8 space-y-6 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
             <div>
-              <h3 className="text-lg font-black text-white">Customer Relationship Management (CRM)</h3>
-              <p className="text-xs text-slate-500">Track repeating buyers, purchase velocity, and direct communications.</p>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                <Users className="w-5 h-5 text-violet-400" /> Customer Relationship Management (CRM)
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">Track repeat buyers, analyze customer volume, and trigger direct customer communications.</p>
             </div>
-            <button 
-              onClick={() => navigate('/customer-crm')} 
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all"
-            >
-              Open Full CRM Module
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => navigate('/inbox')} 
+                className="px-3.5 py-2 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+              >
+                <MessageSquare className="w-4 h-4 text-violet-400" />
+                <span>Inbox</span>
+              </button>
+              <button 
+                onClick={() => navigate('/customer-crm')} 
+                className="px-4 py-2 min-h-[44px] bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-violet-600/20 flex items-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+              >
+                <span>Full CRM Module</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl text-center">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Unique Customers</span>
-              <p className="text-2xl font-black text-white mt-1">148</p>
+          {/* Live Customer Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-4 sm:p-5 bg-slate-950/60 border border-slate-800 rounded-2xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Unique Customers</span>
+              <p className="text-2xl font-black text-white mt-1">{businessCustomers.length}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Total registered buyers</p>
             </div>
-            <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl text-center">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Repeat Rate</span>
-              <p className="text-2xl font-black text-emerald-400 mt-1">34.2%</p>
+            <div className="p-4 sm:p-5 bg-slate-950/60 border border-slate-800 rounded-2xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Lifetime Volume</span>
+              <p className="text-2xl font-black text-emerald-400 font-mono mt-1">
+                {businessCustomers.reduce((acc, c) => acc + (c.totalSpent || 0), 0).toFixed(2)} π
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Direct buyer settlements</p>
             </div>
-            <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl text-center">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">VIP Pioneers</span>
-              <p className="text-2xl font-black text-indigo-400 mt-1">12</p>
+            <div className="p-4 sm:p-5 bg-slate-950/60 border border-slate-800 rounded-2xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Repeat VIPs</span>
+              <p className="text-2xl font-black text-amber-400 mt-1">
+                {businessCustomers.filter(c => (c.totalSpent || 0) >= 50 || (c.totalOrders || 0) >= 2).length}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">High volume accounts</p>
             </div>
+            <div className="p-4 sm:p-5 bg-slate-950/60 border border-slate-800 rounded-2xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Active Leads</span>
+              <p className="text-2xl font-black text-sky-400 mt-1">
+                {businessCustomers.filter(c => (c.totalOrders || 0) === 0).length}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Prospect inquiries</p>
+            </div>
+          </div>
+
+          {/* Recent Customers List */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Recent Customer Profiles</h4>
+              <button 
+                onClick={() => navigate('/customer-crm')} 
+                className="text-xs text-violet-400 hover:text-violet-300 font-bold transition-colors cursor-pointer"
+              >
+                View all ({businessCustomers.length}) →
+              </button>
+            </div>
+
+            {businessCustomers.length === 0 ? (
+              <div className="p-8 text-center bg-slate-950/50 rounded-2xl border border-slate-800 space-y-2">
+                <Users className="w-8 h-8 text-slate-600 mx-auto" />
+                <p className="text-xs font-bold text-slate-400">No customer relationships logged yet</p>
+                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                  When customers purchase products, book services, or send inquiries, their profiles and history will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-800/60 bg-slate-950/40 rounded-2xl border border-slate-800 overflow-hidden">
+                {businessCustomers.slice(0, 5).map(cust => (
+                  <div key={cust.customerId} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-slate-200 uppercase">
+                        {cust.displayName ? cust.displayName.substring(0, 2) : 'CU'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white uppercase">{cust.displayName || 'Pioneer Buyer'}</span>
+                          {(cust.totalSpent || 0) >= 50 && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-bold uppercase">
+                              VIP
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500">{cust.email || `UID: ${cust.userUid.substring(0, 8)}...`}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                      <div className="text-right">
+                        <span className="text-xs font-bold text-emerald-400 font-mono">{(cust.totalSpent || 0).toFixed(2)} π</span>
+                        <span className="text-[10px] text-slate-500 block">{cust.totalOrders || 0} orders</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => navigate('/inbox', {
+                            state: {
+                              targetUid: cust.userUid,
+                              targetName: cust.displayName,
+                              contextType: 'business_customer',
+                              businessId: cust.businessId
+                            }
+                          })}
+                          title="Message customer"
+                          className="p-2 min-h-[44px] min-w-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center cursor-pointer"
+                        >
+                          <MessageSquare className="w-4 h-4 text-violet-400" />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/crm/customer/${cust.customerId}`)}
+                          className="px-3 py-2 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Profile</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

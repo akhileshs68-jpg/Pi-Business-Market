@@ -229,8 +229,8 @@ export const CategoryManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Type Selector Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/40 p-5 rounded-3xl border border-slate-800">
-        <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80 overflow-x-auto scrollbar-hide">
           {[
             { id: 'product', label: 'Products' },
             { id: 'service', label: 'Services' },
@@ -239,8 +239,9 @@ export const CategoryManager: React.FC = () => {
           ].map(t => (
             <button
               key={t.id}
+              type="button"
               onClick={() => setSelectedType(t.id as any)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${selectedType === t.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+              className={`min-h-[44px] px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${selectedType === t.id ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20' : 'text-slate-400 hover:text-white'}`}
             >
               {t.label}
             </button>
@@ -248,8 +249,10 @@ export const CategoryManager: React.FC = () => {
         </div>
 
         <button
+          type="button"
           onClick={handleOpenCreate}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer"
+          aria-label="Add new category"
+          className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer self-start sm:self-auto shadow-md shadow-violet-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
         >
           <Plus className="w-4 h-4" />
           Add Category
@@ -259,22 +262,23 @@ export const CategoryManager: React.FC = () => {
       {/* Category List */}
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
         </div>
       ) : rootCategories.length > 0 ? (
         <div className="space-y-3">
           {rootCategories.map((cat, i) => renderCategoryNode(cat, i))}
         </div>
       ) : (
-        <div className="py-20 text-center bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
+        <div className="py-20 text-center bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
           <FolderTree className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-          <h4 className="text-base font-bold text-white">No Categories Configured</h4>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-6">Establish professional metadata taxonomy to organize your listings.</p>
+          <h4 className="text-base font-bold text-white">No Categories Formed</h4>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-6">Create taxonomy branches to organize catalog items for {selectedType} listings.</p>
           <button 
+            type="button"
             onClick={handleOpenCreate}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl"
+            className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl shadow-md shadow-violet-600/20 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
           >
-            Create First Category
+            Create Initial Category
           </button>
         </div>
       )}
@@ -403,14 +407,14 @@ export const CategoryManager: React.FC = () => {
                   <button 
                     type="button"
                     onClick={() => setIsFormOpen(false)}
-                    className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    className="min-h-[44px] px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit"
                     disabled={savingForm}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/10"
+                    className="min-h-[44px] px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-violet-600/20 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none disabled:opacity-50"
                   >
                     {savingForm && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Save Category Specifications

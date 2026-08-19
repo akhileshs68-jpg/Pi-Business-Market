@@ -205,19 +205,20 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
               {step === 2 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white">Select Store Type</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[360px] overflow-y-auto pr-1">
                     {STORE_TYPES.map(type => (
                       <button
                         key={type}
+                        type="button"
                         onClick={() => setFormData({ ...formData, storeType: type })}
-                        className={`p-4 rounded-2xl border text-left transition-all ${
+                        className={`min-h-[56px] p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center gap-3.5 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                           formData.storeType === type 
                             ? 'bg-indigo-600/10 border-indigo-500 text-white' 
                             : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
                         }`}
                       >
-                        <Store className={`w-5 h-5 mb-2 ${formData.storeType === type ? 'text-indigo-400' : 'text-slate-600'}`} />
-                        <span className="font-bold text-sm">{type}</span>
+                        <Store className={`w-5 h-5 shrink-0 ${formData.storeType === type ? 'text-indigo-400' : 'text-slate-600'}`} />
+                        <span className="font-bold text-xs sm:text-sm">{type}</span>
                       </button>
                     ))}
                   </div>
@@ -228,10 +229,11 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
               {step === 3 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white">Store Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Store Name *</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label htmlFor="wizard-store-name" className="block text-xs font-bold text-slate-400 uppercase">Store Name *</label>
                       <input 
+                        id="wizard-store-name"
                         type="text" 
                         required
                         value={formData.storeName}
@@ -240,56 +242,60 @@ export const StoreWizard: React.FC<StoreWizardProps> = ({ onComplete, onCancel }
                           const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
                           setFormData({ ...formData, storeName: name, website: slug });
                         }}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="e.g. Patna Electronics Store"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Store URL (Custom Slug) *</label>
-                      <div className="flex rounded-xl overflow-hidden border border-slate-800 focus-within:border-indigo-500 bg-slate-950">
-                        <span className="bg-slate-900 px-4 py-3 text-xs text-slate-500 font-mono font-bold flex items-center select-none border-r border-slate-800 whitespace-nowrap">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label htmlFor="wizard-store-slug" className="block text-xs font-bold text-slate-400 uppercase">Store URL (Custom Slug) *</label>
+                      <div className="flex rounded-xl overflow-hidden border border-slate-800 focus-within:border-indigo-500 bg-slate-950 min-h-[44px]">
+                        <span className="bg-slate-900 px-3.5 py-2.5 text-[11px] text-slate-500 font-mono font-bold flex items-center select-none border-r border-slate-800 whitespace-nowrap">
                           pibusiness.market/store/
                         </span>
                         <input 
+                          id="wizard-store-slug"
                           type="text" 
                           required
                           value={formData.website}
                           onChange={e => setFormData({ ...formData, website: e.target.value.toLowerCase().replace(/[^a-z0-9\-]+/g, '') })}
-                          className="flex-1 bg-transparent px-4 py-3 text-white outline-none font-mono text-sm"
+                          className="flex-1 bg-transparent px-3 py-2.5 text-white outline-none font-mono text-xs focus-visible:ring-2 focus-visible:ring-violet-400"
                           placeholder="store-slug"
                         />
                       </div>
                     </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Description *</label>
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label htmlFor="wizard-store-desc" className="block text-xs font-bold text-slate-400 uppercase">Description *</label>
                       <textarea 
+                        id="wizard-store-desc"
                         rows={3}
                         required
                         value={formData.description}
                         onChange={e => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 resize-none"
+                        className="w-full min-h-[90px] bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all resize-y"
                         placeholder="Describe your store offerings and specialities..."
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Email *</label>
+                    <div className="space-y-1.5">
+                      <label htmlFor="wizard-store-email" className="block text-xs font-bold text-slate-400 uppercase">Email *</label>
                       <input 
+                        id="wizard-store-email"
                         type="email" 
                         required
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="store@email.com"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Phone *</label>
+                    <div className="space-y-1.5">
+                      <label htmlFor="wizard-store-phone" className="block text-xs font-bold text-slate-400 uppercase">Phone *</label>
                       <input 
+                        id="wizard-store-phone"
                         type="tel" 
                         required
                         value={formData.phone}
                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="+1 555-0199"
                       />
                     </div>

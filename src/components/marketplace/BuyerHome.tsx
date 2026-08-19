@@ -327,6 +327,41 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
     onNavigate(`product/${prod.id}`);
   };
 
+  const [isCompared, setIsCompared] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('pi_marketplace_compare');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const prodId = prod.id || prod.productId;
+        setIsCompared(list.includes(prodId));
+      }
+    } catch (err) {}
+  }, [prod.id, prod.productId]);
+
+  const handleToggleCompare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    let list: string[] = [];
+    try {
+      const stored = localStorage.getItem('pi_marketplace_compare');
+      if (stored) list = JSON.parse(stored);
+    } catch (err) {}
+    
+    const prodId = prod.id || prod.productId;
+    let updated: string[];
+    if (list.includes(prodId)) {
+      updated = list.filter(x => x !== prodId);
+      if (setToastMessage) setToastMessage("Removed from product comparison");
+    } else {
+      updated = [...list, prodId];
+      if (setToastMessage) setToastMessage("Added to product comparison");
+    }
+    setIsCompared(updated.includes(prodId));
+    try {
+      localStorage.setItem('pi_marketplace_compare', JSON.stringify(updated));
+    } catch (err) {}
+  };
+
   return (
     <motion.div
       whileHover={{ y: -3 }}
@@ -400,11 +435,26 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
             whileTap={{ scale: 0.85 }}
             whileHover={{ scale: 1.1 }}
             onClick={(e) => onToggleWishlist(prod.id, e)}
-            className="p-1.5 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800/80 shadow-md cursor-pointer"
+            className="min-h-[36px] min-w-[36px] p-2 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800/80 shadow-md cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             title={isSaved ? "Remove from Wishlist" : "Add to Wishlist"}
+            aria-label={isSaved ? "Remove from Wishlist" : "Add to Wishlist"}
+            aria-pressed={isSaved}
           >
             <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}`} />
           </motion.button>
+          
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.1 }}
+            onClick={handleToggleCompare}
+            className="min-h-[36px] min-w-[36px] p-2 bg-slate-950/80 hover:bg-slate-900 rounded-full backdrop-blur-md transition-all border border-slate-800/80 shadow-md cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            title={isCompared ? "Remove from Compare" : "Compare Product"}
+            aria-label={isCompared ? "Remove from Compare" : "Compare Product"}
+            aria-pressed={isCompared}
+          >
+            <SlidersHorizontal className={`w-3.5 h-3.5 ${isCompared ? 'text-amber-400 font-bold' : 'text-slate-300'}`} />
+          </motion.button>
+
           <ItemManagementMenu item={prod} itemType="product" buttonVariant="floating" />
         </div>
       </div>
@@ -478,18 +528,20 @@ const CompactMarketplaceCard: React.FC<CompactMarketplaceCardProps> = ({
           <div className="flex items-center gap-1">
             <button
               onClick={handleShare}
-              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all border border-slate-700/60 cursor-pointer"
+              className="min-h-[36px] min-w-[36px] p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-all border border-slate-700/60 cursor-pointer flex items-center justify-center focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               title="Share Product"
+              aria-label="Share Product"
             >
-              <Share2 className="w-3 h-3" />
+              <Share2 className="w-3.5 h-3.5" />
             </button>
             <motion.button
               whileTap={{ scale: 0.88 }}
               whileHover={{ scale: 1.05 }}
               onClick={(e) => onAddToCart(prod, e)}
               disabled={isOutOfStock}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg transition-all shadow-md flex items-center gap-1 text-[10px] font-bold cursor-pointer"
-              title="Add to Cart"
+              className="min-h-[36px] px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg transition-all shadow-md flex items-center gap-1 text-[10px] font-bold cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+              title={isOutOfStock ? "Out of stock" : "Add to Cart"}
+              aria-label={isOutOfStock ? "Out of stock" : "Add to Cart"}
             >
               <ShoppingBag className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Add</span>
@@ -782,6 +834,85 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Voice Search & Speech Recognition State
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const handleVoiceSearch = () => {
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      showToast('Voice search is not supported in this browser.');
+      return;
+    }
+
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+      setIsListening(false);
+      showToast('Voice search stopped');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        showToast('Voice search listening... Speak now');
+      };
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        if (currentTranscript) {
+          setSearchVal(currentTranscript);
+          setShowSearchSuggestions(true);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          showToast('Microphone permission denied.');
+        } else if (event.error === 'no-speech') {
+          showToast('No speech detected. Please try again.');
+        } else {
+          showToast('Voice search error. Please try typing.');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start voice search:', err);
+      setIsListening(false);
+      showToast('Could not start voice search');
+    }
+  };
+
+  // Cleanup SpeechRecognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
   // Toast notification
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -871,6 +1002,26 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
     }, 700);
   };
 
+  // Skeleton Card component for initial loading state
+  const ProductSkeletonCard: React.FC<{ isCarousel?: boolean }> = ({ isCarousel = true }) => (
+    <div 
+      className={`bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden p-2.5 flex flex-col gap-2 shadow animate-pulse ${
+        isCarousel ? 'w-[165px] xs:w-[185px] sm:w-[210px] shrink-0' : 'w-full'
+      }`}
+    >
+      <div className="w-full aspect-[4/3] sm:aspect-square max-h-[160px] bg-slate-800/80 rounded-xl" />
+      <div className="space-y-1.5 pt-1">
+        <div className="h-2 bg-slate-800/80 rounded w-1/3" />
+        <div className="h-3 bg-slate-800/80 rounded w-5/6" />
+        <div className="h-2 bg-slate-800/80 rounded w-1/2" />
+        <div className="flex justify-between items-center pt-2">
+          <div className="h-4 bg-slate-800/80 rounded w-1/3" />
+          <div className="h-6 w-12 bg-slate-800/80 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+
   // Render Product Card using Amazon/Flipkart compact e-commerce layout
   const renderProductCard = (prod: any, isCarousel = false) => {
     return (
@@ -908,11 +1059,13 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             ].map(type => (
               <button
                 key={type.id}
+                type="button"
+                aria-pressed={searchCategory === type.id}
                 onClick={() => {
                   setSearchCategory(type.id as any);
                   handleExecuteSearch(searchVal, type.id);
                 }}
-                className={`px-3 py-1 rounded-lg transition-all shrink-0 ${searchCategory === type.id ? 'bg-violet-600 text-white font-black shadow' : 'bg-slate-950/60 hover:bg-slate-800 text-slate-300'}`}
+                className={`min-h-[36px] sm:min-h-[32px] px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${searchCategory === type.id ? 'bg-violet-600 text-white font-black shadow' : 'bg-slate-950/60 hover:bg-slate-800 text-slate-300'}`}
               >
                 {type.label}
               </button>
@@ -921,9 +1074,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
 
           {/* Search Input Box */}
           <div className="relative flex items-center">
-            <Search className="absolute left-3 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3 w-4 h-4 text-slate-500 pointer-events-none" />
             <input
               type="text"
+              aria-label="Search Marketplace"
               placeholder={getSearchPlaceholder()}
               value={searchVal}
               onChange={(e) => {
@@ -934,22 +1088,42 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleExecuteSearch(searchVal);
               }}
-              className="w-full bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl py-2 pl-9 pr-24 text-[11px] sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all font-medium"
+              className="w-full min-h-[44px] bg-slate-950 border border-slate-800 focus:border-violet-500 rounded-xl py-2.5 pl-9 pr-32 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all font-medium"
             />
             
-            <div className="absolute right-2 flex items-center gap-1">
+            <div className="absolute right-1.5 flex items-center gap-1">
+              {searchVal.length > 0 && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearchVal('');
+                    setShowSearchSuggestions(false);
+                  }}
+                  className="min-h-[36px] min-w-[36px] p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button 
                 type="button" 
-                onClick={() => showToast('Voice search listening...')}
-                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-violet-400 transition-colors"
-                title="Voice Search"
+                aria-label={isListening ? "Stop Voice Search" : "Start Voice Search"}
+                onClick={handleVoiceSearch}
+                className={`min-h-[36px] min-w-[36px] p-2 rounded-lg transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
+                  isListening 
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse' 
+                    : 'hover:bg-slate-800 text-slate-400 hover:text-violet-400'
+                }`}
+                title={isListening ? "Listening... Click to stop" : "Voice Search"}
               >
-                <Mic className="w-4 h-4" />
+                <Mic className={`w-4 h-4 ${isListening ? 'animate-bounce text-rose-400' : ''}`} />
               </button>
               <button 
                 type="button" 
+                aria-label="Submit Search"
                 onClick={() => handleExecuteSearch(searchVal || 'Electronics')}
-                className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-black uppercase rounded-lg transition-all"
+                className="min-h-[36px] px-3.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-black uppercase tracking-wider rounded-lg transition-all shadow cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               >
                 Search
               </button>
@@ -1016,11 +1190,11 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
       {campaigns.length > 0 && (
         <section 
           id="hero_ad_slider" 
-          className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800/80 bg-slate-950 group"
+          className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-800/80 bg-slate-950 group"
           onMouseEnter={() => setIsSliderPaused(true)}
           onMouseLeave={() => setIsSliderPaused(false)}
         >
-          <div className="relative min-h-[200px] xs:min-h-[220px] sm:min-h-[280px] lg:min-h-[320px] overflow-hidden flex items-center">
+          <div className="relative h-[210px] xs:h-[230px] sm:h-[260px] md:h-[280px] lg:h-[310px] overflow-hidden">
             <AnimatePresence mode="wait">
               {campaigns.map((camp, idx) => {
                 if (idx !== currentSlide) return null;
@@ -1030,99 +1204,107 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 1.02 }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className={`absolute inset-0 bg-gradient-to-r ${camp.bgClass || 'from-violet-950 via-indigo-950 to-slate-950'} flex flex-col md:flex-row items-center justify-between p-5 sm:p-8 md:p-10 gap-6`}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className={`absolute inset-0 bg-gradient-to-r ${camp.bgClass || 'from-violet-950 via-indigo-950 to-slate-950'} grid grid-cols-12 items-stretch overflow-hidden`}
                   >
                     {/* Background Glows */}
-                    <div className="absolute right-0 top-0 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute left-1/4 bottom-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute right-0 top-0 w-72 h-72 bg-violet-500/10 rounded-full blur-3xl pointer-events-none z-0" />
+                    <div className="absolute left-1/4 bottom-0 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none z-0" />
 
-                    {/* Left Content */}
-                    <div className="flex flex-col justify-center space-y-2.5 sm:space-y-3 max-w-full md:max-w-[60%] z-10">
-                      
-                      {/* Campaign Header / Badges */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {camp.businessLogo && (
-                          <img src={camp.businessLogo} alt={camp.businessName} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-white/20" />
-                        )}
-
-      
-                        <span className="text-[10px] sm:text-xs font-black text-violet-400 uppercase tracking-widest">
-                          {camp.storeName || camp.businessName}
-                        </span>
-                        {camp.offerBadge && (
-                          <span className="px-2 py-0.5 bg-violet-500/20 border border-violet-500/30 text-violet-300 text-[8px] sm:text-[9px] font-black uppercase rounded-full">
-                            {camp.offerBadge}
-                          </span>
-                        )}
-                        {camp.isVerified && (
-                          <span className="flex items-center gap-0.5 text-emerald-400 text-[9px] font-bold">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Verified</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Main Title */}
-                      <h1 className="text-base xs:text-lg sm:text-2xl md:text-3xl font-black text-white uppercase tracking-tight leading-tight line-clamp-2">
-                        {camp.campaignTitle}
-                      </h1>
-
-                      {/* Description */}
-                      <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed line-clamp-2">
-                        {camp.shortDescription}
-                      </p>
-
-                      {/* Countdown Timer if applicable */}
-                      {(camp.campaignType === 'flash_sale' || camp.campaignType === 'festival') && (
-                        <div className="flex items-center gap-2 pt-1 text-white">
-                          <span className="text-[9px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Offer Ends In:</span>
-                          <div className="flex items-center gap-1 font-mono font-black text-xs sm:text-sm">
-                            <span className="bg-slate-950/80 px-2 py-1 rounded-md text-amber-400 border border-slate-800">{String(timeLeft.hours).padStart(2, '0')}h</span>
-                            <span className="text-slate-500">:</span>
-                            <span className="bg-slate-950/80 px-2 py-1 rounded-md text-amber-400 border border-slate-800">{String(timeLeft.minutes).padStart(2, '0')}m</span>
-                            <span className="text-slate-500">:</span>
-                            <span className="bg-slate-950/80 px-2 py-1 rounded-md text-rose-500 border border-slate-800">{String(timeLeft.seconds).padStart(2, '0')}s</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Call to Action Button */}
-                      <div className="pt-2 flex items-center gap-3">
-                        <button 
-                          onClick={() => {
-                            campaignService.trackClick(camp.id);
-                            onNavigate(camp.targetRoute);
-                          }}
-                          className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-violet-600/20 flex items-center gap-2"
-                        >
-                          <span>
-                            {camp.ctaType === 'visit_store' ? 'Visit Store' : 
-                             camp.ctaType === 'book_service' ? 'Book Service' : 
-                             camp.ctaType === 'learn_more' ? 'Learn More' : 'Shop Now'}
-                          </span>
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                    </div>
-
-                    {/* Right Media Image */}
-                    {camp.bannerImage && (
-                      <div className="relative w-full md:w-56 lg:w-72 h-36 md:h-52 rounded-2xl overflow-hidden shadow-2xl border border-white/10 shrink-0 z-10 hidden sm:block">
+                    {/* 60% Left Image Panel (col-span-7 = 58.3% width) */}
+                    <div className="col-span-7 relative w-full h-full overflow-hidden shrink-0 z-10">
+                      {camp.bannerImage ? (
                         <img 
                           src={camp.bannerImage} 
                           alt={camp.campaignTitle} 
                           className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700" 
                           referrerPolicy="no-referrer"
                         />
-                        {camp.discountPercent ? (
-                          <div className="absolute top-3 right-3 bg-rose-600 text-white font-black text-xs px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-lg">
-                            -{camp.discountPercent}% OFF
-                          </div>
-                        ) : null}
+                      ) : (
+                        <div className="w-full h-full bg-slate-900/80 flex items-center justify-center text-slate-500 font-medium p-4 text-center">
+                          <span className="text-xs sm:text-sm">{camp.campaignTitle}</span>
+                        </div>
+                      )}
+                      {camp.discountPercent ? (
+                        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-rose-600 text-white font-black text-[9px] xs:text-[10px] sm:text-xs md:text-sm px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-xl uppercase tracking-wider shadow-lg z-20">
+                          -{camp.discountPercent}% OFF
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* 40% Right Detail Panel (col-span-5 = 41.7% width) */}
+                    <div className="col-span-5 flex flex-col justify-between p-2.5 xs:p-3 sm:p-5 md:p-6 lg:p-7 pr-3 sm:pr-6 space-y-1 sm:space-y-2 z-10">
+                      
+                      {/* Top Header & Merchant Badges */}
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+                          {camp.businessLogo && (
+                            <img src={camp.businessLogo} alt={camp.businessName} className="w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full object-cover border border-white/20" />
+                          )}
+
+                          <span className="text-[9px] sm:text-xs font-black text-violet-400 uppercase tracking-widest line-clamp-1">
+                            {camp.storeName || camp.businessName}
+                          </span>
+                          {camp.offerBadge && (
+                            <span className="hidden xs:inline-block px-1.5 py-0.2 bg-violet-500/20 border border-violet-500/30 text-violet-300 text-[8px] sm:text-[9px] font-black uppercase rounded-full">
+                              {camp.offerBadge}
+                            </span>
+                          )}
+                          {camp.isVerified && (
+                            <span className="flex items-center gap-0.5 text-emerald-400 text-[8px] sm:text-[9px] font-bold">
+                              <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                              <span className="hidden sm:inline">Verified</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Campaign Title */}
+                        <h1 className="text-xs xs:text-sm sm:text-lg md:text-xl lg:text-2xl font-black text-white uppercase tracking-tight leading-tight line-clamp-2">
+                          {camp.campaignTitle}
+                        </h1>
+
+                        {/* Short Description */}
+                        <p className="text-[10px] xs:text-[11px] sm:text-xs md:text-sm text-slate-300 font-medium leading-snug line-clamp-1 sm:line-clamp-2">
+                          {camp.shortDescription}
+                        </p>
                       </div>
-                    )}
+
+                      {/* Bottom Section: Countdown & CTA */}
+                      <div className="space-y-1.5 pt-0.5">
+                        {/* Countdown Timer if applicable */}
+                        {(camp.campaignType === 'flash_sale' || camp.campaignType === 'festival') && (
+                          <div className="flex items-center gap-1 sm:gap-2 text-white">
+                            <span className="text-[8px] sm:text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider hidden xs:inline">Ends:</span>
+                            <div className="flex items-center gap-0.5 sm:gap-1 font-mono font-black text-[9px] sm:text-xs md:text-sm">
+                              <span className="bg-slate-950/80 px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-amber-400 border border-slate-800">{String(timeLeft.hours).padStart(2, '0')}h</span>
+                              <span className="text-slate-500">:</span>
+                              <span className="bg-slate-950/80 px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-amber-400 border border-slate-800">{String(timeLeft.minutes).padStart(2, '0')}m</span>
+                              <span className="text-slate-500">:</span>
+                              <span className="bg-slate-950/80 px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded text-rose-500 border border-slate-800">{String(timeLeft.seconds).padStart(2, '0')}s</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Call to Action Button */}
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => {
+                              campaignService.trackClick(camp.id);
+                              onNavigate(camp.targetRoute);
+                            }}
+                            className="px-2.5 py-1 sm:px-4 sm:py-2 bg-violet-600 hover:bg-violet-500 text-white font-black text-[10px] sm:text-xs md:text-sm uppercase tracking-wider rounded-lg sm:rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-violet-600/20 flex items-center gap-1 sm:gap-1.5 min-h-[32px] sm:min-h-[38px] md:min-h-[42px]"
+                          >
+                            <span>
+                              {camp.ctaType === 'visit_store' ? 'Visit Store' : 
+                               camp.ctaType === 'book_service' ? 'Book Service' : 
+                               camp.ctaType === 'learn_more' ? 'Learn More' : 'Shop Now'}
+                            </span>
+                            <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
                   </motion.div>
                 );
               })}
@@ -1130,36 +1312,36 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           </div>
 
           {/* Controls Overlay */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-slate-950/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-800">
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2 bg-slate-950/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-800/80 shadow-lg">
             <button 
               onClick={() => setCurrentSlide(prev => (prev - 1 + campaigns.length) % campaigns.length)}
-              className="p-1 text-slate-400 hover:text-white transition-colors"
+              className="p-0.5 text-slate-400 hover:text-white transition-colors"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </button>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5">
               {campaigns.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentSlide(i)}
-                  className={`h-1.5 rounded-full transition-all ${i === currentSlide ? 'w-6 bg-violet-500' : 'w-1.5 bg-slate-700'}`}
+                  className={`h-1 sm:h-1.5 rounded-full transition-all ${i === currentSlide ? 'w-4 sm:w-5 bg-violet-500' : 'w-1 sm:w-1.5 bg-slate-700'}`}
                 />
               ))}
             </div>
 
             <button 
               onClick={() => setIsSliderPaused(!isSliderPaused)}
-              className="p-1 text-slate-400 hover:text-white transition-colors ml-1"
+              className="p-0.5 text-slate-400 hover:text-white transition-colors ml-0.5"
             >
-              {isSliderPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+              {isSliderPaused ? <Play className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <Pause className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
             </button>
 
             <button 
               onClick={() => setCurrentSlide(prev => (prev + 1) % campaigns.length)}
-              className="p-1 text-slate-400 hover:text-white transition-colors"
+              className="p-0.5 text-slate-400 hover:text-white transition-colors"
             >
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
         </section>
@@ -1173,8 +1355,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         <motion.button 
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
+          type="button"
+          aria-label="Buy Products - Explore Market"
           onClick={() => onNavigate('marketplace')}
-          className="bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600/20 hover:border-indigo-500/40 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+          className="bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600/20 hover:border-indigo-500/40 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
         >
           <div className="w-8 h-8 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center shrink-0">
             <ShoppingBag className="w-4 h-4" />
@@ -1188,8 +1372,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         <motion.button 
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
+          type="button"
+          aria-label="Find Services - Hire Experts"
           onClick={() => onCategorySelect('Services')}
-          className="bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-600/20 hover:border-emerald-500/40 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+          className="bg-emerald-600/10 border border-emerald-500/20 hover:bg-emerald-600/20 hover:border-emerald-500/40 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
         >
           <div className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
             <Wrench className="w-4 h-4" />
@@ -1203,8 +1389,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         <motion.button 
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
+          type="button"
+          aria-label="Sell Products - Open a Store"
           onClick={() => onNavigate('create-business')}
-          className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+          className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
         >
           <div className="w-8 h-8 bg-violet-500/10 text-violet-400 rounded-xl flex items-center justify-center shrink-0 border border-violet-500/20 group-hover:border-violet-500/40 transition-colors">
             <Building2 className="w-4 h-4" />
@@ -1218,8 +1406,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         <motion.button 
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
+          type="button"
+          aria-label="Offer Service - Offer Expertise"
           onClick={() => onNavigate('create-business')}
-          className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer"
+          className="bg-slate-900/60 border border-slate-800 hover:bg-slate-800 hover:border-slate-700 p-3 sm:p-3.5 rounded-2xl flex items-center gap-2.5 transition-all group text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
         >
           <div className="w-8 h-8 bg-amber-500/10 text-amber-400 rounded-xl flex items-center justify-center shrink-0 border border-amber-500/20 group-hover:border-amber-500/40 transition-colors">
             <Briefcase className="w-4 h-4" />
@@ -1240,8 +1430,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             Explore Categories
           </h2>
           <button 
+            type="button"
+            aria-expanded={categoriesExpanded}
             onClick={() => setCategoriesExpanded(!categoriesExpanded)}
-            className="flex items-center gap-1 text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-wider transition-colors"
+            className="flex items-center gap-1 text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-wider transition-colors min-h-[32px] px-2 rounded-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
           >
             <span>{categoriesExpanded ? 'Show Less' : 'View All'}</span>
             {categoriesExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -1252,8 +1444,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           {(categoriesExpanded ? dynamicCategories : dynamicCategories.slice(0, 9)).map(cat => (
             <button
               key={cat.id}
+              type="button"
+              aria-label={`Category ${cat.label}, ${cat.count} items`}
               onClick={() => onCategorySelect(cat.id)}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-violet-500/40 text-slate-300 hover:text-white transition-all shadow-md group cursor-pointer"
+              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-violet-500/40 text-slate-300 hover:text-white transition-all shadow-md group cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none min-h-[72px]"
             >
               <span className="text-xl sm:text-2xl mb-1 transform group-hover:scale-110 transition-transform">{cat.icon}</span>
               <span className="text-[10px] font-bold text-center leading-tight line-clamp-1">{cat.label}</span>
@@ -1275,8 +1469,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-          {uniqueProducts.slice(0, 8).map(prod => renderProductCard(prod, true))}
+        <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+          {loadingReal ? (
+            [1, 2, 3, 4, 5].map(i => <ProductSkeletonCard key={i} isCarousel={true} />)
+          ) : (
+            uniqueProducts.slice(0, 8).map(prod => renderProductCard(prod, true))
+          )}
         </div>
       </section>
 
@@ -1446,8 +1644,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             </div>
           </div>
 
-          <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-            {bestDeals.map(prod => renderProductCard(prod, true))}
+          <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+            {loadingReal ? (
+              [1, 2, 3, 4, 5].map(i => <ProductSkeletonCard key={i} isCarousel={true} />)
+            ) : (
+              bestDeals.map(prod => renderProductCard(prod, true))
+            )}
           </div>
         </section>
       )}
@@ -1482,8 +1684,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
               AI Personalized
             </span>
           </div>
-          <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-            {recommendedProducts.map(prod => renderProductCard(prod, true))}
+          <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+            {loadingReal ? (
+              [1, 2, 3, 4, 5].map(i => <ProductSkeletonCard key={i} isCarousel={true} />)
+            ) : (
+              recommendedProducts.map(prod => renderProductCard(prod, true))
+            )}
           </div>
         </section>
       )}
@@ -1501,8 +1707,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-          <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-            {trendingProducts.map(prod => renderProductCard(prod, true))}
+          <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+            {loadingReal ? (
+              [1, 2, 3, 4, 5].map(i => <ProductSkeletonCard key={i} isCarousel={true} />)
+            ) : (
+              trendingProducts.map(prod => renderProductCard(prod, true))
+            )}
           </div>
         </section>
       )}
@@ -1605,7 +1815,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
               Clear
             </button>
           </div>
-          <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+          <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
             {recentlyViewed.map(prod => renderProductCard(prod, true))}
           </div>
         </section>
@@ -1634,8 +1844,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-          {newArrivals.map(prod => renderProductCard(prod, true))}
+        <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+          {loadingReal ? (
+            [1, 2, 3, 4, 5].map(i => <ProductSkeletonCard key={i} isCarousel={true} />)
+          ) : (
+            newArrivals.map(prod => renderProductCard(prod, true))
+          )}
         </div>
       </section>
 
@@ -1651,8 +1865,12 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="flex items-stretch gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-          {uniqueProducts.slice(2, 10).map(prod => renderProductCard(prod, true))}
+        <div className="flex items-start gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+          {loadingReal ? (
+            [1, 2, 3, 4, 5].map(i => <ProductSkeletonCard key={i} isCarousel={true} />)
+          ) : (
+            uniqueProducts.slice(2, 10).map(prod => renderProductCard(prod, true))
+          )}
         </div>
       </section>
 
@@ -1767,7 +1985,11 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-4">
-          {feedProducts.map(prod => renderProductCard(prod, false))}
+          {loadingReal ? (
+            [1, 2, 3, 4, 5, 6].map(i => <ProductSkeletonCard key={i} isCarousel={false} />)
+          ) : (
+            feedProducts.map(prod => renderProductCard(prod, false))
+          )}
         </div>
 
         {hasMore && (

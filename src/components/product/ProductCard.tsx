@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Star, Share2, ShoppingBag, Eye, Heart, Store, Tag, 
-  ChevronLeft, ChevronRight, Check, CheckCircle2, ShieldCheck, Scale
+  ChevronLeft, ChevronRight, Check, CheckCircle2, ShieldCheck, Scale, X
 } from 'lucide-react';
 import { Product } from '../../types';
 import { useAuth } from '../../auth/useAuth';
@@ -219,12 +219,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 return (
                   <button
                     key={val}
+                    type="button"
+                    aria-label={`Select color ${val}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
                     }}
                     style={{ backgroundColor: visualColor }}
-                    className={`w-5 h-5 rounded-full border ${isSelected ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-slate-700'}`}
+                    className={`min-h-[28px] min-w-[28px] sm:w-5 sm:h-5 rounded-full border transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${isSelected ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-slate-700 hover:border-slate-500'}`}
                     title={val}
                   />
                 );
@@ -233,11 +235,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               return (
                 <button
                   key={val}
+                  type="button"
+                  aria-label={`Select option ${val}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (matchingVariant) setSelectedVariantId(matchingVariant.variantId);
                   }}
-                  className={`px-2 py-0.5 rounded text-[9px] font-bold border ${isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'}`}
+                  className={`min-h-[32px] sm:min-h-[24px] px-2.5 sm:px-2 py-1 sm:py-0.5 rounded-lg text-[10px] sm:text-[9px] font-bold border transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600'}`}
                 >
                   {val}
                 </button>
@@ -264,8 +268,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <>
       <div 
+        id={`product-card-${product.productId}`}
+        role="button"
+        tabIndex={0}
+        aria-label={`${product.productName}, price ${displayPrice} Pi`}
         onClick={() => navigate(`/product/${product.productId}`)}
-        className={`bg-[#0a0f1c] border ${isSelected ? 'border-violet-500 ring-1 ring-violet-500' : 'border-slate-800'} rounded-2xl overflow-hidden hover:border-slate-700 transition-all flex flex-col group cursor-pointer w-full shadow-lg relative`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).tagName !== 'INPUT') {
+              e.preventDefault();
+              navigate(`/product/${product.productId}`);
+            }
+          }
+        }}
+        className={`bg-[#0a0f1c] border ${isSelected ? 'border-violet-500 ring-1 ring-violet-500' : 'border-slate-800/90'} rounded-2xl overflow-hidden hover:border-slate-700 transition-all flex flex-col group cursor-pointer w-full shadow-md relative focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none`}
       >
         {isMerchantView && onSelect && (
           <div className="absolute top-2 left-2 z-20" onClick={e => e.stopPropagation()}>
@@ -273,6 +289,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               type="checkbox" 
               checked={isSelected}
               onChange={e => onSelect(product.productId, e.target.checked)}
+              aria-label={`Select product ${product.productName}`}
               className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-violet-600 focus:ring-violet-500/50 cursor-pointer shadow-md"
             />
           </div>
@@ -293,37 +310,44 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 alt={product.productName} 
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
+                }}
               />
               
               {/* Floating Action Badges & Buttons over Image */}
               {hasDiscount && (
-                <div className="absolute top-2 left-2 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg z-10 select-none">
+                <div className="absolute top-2 left-2 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-md z-10 select-none">
                   -{discountPct}% OFF
                 </div>
               )}
 
               <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10" onClick={e => e.stopPropagation()}>
                 <button
-                  title="Compare Item"
+                  title={isComparing ? 'Remove from comparison' : 'Add to comparison'}
+                  aria-label={isComparing ? 'Remove from comparison' : 'Add to comparison'}
+                  aria-pressed={isComparing}
                   onClick={handleToggleCompare}
-                  className={`p-1.5 rounded-lg border backdrop-blur-md transition-all ${
+                  className={`min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center p-2 sm:p-1.5 rounded-xl border backdrop-blur-md transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     isComparing
-                      ? 'bg-indigo-600/95 border-indigo-500 text-white shadow-md'
+                      ? 'bg-indigo-600/95 border-indigo-500 text-white shadow-sm'
                       : 'bg-black/50 hover:bg-black/85 border-white/10 text-slate-300 hover:text-white'
                   }`}
                 >
-                  <Scale className="w-3 h-3" />
+                  <Scale className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  title="Wishlist"
+                  title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                  aria-label={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                  aria-pressed={isWishlisted}
                   onClick={handleToggleWishlist}
-                  className={`p-1.5 rounded-lg border backdrop-blur-md transition-all ${
+                  className={`min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center p-2 sm:p-1.5 rounded-xl border backdrop-blur-md transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                     isWishlisted
-                      ? 'bg-rose-600/95 border-rose-500 text-white shadow-md'
+                      ? 'bg-rose-600/95 border-rose-500 text-white shadow-sm'
                       : 'bg-black/50 hover:bg-black/85 border-white/10 text-slate-300 hover:text-white'
                   }`}
                 >
-                  <Heart className={`w-3 h-3 ${isWishlisted ? 'fill-white' : ''}`} />
+                  <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-white' : ''}`} />
                 </button>
               </div>
 
@@ -338,11 +362,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     {imgIdx + 1} / {gallery.length}
                   </div>
                   
-                  <button onClick={handlePrev} className="absolute left-1 top-1/2 -translate-y-1/2 p-1 bg-black/40 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10">
-                    <ChevronLeft className="w-3 h-3" />
+                  <button 
+                    onClick={handlePrev} 
+                    aria-label="Previous Image"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[28px] sm:min-w-[28px] flex items-center justify-center absolute left-1 top-1/2 -translate-y-1/2 p-1 bg-black/40 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={handleNext} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 bg-black/40 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10">
-                    <ChevronRight className="w-3 h-3" />
+                  <button 
+                    onClick={handleNext} 
+                    aria-label="Next Image"
+                    className="min-h-[36px] min-w-[36px] sm:min-h-[28px] sm:min-w-[28px] flex items-center justify-center absolute right-1 top-1/2 -translate-y-1/2 p-1 bg-black/40 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all z-10 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </>
               )}
@@ -353,7 +385,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="w-[60%] sm:w-[65%] flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-start gap-1">
-                <span className="text-[8px] font-black uppercase text-indigo-400 tracking-widest line-clamp-1 mb-0.5">
+                <span className="text-[9px] font-bold uppercase text-violet-400 tracking-wider line-clamp-1 mb-0.5">
                   {product.category || 'Product'}
                 </span>
                 <div className="flex items-center gap-1 shrink-0">
@@ -372,11 +404,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 </div>
               </div>
               
-              <h3 className="text-xs sm:text-sm font-extrabold text-white leading-tight line-clamp-2 mt-0.5 group-hover:text-indigo-300 transition-colors">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-100 leading-snug line-clamp-2 mt-0.5 group-hover:text-violet-300 transition-colors">
                 {product.productName}
               </h3>
               
-              <p className="text-[9px] text-slate-400 line-clamp-1 mt-1 font-medium">
+              <p className="text-[10px] text-slate-400 line-clamp-1 mt-1 font-normal">
                 {product.shortDescription || product.description}
               </p>
 
@@ -385,9 +417,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {showEscrowBadge && (
                   <span 
                     title="Merchant payout is held for 7 days after successful payment."
-                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-[7px] font-black uppercase tracking-wider select-none cursor-help"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-md text-[8px] font-semibold tracking-tight select-none cursor-help"
                   >
-                    <ShieldCheck className="w-2 h-2 text-amber-400" /> 7-Day Buyer Protection
+                    <ShieldCheck className="w-2.5 h-2.5 text-amber-400 shrink-0" /> 7-Day Buyer Protection
                   </span>
                 )}
               </div>
@@ -413,11 +445,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <span className={`text-[9px] font-bold ${displayStock > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {displayStock > 0 ? `${displayStock} units available` : 'Out of Stock'}
+                <span className={`text-[9px] font-semibold ${displayStock > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {displayStock > 0 ? `${displayStock} in stock` : 'Out of Stock'}
                 </span>
                 {sellerName && (
-                  <span className="text-[8px] flex items-center gap-0.5 text-slate-500 font-bold truncate max-w-[100px]" title={sellerName}>
+                  <span className="text-[8px] flex items-center gap-0.5 text-slate-400 font-medium truncate max-w-[100px]" title={sellerName}>
                     <Store className="w-2.5 h-2.5 text-violet-400 shrink-0" /> {sellerName}
                     {isVerifiedMerchant && <Check className="w-2 h-2 text-emerald-400 shrink-0" />}
                   </span>
@@ -438,8 +470,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={handleShare}
-              className="p-2 bg-slate-900 border border-slate-700 hover:bg-slate-800 rounded-xl text-slate-300 transition-all flex items-center justify-center shrink-0"
+              className="min-h-[44px] min-w-[44px] p-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-slate-300 transition-all flex items-center justify-center shrink-0 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
               title="Share"
+              aria-label="Share product"
             >
               <Share2 className="w-4 h-4" />
             </button>
@@ -447,12 +480,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <button
               onClick={handleAddToCart}
               disabled={isAdding || displayStock === 0}
-              className={`flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+              aria-label={displayStock === 0 ? 'Out of Stock' : added ? 'Added to Cart' : 'Add to Cart'}
+              className={`min-h-[44px] flex-1 py-2.5 px-4 rounded-xl text-xs font-bold tracking-wide transition-all flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
                 displayStock === 0 
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   : added 
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg'
+                    : 'bg-violet-600 hover:bg-violet-500 text-white shadow-sm'
               }`}
             >
               {displayStock === 0 ? (
@@ -473,12 +507,32 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4"
           onClick={() => setIsImgZoom(false)}
         >
+          {/* Close button */}
+          <button
+            type="button"
+            aria-label="Close image zoom"
+            onClick={(e) => { e.stopPropagation(); setIsImgZoom(false); }}
+            className="absolute top-6 right-6 min-h-[44px] min-w-[44px] p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white transition-all z-[115] hover:scale-105 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
           {gallery.length > 1 && (
             <>
-              <button onClick={(e) => { e.stopPropagation(); handlePrev(e); }} className="absolute left-4 p-3 bg-slate-900/60 hover:bg-slate-900 rounded-full text-white z-[110]">
+              <button 
+                type="button"
+                aria-label="Previous image"
+                onClick={(e) => { e.stopPropagation(); handlePrev(e); }} 
+                className="absolute left-4 min-h-[44px] min-w-[44px] p-3 bg-slate-900/70 hover:bg-slate-900 border border-slate-800 rounded-full text-white z-[110] transition-all hover:scale-105 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+              >
                 <ChevronLeft className="w-6 h-6" />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); handleNext(e); }} className="absolute right-4 p-3 bg-slate-900/60 hover:bg-slate-900 rounded-full text-white z-[110]">
+              <button 
+                type="button"
+                aria-label="Next image"
+                onClick={(e) => { e.stopPropagation(); handleNext(e); }} 
+                className="absolute right-4 min-h-[44px] min-w-[44px] p-3 bg-slate-900/70 hover:bg-slate-900 border border-slate-800 rounded-full text-white z-[110] transition-all hover:scale-105 flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+              >
                 <ChevronRight className="w-6 h-6" />
               </button>
             </>
@@ -488,12 +542,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <img 
               src={gallery[imgIdx]} 
               alt={product.productName} 
-              className="max-w-full max-h-full object-contain rounded-xl"
+              className="max-w-full max-h-full object-contain rounded-xl select-none"
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="absolute bottom-8 text-white font-mono text-sm tracking-widest font-black">
-            {imgIdx + 1} / {gallery.length}
+          <div className="mt-4 text-slate-400 font-mono text-xs tracking-widest font-black uppercase">
+            Image {imgIdx + 1} of {gallery.length}
           </div>
         </div>
       )}

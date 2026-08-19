@@ -175,21 +175,21 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
-          <ImageIcon className="w-3.5 h-3.5 text-indigo-400" /> Product Gallery & Visuals ({imageUrls.length}/{maxFiles})
+          <ImageIcon className="w-3.5 h-3.5 text-violet-400" /> Product Gallery & Visuals ({imageUrls.length}/{maxFiles})
         </label>
         <button
           type="button"
           onClick={() => setShowUrlInput(!showUrlInput)}
-          className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 transition-colors"
+          className="min-h-[44px] px-2 text-xs text-violet-400 hover:text-violet-300 font-bold flex items-center gap-1 transition-colors focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none rounded-xl"
         >
-          <LinkIcon className="w-3 h-3" />
+          <LinkIcon className="w-3.5 h-3.5" />
           {showUrlInput ? 'Cancel URL' : '+ Paste URL'}
         </button>
       </div>
 
       {showUrlInput && (
-        <form onSubmit={handleAddCustomUrl} className="space-y-2 bg-slate-950 p-3 rounded-2xl border border-indigo-500/30">
-          <div className="flex gap-2">
+        <form onSubmit={handleAddCustomUrl} className="space-y-2 bg-slate-950 p-3.5 rounded-2xl border border-violet-500/30">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="url"
               value={customUrl}
@@ -198,11 +198,11 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                 setUrlError(null);
               }}
               placeholder="https://images.unsplash.com/photo-..."
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+              className="flex-1 min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             />
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all"
+              className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
             >
               Add
             </button>
@@ -217,9 +217,17 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none ${
             isDragging
-              ? 'border-indigo-500 bg-indigo-500/10 scale-[0.99]'
+              ? 'border-violet-500 bg-violet-500/10 scale-[0.99]'
               : 'border-slate-800 hover:border-slate-700 bg-slate-950/60 hover:bg-slate-950'
           }`}
         >
@@ -233,14 +241,14 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
           />
 
           <div className="flex flex-col items-center justify-center space-y-2">
-            <div className="p-3 bg-indigo-600/10 text-indigo-400 rounded-2xl border border-indigo-500/20">
+            <div className="p-3 bg-violet-600/10 text-violet-400 rounded-2xl border border-violet-500/20">
               <Upload className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs font-bold text-white">
-                Drop high-resolution product photos here, or <span className="text-indigo-400 underline">browse</span>
+                Drop high-resolution product photos here, or <span className="text-violet-400 underline">browse</span>
               </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">
+              <p className="text-[10px] text-slate-400 mt-0.5">
                 Supports PNG, JPG, WEBP up to 10MB each
               </p>
             </div>
@@ -249,8 +257,8 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
       )}
 
       {uploadingFiles.length > 0 && (
-        <div className="space-y-2 bg-slate-950 p-3 rounded-2xl border border-slate-800">
-          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+        <div className="space-y-2 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+          <p className="text-[10px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" /> Uploading to Marketplace Cloud...
           </p>
           {uploadingFiles.map((file) => (
@@ -261,7 +269,7 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
               </div>
               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-indigo-500 transition-all duration-300 rounded-full"
+                  className="h-full bg-violet-500 transition-all duration-300 rounded-full"
                   style={{ width: `${file.progress}%` }}
                 />
               </div>
@@ -279,7 +287,7 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                 key={url + idx}
                 className={`relative group aspect-square rounded-2xl overflow-hidden bg-slate-950 border transition-all ${
                   isPrimary
-                    ? 'border-indigo-500 shadow-md shadow-indigo-500/20 ring-1 ring-indigo-500'
+                    ? 'border-violet-500 shadow-md shadow-violet-500/20 ring-1 ring-violet-500'
                     : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -291,14 +299,15 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                 />
 
                 {isPrimary ? (
-                  <div className="absolute top-2 left-2 px-2 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded-full shadow flex items-center gap-1">
+                  <div className="absolute top-2 left-2 px-2.5 py-1 bg-violet-600 text-white text-[9px] font-bold rounded-full shadow flex items-center gap-1">
                     <Star className="w-2.5 h-2.5 fill-white" /> Primary
                   </div>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setPrimary(url)}
-                    className="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/80 hover:bg-indigo-600 text-slate-300 hover:text-white text-[9px] font-bold rounded-full opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1 backdrop-blur-sm"
+                    aria-label={`Set image ${idx + 1} as primary`}
+                    className="min-h-[32px] absolute top-2 left-2 px-2.5 py-1 bg-slate-900/90 hover:bg-violet-600 text-slate-200 hover:text-white text-[9px] font-bold rounded-full opacity-90 sm:opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                   >
                     <Star className="w-2.5 h-2.5" /> Set Main
                   </button>
@@ -307,9 +316,10 @@ const ProductImageUploader: React.FC<ProductImageUploaderProps> = ({
                 <button
                   type="button"
                   onClick={() => removeImage(url)}
-                  className="absolute top-2 right-2 p-1.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow"
+                  aria-label={`Remove image ${idx + 1}`}
+                  className="min-h-[32px] min-w-[32px] absolute top-2 right-2 p-1.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl opacity-90 sm:opacity-0 group-hover:opacity-100 transition-all shadow flex items-center justify-center focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-none"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             );
@@ -510,9 +520,19 @@ const ProductCardItem = React.memo<{
           
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="text-sm font-black text-white">{displayPrice} π</span>
-            <span className={`text-[10px] font-bold ${displayStock > 10 ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {displayStock} units
-            </span>
+            {displayStock === 0 ? (
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                Out of Stock
+              </span>
+            ) : displayStock <= 10 ? (
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                Low Stock ({displayStock} left)
+              </span>
+            ) : (
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                In Stock ({displayStock} units)
+              </span>
+            )}
           </div>
           
           {hasVariants && (
@@ -523,13 +543,14 @@ const ProductCardItem = React.memo<{
         </div>
 
         {/* Bottom Actions */}
-        <div className="pt-3 mt-3 border-t border-slate-800/80 flex flex-wrap gap-2">
+        <div className="pt-3 mt-3 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
           <button
             onClick={() => navigate(`/product/${p.productId}`)}
-            className="p-1.5 bg-slate-950 hover:bg-violet-600/10 border border-slate-800 hover:border-violet-500/20 text-violet-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
+            className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-violet-600/10 border border-slate-800 hover:border-violet-500/20 text-violet-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             title="View Product Details"
+            aria-label={`View details for ${p.productName}`}
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => {
@@ -537,10 +558,11 @@ const ProductCardItem = React.memo<{
               navigator.clipboard.writeText(`${window.location.origin}/product/${p.productId}`);
               alert('Product Link Copied!');
             }}
-            className="px-2 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="min-h-[44px] px-3.5 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl text-[11px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
             title="Share Product Link"
+            aria-label={`Share link for ${p.productName}`}
           >
-            <Share2 className="w-3.5 h-3.5" /> Share
+            <Share2 className="w-4 h-4" /> Share
           </button>
           
           <div className="flex-1" />
@@ -548,31 +570,35 @@ const ProductCardItem = React.memo<{
           <button
             onClick={() => onToggleStatus(p)}
             disabled={actionLoading === p.productId}
-            className="p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-lg transition-all flex items-center justify-center cursor-pointer"
-            title={p.status === 'published' ? 'Pause' : 'Resume'}
+            className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none disabled:opacity-50"
+            title={p.status === 'published' ? 'Pause Listing' : 'Resume Listing'}
+            aria-label={p.status === 'published' ? `Pause listing ${p.productName}` : `Resume listing ${p.productName}`}
           >
-            {p.status === 'published' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {p.status === 'published' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           </button>
           <button
             onClick={() => onOpenEdit(p)}
-            className="p-1.5 bg-slate-950 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/20 text-indigo-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
-            title="Edit"
+            className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-indigo-600/10 border border-slate-800 hover:border-indigo-500/20 text-indigo-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            title="Edit Product"
+            aria-label={`Edit ${p.productName}`}
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => onArchive(p.productId)}
-            className="p-1.5 bg-slate-950 hover:bg-amber-600/10 border border-slate-800 hover:border-amber-500/20 text-amber-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
-            title="Archive"
+            className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-amber-600/10 border border-slate-800 hover:border-amber-500/20 text-amber-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            title="Archive Product"
+            aria-label={`Archive ${p.productName}`}
           >
-            <Archive className="w-3.5 h-3.5" />
+            <Archive className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete(p.productId)}
-            className="p-1.5 bg-slate-950 hover:bg-rose-600/10 border border-slate-800 hover:border-rose-500/20 text-rose-400 rounded-lg transition-all flex items-center justify-center cursor-pointer"
-            title="Delete"
+            className="min-h-[44px] min-w-[44px] px-3 py-2 bg-slate-950 hover:bg-rose-600/10 border border-slate-800 hover:border-rose-500/20 text-rose-400 rounded-xl transition-all flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+            title="Delete Product"
+            aria-label={`Delete ${p.productName}`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -980,16 +1006,18 @@ export const ProductManager: React.FC = () => {
             <input 
               type="text"
               placeholder="Search products, SKU..."
+              aria-label="Search products or SKU"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:border-indigo-500 outline-none w-56 transition-all"
+              className="pl-10 pr-4 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none w-56 transition-all"
             />
           </div>
 
           <select
             value={selectedStoreId}
             onChange={(e) => setSelectedStoreId(e.target.value)}
-            className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 outline-none cursor-pointer"
+            aria-label="Filter products by store outlet"
+            className="px-3.5 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <option value="all">All Stores</option>
             {stores.map(s => (
@@ -1000,7 +1028,8 @@ export const ProductManager: React.FC = () => {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 outline-none cursor-pointer"
+            aria-label="Filter products by publication status"
+            className="px-3.5 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="published">Published</option>
@@ -1012,7 +1041,8 @@ export const ProductManager: React.FC = () => {
 
         <button
           onClick={handleOpenCreate}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer self-start sm:self-auto shadow-lg shadow-indigo-600/10"
+          className="min-h-[44px] px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer self-start sm:self-auto shadow-lg shadow-violet-600/10 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
+          aria-label="Create new product"
         >
           <Plus className="w-4 h-4" />
           Create Product
@@ -1022,7 +1052,7 @@ export const ProductManager: React.FC = () => {
       {/* Grid List */}
       {loading ? (
         <div className="h-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
         </div>
       ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1043,10 +1073,10 @@ export const ProductManager: React.FC = () => {
         <div className="py-20 text-center bg-slate-900/20 rounded-3xl border border-dashed border-slate-800">
           <Tag className="w-10 h-10 text-slate-700 mx-auto mb-3" />
           <h4 className="text-base font-bold text-white">No Products Registered</h4>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-6">Create physical or digital product listings under this business.</p>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-6">Create physical or digital product listings under this business.</p>
           <button 
             onClick={handleOpenCreate}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl cursor-pointer"
+            className="min-h-[44px] px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
           >
             Launch First Product
           </button>
@@ -1068,13 +1098,14 @@ export const ProductManager: React.FC = () => {
                   <h3 className="text-lg font-black text-white">
                     {editingProduct ? 'Edit Commercial Product' : 'Register Commercial Product'}
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-400">
                     Define price, inventory, brand assets, and search discovery options.
                   </p>
                 </div>
                 <button 
                   onClick={() => setIsFormOpen(false)}
-                  className="p-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer"
+                  aria-label="Close product modal"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1091,27 +1122,27 @@ export const ProductManager: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Basic Info */}
                   <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest border-b border-slate-800/60 pb-1.5">Basic Listing</h4>
+                    <h4 className="text-xs font-bold text-violet-400 uppercase tracking-widest border-b border-slate-800/60 pb-1.5">Basic Listing</h4>
                     
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Product Title *</label>
+                      <label className="text-[11px] font-bold text-slate-300">Product Title *</label>
                       <input 
                         type="text" 
                         required
                         value={formData.productName}
                         onChange={(e) => setFormData(prev => ({ ...prev, productName: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="e.g. Premium Leather Smart Wallet"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Type *</label>
+                        <label className="text-[11px] font-bold text-slate-300">Type *</label>
                         <select
                           value={formData.type}
                           onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         >
                           <option value="physical">Physical Product</option>
                           <option value="digital">Digital Download</option>
@@ -1121,11 +1152,11 @@ export const ProductManager: React.FC = () => {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Category *</label>
+                        <label className="text-[11px] font-bold text-slate-300">Category *</label>
                         <select
                           value={formData.category}
                           onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         >
                           {categories.map(cat => (
                             <option key={cat.categoryId} value={cat.name}>{cat.name}</option>
@@ -1135,23 +1166,23 @@ export const ProductManager: React.FC = () => {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Short Summary</label>
+                      <label className="text-[11px] font-bold text-slate-300">Short Summary</label>
                       <input 
                         type="text" 
                         value={formData.shortDescription}
                         onChange={(e) => setFormData(prev => ({ ...prev, shortDescription: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all"
                         placeholder="One line display description"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Fulfillment Details / Description *</label>
+                      <label className="text-[11px] font-bold text-slate-300">Fulfillment Details / Description *</label>
                       <textarea 
                         required
                         value={formData.description}
                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none min-h-[100px]"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none transition-all min-h-[100px]"
                         placeholder="Comprehensive specifications and shipping notes..."
                       />
                     </div>
@@ -1161,16 +1192,16 @@ export const ProductManager: React.FC = () => {
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-widest border-b border-slate-800/60 pb-1.5">Pricing & Supply</h4>
                     
-                    <div className="space-y-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+                    <div className="space-y-3 bg-slate-900/50 p-3.5 rounded-2xl border border-slate-800">
                       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                         <span className="text-xs font-bold text-slate-300">Pricing Mode</span>
-                        <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                        <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
                           <button
                             type="button"
                             onClick={() => setFormData(prev => ({ ...prev, pricingMode: 'EXCHANGE' }))}
-                            className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all ${
+                            className={`min-h-[36px] px-3 py-1 text-[11px] font-bold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer ${
                               formData.pricingMode === 'EXCHANGE'
-                                ? 'bg-emerald-600 text-white font-bold'
+                                ? 'bg-emerald-600 text-white'
                                 : 'text-slate-400 hover:text-white'
                             }`}
                           >
@@ -1179,9 +1210,9 @@ export const ProductManager: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setFormData(prev => ({ ...prev, pricingMode: 'COMMUNITY' }))}
-                            className={`px-3 py-1 text-[11px] font-medium rounded-md transition-all ${
+                            className={`min-h-[36px] px-3 py-1 text-[11px] font-bold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none cursor-pointer ${
                               formData.pricingMode === 'COMMUNITY'
-                                ? 'bg-emerald-600 text-white font-bold'
+                                ? 'bg-emerald-600 text-white'
                                 : 'text-slate-400 hover:text-white'
                             }`}
                           >
@@ -1194,11 +1225,11 @@ export const ProductManager: React.FC = () => {
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-slate-400">Currency</label>
+                              <label className="text-[11px] font-bold text-slate-300">Currency</label>
                               <select
                                 value={formData.localCurrency}
                                 onChange={(e) => setFormData(prev => ({ ...prev, localCurrency: e.target.value }))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
+                                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                               >
                                 {getSupportedCurrencies().filter(c => c.code !== 'PI').map(curr => (
                                   <option key={curr.code} value={curr.code}>
@@ -1208,7 +1239,7 @@ export const ProductManager: React.FC = () => {
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-slate-400">Local Price</label>
+                              <label className="text-[11px] font-bold text-slate-300">Local Price</label>
                               <input
                                 type="number"
                                 required
@@ -1216,12 +1247,12 @@ export const ProductManager: React.FC = () => {
                                 step={0.01}
                                 value={formData.localAmount || ''}
                                 onChange={(e) => setFormData(prev => ({ ...prev, localAmount: parseFloat(e.target.value) || 0 }))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                                 placeholder="1000"
                               />
                             </div>
                           </div>
-                          <div className="text-[11px] text-emerald-400/90 font-medium bg-slate-950/70 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                          <div className="text-[11px] text-emerald-400/90 font-medium bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
                             <div className="flex items-center justify-between text-[10px] text-slate-400">
                               <span>Market Exchange Pricing</span>
                               <span className="text-emerald-400 font-bold">Live Rate</span>
@@ -1246,11 +1277,11 @@ export const ProductManager: React.FC = () => {
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-slate-400">Local Currency</label>
+                              <label className="text-[11px] font-bold text-slate-300">Local Currency</label>
                               <select
                                 value={formData.localCurrency}
                                 onChange={(e) => setFormData(prev => ({ ...prev, localCurrency: e.target.value }))}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
+                                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                               >
                                 {getSupportedCurrencies().filter(c => c.code !== 'PI').map(curr => (
                                   <option key={curr.code} value={curr.code}>
@@ -1260,7 +1291,7 @@ export const ProductManager: React.FC = () => {
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-slate-400">Local Price</label>
+                              <label className="text-[11px] font-bold text-slate-300">Local Price</label>
                               <input
                                 type="number"
                                 min={0.01}
@@ -1270,7 +1301,7 @@ export const ProductManager: React.FC = () => {
                                   const amt = parseFloat(e.target.value) || 0;
                                   setFormData(prev => ({ ...prev, localAmount: amt }));
                                 }}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                                className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                                 placeholder="1000"
                               />
                             </div>
@@ -1320,13 +1351,13 @@ export const ProductManager: React.FC = () => {
                                           price: calc.communityPiAmount,
                                         }));
                                       }}
-                                      className="w-full py-1.5 bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-200 text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
+                                      className="w-full min-h-[44px] py-2 bg-violet-600/30 hover:bg-violet-600/50 border border-violet-500/40 text-violet-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                                     >
                                       Use Calculated Price ({calc.communityPiAmount} π)
                                     </button>
                                   </div>
                                 ) : (
-                                  <p className="text-[11px] text-slate-500 italic">
+                                  <p className="text-[11px] text-slate-400 italic">
                                     Enter local price above to convert via the $314,159 USD/π Community Reference pipeline.
                                   </p>
                                 )}
@@ -1335,7 +1366,7 @@ export const ProductManager: React.FC = () => {
                           })()}
 
                           <div className="space-y-1">
-                            <label className="text-[11px] font-bold text-slate-400">Community Price (π) *</label>
+                            <label className="text-[11px] font-bold text-slate-300">Community Price (π) *</label>
                             <input
                               type="number"
                               required
@@ -1346,7 +1377,7 @@ export const ProductManager: React.FC = () => {
                                 const val = parseFloat(e.target.value) || 0;
                                 setFormData(prev => ({ ...prev, communityPiAmount: val, price: val }));
                               }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none font-bold text-violet-300"
+                              className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none font-bold text-violet-300"
                               placeholder="0.0000381"
                             />
                           </div>
@@ -1355,36 +1386,36 @@ export const ProductManager: React.FC = () => {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-400">Regular / MRP Price</label>
+                      <label className="text-[11px] font-bold text-slate-300">Regular / MRP Price</label>
                       <input 
                         type="number" 
                         min={0}
                         value={formData.comparePrice}
                         onChange={(e) => setFormData(prev => ({ ...prev, comparePrice: parseFloat(e.target.value) || 0 }))}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">Initial Inventory *</label>
+                        <label className="text-[11px] font-bold text-slate-300">Initial Inventory *</label>
                         <input 
                           type="number" 
                           required
                           min={0}
                           value={formData.stock}
                           onChange={(e) => setFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-400">SKU Identifier</label>
+                        <label className="text-[11px] font-bold text-slate-300">SKU Identifier</label>
                         <input 
                           type="text" 
                           value={formData.sku}
                           onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         />
                       </div>
                     </div>
@@ -1403,11 +1434,11 @@ export const ProductManager: React.FC = () => {
                     />
 
                     <div className="space-y-1.5 pt-2">
-                      <label className="text-[11px] font-bold text-slate-400">Target Store Outlet for Listing</label>
+                      <label className="text-[11px] font-bold text-slate-300">Target Store Outlet for Listing</label>
                       <select
                         value={selectedStoreId}
                         onChange={(e) => setSelectedStoreId(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none cursor-pointer focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                       >
                         {stores.map(s => (
                           <option key={s.storeId} value={s.storeId}>{s.storeName}</option>
@@ -1424,50 +1455,50 @@ export const ProductManager: React.FC = () => {
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400">Weight (kg)</label>
+                      <label className="text-[10px] font-bold text-slate-300">Weight (kg)</label>
                       <input
                         type="number"
                         min={0}
                         step={0.01}
                         value={formData.weight || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         placeholder="0.5"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400">Length (cm)</label>
+                      <label className="text-[10px] font-bold text-slate-300">Length (cm)</label>
                       <input
                         type="number"
                         min={0}
                         step={0.1}
                         value={formData.length || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         placeholder="10"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400">Width (cm)</label>
+                      <label className="text-[10px] font-bold text-slate-300">Width (cm)</label>
                       <input
                         type="number"
                         min={0}
                         step={0.1}
                         value={formData.width || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         placeholder="10"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400">Height (cm)</label>
+                      <label className="text-[10px] font-bold text-slate-300">Height (cm)</label>
                       <input
                         type="number"
                         min={0}
                         step={0.1}
                         value={formData.height || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, height: parseFloat(e.target.value) || 0 }))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         placeholder="5"
                       />
                     </div>
@@ -1481,54 +1512,54 @@ export const ProductManager: React.FC = () => {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400">SEO Custom Title</label>
+                      <label className="text-[10px] font-bold text-slate-300">SEO Custom Title</label>
                       <input 
                         type="text" 
                         value={formData.seoTitle}
                         onChange={(e) => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         placeholder="Meta search preview heading"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-400">SEO Meta Description</label>
+                      <label className="text-[10px] font-bold text-slate-300">SEO Meta Description</label>
                       <input 
                         type="text" 
                         value={formData.seoDescription}
                         onChange={(e) => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                        className="w-full min-h-[44px] bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                         placeholder="Under 160 characters summary"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-800 pt-5">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800 pt-5">
+                  <div className="flex items-center gap-2.5 self-start sm:self-auto">
                     <input 
                       type="checkbox"
                       id="featured-check"
                       checked={formData.featured}
                       onChange={(e) => setFormData(prev => ({ ...prev, featured: e.target.checked }))}
-                      className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-indigo-500 focus:ring-indigo-500"
+                      className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-violet-600 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     />
                     <label htmlFor="featured-check" className="text-xs font-bold text-slate-300 cursor-pointer selection:bg-transparent">
                       Feature on Store Homepage
                     </label>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                     <button 
                       type="button"
                       onClick={() => setIsFormOpen(false)}
-                      className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                      className="min-h-[44px] px-5 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none"
                     >
                       Cancel
                     </button>
                     <button 
                       type="submit"
                       disabled={savingForm}
-                      className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/10"
+                      className="min-h-[44px] px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-violet-600/10 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:outline-none disabled:opacity-50"
                     >
                       {savingForm && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       Save Product

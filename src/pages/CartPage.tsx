@@ -115,11 +115,17 @@ export const CartPage: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-200">
-        <p className="text-sm font-bold text-slate-400 mb-4">Please log in to view your cart.</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-200 px-4">
+        <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center mb-6 text-slate-500 shadow-xl">
+          <ShoppingBag className="w-8 h-8 text-violet-400" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Sign in to view your cart</h2>
+        <p className="text-sm text-slate-400 mb-6 text-center max-w-sm">
+          Please log in to manage your items, review your orders, and access your saved favorites.
+        </p>
         <button 
           onClick={() => navigate('/login')}
-          className="px-6 py-3 bg-violet-600 hover:bg-violet-500 rounded-xl text-white font-bold text-xs uppercase tracking-wider"
+          className="min-h-[44px] px-8 py-3 bg-violet-600 hover:bg-violet-500 rounded-xl text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-lg shadow-violet-600/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
         >
           Go to Login
         </button>
@@ -145,32 +151,41 @@ export const CartPage: React.FC = () => {
         onToggleCart={() => setActiveTab('cart')}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 relative z-10">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-          <div className="space-y-2">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 sm:mb-10">
+          <div className="space-y-2.5">
             <button 
               onClick={() => navigate('/discovery')}
-              className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-violet-400 font-bold uppercase tracking-wider transition-colors"
+              aria-label="Back to Marketplace"
+              className="min-h-[44px] inline-flex items-center gap-2 text-xs text-slate-400 hover:text-violet-400 font-bold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 rounded-xl px-2.5 py-1 -ml-2.5 cursor-pointer"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-4 h-4" />
               <span>Back to Marketplace</span>
             </button>
-            <h1 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-tighter">
+            <h1 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-tight">
               Universal Shopping Hub
             </h1>
-            <p className="text-slate-400 text-sm font-medium max-w-xl">
+            <p className="text-slate-400 text-sm font-medium max-w-xl leading-relaxed">
               Manage your physical items, professional services, and saved favorites in one seamless non-custodial e-commerce cockpit.
             </p>
           </div>
 
           {/* Tab Toggles */}
-          <div className="flex bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 shrink-0 self-start md:self-auto shadow-lg backdrop-blur-md">
+          <div 
+            role="tablist" 
+            aria-label="Cart navigation" 
+            className="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shrink-0 self-start md:self-auto shadow-lg backdrop-blur-md"
+          >
             <button
+              role="tab"
+              aria-selected={activeTab === 'cart'}
+              aria-controls="cart-panel"
+              id="cart-tab"
               onClick={() => setActiveTab('cart')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+              className={`min-h-[44px] flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
                 activeTab === 'cart' 
-                  ? 'bg-violet-600 text-white shadow-md shadow-violet-600/10' 
+                  ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20' 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -179,10 +194,14 @@ export const CartPage: React.FC = () => {
             </button>
             
             <button
+              role="tab"
+              aria-selected={activeTab === 'wishlist'}
+              aria-controls="wishlist-panel"
+              id="wishlist-tab"
               onClick={() => setActiveTab('wishlist')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
+              className={`min-h-[44px] flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
                 activeTab === 'wishlist' 
-                  ? 'bg-violet-600 text-white shadow-md shadow-violet-600/10' 
+                  ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20' 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -210,7 +229,7 @@ export const CartPage: React.FC = () => {
         {/* Main Content Area */}
         <div className="space-y-12">
           {activeTab === 'cart' ? (
-            <div className="space-y-12">
+            <div id="cart-panel" role="tabpanel" aria-labelledby="cart-tab" className="space-y-12">
               <ShoppingCart 
                 userUid={user.uid} 
                 onItemMovedToWishlist={handleItemMovedToWishlist}
@@ -233,11 +252,13 @@ export const CartPage: React.FC = () => {
               )}
             </div>
           ) : (
-            <Wishlist 
-              userUid={user.uid}
-              onCartUpdated={handleCartUpdated}
-              onWishlistUpdated={handleWishlistUpdated}
-            />
+            <div id="wishlist-panel" role="tabpanel" aria-labelledby="wishlist-tab">
+              <Wishlist 
+                userUid={user.uid}
+                onCartUpdated={handleCartUpdated}
+                onWishlistUpdated={handleWishlistUpdated}
+              />
+            </div>
           )}
         </div>
       </main>
