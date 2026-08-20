@@ -48,6 +48,9 @@ export interface User {
   activeRole?: string;
   accountType?: string;
   photoUrl?: string;
+  phone?: string;
+  bio?: string;
+  country?: string;
   createdAt?: string;
   updatedAt?: string;
   lastLogin?: string;

@@ -670,7 +670,13 @@ export const authService = {
       status: existingFirestoreUser?.status || 'active',
       createdAt: existingFirestoreUser?.createdAt || storedUser?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
+      lastLogin: new Date().toISOString(),
+      photoUrl: existingFirestoreUser?.photoUrl || storedUser?.photoUrl || '',
+      fullName: existingFirestoreUser?.fullName || storedUser?.fullName || '',
+      email: existingFirestoreUser?.email || storedUser?.email || '',
+      phone: existingFirestoreUser?.phone || (storedUser as any)?.phone || '',
+      bio: existingFirestoreUser?.bio || (storedUser as any)?.bio || '',
+      country: existingFirestoreUser?.country || (storedUser as any)?.country || 'Global Pioneer'
     };
 
     PiBusinessMarketDB.setCurrentUser(freshUser);
@@ -757,6 +763,12 @@ export const authService = {
           // Update the local storage / memory state with the authoritative server-side values (such as platformRole, activeRole, etc.)
           freshUser = {
             ...freshUser,
+            photoUrl: readData.photoUrl || freshUser.photoUrl,
+            fullName: readData.fullName || freshUser.fullName,
+            email: readData.email || freshUser.email,
+            phone: readData.phone || freshUser.phone,
+            bio: readData.bio || freshUser.bio,
+            country: readData.country || freshUser.country,
             platformRole: readData.platformRole || freshUser.platformRole,
             activeRole: readData.activeRole || freshUser.activeRole,
             role: readData.role || freshUser.role,
