@@ -1,0 +1,8 @@
+798edce0fc3a65db5a2941c4a9ac5ff42a27eaf7	refs/heads/main
+add20d9f8d9cb0eb957d3c74b5694873e34ad44a	refs/remotes/origin/HEAD
+add20d9f8d9cb0eb957d3c74b5694873e34ad44a	refs/remotes/origin/main
+6b9c1d09c6b2e7cfccaf29a012b8d9a6866446ff	refs/stash
+c275a1ae830b96048088ca6106650d23c0f6fce0	refs/tags/v1.0.0
+6e95f03ad8a51aab442ca558694bc7f37bcade25	refs/tags/v1.0.0^{}
+2a9641e80702559049462132d0975d43c3970db1	refs/tags/v1.0.0-enterprise-base
+e557cc726344753f5545402abd2279f1a20ce196	refs/tags/v1.0.0-enterprise-base^{}

@@ -1,0 +1,21 @@
+798edce0fc3a65db5a2941c4a9ac5ff42a27eaf7 95e3eb84956d7f682ec055ec36addd693b6e9cea Akhilesh Singh <akhileshs68@gmail.com> 1786330494 +0530	commit: Phase 9 final regression and QA
+95e3eb84956d7f682ec055ec36addd693b6e9cea f1639884888633a944477e42fad7b98988c57fb6 Akhilesh Singh <akhileshs68@gmail.com> 1786332719 +0530	commit: Phase 9 final fulfillment QA and regression fixes
+f1639884888633a944477e42fad7b98988c57fb6 7da6932ad4c1d04729aa3f894b7a3c8ba65283d5 Akhilesh Singh <akhileshs68@gmail.com> 1786334377 +0530	commit: feat: finalize universal sharing and public URL security
+7da6932ad4c1d04729aa3f894b7a3c8ba65283d5 d4ef6426c58514a128aab2babe04dca8581125d7 Akhilesh Singh <akhileshs68@gmail.com> 1786336174 +0530	commit: feat: finalize universal sharing and public URL security update
+d4ef6426c58514a128aab2babe04dca8581125d7 f21f6b73caf01ddec0deb57c6b43583b12f40f0b Akhilesh Singh <akhileshs68@gmail.com> 1786365705 +0530	commit: feat: finalize dual pricing engine and live exchange pricing
+f21f6b73caf01ddec0deb57c6b43583b12f40f0b d8c9022b87d114f26d02b8fd8b8b8012774ff0f5 Akhilesh Singh <akhileshs68@gmail.com> 1786413823 +0530	commit: security hardening and admin dashboard fixes
+d8c9022b87d114f26d02b8fd8b8b8012774ff0f5 4237bcde5bccdce1dc0c6cf240d53f14bf0e7af1 Akhilesh Singh <akhileshs68@gmail.com> 1786415033 +0530	commit: fix navbar navigation and role switching
+4237bcde5bccdce1dc0c6cf240d53f14bf0e7af1 fcca4124c5ac3f0539e65a0ca880bcbd2c9ff83e Akhilesh Singh <akhileshs68@gmail.com> 1786419905 +0530	commit: Complete security and advertising payment remediation
+fcca4124c5ac3f0539e65a0ca880bcbd2c9ff83e e9d10de076f1cb9abab6b3daae8ccab91f8e99cc Akhilesh Singh <akhileshs68@gmail.com> 1786422272 +0530	commit: Fix runtime Super Admin visibility across App Studio and Pi Browser
+e9d10de076f1cb9abab6b3daae8ccab91f8e99cc af5b4a73a3fe2bfd26d55ad566608b95fcaf5bf2 Akhilesh Singh <akhileshs68@gmail.com> 1786426229 +0530	commit: Fix Super Admin provisioning and App Studio visibility
+af5b4a73a3fe2bfd26d55ad566608b95fcaf5bf2 993d0ec73250e9cfe1701a44d60e852f0e3c8bde Akhilesh Singh <akhileshs68@gmail.com> 1786428010 +0530	commit: Fix Super Admin role visibility and identity sync
+993d0ec73250e9cfe1701a44d60e852f0e3c8bde 1060e985658a900f99aa890f4a75f50eb1046469 Akhilesh Singh <akhileshs68@gmail.com> 1786429702 +0530	commit: Fix Super Admin identity synchronization
+1060e985658a900f99aa890f4a75f50eb1046469 723bebc4be2ae020d8742906fb0236539f89695e Akhilesh Singh <akhileshs68@gmail.com> 1786431139 +0530	commit: Remove accidental temporary file
+723bebc4be2ae020d8742906fb0236539f89695e 0ffcf6f9c0b2930c19920476ea3067b4a3805cee Akhilesh Singh <akhileshs68@gmail.com> 1786435843 +0530	commit: Add role-aware workspace navigation
+0ffcf6f9c0b2930c19920476ea3067b4a3805cee 998753c2b586fb51919889d81898c5448c3cc8fb Akhilesh Singh <akhileshs68@gmail.com> 1786437011 +0530	commit: Fix Super Admin App Studio visibility
+998753c2b586fb51919889d81898c5448c3cc8fb af69c7aeb87f3a1227a6a5b0b93880cca58119d8 Akhilesh Singh <akhileshs68@gmail.com> 1786444914 +0530	commit: Add seller advertising entry point
+af69c7aeb87f3a1227a6a5b0b93880cca58119d8 6d2048ae6c0e05b3ecd814bb87c9b68e7e9cfc3a Akhilesh Singh <akhileshs68@gmail.com> 1786534372 +0530	commit: fix: improve mobile seller and order dashboard UI
+6d2048ae6c0e05b3ecd814bb87c9b68e7e9cfc3a 88d32d97f2fe7c7798986621bec7ea6000886a65 Akhilesh Singh <akhileshs68@gmail.com> 1786585630 +0530	commit: fix: repair Pi ad payment approval flow and mobile seller UI
+0d18bf85c82e1cdd8623dae26657046b9fa40424 af765d06fc41929482f1cb38a50daf765f30dd05 AI Coding Agent <developer@example.com> 1786954253 +0530	commit: fix: persist campaign banner URL before Pi payment
+af765d06fc41929482f1cb38a50daf765f30dd05 58e916a7ee2d9bbc67e43c08dec461c7533a232e AI Coding Agent <developer@example.com> 1786956197 +0530	commit: fix: stabilize campaign banner and Firestore payload
+58e916a7ee2d9bbc67e43c08dec461c7533a232e e449cf164144ed64fab4871b6c2b396f2177df36 AI Coding Agent <developer@example.com> 1786960838 +0530	commit: fix: stabilize campaign ads and admin moderation
