@@ -145,9 +145,9 @@ export const searchService = {
               const oldPriceVal = p.oldPrice !== undefined ? p.oldPrice : (p.originalPrice !== undefined ? p.originalPrice : 0);
 
               results.push({
-                documentId: `product_${p.productId || d.id}`,
+                documentId: `product_${d.id}`,
                 entityType: 'product',
-                entityId: p.productId || d.id,
+                entityId: d.id,
                 businessId: p.businessId,
                 storeId: p.storeId,
                 title: p.productName || p.name || p.title || '',
@@ -202,9 +202,9 @@ export const searchService = {
               ].filter((v, i, self) => v && self.indexOf(v) === i);
 
               results.push({
-                documentId: `business_${b.id || d.id}`,
+                documentId: `business_${d.id}`,
                 entityType: 'business',
-                entityId: b.id || d.id,
+                entityId: d.id,
                 businessId: b.id,
                 title: b.displayName || b.businessName || b.name || b.title || '',
                 description: b.description || b.industry || '',
@@ -247,9 +247,9 @@ export const searchService = {
               ].filter((v, i, self) => v && self.indexOf(v) === i);
 
               results.push({
-                documentId: `store_${s.storeId || d.id}`,
+                documentId: `store_${d.id}`,
                 entityType: 'store',
-                entityId: s.storeId || d.id,
+                entityId: d.id,
                 businessId: s.businessId,
                 title: s.storeName || s.name || s.displayName || s.title || '',
                 description: s.description || s.storeType || '',
@@ -292,9 +292,9 @@ export const searchService = {
               ].filter((v, i, self) => v && self.indexOf(v) === i);
 
               results.push({
-                documentId: `service_${s.serviceId || d.id}`,
+                documentId: `service_${d.id}`,
                 entityType: 'service',
-                entityId: s.serviceId || d.id,
+                entityId: d.id,
                 businessId: s.businessId,
                 title: s.title || s.name || s.serviceName || '',
                 description: s.description || '',
@@ -329,9 +329,9 @@ export const searchService = {
             const j = d.data();
             if (j.status !== 'archived' && j.status !== 'deleted') {
               results.push({
-                documentId: `job_${j.jobId || d.id}`,
+                documentId: `job_${d.id}`,
                 entityType: 'job',
-                entityId: j.jobId || d.id,
+                entityId: d.id,
                 businessId: j.businessId,
                 title: j.title || j.name || j.jobTitle || '',
                 description: j.department || '',

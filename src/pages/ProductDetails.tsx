@@ -210,13 +210,13 @@ export const ProductDetails: React.FC = () => {
       if (dbProd) {
         setProduct({
           ...dbProd,
-          productId: dbProd.productId || dbProd.id || id
+          productId: dbProd.productId || dbProd.docId || dbProd.id || id
         } as Product);
         return;
       }
 
       const { results } = await searchService.search('', {});
-      const found = results.find(p => p.entityId === id);
+      const found = results.find(p => p.entityId === id || p.documentId === id || p.documentId === `product_${id}` || p.documentId === `service_${id}`);
       if (found) {
         setProduct(mapSearchEntryToProduct(found));
       }

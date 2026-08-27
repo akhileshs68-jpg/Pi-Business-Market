@@ -742,10 +742,10 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           getDocs(query(collection(db, 'businesses'), limit(6)))
         ]);
 
-        const productsList = productsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const servicesList = servicesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const storesList = storesSnap.docs.map(d => ({ id: d.id, storeId: d.id, ...d.data() }));
-        const bizList = bizSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const productsList = productsSnap.docs.map(d => ({ ...d.data(), id: d.id, docId: d.id, productId: (d.data() as any).productId || d.id }));
+        const servicesList = servicesSnap.docs.map(d => ({ ...d.data(), id: d.id, docId: d.id, serviceId: (d.data() as any).serviceId || d.id }));
+        const storesList = storesSnap.docs.map(d => ({ ...d.data(), id: d.id, storeId: d.id }));
+        const bizList = bizSnap.docs.map(d => ({ ...d.data(), id: d.id, businessId: d.id }));
 
         if (isMounted) {
           setFirestoreProducts(productsList);
@@ -760,7 +760,7 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
           if (!isMounted) return;
           try {
             const moreProductsSnap = await getDocs(query(collection(db, 'products'), limit(50)));
-            const allProductsList = moreProductsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const allProductsList = moreProductsSnap.docs.map(d => ({ ...d.data(), id: d.id, docId: d.id, productId: (d.data() as any).productId || d.id }));
             if (isMounted) {
               setFirestoreProducts(allProductsList);
             }

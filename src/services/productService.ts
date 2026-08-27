@@ -541,18 +541,59 @@ export const productService = {
       q = query(collection(db, collectionName), where('ownerUid', '==', ownerUid));
       snapshot = await getDocs(q);
     }
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        docId: doc.id,
+        productId: data.productId || doc.id
+      } as any;
+    });
   },
 
   async getItemById(id: string, type: 'product' | 'service') {
     const db = getFirebaseDb();
     const collectionName = type === 'product' ? 'products' : 'services';
-    const itemRef = doc(db, collectionName, id);
     
-    const snap = await getDoc(itemRef);
-    if (snap.exists()) {
-      return { id: snap.id, ...snap.data() };
+    // 1. Direct document lookup by Firestore Document ID
+    try {
+      const itemRef = doc(db, collectionName, id);
+      const snap = await getDoc(itemRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return { ...data, id: snap.id, docId: snap.id, productId: data.productId || snap.id };
+      }
+    } catch (e) {
+      console.warn(`[productService] Direct getDoc by document ID (${id}) failed, attempting field fallback:`, e);
     }
+
+    // 2. Fallback query by 'productId' field
+    try {
+      const qProductId = query(collection(db, collectionName), where('productId', '==', id));
+      const snapProductId = await getDocs(qProductId);
+      if (!snapProductId.empty) {
+        const d = snapProductId.docs[0];
+        const data = d.data();
+        return { ...data, id: d.id, docId: d.id, productId: data.productId || d.id };
+      }
+    } catch (e) {
+      console.warn(`[productService] Query by productId field (${id}) failed:`, e);
+    }
+
+    // 3. Fallback query by 'id' field
+    try {
+      const qId = query(collection(db, collectionName), where('id', '==', id));
+      const snapId = await getDocs(qId);
+      if (!snapId.empty) {
+        const d = snapId.docs[0];
+        const data = d.data();
+        return { ...data, id: d.id, docId: d.id, productId: data.productId || d.id };
+      }
+    } catch (e) {
+      console.warn(`[productService] Query by id field (${id}) failed:`, e);
+    }
+
     return null;
   }
 ,
@@ -579,9 +620,10 @@ export const productService = {
       allDocs.forEach(doc => {
         const data = doc.data();
         productsMap.set(doc.id, {
+          ...data,
           id: doc.id,
-          productId: doc.id, // For backwards compatibility
-          ...data
+          docId: doc.id,
+          productId: data.productId || doc.id
         });
       });
 
