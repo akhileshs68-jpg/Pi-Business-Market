@@ -68,172 +68,12 @@ export interface DirectoryListing {
   consultationFeePi?: number;
 }
 
-const MOCK_DIRECTORY_LISTINGS: DirectoryListing[] = [
-  {
-    id: 'doc_dr_sarah',
-    name: 'Dr. Sarah Jenkins, MD',
-    type: 'professional',
-    professionCategory: 'Doctor',
-    titleOrSpecialty: 'Telemedicine & General Cardiology',
-    location: 'Boston, MA • Remote Consultation',
-    rating: 4.9,
-    reviewCount: 128,
-    trustScore: 99,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300',
-    description: 'Board-certified cardiologist providing online consultations paid in Pi cryptocurrency.',
-    experienceYears: 14,
-    consultationFeePi: 25
-  },
-  {
-    id: 'law_lex_pioneer',
-    name: 'Adv. Michael Vance & Partners',
-    type: 'professional',
-    professionCategory: 'Lawyer',
-    titleOrSpecialty: 'Corporate Law, Smart Contracts & IP',
-    location: 'London, UK',
-    rating: 4.8,
-    reviewCount: 94,
-    trustScore: 97,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300',
-    description: 'International legal advisory specializing in Web3 compliance, trademark protection & business disputes.',
-    experienceYears: 18,
-    consultationFeePi: 40
-  },
-  {
-    id: 'eng_apex_struct',
-    name: 'Apex Structural Engineering',
-    type: 'professional',
-    professionCategory: 'Engineer',
-    titleOrSpecialty: 'Civil & Renewable Energy Systems',
-    location: 'Frankfurt, Germany',
-    rating: 5.0,
-    reviewCount: 62,
-    trustScore: 98,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=300',
-    description: 'Certified structural engineering firm delivering solar grid designs and commercial blueprints.',
-    experienceYears: 12,
-    consultationFeePi: 50
-  },
-  {
-    id: 'arch_studio_v',
-    name: 'Studio V Modern Architects',
-    type: 'professional',
-    professionCategory: 'Architect',
-    titleOrSpecialty: 'Sustainable Eco-Architecture & 3D Renderings',
-    location: 'Tokyo, Japan',
-    rating: 4.9,
-    reviewCount: 88,
-    trustScore: 96,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=300',
-    description: 'Award-winning architectural studio crafting passive energy homes and luxury commercial spaces.',
-    experienceYears: 10,
-    consultationFeePi: 35
-  },
-  {
-    id: 'edu_pioneer_academy',
-    name: 'Global Pioneer Academy',
-    type: 'organization',
-    professionCategory: 'School',
-    titleOrSpecialty: 'K-12 STEM & Web3 Software Engineering School',
-    location: 'Singapore Educational Hub',
-    rating: 4.9,
-    reviewCount: 310,
-    trustScore: 99,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=300',
-    description: 'Accredited international school accepting Pi tuition fees for coding, science, and languages.',
-    experienceYears: 20
-  },
-  {
-    id: 'hosp_st_jude',
-    name: 'St. Jude International Hospital',
-    type: 'organization',
-    professionCategory: 'Hospital',
-    titleOrSpecialty: 'Emergency Medicine & Diagnostic Center',
-    location: 'Nairobi, Kenya',
-    rating: 4.8,
-    reviewCount: 420,
-    trustScore: 98,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=300',
-    description: 'Full-service tertiary healthcare institution supporting pioneer health escrow programs.',
-    experienceYears: 25
-  },
-  {
-    id: 'ngo_green_earth',
-    name: 'GreenEarth Reforestation Trust',
-    type: 'organization',
-    professionCategory: 'NGO',
-    titleOrSpecialty: 'Environmental Protection & Carbon Offsets',
-    location: 'Global Non-Profit',
-    rating: 5.0,
-    reviewCount: 512,
-    trustScore: 100,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=300',
-    description: 'Verified non-profit organization planting trees funded directly by Pi Pioneer donations.',
-    experienceYears: 8
-  },
-  {
-    id: 'freelance_alex_ui',
-    name: 'Alex Rivera • Principal Designer',
-    type: 'professional',
-    professionCategory: 'Freelancer',
-    titleOrSpecialty: 'UI/UX Design, React & Motion Graphics',
-    location: 'Barcelona, Spain • Remote',
-    rating: 4.9,
-    reviewCount: 145,
-    trustScore: 95,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300',
-    description: 'Freelance product designer with 8+ years building enterprise SaaS dashboards & mobile apps.',
-    experienceYears: 8,
-    consultationFeePi: 15
-  },
-  {
-    id: 'creator_studio_pi',
-    name: 'Vanguard Media House',
-    type: 'professional',
-    professionCategory: 'Creator',
-    titleOrSpecialty: '4K Video Production & Brand Storytelling',
-    location: 'Los Angeles, CA',
-    rating: 4.8,
-    reviewCount: 76,
-    trustScore: 94,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=300',
-    description: 'High-end content creation studio helping Web3 enterprises launch promotional campaigns.',
-    experienceYears: 6,
-    consultationFeePi: 30
-  },
-  {
-    id: 'local_express_plumb',
-    name: 'QuickFix Express Plumbing & HVAC',
-    type: 'professional',
-    professionCategory: 'Local Service',
-    titleOrSpecialty: '24/7 Emergency Plumbing & Solar Water Heating',
-    location: 'Toronto, Canada',
-    rating: 4.9,
-    reviewCount: 230,
-    trustScore: 96,
-    verified: true,
-    imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300',
-    description: 'Licensed plumbers and technicians offering on-demand residential repairs paid in Pi.',
-    experienceYears: 15,
-    consultationFeePi: 20
-  }
-];
-
 export const BusinessDirectory: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [listings, setListings] = useState<DirectoryListing[]>(MOCK_DIRECTORY_LISTINGS);
+  const [listings, setListings] = useState<DirectoryListing[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -244,7 +84,7 @@ export const BusinessDirectory: React.FC = () => {
     setLoading(true);
     try {
       const db = getFirebaseDb();
-      const q = query(collection(db, 'businesses'), limit(20));
+      const q = query(collection(db, 'businesses'), limit(50));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const fetchedList: DirectoryListing[] = snap.docs.map(d => {
@@ -253,24 +93,25 @@ export const BusinessDirectory: React.FC = () => {
             id: d.id,
             name: data.businessName || data.displayName || 'Verified Partner',
             type: 'business',
-            professionCategory: (data.industry as any) || 'Enterprise',
+            professionCategory: (data.industry as any) || data.category || 'Enterprise',
             titleOrSpecialty: data.category || data.industry || 'General Business',
             location: data.location || data.city || 'Global Hub',
-            rating: data.rating || 4.8,
-            reviewCount: data.reviewCount || 35,
+            rating: data.rating || 5.0,
+            reviewCount: data.reviewCount || 0,
             trustScore: data.trustScore || 95,
-            verified: data.verificationStatus === 'Verified',
-            imageUrl: data.logoUrl || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300',
+            verified: data.verificationStatus === 'Verified' || data.verified === true,
+            imageUrl: data.logoUrl || data.bannerUrl || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300',
             description: data.description || 'Verified Pioneer Business Ecosystem member.',
-            experienceYears: data.experienceYears || 5
+            experienceYears: data.experienceYears || 1
           };
         });
-        setListings([...fetchedList, ...MOCK_DIRECTORY_LISTINGS]);
+        setListings(fetchedList);
       } else {
-        setListings(MOCK_DIRECTORY_LISTINGS);
+        setListings([]);
       }
     } catch (e) {
-      setListings(MOCK_DIRECTORY_LISTINGS);
+      console.warn('Error fetching directory listings:', e);
+      setListings([]);
     } finally {
       setLoading(false);
     }

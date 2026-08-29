@@ -202,21 +202,38 @@ export const ProductDetails: React.FC = () => {
   const fetchProduct = async () => {
     setLoading(true);
     try {
-      let dbProd = await productService.getProduct(id!) as any;
+      const rawId = (id || '').trim();
+      const cleanId = rawId.replace(/^(product_|service_)/, '');
+
+      let dbProd = await productService.getProduct(cleanId) as any;
+      if (!dbProd && rawId !== cleanId) {
+        dbProd = await productService.getProduct(rawId) as any;
+      }
       if (!dbProd) {
         // Try getting as a service as well
-        dbProd = await productService.getItemById(id!, 'service') as any;
+        dbProd = await productService.getItemById(cleanId, 'service') as any;
+        if (!dbProd && rawId !== cleanId) {
+          dbProd = await productService.getItemById(rawId, 'service') as any;
+        }
       }
       if (dbProd) {
         setProduct({
           ...dbProd,
-          productId: dbProd.productId || dbProd.docId || dbProd.id || id
+          id: dbProd.id || dbProd.docId || dbProd.productId || cleanId || rawId,
+          productId: dbProd.productId || dbProd.docId || dbProd.id || cleanId || rawId
         } as Product);
         return;
       }
 
       const { results } = await searchService.search('', {});
-      const found = results.find(p => p.entityId === id || p.documentId === id || p.documentId === `product_${id}` || p.documentId === `service_${id}`);
+      const found = results.find(p => 
+        p.entityId === rawId || 
+        p.entityId === cleanId || 
+        p.documentId === rawId || 
+        p.documentId === cleanId || 
+        p.documentId === `product_${cleanId}` || 
+        p.documentId === `service_${cleanId}`
+      );
       if (found) {
         setProduct(mapSearchEntryToProduct(found));
       }
@@ -651,7 +668,9 @@ export const ProductDetails: React.FC = () => {
     )
   );
 
-  const isPublic = !product.status || product.status === 'published';
+  const isPublic = !product.status || 
+    ['published', 'active', 'in_stock', 'approved'].includes(product.status.toLowerCase()) || 
+    (product as any).published === true;
 
   if (!isPublic && !isOwner) {
     return (

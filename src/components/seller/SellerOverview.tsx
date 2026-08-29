@@ -73,14 +73,14 @@ const MOCK_RECENT_ORDERS = [
 
 const MOCK_LOW_STOCK = [
   {
-    id: 'p_1',
-    name: 'Consensus Core Hardware Wallet',
+    id: 'demo_stock_1',
+    name: 'Hardware Security Key (Sample)',
     stock: 3,
     image: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?w=150&auto=format&fit=crop&q=60'
   },
   {
-    id: 'p_4',
-    name: 'AeroSync Fitness Smartwatch',
+    id: 'demo_stock_2',
+    name: 'Fitness Smartwatch (Sample)',
     stock: 1,
     image: 'https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?w=150&auto=format&fit=crop&q=60'
   }

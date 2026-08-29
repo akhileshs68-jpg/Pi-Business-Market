@@ -81,7 +81,7 @@ export const searchService = {
     filters: SearchFilters = {}, 
     pageSize: number = 20,
     lastDoc?: any
-  ): Promise<{ results: SearchIndexEntry[], lastVisible: any }> {
+  ): Promise<{ results: SearchIndexEntry[], total: number, lastVisible: any }> {
     const db = getFirebaseDb();
     let results: SearchIndexEntry[] = [];
 
@@ -131,7 +131,10 @@ export const searchService = {
           console.log('[Search Debug] Products returned:', snap.size);
           snap.forEach(d => {
             const p = d.data();
-            if (p.status === 'published' || !p.status) {
+            const prodStatus = (p.status || 'published').toLowerCase();
+            const isInactive = prodStatus === 'archived' || prodStatus === 'deleted' || prodStatus === 'draft' || p.published === false;
+            
+            if (!isInactive) {
               const categoryIdsList = [
                 ...getCategorySynonyms(p.category || ''),
                 ...getCategorySynonyms(p.subCategory || ''),
@@ -364,12 +367,22 @@ export const searchService = {
     if (filters.businessId) {
       results = results.filter(r => r.businessId === filters.businessId);
     }
-    if (filters.categoryId) {
-      results = results.filter(r => r.categoryIds?.includes(filters.categoryId!));
+    if (filters.categoryId && filters.categoryId !== 'all') {
+      const lowerCat = filters.categoryId.toLowerCase().trim();
+      results = results.filter(r => {
+        if (!r.categoryIds || r.categoryIds.length === 0) {
+          return (r.metadata?.category || '').toLowerCase().includes(lowerCat);
+        }
+        return r.categoryIds.some(c => {
+          const lowerC = c.toLowerCase().trim();
+          return lowerC === lowerCat || lowerC.includes(lowerCat) || lowerCat.includes(lowerC);
+        });
+      });
     }
 
     if (keyword) {
-      const lowerKw = keyword.toLowerCase();
+      const lowerKw = keyword.toLowerCase().trim();
+      const kwTokens = lowerKw.split(/\s+/).filter(Boolean);
       console.log(`[Search Debug] Calculating fuzzy scores for "${lowerKw}"`);
       
       const scoredResults = results.map(item => {
@@ -387,6 +400,15 @@ export const searchService = {
           item.keywords.forEach(k => {
             maxScore = Math.max(maxScore, calculateScore(lowerKw, k) * 0.9);
           });
+        }
+
+        // Multi-token fallback: if all/any tokens match title or keywords
+        if (maxScore === 0 && kwTokens.length > 0) {
+          const itemText = `${item.title} ${item.description || ''} ${item.keywords?.join(' ') || ''} ${(item.categoryIds || []).join(' ')}`.toLowerCase();
+          const matchedCount = kwTokens.filter(token => itemText.includes(token)).length;
+          if (matchedCount > 0) {
+            maxScore = (matchedCount / kwTokens.length) * 50;
+          }
         }
         
         console.log(`[Search Debug] Item: "${item.title}" | Type: ${item.entityType} | Score: ${maxScore}`);
@@ -407,12 +429,14 @@ export const searchService = {
       });
     }
 
+    const total = results.length;
     if (pageSize) {
       results = results.slice(0, pageSize);
     }
 
     return {
       results,
+      total,
       lastVisible: null
     };
   },

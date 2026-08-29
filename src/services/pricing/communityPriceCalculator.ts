@@ -40,7 +40,7 @@ export const COMMUNITY_CALCULATOR_DISCLAIMER =
   "This calculator helps you choose a Community Price based on the platform's $314,159 USD/Pi Community Reference Value. It does not represent a live market rate.";
 
 export const COMMUNITY_EXCHANGE_SEPARATION_NOTE = 
-  "Community Price is derived using the $314,159 USD/Pi reference rate and does not automatically follow live exchange prices.";
+  "Community Price is derived using manually defined community reference values (e.g., $314,159 USD/Pi) and does not automatically follow live exchange prices.";
 
 /**
  * Calculates Community Pi Price from a local currency product price.
@@ -166,7 +166,8 @@ export function calculateCommunityPrice(input: CommunityPriceCalculationInput): 
     };
   }
 
-  const rawRefPi = input.userDefinedPiReference ?? DEFAULT_COMMUNITY_PI_USD_RATE;
+  const hasUserRef = input.userDefinedPiReference !== undefined && input.userDefinedPiReference !== null && input.userDefinedPiReference !== '';
+  const rawRefPi = hasUserRef ? input.userDefinedPiReference : DEFAULT_COMMUNITY_PI_USD_RATE;
   const piRefValue = typeof rawRefPi === 'number' ? rawRefPi : parseFloat(String(rawRefPi).trim());
   if (isNaN(piRefValue) || !isFinite(piRefValue) || piRefValue <= 0) {
     return {
@@ -180,9 +181,8 @@ export function calculateCommunityPrice(input: CommunityPriceCalculationInput): 
     };
   }
 
-  // Pipeline: LOCAL CURRENCY -> USD EQUIVALENT -> ÷ COMMUNITY PI USD REFERENCE RATE
   const usdEquivalent = convertLocalToUsd(refAmount, normalizedCurr, input.customFxRates);
-  const calculated = usdEquivalent / piRefValue;
+  const calculated = hasUserRef ? (refAmount / piRefValue) : (usdEquivalent / piRefValue);
   if (!isFinite(calculated) || isNaN(calculated)) {
     return {
       success: false,

@@ -555,22 +555,38 @@ export const productService = {
   async getItemById(id: string, type: 'product' | 'service') {
     const db = getFirebaseDb();
     const collectionName = type === 'product' ? 'products' : 'services';
+    const rawId = (id || '').trim();
+    const cleanId = rawId.replace(/^(product_|service_)/, '');
     
-    // 1. Direct document lookup by Firestore Document ID
+    // 1. Direct document lookup by cleanId
     try {
-      const itemRef = doc(db, collectionName, id);
+      const itemRef = doc(db, collectionName, cleanId);
       const snap = await getDoc(itemRef);
       if (snap.exists()) {
         const data = snap.data();
         return { ...data, id: snap.id, docId: snap.id, productId: data.productId || snap.id };
       }
     } catch (e) {
-      console.warn(`[productService] Direct getDoc by document ID (${id}) failed, attempting field fallback:`, e);
+      console.warn(`[productService] Direct getDoc by cleanId (${cleanId}) failed:`, e);
+    }
+
+    // Direct document lookup by rawId if different
+    if (rawId && rawId !== cleanId) {
+      try {
+        const itemRef = doc(db, collectionName, rawId);
+        const snap = await getDoc(itemRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          return { ...data, id: snap.id, docId: snap.id, productId: data.productId || snap.id };
+        }
+      } catch (e) {
+        console.warn(`[productService] Direct getDoc by rawId (${rawId}) failed:`, e);
+      }
     }
 
     // 2. Fallback query by 'productId' field
     try {
-      const qProductId = query(collection(db, collectionName), where('productId', '==', id));
+      const qProductId = query(collection(db, collectionName), where('productId', '==', cleanId));
       const snapProductId = await getDocs(qProductId);
       if (!snapProductId.empty) {
         const d = snapProductId.docs[0];
@@ -578,12 +594,12 @@ export const productService = {
         return { ...data, id: d.id, docId: d.id, productId: data.productId || d.id };
       }
     } catch (e) {
-      console.warn(`[productService] Query by productId field (${id}) failed:`, e);
+      console.warn(`[productService] Query by productId field (${cleanId}) failed:`, e);
     }
 
     // 3. Fallback query by 'id' field
     try {
-      const qId = query(collection(db, collectionName), where('id', '==', id));
+      const qId = query(collection(db, collectionName), where('id', '==', cleanId));
       const snapId = await getDocs(qId);
       if (!snapId.empty) {
         const d = snapId.docs[0];
@@ -591,7 +607,7 @@ export const productService = {
         return { ...data, id: d.id, docId: d.id, productId: data.productId || d.id };
       }
     } catch (e) {
-      console.warn(`[productService] Query by id field (${id}) failed:`, e);
+      console.warn(`[productService] Query by id field (${cleanId}) failed:`, e);
     }
 
     return null;
@@ -633,6 +649,122 @@ export const productService = {
       return [];
     }
   },
+  async getProducts(filters: any = {}, pageSize?: number, lastDoc?: any): Promise<{ products: any[], lastDoc: any }> {
+    const db = getFirebaseDb();
+    try {
+      const snap = await getDocs(collection(db, 'products'));
+      let products: any[] = snap.docs.map(doc => {
+        const data = doc.data() as any;
+        return {
+          ...data,
+          id: doc.id,
+          docId: doc.id,
+          productId: data.productId || doc.id
+        };
+      });
+
+      // Filter by status
+      if (filters.status && filters.status !== 'all') {
+        const targetStatus = filters.status.toLowerCase();
+        products = products.filter(p => (p.status || 'published').toLowerCase() === targetStatus);
+      } else if (!filters.includeArchived) {
+        products = products.filter(p => {
+          const s = (p.status || 'published').toLowerCase();
+          return s !== 'archived' && s !== 'deleted';
+        });
+      }
+
+      // Filter by category
+      if (filters.category && filters.category !== 'all') {
+        const cat = filters.category.toLowerCase().trim();
+        products = products.filter(p => (p.category || '').toLowerCase().trim() === cat);
+      }
+
+      // Filter by featured
+      if (filters.featured) {
+        products = products.filter(p => p.featured === true || p.isRecommended === true);
+      }
+
+      // Filter by owner/seller
+      if (filters.sellerId || filters.ownerUid) {
+        const targetOwner = filters.sellerId || filters.ownerUid;
+        products = products.filter(p => p.ownerUid === targetOwner || p.sellerId === targetOwner);
+      }
+
+      // Filter by store
+      if (filters.storeId) {
+        products = products.filter(p => p.storeId === filters.storeId);
+      }
+
+      // Filter by business
+      if (filters.businessId) {
+        products = products.filter(p => p.businessId === filters.businessId);
+      }
+
+      if (pageSize && pageSize > 0) {
+        products = products.slice(0, pageSize);
+      }
+
+      return { products, lastDoc: null };
+    } catch (err) {
+      console.error('[productService] getProducts error:', err);
+      return { products: [], lastDoc: null };
+    }
+  },
+
+  async listProducts(filters: any = {}, pageSize?: number, lastDoc?: any) {
+    const res = await this.getProducts(filters, pageSize, lastDoc);
+    return res.products;
+  },
+
+  async fetchProducts(filters: any = {}) {
+    return this.listProducts(filters);
+  },
+
+  async fetchProduct(id: string) {
+    return this.getProduct(id);
+  },
+
+  async searchProducts(keyword: string, filters: any = {}) {
+    const all = await this.listProducts(filters);
+    if (!keyword || !keyword.trim()) return all;
+    const lower = keyword.toLowerCase().trim();
+    return all.filter(p => {
+      const name = (p.productName || p.name || p.title || '').toLowerCase();
+      const desc = (p.description || p.shortDescription || '').toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      const cat = (p.category || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      return name.includes(lower) || desc.includes(lower) || brand.includes(lower) || cat.includes(lower) || sku.includes(lower);
+    });
+  },
+
+  async featuredProducts(limitCount = 8) {
+    const all = await this.listProducts({ featured: true });
+    if (all.length > 0) return all.slice(0, limitCount);
+    const fallbackAll = await this.listProducts();
+    return fallbackAll.slice(0, limitCount);
+  },
+
+  async sellerProducts(sellerUid: string) {
+    return this.getItemsByOwner(sellerUid, 'product');
+  },
+
+  async adminProducts(filters: any = {}) {
+    return this.listProducts({ ...filters, includeArchived: true });
+  },
+
+  async relatedProducts(productId: string, category?: string, limitCount = 4) {
+    const all = await this.listProducts();
+    const cleanId = (productId || '').replace(/^(product_|service_)/, '');
+    const filtered = all.filter(p => p.id !== cleanId && p.productId !== cleanId);
+    if (category) {
+      const sameCat = filtered.filter(p => (p.category || '').toLowerCase() === category.toLowerCase());
+      if (sameCat.length > 0) return sameCat.slice(0, limitCount);
+    }
+    return filtered.slice(0, limitCount);
+  },
+
   async getProduct(id: string) {
     return this.getItemById(id, 'product');
   },

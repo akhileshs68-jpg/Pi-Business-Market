@@ -11,8 +11,9 @@ let storage: FirebaseStorage | null = null;
 
 const getRawConfig = () => {
   const envKey = typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_FIREBASE_API_KEY;
+  let cfg: any;
   if (envKey) {
-    return {
+    cfg = {
       apiKey: (import.meta as any).env.VITE_FIREBASE_API_KEY,
       authDomain: (import.meta as any).env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: (import.meta as any).env.VITE_FIREBASE_PROJECT_ID,
@@ -21,16 +22,24 @@ const getRawConfig = () => {
       appId: (import.meta as any).env.VITE_FIREBASE_APP_ID,
       firestoreDatabaseId: (import.meta as any).env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
     };
+  } else {
+    cfg = {
+      apiKey: firebaseAppletConfig.apiKey,
+      authDomain: firebaseAppletConfig.authDomain,
+      projectId: firebaseAppletConfig.projectId,
+      storageBucket: firebaseAppletConfig.storageBucket,
+      messagingSenderId: firebaseAppletConfig.messagingSenderId,
+      appId: firebaseAppletConfig.appId,
+      firestoreDatabaseId: firebaseAppletConfig.firestoreDatabaseId,
+    };
   }
-  return {
-    apiKey: firebaseAppletConfig.apiKey,
-    authDomain: firebaseAppletConfig.authDomain,
-    projectId: firebaseAppletConfig.projectId,
-    storageBucket: firebaseAppletConfig.storageBucket,
-    messagingSenderId: firebaseAppletConfig.messagingSenderId,
-    appId: firebaseAppletConfig.appId,
-    firestoreDatabaseId: firebaseAppletConfig.firestoreDatabaseId,
-  };
+
+  // Canonical Firebase Project Verification & Audit Logger
+  if (cfg.projectId && cfg.projectId !== 'pi-business-market') {
+    console.warn(`[Firebase Security Alert] Active Firebase Project is "${cfg.projectId}". Canonical target: "pi-business-market".`);
+  }
+
+  return cfg;
 };
 
 export const isFirebaseConfigured = () => {

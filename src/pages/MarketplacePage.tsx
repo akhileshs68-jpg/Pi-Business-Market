@@ -65,6 +65,8 @@ import { ComparisonModal } from '../components/marketplace/ComparisonModal';
 
 const mapSearchEntryToProduct = (entry: SearchIndexEntry): Product => {
   return {
+    id: entry.entityId,
+    docId: entry.entityId,
     productId: entry.entityId,
     storeId: entry.storeId || '',
     businessId: entry.businessId,
@@ -406,14 +408,9 @@ export const MarketplacePage: React.FC = () => {
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      if (query || activeType !== 'all' || selectedCategory !== null) {
-        setVisibleCount(12);
-        handleSearch();
-      } else {
-        setResults([]);
-        setError(null);
-      }
-    }, 500);
+      setVisibleCount(12);
+      handleSearch();
+    }, 400);
 
     return () => clearTimeout(delayDebounceFn);
   }, [query, activeType, selectedCategory, selectedSubcategory, selectedChildCategory]);

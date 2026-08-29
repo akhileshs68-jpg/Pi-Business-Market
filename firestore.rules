@@ -1444,7 +1444,7 @@ service cloud.firestore {
       allow update: if canMutate() && isSignedIn() && (
         isAdmin() || (
           (isOwner(existing().userUid) || isOwner(existing().userId) || walletId.startsWith(request.auth.uid) || walletId.startsWith(getPiUid())) &&
-          !incoming().diff(existing()).affectedKeys().hasAny(['balance', 'totalTokens', 'userUid', 'userId', 'stakedTokens'])
+          !incoming().diff(existing()).affectedKeys().hasAny(['balance', 'bmpBalance', 'lifetimeBmp', 'stakedBmp', 'totalTokens', 'userUid', 'userId', 'stakedTokens'])
         )
       );
       allow delete: if canMutate() && isAdmin();

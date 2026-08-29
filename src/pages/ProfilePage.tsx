@@ -62,92 +62,9 @@ import {
 } from 'lucide-react';
 
 import { orderService } from '../services/orderService';
+import { productService } from '../services/productService';
 import { Order, OrderStatus } from '../types';
 import { useTheme, ThemeType } from '../context/ThemeContext';
-
-// Compact local list of all products for wishlist resolution
-const ALL_PRODUCTS_DATABASE = [
-  {
-    id: 'p_1',
-    title: 'Consensus Core Hardware Wallet',
-    price: 45,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?w=500&auto=format&fit=crop&q=60',
-    seller: 'PiSec Technologies',
-    rating: 4.9,
-    reviews: 142
-  },
-  {
-    id: 'p_2',
-    title: 'Developer Workstation Book Pro',
-    price: 350,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1496181130204-755241544e35?w=500&auto=format&fit=crop&q=60',
-    seller: 'Silicon Pioneers',
-    rating: 4.8,
-    reviews: 89
-  },
-  {
-    id: 'p_3',
-    title: 'Single-Origin Ethiopian Coffee Beans (1kg)',
-    price: 2.5,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=500&auto=format&fit=crop&q=60',
-    seller: 'Kaffa Pi Roasters',
-    rating: 5.0,
-    reviews: 210
-  },
-  {
-    id: 'p_4',
-    title: 'AeroSync Fitness Smartwatch',
-    price: 18.5,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?w=500&auto=format&fit=crop&q=60',
-    seller: 'OmniWear Global',
-    rating: 4.7,
-    reviews: 64
-  },
-  {
-    id: 'p_5',
-    title: 'Urban Comfort Denim Jacket',
-    price: 12.0,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=500&auto=format&fit=crop&q=60',
-    seller: 'Pi Wearables',
-    rating: 4.6,
-    reviews: 45
-  },
-  {
-    id: 'p_6',
-    title: 'Organic Green Tea Selection',
-    price: 1.8,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=500&auto=format&fit=crop&q=60',
-    seller: 'EcoFarms Premium',
-    rating: 4.9,
-    reviews: 112
-  },
-  {
-    id: 'p_7',
-    title: 'NFT Creator Suite - Lifetime License',
-    price: 88.0,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&auto=format&fit=crop&q=60',
-    seller: 'Web3 Toolbox',
-    rating: 4.9,
-    reviews: 83
-  },
-  {
-    id: 'p_8',
-    title: 'Pro Sound Active Noise Headphones',
-    price: 24.5,
-    currency: 'π',
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60',
-    seller: 'AcousticPi',
-    rating: 4.8,
-    reviews: 96
-  }
-];
 
 type ProfileTab = 'account' | 'orders' | 'wallet' | 'wishlist' | 'settings' | 'help';
 
@@ -328,7 +245,7 @@ export const ProfilePage: React.FC = () => {
   }, [user, activeTab]);
 
   // Load wishlist from both modern and legacy keys
-  const loadWishlist = () => {
+  const loadWishlist = async () => {
     try {
       const storedWish = localStorage.getItem('bmp_marketplace_wishlist');
       const legacyWish = localStorage.getItem('pi_marketplace_wishlist');
@@ -337,8 +254,29 @@ export const ProfilePage: React.FC = () => {
       const allIds = Array.from(new Set([...parsedStored, ...parsedLegacy]));
       
       if (allIds.length > 0) {
-        const filtered = ALL_PRODUCTS_DATABASE.filter(item => allIds.includes(item.id));
-        setWishlistItems(filtered);
+        const fetchedItems = await Promise.all(
+          allIds.map(async (id) => {
+            try {
+              const p: any = await productService.getProduct(id);
+              if (p) {
+                return {
+                  id: p.productId || p.id,
+                  title: p.productName || p.title || 'Product',
+                  price: p.price ?? 0,
+                  currency: p.currency || 'π',
+                  image: p.mainImage || (p.imageUrls && p.imageUrls[0]) || '',
+                  seller: p.brand || p.seller || 'Verified Merchant',
+                  rating: p.rating || 5.0,
+                  reviews: p.reviews || p.reviewCount || 0
+                };
+              }
+            } catch (err) {
+              console.warn(`[ProfilePage] Failed to resolve wishlist product ${id}:`, err);
+            }
+            return null;
+          })
+        );
+        setWishlistItems(fetchedItems.filter(Boolean) as any[]);
       } else {
         setWishlistItems([]);
       }

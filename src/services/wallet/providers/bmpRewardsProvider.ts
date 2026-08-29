@@ -21,12 +21,12 @@ export const bmpRewardsProvider: WalletProvider = {
       const gamificationRef = doc(db, 'user_gamification', canonicalUserId);
       const gamificationSnap = await getDoc(gamificationRef);
       
-      let initialBalance = 300; // Default demo balance
-      let initialLifetime = 300;
+      let initialBalance = 0; // Canonical initial zero balance
+      let initialLifetime = 0;
 
       if (gamificationSnap.exists()) {
         const gData = gamificationSnap.data();
-        initialBalance = gData.bmpBalance ?? gData.lifetimeBmp ?? 300;
+        initialBalance = gData.bmpBalance ?? gData.lifetimeBmp ?? 0;
         initialLifetime = gData.lifetimeBmp ?? initialBalance;
       }
 
@@ -60,7 +60,7 @@ export const bmpRewardsProvider: WalletProvider = {
       return initialBalance;
     } catch (err) {
       console.warn('Failed to auto-create ledger wallet doc:', err);
-      return 300;
+      return 0;
     }
   },
 

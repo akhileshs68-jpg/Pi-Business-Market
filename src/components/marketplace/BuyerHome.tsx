@@ -60,99 +60,7 @@ interface BuyerHomeProps {
   onCategorySelect: (catId: string) => void;
 }
 
-// Fallback Stores for Featured Stores section if Firestore query returns empty
-const FALLBACK_STORES = [
-  {
-    storeId: 'store_alpha_01',
-    storeName: 'Alpha Tech Flagship',
-    storeCategory: 'Electronics',
-    rating: 4.9,
-    reviewCount: 340,
-    verified: true,
-    logoUrl: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600',
-    productCount: 48,
-    location: 'Silicon Valley, USA'
-  },
-  {
-    storeId: 'store_pioneer_fashion',
-    storeName: 'Pioneer Luxury Apparel',
-    storeCategory: 'Fashion & Wearables',
-    rating: 4.8,
-    reviewCount: 210,
-    verified: true,
-    logoUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600',
-    productCount: 82,
-    location: 'Paris, France'
-  },
-  {
-    storeId: 'store_bio_harvest',
-    storeName: 'GreenEarth Bio Organics',
-    storeCategory: 'Agriculture & Food',
-    rating: 5.0,
-    reviewCount: 156,
-    verified: true,
-    logoUrl: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?w=600',
-    productCount: 35,
-    location: 'Nairobi, Kenya'
-  },
-  {
-    storeId: 'store_crypto_home',
-    storeName: 'Nordic Home Living',
-    storeCategory: 'Home & Furniture',
-    rating: 4.7,
-    reviewCount: 98,
-    verified: true,
-    logoUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600',
-    productCount: 64,
-    location: 'Stockholm, Sweden'
-  }
-];
-
-// Fallback Businesses for Featured & Verified Businesses section
-const FALLBACK_BUSINESSES = [
-  {
-    id: 'bus_alpha_corp',
-    businessName: 'Alpha Global Technologies',
-    category: 'IT & Hardware Manufacturing',
-    location: 'California, United States',
-    trustScore: 98,
-    verified: true,
-    employeeCount: 120,
-    logoUrl: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600',
-    verificationLevel: 'Government Registered'
-  },
-  {
-    id: 'bus_freight_logistics',
-    businessName: 'Pioneer Air & Sea Freight',
-    category: 'Global Logistics & Shipping',
-    location: 'Singapore Hub',
-    trustScore: 96,
-    verified: true,
-    employeeCount: 450,
-    logoUrl: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600',
-    verificationLevel: 'Escrow Insured'
-  },
-  {
-    id: 'bus_solar_energy',
-    businessName: 'Helios Clean Energy Corp',
-    category: 'Renewable Power & Tech',
-    location: 'Berlin, Germany',
-    trustScore: 95,
-    verified: true,
-    employeeCount: 85,
-    logoUrl: 'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=150',
-    bannerUrl: 'https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=600',
-    verificationLevel: 'KYC Verified'
-  }
-];
-
-// Fallback News Items
+// Ecosystem Informational Updates
 const PI_ECOSYSTEM_NEWS = [
   {
     id: 'news_01',
@@ -750,8 +658,8 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
         if (isMounted) {
           setFirestoreProducts(productsList);
           setFirestoreServices(servicesList);
-          setFirestoreStores(storesList.length > 0 ? storesList : FALLBACK_STORES);
-          setFirestoreBusinesses(bizList.length > 0 ? bizList : FALLBACK_BUSINESSES);
+          setFirestoreStores(storesList);
+          setFirestoreBusinesses(bizList);
           setLoadingReal(false);
         }
 
@@ -772,8 +680,8 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
       } catch (err) {
         console.error('Home data load error:', err);
         if (isMounted) {
-          setFirestoreStores(FALLBACK_STORES);
-          setFirestoreBusinesses(FALLBACK_BUSINESSES);
+          setFirestoreStores([]);
+          setFirestoreBusinesses([]);
           setLoadingReal(false);
         }
       }
@@ -1529,102 +1437,106 @@ export const BuyerHome: React.FC<BuyerHomeProps> = ({
       </section>
 
       {/* 6. FEATURED STORES */}
-      <section id="featured_stores_section" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-            <span className="w-1 h-4 bg-amber-500 rounded-full" />
-            Verified Stores
-          </h2>
-          <button onClick={() => onNavigate('/marketplace')} className="text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-wider flex items-center gap-1">
-            <span>All Stores</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      {firestoreStores.length > 0 && (
+        <section id="featured_stores_section" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+              <span className="w-1 h-4 bg-amber-500 rounded-full" />
+              Verified Stores
+            </h2>
+            <button onClick={() => onNavigate('/marketplace')} className="text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-wider flex items-center gap-1">
+              <span>All Stores</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
-          {firestoreStores.slice(0, 4).map((store, i) => (
-            <div 
-              key={store.storeId || i}
-              onClick={() => onNavigate(`/store/${store.storeId}`)}
-              className="bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-amber-500/40 rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col shadow-lg group"
-            >
-              <div className="relative h-20 bg-slate-950 overflow-hidden">
-                <img src={store.bannerUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500'} alt={store.storeName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
-              </div>
-              <div className="p-3 pt-0 relative flex-1 flex flex-col justify-between space-y-2">
-                <div className="flex items-end gap-2 -mt-5">
-                  <img src={store.logoUrl || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100'} alt={store.storeName} className="w-10 h-10 rounded-xl object-cover border-2 border-slate-900 shadow-md shrink-0 bg-slate-950" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-bold text-white truncate group-hover:text-amber-400 transition-colors">
-                      {store.storeName}
-                    </h3>
-                    <span className="text-[9px] text-slate-400 truncate block">{store.storeCategory || 'General Store'}</span>
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
+            {firestoreStores.slice(0, 4).map((store, i) => (
+              <div 
+                key={store.storeId || store.id || i}
+                onClick={() => onNavigate(`/store/${store.storeId || store.id}`)}
+                className="bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-amber-500/40 rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col shadow-lg group"
+              >
+                <div className="relative h-20 bg-slate-950 overflow-hidden">
+                  <img src={store.bannerUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500'} alt={store.storeName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+                </div>
+                <div className="p-3 pt-0 relative flex-1 flex flex-col justify-between space-y-2">
+                  <div className="flex items-end gap-2 -mt-5">
+                    <img src={store.logoUrl || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100'} alt={store.storeName} className="w-10 h-10 rounded-xl object-cover border-2 border-slate-900 shadow-md shrink-0 bg-slate-950" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xs font-bold text-white truncate group-hover:text-amber-400 transition-colors">
+                        {store.storeName}
+                      </h3>
+                      <span className="text-[9px] text-slate-400 truncate block">{store.storeCategory || 'General Store'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-800/60">
+                    <div className="flex items-center text-amber-400 font-bold">
+                      <Star className="w-3 h-3 fill-amber-400 mr-0.5" />
+                      <span>{store.rating || 4.8}</span>
+                    </div>
+                    <span>{store.productCount || 0} Products</span>
+                    <span className="text-amber-400 font-bold group-hover:underline">Visit Store →</span>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-800/60">
-                  <div className="flex items-center text-amber-400 font-bold">
-                    <Star className="w-3 h-3 fill-amber-400 mr-0.5" />
-                    <span>{store.rating || 4.8}</span>
-                  </div>
-                  <span>{store.productCount || 24} Products</span>
-                  <span className="text-amber-400 font-bold group-hover:underline">Visit Store →</span>
-                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 7. FEATURED BUSINESSES SHOWCASE */}
-      <section id="featured_businesses_section" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
-            <span className="w-1 h-4 bg-blue-500 rounded-full" />
-            Featured Enterprises & Manufacturers
-          </h2>
-          <button onClick={() => onNavigate('/business-center')} className="text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-wider flex items-center gap-1">
-            <span>Business Portal</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      {firestoreBusinesses.length > 0 && (
+        <section id="featured_businesses_section" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+              <span className="w-1 h-4 bg-blue-500 rounded-full" />
+              Featured Enterprises & Manufacturers
+            </h2>
+            <button onClick={() => onNavigate('/business-center')} className="text-[10px] font-black text-slate-400 hover:text-white uppercase tracking-wider flex items-center gap-1">
+              <span>Business Portal</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {firestoreBusinesses.slice(0, 3).map((biz, i) => (
-            <div 
-              key={biz.id || i}
-              onClick={() => onNavigate(`/business/${biz.id}`)}
-              className="bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/40 rounded-2xl p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between space-y-3 shadow-lg group"
-            >
-              <div className="flex items-start gap-3">
-                <img src={biz.logoUrl || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=100'} alt={biz.businessName} className="w-12 h-12 rounded-xl object-cover border border-slate-800 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1">
-                    <h3 className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
-                      {biz.businessName}
-                    </h3>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  </div>
-                  <span className="text-[10px] text-slate-400 truncate block">{biz.category}</span>
-                  <div className="flex items-center gap-1 text-[9px] text-slate-500 mt-1">
-                    <MapPin className="w-3 h-3 text-slate-600" />
-                    <span className="truncate">{biz.location || 'Global Hub'}</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {firestoreBusinesses.slice(0, 3).map((biz, i) => (
+              <div 
+                key={biz.id || i}
+                onClick={() => onNavigate(`/business/${biz.id}`)}
+                className="bg-slate-900/60 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/40 rounded-2xl p-4 transition-all duration-300 cursor-pointer flex flex-col justify-between space-y-3 shadow-lg group"
+              >
+                <div className="flex items-start gap-3">
+                  <img src={biz.logoUrl || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=100'} alt={biz.businessName} className="w-12 h-12 rounded-xl object-cover border border-slate-800 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <h3 className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors">
+                        {biz.businessName}
+                      </h3>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    </div>
+                    <span className="text-[10px] text-slate-400 truncate block">{biz.category}</span>
+                    <div className="flex items-center gap-1 text-[9px] text-slate-500 mt-1">
+                      <MapPin className="w-3 h-3 text-slate-600" />
+                      <span className="truncate">{biz.location || 'Global Hub'}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[10px]">
-                <div className="flex items-center gap-1 text-emerald-400 font-bold">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Trust Score: {biz.trustScore || 95}/100</span>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[10px]">
+                  <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Trust Score: {biz.trustScore || 95}/100</span>
+                  </div>
+                  <span className="text-blue-400 font-bold group-hover:underline">View Profile →</span>
                 </div>
-                <span className="text-blue-400 font-bold group-hover:underline">View Profile →</span>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 8. FLASH DEALS BANNER & CAROUSEL */}
       {bestDeals.length > 0 && (

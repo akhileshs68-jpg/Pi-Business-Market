@@ -256,9 +256,9 @@ export class EnterpriseCheckoutEngine {
     
     // Dynamic shipping quote based on orderItems and address/pickup method
     const quote = shippingService.calculateShippingQuote(orderItems, session.shippingAddress);
-    const shipping = session.shipping !== undefined && session.shipping !== 10 ? session.shipping : quote.shippingCharge;
-    const tax = session.tax || parseFloat((subtotal * 0.05).toFixed(2));
-    const grandTotal = parseFloat((subtotal - discount + shipping + tax).toFixed(2));
+    const shipping = session.shipping !== undefined ? session.shipping : quote.shippingCharge;
+    const tax = session.tax !== undefined ? session.tax : parseFloat((subtotal * 0.05).toFixed(3));
+    const grandTotal = session.grandTotal !== undefined ? session.grandTotal : parseFloat((subtotal - discount + shipping + tax).toFixed(4));
 
     // Calculate BMP reward estimate (10 BMP per 1 Pi spent)
     const bmpRewardsEstimate = Math.floor(grandTotal * 10);

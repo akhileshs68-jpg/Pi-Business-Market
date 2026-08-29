@@ -40,6 +40,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const effectiveProductId = product.productId || (product as any).id || (product as any).docId || '';
   
   // Gallery
   const [imgIdx, setImgIdx] = useState(0);
@@ -99,19 +100,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   useEffect(() => {
     const wishlist = WishlistService.getLocalWishlist();
     const compare = WishlistService.getLocalCompare();
-    setIsWishlisted(wishlist.includes(product.productId));
-    setIsComparing(compare.includes(product.productId));
-  }, [product.productId]);
+    setIsWishlisted(wishlist.includes(effectiveProductId));
+    setIsComparing(compare.includes(effectiveProductId));
+  }, [effectiveProductId]);
 
   const handleToggleWishlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const wishStatus = await WishlistService.toggleWishlist(product.productId, user?.uid);
+    const wishStatus = await WishlistService.toggleWishlist(effectiveProductId, user?.uid);
     setIsWishlisted(wishStatus);
   };
 
   const handleToggleCompare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const { inCompare } = WishlistService.toggleCompare(product.productId);
+    const { inCompare } = WishlistService.toggleCompare(effectiveProductId);
     setIsComparing(inCompare);
   };
   
@@ -135,7 +136,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       await cartService.addToCart(cart.cartId, {
         cartId: cart.cartId,
-        productId: product.productId,
+        productId: effectiveProductId,
         variantId: activeVariant?.variantId,
         name: `${product.productName}${variantName}`,
         imageUrl: gallery[0],
@@ -162,7 +163,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/product/${product.productId}`;
+    const url = `${window.location.origin}/product/${effectiveProductId}`;
     let text = `Check out ${product.productName}`;
     if (activeVariant) {
       text += ` (${Object.values(activeVariant.attributes).join(', ')})`;
@@ -268,16 +269,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <>
       <div 
-        id={`product-card-${product.productId}`}
+        id={`product-card-${effectiveProductId}`}
         role="button"
         tabIndex={0}
         aria-label={`${product.productName}, price ${displayPrice} Pi`}
-        onClick={() => navigate(`/product/${product.productId}`)}
+        onClick={() => navigate(`/product/${effectiveProductId}`)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             if ((e.target as HTMLElement).tagName !== 'BUTTON' && (e.target as HTMLElement).tagName !== 'INPUT') {
               e.preventDefault();
-              navigate(`/product/${product.productId}`);
+              navigate(`/product/${effectiveProductId}`);
             }
           }
         }}
@@ -288,7 +289,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <input 
               type="checkbox" 
               checked={isSelected}
-              onChange={e => onSelect(product.productId, e.target.checked)}
+              onChange={e => onSelect(effectiveProductId, e.target.checked)}
               aria-label={`Select product ${product.productName}`}
               className="w-5 h-5 rounded border-slate-700 bg-slate-900 text-violet-600 focus:ring-violet-500/50 cursor-pointer shadow-md"
             />

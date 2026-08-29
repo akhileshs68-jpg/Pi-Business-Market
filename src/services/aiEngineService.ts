@@ -96,19 +96,26 @@ export const aiEngineService = {
 
       // Fetch user's recent interactions (history, wishlists) to inform AI
       // For now, we simulate by pulling featured or random top-rated items
-      const q = query(collection(db, 'products'), where('status', '==', 'published'), limit(limitCount));
-      const snap = await getDocs(q);
+      const snap = await getDocs(query(collection(db, 'products'), limit(limitCount * 2)));
       
       snap.forEach(doc => {
         const data = doc.data();
-        recommendations.push({
-          type: 'product',
-          id: doc.id,
-          title: data.name || data.title || '',
-          reason: 'Based on your recent browsing history',
-          score: 0.9 + (Math.random() * 0.09), // AI confidence score
-          metadata: data
-        });
+        const prodStatus = (data.status || 'published').toLowerCase();
+        if (prodStatus !== 'archived' && prodStatus !== 'deleted' && prodStatus !== 'draft') {
+          recommendations.push({
+            type: 'product',
+            id: doc.id,
+            title: data.productName || data.name || data.title || '',
+            reason: 'Based on your recent browsing history',
+            score: 0.9 + (Math.random() * 0.09), // AI confidence score
+            metadata: {
+              ...data,
+              id: doc.id,
+              docId: doc.id,
+              productId: data.productId || doc.id
+            }
+          });
+        }
       });
 
       // Track AI inference
